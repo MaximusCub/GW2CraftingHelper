@@ -532,7 +532,10 @@ namespace TaimisToolbench.Tests.Services
             // coin part alone, with no exchange rate available), now
             // visible in a new pairing. "Fixing" it would mean inventing a
             // currency comparison the repo invariant (avoid inventing
-            // currency exchange rates) forbids.
+            // currency exchange rates) forbids. Scoped to CURRENCY: the
+            // same shape with an unvalued BARTER ITEM line is not a
+            // limitation and no longer ranks this way - see
+            // PlanSolverUnpricedBarterOfferTests.
             var tree = Craftable(1, 1,
                 Option(10, 1, 1, Leaf(2, 5), Leaf(23, 1, "Currency"))); // 5*100=500 real
             var prices = new Dictionary<int, ItemPrice>

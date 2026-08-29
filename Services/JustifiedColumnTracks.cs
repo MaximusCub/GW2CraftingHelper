@@ -85,10 +85,12 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// X at which content centres in a column's own reserved BAND rather
-        /// than in an equal track: the same law, for the columns whose band -
-        /// not an equal share of the row - is what a header has to sit over.
+        /// than in an equal track: the same law, for a column whose band -
+        /// not an equal share of the row - is the thing to centre in.
         /// Content wider than its band pins left, exactly as it does in a
-        /// track.
+        /// track. NOT the rule for a header, which centres over the cells'
+        /// own extent instead - see <see cref="CenteredOverContent"/>; use
+        /// this only where the band IS the content.
         /// </summary>
         public static int CenteredInBand(int bandX, int bandWidth, int contentWidth)
         {
@@ -98,6 +100,131 @@ namespace TaimisToolbench.Services
             }
 
             return bandX + (bandWidth - contentWidth) / 2;
+        }
+
+        /// <summary>
+        /// Clearance kept between two headers that back off from the same
+        /// boundary line. Each gives up half of it, so the pair can close
+        /// to this and no further.
+        /// </summary>
+        public const int HeaderGutter = 6;
+
+        /// <summary>
+        /// The x range a header may occupy: bounded by the COLUMNS EITHER
+        /// SIDE of it, never by its own reserved band. A band is sized to
+        /// hold one column's widest cell and a header is routinely wider
+        /// than that, so clamping a header into its band right-aligns the
+        /// very header the centring was meant to move - the defect
+        /// <see cref="CenteredOverContent"/> exists to remove. Columns
+        /// hundreds of pixels apart have nothing to collide with and no
+        /// clamp fires at all.
+        /// <para>
+        /// Build the bounds with <see cref="RoomLeftBound"/> /
+        /// <see cref="RoomRightBound"/> where a neighbouring column exists
+        /// and from the table's own edge where none does. Derivation:
+        /// docs/ARCHITECTURE.md section S1.2.
+        /// </para>
+        /// </summary>
+        public readonly struct HeaderRoom
+        {
+            public readonly int Left;
+            public readonly int Right;
+
+            private HeaderRoom(int left, int right)
+            {
+                Left = left;
+                Right = right;
+            }
+
+            /// <summary>
+            /// Room between two bounds. A right bound left of the left one
+            /// - a table too narrow to hold the column at all - collapses
+            /// onto the left bound rather than inverting.
+            /// </summary>
+            public static HeaderRoom Between(int left, int right)
+            {
+                return new HeaderRoom(left, right < left ? left : right);
+            }
+
+            /// <summary>Width of the room; never negative.</summary>
+            public int Width
+            {
+                get { return Right - Left; }
+            }
+        }
+
+        /// <summary>
+        /// Leftmost x a header may reach: the middle of the gap between the
+        /// column on its left and its own cells, plus half a
+        /// <see cref="HeaderGutter"/>, so the two headers meeting over that
+        /// gap keep a whole one between them.
+        /// <paramref name="leftNeighborInkRight"/> is where that column
+        /// stops drawing - its widest cell, or the ellipsis budget a
+        /// flexing name column may fill. Never past
+        /// <paramref name="ownInkLeft"/>: a column's own cells are always
+        /// inside its header's room, however little gap precedes them.
+        /// </summary>
+        public static int RoomLeftBound(int leftNeighborInkRight, int ownInkLeft)
+        {
+            int bound = leftNeighborInkRight
+                + ((ownInkLeft - leftNeighborInkRight) / 2) + (HeaderGutter / 2);
+            return bound > ownInkLeft ? ownInkLeft : bound;
+        }
+
+        /// <summary>
+        /// <see cref="RoomLeftBound"/> mirrored: the rightmost x a header's
+        /// right edge may reach before the column on its right, and never
+        /// short of <paramref name="ownInkRight"/>.
+        /// </summary>
+        public static int RoomRightBound(int ownInkRight, int rightNeighborInkLeft)
+        {
+            int bound = ownInkRight
+                + ((rightNeighborInkLeft - ownInkRight) / 2) - (HeaderGutter / 2);
+            return bound < ownInkRight ? ownInkRight : bound;
+        }
+
+        /// <summary>
+        /// X at which a header centres over the extent its column's CELLS
+        /// actually cover - <paramref name="contentX"/> to contentX +
+        /// <paramref name="contentWidth"/> - rather than over the reserved
+        /// band those cells sit in. THE header law of this module: a band
+        /// is invisible to a reader, so centring in one drifts the word off
+        /// the ink it names by half of however much the band exceeds it,
+        /// and a band routinely does.
+        /// <para>
+        /// Cells keep their own justification, so the CALLER derives
+        /// contentX from it: the column's left rule for a left-ruled
+        /// column, rightEdge - contentWidth for a right-aligned one. The
+        /// header is free to overhang its own band symmetrically; only
+        /// <paramref name="room"/> stops it, and a header wider than the
+        /// room pins to the room's left bound and overhangs rightward only
+        /// - the one direction <see cref="CenteredX"/> already spills in.
+        /// Derivation: docs/ARCHITECTURE.md section S1.2.
+        /// </para>
+        /// </summary>
+        public static int CenteredOverContent(
+            int contentX, int contentWidth, int headerWidth, HeaderRoom room)
+        {
+            int x = contentX + ((contentWidth - headerWidth) / 2);
+            int rightmost = room.Right - headerWidth;
+            if (x > rightmost)
+            {
+                x = rightmost;
+            }
+
+            return x < room.Left ? room.Left : x;
+        }
+
+        /// <summary>
+        /// <see cref="CenteredOverContent"/> for a column whose cells
+        /// right-align on <paramref name="contentRightEdge"/> - the shape
+        /// every numeric and coin column in the module has.
+        /// </summary>
+        public static int CenteredOverContentRightAligned(
+            int contentRightEdge, int contentWidth, int headerWidth, HeaderRoom room)
+        {
+            return CenteredOverContent(
+                contentRightEdge - contentWidth, contentWidth, headerWidth, room);
         }
 
         /// <summary>

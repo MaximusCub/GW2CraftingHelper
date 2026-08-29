@@ -677,6 +677,106 @@ fallback cannot break more finely than its existing coin-tie rule. Full
 records: `dev/archive/known-issues/2026-08-15-craft-vendor-comparability-parity-fix.md`,
 `...-adversarial.md`, `...-external.md`.
 
+**Follow-up (FIXED): a barter line is not worth zero.** That fix's fourth
+finding accepted, as a documented limitation, that the terminal fallback
+ranked a vendor offer's coin part against a craft route's real cost. Field
+use showed why that is not survivable once the unvalued line is an *item*
+rather than a wallet currency: Obsidian Heavy Breastplate (101521) was
+recommended as a 2g95s10c vendor purchase, that being the price of the
+10 Globs of Ectoplasm on Lyhr's offer, which also charges four
+account-bound Gifts that folded into no coin at all. The coin part is a
+partial accounting; the craft cost it was beating is a complete one. An
+offer carrying a barter line can no longer win that comparison, and the
+mirror-image case - an offer silently dropped from both tiers when its
+comparison value overflowed - now demotes to fallback instead. The
+currency-only ranking is unchanged.
+
+Measured against the shipped corpus (14,966 seeded recipes, the real
+`ref/vendor_offers.json`, Globs of Ectoplasm priced at 2,916c and nothing
+else): the plan for 101521 went from a single `BuyFromVendor` step at
+29,160c - the whole tree collapsed away - to `Craft` at 1,874,480c with
+630 Globs of Ectoplasm bought and every Gift named with a quantity. The
+vendor route stays selectable, and taking it reports 29,160c of coin
+*plus* four itemised lines carrying no gold value, with
+`VendorHasBarterItemCost` set so no consumer may read the coin figure as
+the whole cost.
+
+Two residuals. First, the ranking one above, unchanged. Second, and
+larger: a committed vendor decision's coin cost still omits its barter
+lines, so a plan total containing one is a LOWER BOUND. That is not for
+want of data - 100509 Arcanum of Astral Heartbeat has no recipe but does
+have an offer (1 Lesser Vision Crystal, item 49523, itself craftable) -
+but because the tree expands recipe ingredients into nodes and vendor
+cost lines into leaves, so a cost line is never itself solved. Closing it
+means expanding cost lines into priced subtrees, against a cost-line
+graph that is measurably cyclic (86094 <-> 91232 among 12 cycles found
+before the search was cut short). Coverage:
+`tests/TaimisToolbench.Tests/Services/PlanSolverUnpricedBarterOfferTests.cs`.
+
+**Follow-up (FIXED): the second residual, closed by construction.** Cost
+lines are now solved. A vendor offer's `Item` cost line with no Trading
+Post price gets a per-unit acquisition cost from the same
+`PlanSolver.Evaluate` a recipe ingredient gets, run over a quantity-1
+subtree, and folds into the offer's real coin cost by the same
+`unit x count` multiplication a TP-priced line already used. Only a line
+nothing can price at all stays a barter line.
+
+The guard above is no longer what produces the right answer here, and
+that was measured rather than assumed: with BOTH the barter guard and the
+domination check disabled, 101521 still commits Craft, because the offer's
+own coin figure now exceeds the craft it mirrors. Both routes are still
+fallback-tier for this item (legendary crafting bottoms out in Spirit
+Shards and Karma, which carry no valuation by default), so the terminal
+fallback branch is still REACHED - the guards simply no longer decide it.
+They remain the answer for the cases pricing genuinely cannot reach. The cost-line graph's cycles are
+cut by a visiting set and every id is memoized on first ask, resolved or
+not, which makes the work linear in the number of cost items. Design,
+bounds and the (i)-not-(ii) display decision: `docs/ARCHITECTURE.md`
+section 7.4. A second, price-free check (`Services/VendorOfferDomination.cs`)
+reaches the same verdict from the offer's shape alone. Coverage:
+`tests/TaimisToolbench.Tests/Services/VendorCostLineExpansionRealCorpusTests.cs`
+and `.../VendorOfferDominationTests.cs`.
+
+Measured on the same corpus and the same single price the report above
+used (Globs of Ectoplasm at 2,916c): the forced vendor route for 101521
+went from 29,160c - the ectoplasm alone - to the craft route's cost plus
+exactly 29,160c, which is what the wiki says Lyhr's offer is.
+
+**Gates this model still does not have (REPORTED, not implemented).** The
+wiki names three conditions that decide whether a route is available at
+all, and the module expresses none of them:
+
+- **"Recipe: Legendary Obsidian Armor"**, the item that unlocks Lyhr's
+  exchange. The module has vocabulary for a recipe gate (`RequiredRecipe`,
+  `learnedRecipeIds` from `/v2/account/recipes`) but it is CRAFT-side
+  only: an offer has no notion of a required item, and `VendorOffer` has
+  no field for one. Without it the plan can recommend a vendor route the
+  player cannot use until they buy a 60-Provisioner-Token recipe sheet
+  first. This is the one worth doing: it needs a `VendorOffer` field, a
+  `tools/VendorOfferUpdater` scrape for it, and a check beside the
+  existing discipline gate.
+- **The "Astral Heartbeat" achievement** gating 100509 Arcanum of Astral
+  Heartbeat, the one cost item in this chain with no recipe at all. The
+  module reads achievement *bits* (`AchievementBitDedupPrePass`,
+  `RawIngredient.AchievementId/AchievementBit`) but only to dedup
+  one-time reward ingredients; nothing consults account achievement
+  completion, and `/v2/account/achievements` is not fetched. The
+  achievement is account-wide and one-time, so the failure mode is
+  narrow: a plan costs the Arcanum honestly and the player finds it
+  unpurchasable until they finish the achievement.
+- **Station locality** - Obsidian armour is craftable only at the
+  Wizard's Tower Armorsmithing stations, not at every Armorsmith. The
+  module models discipline and rating but has no concept of WHERE a
+  craft happens, and neither `RawRecipe` nor the API's recipe schema
+  carries one; it would be wiki-scraped data, like the vendor corpus.
+  Purely informational in effect - the cost is right, the trip is longer
+  than the plan implies.
+
+None of the three changes a COST, which is why none was implemented here:
+each turns a route from available into unavailable, and getting that
+wrong hides a route the player can actually take - the failure this whole
+item is about, in the other direction.
+
 ### 45. W3B: generation progress + rich logging
 
 The plan-strip status board and the phase-by-phase progress reporting a

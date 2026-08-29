@@ -163,6 +163,15 @@ namespace TaimisToolbench.Views.Rendering
             /// </summary>
             internal readonly List<Panel> Pills = new List<Panel>();
 
+            /// <summary>
+            /// Each pill's x measured from the pill column's own left edge,
+            /// in step with <see cref="Pills"/>. The resize pass replays
+            /// these rather than re-flowing the run, so the IGNORE toggle's
+            /// reserved slot (Services/TreePillRunLayout) stays anchored at
+            /// every window width.
+            /// </summary>
+            internal readonly List<int> PillOffsets = new List<int>();
+
             internal CoinCurrencyRenderer.ValueCellHandle CostCell;
             internal bool RowDrawsCurrency;
 
@@ -222,6 +231,35 @@ namespace TaimisToolbench.Views.Rendering
         private TreeCostColumnMath.CostColumnWidths _costColumnWidths =
             TreeCostColumnMath.CostColumnWidths.Empty;
 
+        // The widest sub-columns any render of THIS plan has already
+        // reserved. Unlike _costColumnWidths it survives the per-pass
+        // reset, and only a fresh Generate clears it, so an in-session
+        // ignore cannot narrow the cost column and slide every row's pills
+        // sideways under the cursor - see Services/TreeCostColumnFloor.
+        private TreeCostColumnMath.CostColumnWidths _planCostColumnFloor =
+            TreeCostColumnMath.CostColumnWidths.Empty;
+
+        // This render's Recipe Tree section header - the element
+        // CollapseAll re-anchors the viewport to.
+        private Panel _treeHeaderPanel;
+
+        // The column-header row's own relayout closure, held so the
+        // "Source" header can be re-placed the moment a newly built row
+        // widens the pill ink under it - see NoteSourceHeaderInk. Withdrawn
+        // by the per-pass reset with the controls it moves.
+        private Action<int> _treeHeaderRelayout;
+
+        // Widest pill run any row of THIS plan has drawn, measured from the
+        // pill column's own left edge, and the thing the "Source" header
+        // centres over (Services/TreePillRunLayout.HeaderX). Rows are built
+        // lazily, so this is only ever known for the rows built so far;
+        // it is therefore a one-way high-water mark cleared by a fresh
+        // Generate, exactly as the cost column's reserve is
+        // (Services/TreeCostColumnFloor) - an expand may widen it, a
+        // collapse or a narrower re-solve may not move it back and slide
+        // the header out from under the reader's eye.
+        private int _sourceHeaderInkWidth;
+
         /// <summary>
         /// Per-render-pass reset, called from
         /// CraftingPlanView.RenderPlan before it disposes/rebuilds the
@@ -242,6 +280,8 @@ namespace TaimisToolbench.Views.Rendering
             _scannedNodeCount = 0;
             _treeRoots = null;
             _treeFlow = null;
+            _treeHeaderPanel = null;
+            _treeHeaderRelayout = null;
             _costColumnWidths = TreeCostColumnMath.CostColumnWidths.Empty;
 
             // Withdrawn with the render pass that published them: the tree
@@ -265,6 +305,13 @@ namespace TaimisToolbench.Views.Rendering
             _nodeOverrides.Clear();
             _ignoredItemIds.Clear();
             _nodeExpansion.Clear();
+
+            // The cost column's no-narrowing floor is a property of the
+            // plan on screen; a new one re-derives it from its own scan.
+            // The pill column's ink high-water mark is the same kind of
+            // fact and is cleared with it.
+            _planCostColumnFloor = TreeCostColumnMath.CostColumnWidths.Empty;
+            _sourceHeaderInkWidth = 0;
             _lastResult = result;
         }
 
@@ -343,7 +390,8 @@ namespace TaimisToolbench.Views.Rendering
             // walk. It reads nothing the header
             // produces, so the move is ordering only.
             var scan = ScanTreeColumns(_treeRoots);
-            _costColumnWidths = scan.CostWidths;
+            _costColumnWidths = TreeCostColumnFloor.Widen(_planCostColumnFloor, scan.CostWidths);
+            _planCostColumnFloor = _costColumnWidths;
             _scannedNodeCount = scan.NodeCount;
 
             // Parenthesised count, like every other countable section
@@ -360,12 +408,15 @@ namespace TaimisToolbench.Views.Rendering
                 title, PlanSectionType.RecipeTree, panelWidth, true, null);
             var treeFlow = header.ContentFlow;
             _treeFlow = treeFlow;
+            _treeHeaderPanel = header.HeaderPanel;
 
             // Column headers over the two columns a tree row's right-hand
             // side actually has. Both track the panel width (the pill+cost
             // block's x is width-derived), hence middleXForWidth/
             // rightXForWidth rather than build-time x's, and both centre
-            // over what they name (JustifiedColumnTracks.CenteredInBand).
+            // over the INK their cells cover rather than over the bands
+            // reserved for them, bounded only by each other and by the
+            // table's edge (JustifiedColumnTracks.HeaderRoom).
             // Counted by PlanContentHeightMath.MultiRootTreeFlowHeight,
             // which every treeFlow height assignment goes through, and
             // guarded on the same "is there a tree at all" condition that
@@ -382,21 +433,38 @@ namespace TaimisToolbench.Views.Rendering
                 var headerCostWidths = _costColumnWidths;
                 int sourceHeaderWidth = MeasureHeaderLabel(SourceHeaderText);
                 int costHeaderWidth = MeasureHeaderLabel(CostHeaderText);
-                ColumnHeaderRowRenderer.CreateColumnHeaderRow(
+
+                // _sourceHeaderInkWidth is read LIVE, unlike everything
+                // else this closure holds: no row exists yet, so the ink
+                // the header centres over is not knowable until the loop
+                // below has run and NoteSourceHeaderInk has re-placed the
+                // header behind it.
+                Func<int, PlanRelayoutMath.TreeColumnEdges> headerEdgesFor =
+                    w => PlanRelayoutMath.ComputeTreeColumnEdges(
+                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin);
+
+                _treeHeaderRelayout = ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     treeFlow, panelWidth, "Item", TreeRowShapePlanner.NameColumnOffset, CostHeaderText, _sink,
                     middleLabel: SourceHeaderText,
-                    middleXForWidth: w => JustifiedColumnTracks.CenteredInBand(
-                        PlanRelayoutMath.ComputeTreeColumnEdges(
-                            w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).PillColX,
-                        TreePillColumnWidth,
-                        sourceHeaderWidth),
-                    rightXForWidth: w => PlanRelayoutMath.ComputeTreeColumnEdges(
-                        w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).CostRightEdge,
-                    rightLabelXForWidth: w => TreeCostColumnMath.HeaderX(
-                        PlanRelayoutMath.ComputeTreeColumnEdges(
-                            w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin).CostRightEdge,
-                        headerCostWidths,
-                        costHeaderWidth));
+                    middleXForWidth: w =>
+                    {
+                        var edges = headerEdgesFor(w);
+                        PlanRelayoutMath.ComputeTreeHeaderRooms(
+                            edges, _sourceHeaderInkWidth, headerCostWidths.WidestRowRunWidth,
+                            out var sourceRoom, out _);
+                        return TreePillRunLayout.HeaderX(
+                            edges.PillColX, _sourceHeaderInkWidth, sourceHeaderWidth, sourceRoom);
+                    },
+                    rightXForWidth: w => headerEdgesFor(w).CostRightEdge,
+                    rightLabelXForWidth: w =>
+                    {
+                        var edges = headerEdgesFor(w);
+                        PlanRelayoutMath.ComputeTreeHeaderRooms(
+                            edges, _sourceHeaderInkWidth, headerCostWidths.WidestRowRunWidth,
+                            out _, out var costRoom);
+                        return TreeCostColumnMath.HeaderX(
+                            edges.CostRightEdge, headerCostWidths, costHeaderWidth, costRoom);
+                    });
             }
 
 #if DEBUG
@@ -591,19 +659,80 @@ namespace TaimisToolbench.Views.Rendering
 
         private void CollapseAll()
         {
-            _host.PreserveScrollAcross(() =>
+            try
             {
-                foreach (var s in _treeNodeStates)
+                _host.PreserveScrollAcross(() =>
                 {
-                    s.IsExpanded = false;
-                    _nodeExpansion[s.Node.NodeId] = false;
-                    s.ChildContainer.Visible = false;
-                    s.ArrowLabel.Text = ">";
-                }
+                    foreach (var s in _treeNodeStates)
+                    {
+                        s.IsExpanded = false;
+                        _nodeExpansion[s.Node.NodeId] = false;
+                        s.ChildContainer.Visible = false;
+                        s.ArrowLabel.Text = ">";
+                    }
 
-                RefreshTreeContainerHeights();
-            });
+                    RefreshTreeContainerHeights();
+                    RepointHiddenRowAnchors();
+                });
+            }
+            finally
+            {
+                // Every row's own anchor goes back once the restore has
+                // run: PreserveScrollAcross resolves synchronously, and
+                // the verify pass it may start re-applies the offset it
+                // resolved, never the anchor. In a finally so a throw
+                // mid-collapse cannot leave the registry pointing rows at
+                // the header for the rest of the session.
+                RepointRowAnchorsToRows();
+            }
+
             HoverChainResync.AfterRebuild();
+        }
+
+        /// <summary>
+        /// Hands the scroll anchors of the rows a Collapse All just hid to
+        /// the tree's section header, for the length of the restore.
+        /// <para>
+        /// The view captures its anchor BEFORE the collapse, so it holds a
+        /// tree row whenever the user was reading the tree; that row is
+        /// then invisible, the anchor resolves to nothing, and the restore
+        /// falls back to the raw offset - which now points past the
+        /// collapsed tree, into the Shopping List. Pointing those keys at
+        /// the header gives the restore an element that is still on screen
+        /// and puts the header on the line the row held: the top of the
+        /// viewport, since the click came from the toolbar, off the
+        /// scrolled panel.
+        /// </para>
+        /// </summary>
+        private void RepointHiddenRowAnchors()
+        {
+            if (_registerRowScrollAnchor == null || _treeHeaderPanel == null)
+            {
+                return;
+            }
+
+            foreach (var entry in _treeRowsByNodeId)
+            {
+                // Depth 0 survives a Collapse All, and its own row is a
+                // better anchor than the header above it.
+                if (entry.Value.Depth > 0)
+                {
+                    _registerRowScrollAnchor(entry.Key, _treeHeaderPanel);
+                }
+            }
+        }
+
+        private void RepointRowAnchorsToRows()
+        {
+            if (_registerRowScrollAnchor == null)
+            {
+                return;
+            }
+
+            foreach (var entry in _treeRowsByNodeId)
+            {
+                _registerRowScrollAnchor(entry.Key, entry.Value.RowPanel);
+            }
         }
 
         private void ApplyPreset(AcquisitionSource source)
@@ -698,10 +827,6 @@ namespace TaimisToolbench.Views.Rendering
         private const int PillGap = 6;
         private const int PillPadding = 12;
         private const int TightPillPadding = 6;
-
-        // The rule's geometry lives in TreeRowShapePlanner; only its color
-        // is a palette decision, so only its color stays here.
-        private static readonly Color TreeDimmedRuleColor = Color.White * 0.18f;
 
         // What a dead click on a dimmed pill means, and the one action
         // that makes it live again. Every dimmed row is somewhere under a
@@ -846,20 +971,6 @@ namespace TaimisToolbench.Views.Rendering
             {
                 rowPanel.BackgroundColor = Color.Transparent;
             };
-
-            // Left-indent rule (see TreeDimmedRuleColor). Drawn before
-            // every other child so nothing else in the row paints under it,
-            // and never on a live row.
-            if (dimmed)
-            {
-                new Panel()
-                {
-                    Size = new Point(TreeRowShapePlanner.DimmedRuleWidth, TreeRowHeight),
-                    Location = new Point(shape.DimmedRuleX, 0),
-                    BackgroundColor = TreeDimmedRuleColor,
-                    Parent = rowPanel,
-                };
-            }
 
             // Caret column: fixed width even for leaf rows (no children ->
             // no glyph, but the icon column still starts at the same x as
@@ -1019,8 +1130,7 @@ namespace TaimisToolbench.Views.Rendering
             // Decision pill column: one pill per feasible source (direct
             // selection - click sets the override and re-solves), or a
             // single locked/HAVE/CURRENCY pill when there is no choice.
-            var pillPanels = handle.Pills;
-            RenderDecisionPills(rowPanel, node, pillColX, TreeRowPillY, dimmed, pillPanels);
+            RenderDecisionPills(handle, node, pillColX, TreeRowPillY, dimmed);
 
             // Cost column: four right-aligned sub-columns (gold, silver,
             // copper, then any non-coin currency), each sized by this
@@ -1052,7 +1162,7 @@ namespace TaimisToolbench.Views.Rendering
             RenderCostCell(handle, node, edges.CostRightEdge, dimmed);
 
             FlowPanel childFlow = RenderChildContainer(
-                node, parent, panelWidth, depth, shape, rowPanel, arrowLabel, pillPanels, handle);
+                node, parent, panelWidth, depth, shape, rowPanel, arrowLabel, handle);
 
             RegisterRowResizeHandlers(handle, rowPanel, childFlow, nameFont);
         }
@@ -1132,7 +1242,7 @@ namespace TaimisToolbench.Views.Rendering
         /// </summary>
         private FlowPanel RenderChildContainer(
             CraftingTreeNode node, FlowPanel parent, int panelWidth, int depth, TreeRowShape shape,
-            Panel rowPanel, Label arrowLabel, List<Panel> pillPanels, TreeRowHandle handle)
+            Panel rowPanel, Label arrowLabel, TreeRowHandle handle)
         {
             bool hasChildren = shape.HasChildren;
             bool isExpanded = shape.IsExpanded;
@@ -1196,7 +1306,7 @@ namespace TaimisToolbench.Views.Rendering
                 {
                     // Pills have their own click actions; do not also treat
                     // a pill click as an expand/collapse toggle.
-                    if (AnyPillHovered(pillPanels))
+                    if (AnyPillHovered(handle.Pills))
                     {
                         return;
                     }
@@ -1236,7 +1346,7 @@ namespace TaimisToolbench.Views.Rendering
                 // Same pill guard as toggleHandler, for the same reason: a
                 // press on a pill reaches this row panel too, and the row
                 // must not answer a click it is about to ignore.
-                PressFeedback.Wire(rowPanel, () => AnyPillHovered(pillPanels));
+                PressFeedback.Wire(rowPanel, () => AnyPillHovered(handle.Pills));
                 rowPanel.Click += toggleHandler;
             }
 
@@ -1262,14 +1372,12 @@ namespace TaimisToolbench.Views.Rendering
                 rowPanel.Size = new Point(w, TreeRowHeight);
                 var e = RowEdges(handle, w);
 
-                if (handle.Pills.Count > 0)
+                int placed = handle.Pills.Count < handle.PillOffsets.Count
+                    ? handle.Pills.Count
+                    : handle.PillOffsets.Count;
+                for (int i = 0; i < placed; i++)
                 {
-                    int x = e.PillColX;
-                    foreach (var pill in handle.Pills)
-                    {
-                        pill.Location = new Point(x, TreeRowPillY);
-                        x += pill.Width + PillGap;
-                    }
+                    handle.Pills[i].Location = new Point(e.PillColX + handle.PillOffsets[i], TreeRowPillY);
                 }
 
                 if (handle.CostCell != null)
@@ -1388,7 +1496,12 @@ namespace TaimisToolbench.Views.Rendering
                 return false;
             }
 
-            if (!CostWidthsEqual(scan.CostWidths, _costColumnWidths))
+            // Against the floored widths, not the raw scan: a re-solve
+            // that only REMOVES the tree's widest cost run keeps the
+            // reservation it already made, so that click no longer forces
+            // a full rebuild either.
+            if (!TreeCostColumnFloor.Equal(
+                TreeCostColumnFloor.Widen(_planCostColumnFloor, scan.CostWidths), _costColumnWidths))
             {
                 return false;
             }
@@ -1470,15 +1583,6 @@ namespace TaimisToolbench.Views.Rendering
             return true;
         }
 
-        private static bool CostWidthsEqual(
-            TreeCostColumnMath.CostColumnWidths a, TreeCostColumnMath.CostColumnWidths b)
-        {
-            return a.GoldTextWidth == b.GoldTextWidth
-                && a.SilverTextWidth == b.SilverTextWidth
-                && a.CopperTextWidth == b.CopperTextWidth
-                && a.CurrencyRunWidth == b.CurrencyRunWidth;
-        }
-
         /// <summary>
         /// Re-renders the parts of one row a re-solve can change - the qty
         /// prefix, the pill column, the cost cell and the tooltip - into
@@ -1522,8 +1626,8 @@ namespace TaimisToolbench.Views.Rendering
                 handle.NameLabel.Text = displayName;
             }
 
-            DisposePills(handle.Pills);
-            RenderDecisionPills(handle.RowPanel, newNode, edges.PillColX, TreeRowPillY, handle.Dimmed, handle.Pills);
+            DisposePills(handle);
+            RenderDecisionPills(handle, newNode, edges.PillColX, TreeRowPillY, handle.Dimmed);
 
             DisposeValueCell(handle.CostCell);
             RenderCostCell(handle, newNode, edges.CostRightEdge, handle.Dimmed);
@@ -1538,14 +1642,20 @@ namespace TaimisToolbench.Views.Rendering
             }
         }
 
-        private static void DisposePills(List<Panel> pills)
+        /// <summary>
+        /// Drops the row's pills and the offsets that placed them, which
+        /// are refilled together by the next RenderDecisionPills call and
+        /// must never be left describing controls that no longer exist.
+        /// </summary>
+        private static void DisposePills(TreeRowHandle handle)
         {
-            foreach (var pill in pills)
+            foreach (var pill in handle.Pills)
             {
                 pill.Dispose();
             }
 
-            pills.Clear();
+            handle.Pills.Clear();
+            handle.PillOffsets.Clear();
         }
 
         /// <summary>
@@ -1689,9 +1799,12 @@ namespace TaimisToolbench.Views.Rendering
         /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private void RenderDecisionPills(
-            Panel rowPanel, CraftingTreeNode node, int pillColX, int pillY, bool dimmed,
-            List<Panel> pillPanels)
+            TreeRowHandle handle, CraftingTreeNode node, int pillColX, int pillY, bool dimmed)
         {
+            var rowPanel = handle.RowPanel;
+            var pillPanels = handle.Pills;
+            var pillOffsets = handle.PillOffsets;
+
             // Plan-scope currency facts
             // for the new HAVE/TOTAL pill - see PlanViewModel.
             // CurrencyPlanTotals/OwnedCurrencyAmounts' own doc comments.
@@ -1699,26 +1812,72 @@ namespace TaimisToolbench.Views.Rendering
             var specs = DecisionPillPlanner.BuildPillSpecs(node, plan?.CurrencyPlanTotals, plan?.OwnedCurrencyAmounts);
             var font = UiFonts.Caption;
             pillPanels.Clear();
+            pillOffsets.Clear();
             int x = pillColX;
 
-            var pillWidths = new List<int>(specs.Count);
-            foreach (var spec in specs)
+            int maxRightEdge = pillColX + TreePillColumnWidth - 4;
+
+            // The Ignore toggle leaves the flowed run for a slot pinned to
+            // the column's right edge - only when it is last, which is
+            // where DecisionPillPlanner emits it; anywhere else it stays in
+            // the run rather than letting the pills after it be dropped.
+            int anchoredIndex = specs.Count > 0 && specs[specs.Count - 1].Kind == PillKind.Ignore
+                ? specs.Count - 1
+                : -1;
+            int anchoredWidth = anchoredIndex >= 0 ? ReservedIgnorePillWidth(font) : 0;
+            int leadingCount = anchoredIndex >= 0 ? anchoredIndex : specs.Count;
+
+            var pillWidths = new List<int>(leadingCount);
+            for (int specIndex = 0; specIndex < leadingCount; specIndex++)
             {
-                pillWidths.Add((int)System.Math.Ceiling(font.MeasureString(spec.Text).Width) + PillPadding);
+                pillWidths.Add(
+                    (int)System.Math.Ceiling(font.MeasureString(specs[specIndex].Text).Width) + PillPadding);
             }
 
-            int maxRightEdge = pillColX + TreePillColumnWidth - 4;
             var fit = PlanRelayoutMath.ComputePillFit(
-                pillWidths, PillPadding - TightPillPadding, PillGap, pillColX, maxRightEdge,
+                pillWidths, PillPadding - TightPillPadding, PillGap, pillColX,
+                TreePillRunLayout.LeadingLimitX(maxRightEdge, anchoredWidth, PillGap),
                 MeasureOverflowPillWidth);
 
             int chosenPadding = PillPadding - fit.WidthReduction;
 
+            // Where every pill goes, decided before any is built: the
+            // flowed leading run, then the anchored toggle. The overflow
+            // pill is rendered after the loop, from the x the run left.
+            var placements = new List<PillPlacement>(fit.VisibleCount + 1);
             for (int specIndex = 0; specIndex < fit.VisibleCount; specIndex++)
             {
-                var spec = specs[specIndex];
-                int pillWidth = PlanRelayoutMath.ReducedWidth(pillWidths[specIndex], fit.WidthReduction);
-                int textWidth = pillWidth - chosenPadding;
+                int width = PlanRelayoutMath.ReducedWidth(pillWidths[specIndex], fit.WidthReduction);
+                placements.Add(new PillPlacement(specIndex, x, width, width - chosenPadding));
+                x += width + PillGap;
+            }
+
+            if (anchoredIndex >= 0)
+            {
+                placements.Add(new PillPlacement(
+                    anchoredIndex,
+                    TreePillRunLayout.AnchoredSlotX(maxRightEdge, anchoredWidth),
+                    anchoredWidth,
+                    (int)System.Math.Ceiling(font.MeasureString(specs[anchoredIndex].Text).Width)));
+            }
+
+            // Right edge of this row's INK, which the "Source" header
+            // centres over. Taken off the resolved placements rather than
+            // off the column's reserve: the anchored IGNORE slot is
+            // already among them at the column's own right edge, so a row
+            // that has one reports the full column and a root row that
+            // does not reports just its badges.
+            int inkRightEdge = pillColX;
+
+            foreach (var placement in placements)
+            {
+                var spec = specs[placement.SpecIndex];
+                int pillWidth = placement.Width;
+                int textWidth = placement.TextWidth;
+                if (placement.X + pillWidth > inkRightEdge)
+                {
+                    inkRightEdge = placement.X + pillWidth;
+                }
 
                 PillColors.GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
                 // White, not borderColor: Selected/Available fills expose the
@@ -1744,7 +1903,7 @@ namespace TaimisToolbench.Views.Rendering
                     textColor *= PillColors.DimmedPillFactor;
                 }
 
-                var outer = CreatePillPanel(rowPanel, spec.Text, font, pillWidth, textWidth, x, pillY,
+                var outer = CreatePillPanel(rowPanel, spec.Text, font, pillWidth, textWidth, placement.X, pillY,
                     borderColor, fillColor, textColor, out Panel inner, out Label label);
 
                 // The dimmed-only difference between this and the two flags
@@ -1889,13 +2048,94 @@ namespace TaimisToolbench.Views.Rendering
                 }
 
                 pillPanels.Add(outer);
-                x += pillWidth + PillGap;
+                pillOffsets.Add(placement.X - pillColX);
             }
 
             if (fit.HiddenCount > 0)
             {
-                RenderOverflowPill(rowPanel, specs, fit, font, x, pillY, dimmed, pillPanels);
+                pillPanels.Add(
+                    RenderOverflowPill(rowPanel, specs, fit, font, x, pillY, dimmed));
+                pillOffsets.Add(x - pillColX);
+                if (x + fit.OverflowPillWidth > inkRightEdge)
+                {
+                    inkRightEdge = x + fit.OverflowPillWidth;
+                }
             }
+
+            NoteSourceHeaderInk(inkRightEdge - pillColX);
+        }
+
+        /// <summary>
+        /// Records a freshly built row's pill-run width and re-places the
+        /// "Source" header when it widens the plan's high-water mark (see
+        /// <see cref="_sourceHeaderInkWidth"/>). Called from the ONE place
+        /// every row's pills are laid out, so a lazy expand, an Expand All
+        /// and an in-place refresh all reach it without each remembering
+        /// to.
+        /// <para>
+        /// Bounded work: only a strict increase re-places anything, and
+        /// the widths are monotone, so a whole tree costs at most a
+        /// handful of header moves. The re-place is the header row's own
+        /// relayout closure, which is position-only by contract
+        /// (ISectionRelayoutSink.AddRelayout).
+        /// </para>
+        /// </summary>
+        private void NoteSourceHeaderInk(int inkRunWidth)
+        {
+            if (inkRunWidth <= _sourceHeaderInkWidth)
+            {
+                return;
+            }
+
+            _sourceHeaderInkWidth = inkRunWidth;
+
+            // A width of 0 is the "no content panel" answer
+            // (CraftingPlanView.GetCurrentPanelWidth); placing the header
+            // off that would strand it until the next resize, and the
+            // field above is already updated for whoever asks next.
+            int panelWidth = _host.PanelWidth;
+            if (panelWidth > 0)
+            {
+                _treeHeaderRelayout?.Invoke(panelWidth);
+            }
+        }
+
+        /// <summary>
+        /// One pill's resolved geometry: which spec it draws, where it
+        /// sits, and how wide its slot and its text are. Text width is
+        /// carried separately because the anchored IGNORE slot is wider
+        /// than the text currently in it (Services/TreePillRunLayout), so
+        /// the label cannot be centred from the slot's padding alone.
+        /// </summary>
+        private readonly struct PillPlacement
+        {
+            internal readonly int SpecIndex;
+            internal readonly int X;
+            internal readonly int Width;
+            internal readonly int TextWidth;
+
+            internal PillPlacement(int specIndex, int x, int width, int textWidth)
+            {
+                SpecIndex = specIndex;
+                X = x;
+                Width = width;
+                TextWidth = textWidth;
+            }
+        }
+
+        /// <summary>
+        /// The slot the IGNORE toggle is drawn into, wide enough for
+        /// either of its two texts so a click cannot resize or move it -
+        /// see <see cref="TreePillRunLayout"/>. Measured per row rather
+        /// than cached: two MeasureString calls on constant strings, on a
+        /// path that already measures every pill it draws.
+        /// </summary>
+        private static int ReservedIgnorePillWidth(BitmapFont font)
+        {
+            return TreePillRunLayout.ReservedSlotWidth(
+                (int)Math.Ceiling(font.MeasureString(DecisionPillPlanner.IgnorePillText).Width),
+                (int)Math.Ceiling(font.MeasureString(DecisionPillPlanner.IgnoredPillText).Width),
+                PillPadding);
         }
 
         /// <summary>
@@ -1911,9 +2151,9 @@ namespace TaimisToolbench.Views.Rendering
         /// Why it is not wired to a popup offering the hidden options:
         /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
-        private static void RenderOverflowPill(
+        private static Panel RenderOverflowPill(
             Panel rowPanel, IReadOnlyList<PillSpec> specs, PlanRelayoutMath.PillFitPlan fit,
-            BitmapFont font, int x, int pillY, bool dimmed, List<Panel> pillPanels)
+            BitmapFont font, int x, int pillY, bool dimmed)
         {
             string text = OverflowPillText(fit.HiddenCount);
             int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
@@ -1927,8 +2167,11 @@ namespace TaimisToolbench.Views.Rendering
                 textColor *= PillColors.DimmedPillFactor;
             }
 
+            // Bounded by the fit, not by specs.Count: the anchored IGNORE
+            // toggle is the last spec and was never part of the run this
+            // fit was computed over, so it is not one of the hidden ones.
             var hiddenTexts = new List<string>(fit.HiddenCount);
-            for (int i = fit.VisibleCount; i < specs.Count; i++)
+            for (int i = fit.VisibleCount; i < fit.VisibleCount + fit.HiddenCount; i++)
             {
                 hiddenTexts.Add(specs[i].Text);
             }
@@ -1943,7 +2186,7 @@ namespace TaimisToolbench.Views.Rendering
             TooltipFacility.ApplyPlain(inner, tooltipText);
             TooltipFacility.ApplyPlain(label, tooltipText);
 
-            pillPanels.Add(outer);
+            return outer;
         }
 
         private static string OverflowPillText(int hiddenCount)

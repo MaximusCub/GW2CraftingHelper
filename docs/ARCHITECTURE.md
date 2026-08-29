@@ -811,6 +811,27 @@ offers cost the same single non-coin line, kind included; ties across
 different lines keep the first-listed offer, because ranking across them
 has no exchange rate and their unit counts must never be compared.
 
+That coin part is a **partial** accounting of the offer, and how partial
+depends on which kind of line was left unvalued. An unvalued wallet
+currency has no coin equivalent by invariant - the module refuses to
+invent an exchange rate - and every competing route omits one the same
+way, so ranking on the coin part is the only rule available. An unvalued
+**barter** line is different: it is an item acquisition, exactly the thing
+this solver exists to cost, and its omission is missing data rather than a
+deliberate refusal. `PlanSolver.Evaluate`'s terminal fallback branch
+therefore refuses to let an offer carrying a barter line win its
+comparison against a craft route, whose real cost accounts for every
+priceable component in its subtree. The offer stays reachable -
+`CanBuyVendor`, the VENDOR pill and a manual override are all unaffected -
+it simply cannot win on a price that omits most of itself. See section 8's
+barter-offer rule and `docs/KNOWN-ISSUES.md` item 44.
+
+An offer whose comparable-tier comparison value **overflows** demotes to
+the fallback tier rather than being dropped from both: its coin part is
+still real, and discarding it reported "no vendor route" for a route that
+exists, purely because a user-supplied valuation was absurd. That is the
+same treatment the per-line valuation accumulation beside it already gave.
+
 A `DailyCap`/`WeeklyCap`/`SeasonalCap` never excludes an offer or affects
 its tier - gw2efficiency only ever surfaces a cap as a post-solve notice,
 never re-routing the tree - so both tiers carry the raw caps through for
@@ -867,6 +888,116 @@ must suppress component-leaf display, in
 
 **Full history:** KNOWN-ISSUES items 20.1, 20.2, 28, 33.
 
+### 7.4 Cost lines are solved, not displayed
+
+**What:** A vendor offer's `Item` cost line with no Trading Post price gets
+a per-unit acquisition cost from the same `PlanSolver.Evaluate` a recipe
+ingredient gets, run over a quantity-1 subtree, and folds into the offer's
+real coin cost by the same `unit x count` multiplication a TP-priced line
+already uses. `Services/VendorCostLineSubtrees.cs` holds the subtrees,
+`Models/CostLineUnitValue.cs` is one line's answer,
+`PlanSolver.ResolveCostLineUnitValue` is the recursion, and
+`CraftingPlanPipeline.ExpandVendorCostLinesAsync` builds the inputs.
+
+**Why:** the tree expanded recipe INGREDIENTS into solved nodes but vendor
+COST LINES into unpriced display leaves, so a cost line was never itself
+solved. The same components were therefore costed on the craft path and
+free on the vendor path - an asymmetry in the data model, not a pricing
+bug. Lyhr, in the Wizard's Tower, is a convenience vendor: his offers are
+the craft or Mystic Forge recipe plus a fee, confirmed on the wiki at
+three levels of the Obsidian armour chain, and 40 of his 132 offers charge
+exactly 10 Globs of Ectoplasm on top. The Obsidian Heavy Breastplate was
+recommended as a 2g95s10c purchase, that fee being the only part of the
+offer anything costed. gw2efficiency never meets this because it has no
+separate "vendor offer" concept at all - `recipe-calculation`'s
+`src/static/vendorItems.ts` is an empty object above the comment "we now
+manage vendor items via custom recipes" - so a merchant exchange is a
+recipe there and is priced by the one code path. Unifying the COSTING
+without unifying the display vocabulary is the same idea at this module's
+seams: a vendor purchase must not start reporting itself as a craft.
+
+**Displayed as a leaf, costed as a subtree.** A cost line's subtree never
+enters the plan tree. What the user sees is the cost-component leaf that
+already existed (KNOWN-ISSUES #47), now carrying the computed price where
+it used to render a blank cell. Full expansion in the UI was measured
+before being rejected: on item 101521 the cost-line graph closes at 77
+item ids and 4,215 nodes against an 842-node plan tree, so showing it
+would have multiplied a 340-node plan by roughly six and buried the plan
+in acquisition chains for components the player is buying precisely so
+they need not think about them.
+
+**A side table, not a field on `RecipeNode`.** That type is reachable from
+`Models/PersistedPlan.cs`, so hanging subtrees off it would bump the plan
+schema version and discard every saved plan on the version it shipped in.
+`PlanSolveContext` snapshots the resolved VALUES instead of the subtrees -
+a few dozen small rows rather than several thousand `RecipeNode`s, on a
+path that re-serializes the whole context on every override click. The
+persisted graph gained additions only, so `CurrentSchemaVersion` stayed at
+3; a plan saved before the change restores with no values and re-solves as
+the solver did before expansion existed.
+
+**Termination, and why the work is linear.** The cost-line graph is
+genuinely cyclic - 86094 and 91232 buy each other, among at least twelve
+cycles. Three independent bounds hold, any one of which suffices. A
+`Visiting` set of item ids refuses re-entry, which cuts a cycle rather than
+following it. Every id is written to the memo the first time it is asked
+for - a value, or Unresolved when the attempt was cut - so no id is
+evaluated twice and the total number of subtree evaluations is at most the
+subtree count, which is also what the budget is set to. A depth cap bounds
+a long acyclic chain the same way.
+
+A cut answers Unresolved rather than a partial figure, and that answer is
+memoized. Both halves matter. A partial figure looks like money and could
+win a comparison it should lose, whereas Unresolved leaves the line a
+barter line - the pre-expansion treatment, which section 8's barter-offer
+rule stops any route winning on. Memoizing it is what keeps a cycle from
+re-resolving its members combinatorially. The precision given up is real -
+an id cut once stays uncosted for the rest of that solve - and is given up
+in the safe direction.
+
+**The two prices stay two prices.** A subtree's decision-only remainder
+(its `ComparisonValue` above its `TotalCost`, which is what a valued wallet
+currency under the line produces) rides in `valuationCopper` with every
+other decision-only figure, so it can move a comparison and can never reach
+a coin total. A subtree that carries an unvalued cost of its own leaves the
+offer fallback-tier, exactly as an unvalued line always did: its coin part
+is now real, but it is still not the whole story.
+
+**A unit price, not a scaled solve.** The subtree is built at quantity 1
+and multiplied by the line's count and `unitsNeeded`, which linearizes away
+any batch-ceil non-linearity beneath the line. That is the same
+approximation the TP-priced path has always made - a cost line has always
+been `unit price x count` - and the change is only which sources may supply
+that unit price.
+
+**Superset domination**
+(`Services/VendorOfferDomination.cs`). An offer charging a craftable
+recipe's own ingredients plus a fee cannot be the cheaper route, and saying
+so needs no prices at all: 104 of the 59,414 shipped offers are that shape.
+Such an offer is barred from the comparable tier and cannot beat a craft
+route in the terminal fallback, but is never dropped - it stays reported,
+clickable, and still the answer when it is the only one. Every arm of the
+check fails closed, and it answers false whenever competency is unknown:
+"a recipe exists" is not "this account can use it", and only the second
+makes the vendor redundant. An offer charging EXACTLY the ingredients and
+nothing more is not dominated - it is a real alternative that skips the
+discipline at no extra cost. This is a second, independent line of defence
+rather than the fix: costing the cost lines already prices such an offer
+above the craft it mirrors, and the two agree without either depending on
+the other.
+
+**Measured** on item 101521 over the shipped corpus, warm, 20 solves each,
+with Globs of Ectoplasm at 2,916c as the only priced input (the same
+single input the original report was measured with): plan tree 842 nodes;
+77 cost-line subtrees totalling 4,215 nodes, built in 18ms; solve 2.1ms ->
+13.6ms; an override re-solve from the snapshotted values 2.4ms, which is
+the interactive path. The forced vendor route went from 29,160c - the
+ectoplasm alone - to the craft route's cost plus exactly 29,160c, which is
+what the wiki says the offer is.
+
+**Gates this model still does not have** are recorded in
+`docs/KNOWN-ISSUES.md` item 44.
+
 ---
 
 ## 8. Solver decision rules
@@ -916,7 +1047,16 @@ inventing a new one. The load-bearing rules:
   is paid partly in barter is flagged `VendorHasBarterItemCost` on both
   `PlanStep` and `CraftingTreeNode`: it is the twin of a non-empty
   `VendorCurrencyCosts`, and every consumer that reads a coin figure as
-  the whole cost must check both.
+  the whole cost must check both. **A barter line is never worth zero.**
+  An offer carrying one is never ranked on its coin part against a craft
+  route in the terminal fallback branch - that part omits the barter line
+  entirely, so it is a partial accounting being compared with a complete
+  one, and the offer would win on a price missing most of itself. It stays
+  offered and manually selectable; it just cannot win that comparison.
+  Section 7.1 has the currency/barter asymmetry this rests on. Since
+  section 7.4 a cost line is a barter line only when NOTHING can price it,
+  not merely when the Trading Post cannot, so this rule now covers what
+  pricing genuinely cannot reach rather than the common case.
 - **Craft/vendor comparability parity:** a recipe with an unvalued
   Currency-type ingredient is fallback-tier - never comparable with a real
   TP/vendor coin price in `PickCheapest` - exactly like a vendor offer
@@ -1410,15 +1550,15 @@ display-only read.
 
 ### V.2 `ApiAccessDialog`: why not a generalized `ModalDialog`
 
-It follows the same `StandardWindow` construction technique as
-`ModalDialog` - a 1x1 pixel background stretched to the window's own size,
-`TopMost`, a stable `Id`, `Show()`/`Hide()` semantics - but is a separate
-class rather than a generalization of it. `ModalDialog`'s shape is one
-short sentence, a fixed "Confirm" title, and a caller-named confirm button
-beside a fixed Cancel; this dialog is a multi-line numbered checklist under
-a different title with a Retry/Close pair. `ModalDialog`'s message `Label`
-is also not wrapped at all, which is fine for its own short sentence and
-wrong for full-sentence checklist items.
+It shares `DialogWindow` and `Services/DialogLayoutMath` with `ModalDialog`
+- a 1x1 pixel background stretched to the window's own size, `TopMost`, a
+stable `Id`, `Show()`/`Hide()` semantics, and one content-driven sizing pass
+- but is a separate class rather than a generalization of it. `ModalDialog`
+is one short sentence under a fixed "Confirm" title, centred, with a
+caller-named confirm button and an optional second seat; this dialog is a
+multi-paragraph numbered checklist under a different title, left-aligned,
+with a fixed Retry/Close pair. What was duplicated between them was the
+geometry, and that is now in one place.
 
 It deliberately skips `ModalDialog`'s settings-backed drag position
 persistence. This is a rare error-path dialog, not a workflow a user
@@ -2150,6 +2290,35 @@ having settled that question. `TextBox`es are 26 at nine of their eleven sites
 (Settings' six, the Snapshot and Log search boxes, About's), and the two
 `Dropdown`s outside the plan tab are 30, so the Log toolbar's run is three
 input heights wide before any button is placed.
+### V.37 `DialogWindow`: resizing a window Blish sizes once
+
+`WindowBase2` takes its window and content regions in a PROTECTED
+`ConstructWindow` and `Container.ContentRegion` has no public setter, so a
+dialog that wrote its own `Height` from outside would keep the content
+region it was built with and walk its buttons out of it - which is what the
+pre-sizing `ModalDialog` documented as the reason it could not grow.
+Subclassing is the seam that reaches `ConstructWindow`, and re-calling it
+recomputes padding, content margin, background ratios, title-bar bounds and
+`Size` together, exactly as a fresh window would have them.
+
+Two offsets come out of the decompiled 1.3.0 arithmetic and are worth
+writing down, because neither is visible from the call site. First,
+`ConstructWindow` places the content region at `contentRegion.Y + 40 -
+Padding.Top`, and `Padding.Top` is `Math.Max(windowRegion.Top - 40, 11)`,
+which for a window region starting at 0 is the 11 floor: a 35px inset lands
+the content 64px down. Second, its own `base.Size = windowSize` assignment
+fires `OnResized`, which recomputes the content region from `Size` minus the
+content margin. So the height actually handed to `ConstructWindow` is not
+the height the region ends up with. `DialogWindow` passes the REQUESTED
+content height rather than the window region's remainder: when `OnResized`
+fires the region lands 11px taller, and when it does not (a resize to the
+size the window already has) it lands exactly as passed. Both hold the
+content box; passing the remainder would leave the shorter of the two 11px
+short, with the button row's bottom edge outside it.
+
+`ChromeHeight` is the 74 that falls out: 24px of window above the content
+region, the 40px title bar, and the 10px kept below.
+
 ### 12.1 Two verdicts, two severities
 
 `PlanStore` mirrors `SnapshotStore`'s shape - single-file JSON, atomic
@@ -2333,6 +2502,52 @@ edge also lines them up, but only at that edge - a short header over wide
 cells then reads as belonging to the column on its right, which is why the
 tracks centre instead. `Services/PlanHistoryRowLayout.cs` is that law applied
 to one row.
+
+`JustifiedColumnTracks.CenteredOverContent` is the second half of that same
+law, and the correction to the first attempt at it. Centring each header on
+its column's reserved *band* was shipped first and read wrong on the plan
+panel: a band is invisible, so a header centred in one drifts off the ink it
+names by half of however much the band exceeds it, and a band routinely
+exceeds it - a fixed floor (`ShoppingColumnMath.TotalMinWidth`), a
+header-width floor (every band in the module is floored at its own label so
+the label fits), or a reserve shared by several columns and sized by the
+widest of them (`SummarySectionLayoutMath`'s one `NumberColumnWidth` across
+Required/Have/Needed). Measured on the owner's 2026-08-28 capture: the
+Recipe Tree's "Source" header centred at x~797 over a badge run occupying
+700..765, and the currency table's "Have" header sat over neither its own
+numbers' right edge nor their centre.
+
+The cells were never the problem and do not move: badges stay left so their
+left edges rule down the column, numbers stay right so their digits line up.
+Only the header moves, onto the centre of the extent the cells actually
+cover. The caller derives that extent from the cells' own justification
+(the column's left rule for a left-ruled column, `rightEdge - contentWidth`
+for a right-aligned one).
+
+Clamping that result back into the *band* was the first attempt's own second
+defect, and shipped the disease as the cure. `bandX + bandWidth - headerWidth`
+is the column's right edge whenever the band ends there, so the clamp fires
+for every header wider than its column's ink - which is most of them, since
+every band is floored at its own header label - and pins the header's right
+edge to the values' right edge. That is right-alignment: precisely what the
+centring was added to remove, and what the owner measured on the 2026-08-29
+capture, where Required/Have/Needed sat 17, 12 and 15px left of their ink -
+exactly half of each header's excess over the numbers under it.
+
+A band is not a boundary. What a header must not reach is the *neighbouring
+column*, and on a justified table those sit a whole track apart. So the
+clamp is `JustifiedColumnTracks.HeaderRoom`: from the boundary with the
+column on the left to the boundary with the column on the right, each
+boundary the middle of the gap between the two columns' ink and each header
+backing off half a `HeaderGutter` from it, so two headers that both run to
+their bound stay a whole gutter apart and can never touch. Where there is no
+neighbouring column the bound is the table's own edge, which nothing crosses.
+A column's own ink is always inside its room, however little gap precedes it,
+and a header wider than the whole room pins to the room's left bound and
+spills rightward only - the one direction `CenteredX` already spills in.
+Used Materials' Amount column is the case that reaches that last rule: it
+reserves nothing beyond its widest quantity and pins to the table edge, so
+its header has ~27px of room and cannot be centred at all.
 
 `Services/LogGutterLayout.cs` replaced one worst-case prefix *template* -
 the widest level word, a widest-digit stamp, and a fourteen-`w` tag
@@ -2603,6 +2818,63 @@ when it is supplied it becomes the "total" with the phase sum appended
 alongside as "(phases Nms)" for comparison; when absent - every existing
 test, any future non-UI caller - the "total" stays the phase sum exactly as
 before.
+
+### S1.10 Dialog sizing: the width bracket and the balanced wrap
+
+`Services/DialogLayoutMath.cs` replaced two fixed rectangles. `ModalDialog`
+was a 560x190 window whose every inner offset was derived from those two
+numbers, so a one-line acknowledgement and a four-line warning drew the same
+box; `ApiAccessDialog` was a second fixed rectangle, 560x300, with its own
+copy of the same constants. Both were sized for their worst case.
+
+**Why the width has a floor at all.** Nothing about readability stops a
+dialog at 500px. The title bar does. Decompiled BlishHUD 1.3.0,
+`WindowBase2.RecalculateLayout`, draws the left title-bar texture into
+`Min(textureWidth, windowWidth - 216)` and `DrawOnCtrl` stretches rather
+than crops, so a narrow window squeezes the art. The recorded evidence is
+two points: a 400px window (about 184px of draw) rasterized as coloured
+streaks behind the title, and 560 (about 344px) renders clean. 500 - the
+480px `MinContentWidth` plus the shell's 2x10 side insets - sits at about
+284px of draw. That is inferred from the bracket, not measured; if the art
+degrades in the field the floor moves up, and nothing else has to change.
+
+**Why the title can push past the ceiling.** `PaintTitleText` draws the
+title in `DefaultFont32` at a fixed 80px indent with no alignment control,
+and the exit button sits at a fixed inset from the right, so window width is
+the only lever a dialog has over its own title. `ApiAccessDialog` learned
+this the expensive way: at 480 its title clipped three characters mid-word.
+That is now a rule rather than a magic number - the caller measures its
+title in the face Blish paints it in and the width floor becomes
+`TitleTextIndent + titleWidth + TitleRightReserve`, which reproduces the 560
+that dialog needs without anyone writing 560 down.
+
+**The balanced wrap.** Wrapping at the ceiling and stopping there gives a
+full first line and a stub second one. The width is instead the narrowest
+that still reaches the same line count, found by binary search over
+`TextWrapMath.Wrap`: greedy wrapping never yields fewer lines as the width
+shrinks, so the predicate is monotone and the search is exact. It runs once
+per `Show`, about ten wraps of one message, and never on a render path.
+
+**One seat for a pair.** A confirm and a cancel in the same row share one
+width, the larger of what the two labels need. The first cut kept the two
+floor widths the pre-sizing dialog happened to ship, 100 for the confirm
+seat and 70 for the cancel, and that inverted the relationship between the
+labels: "Clear" floored up to 100 sat beside a longer "Cancel" that reached
+only 70, so the shorter word rendered as the wider button. Invisible while
+every dialog was 560px of mostly empty space; reported on sight once the
+boxes went tight. The single floor that replaced them is 80, the width of
+the Settings save bar's "Save", so a verb in a dialog is never narrower than
+the same verb on a tab. A lone acknowledgement button is not in a pair and
+is not stretched to one: it takes its own label or the floor.
+
+**Order of operations.** Balance within the preferred wrap ceiling; raise to
+the largest of the button row, the title and the width floor; clamp to what
+the screen can actually hold. The screen wins last, which is why
+`MaxContentWidth` returns the screen's hard ceiling and applies no preferred
+clamp of its own - a button row wider than the preferred width must be able
+to grow the box, and only the screen may refuse it.
+
+
 ## S2. Services Q-Z: relocated design narrative
 
 Design narrative moved out of doc comments in `Services/` (files whose

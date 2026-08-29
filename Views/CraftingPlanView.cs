@@ -51,6 +51,21 @@ namespace TaimisToolbench.Views
         private const int RightEdgePadding = WindowSizing.RightEdgePadding;
         private const int SectionSpacing = 16;
 
+        /// <summary>
+        /// ZIndex every control of the pinned top strip carries, above the
+        /// scrolling content panel's default 0. Blish paints a container's
+        /// children in ZIndex order, and this is not decoration: content
+        /// scrolled ABOVE the viewport paints a few pixels into the strip,
+        /// growing with tree depth, because Container.Paint unscales the
+        /// physical scissor back to logical space for its children and
+        /// floor(floor(y*s)/s) is less than or equal to y - so every
+        /// nesting level can move the propagated clip's top edge up and
+        /// none can move it back down. docs/ARCHITECTURE.md section V.26
+        /// is where that inequality is transcribed from the decompiled
+        /// binary; ClipTopSlipSimulationTests runs it.
+        /// </summary>
+        private const int TopStripZIndex = 1;
+
         // Aliased, not duplicated: the band height, its title y and its
         // caret y are one piece of arithmetic against the section-title
         // font's measured ink - see PlanContentHeightMath.
@@ -65,14 +80,19 @@ namespace TaimisToolbench.Views
 
         /// <summary>
         /// This view's own binding of TopRegionLayoutMath.Compute: the
-        /// row count and the tree toolbar's visibility are view state, the
-        /// arithmetic is not. Every caller goes through here so no call
-        /// site can lay the strip out against a different answer to "is the
-        /// toolbar row showing".
+        /// strip's row count and the tree toolbar's visibility are view
+        /// state, the arithmetic is not. Every caller goes through here so
+        /// no call site can lay the strip out against a different answer to
+        /// "is the toolbar row showing".
+        /// <para>
+        /// The strip's rows are grid rows, not item rows - four items share
+        /// one at the window minimum - so the width has to be passed in:
+        /// there is no strip height without it.
+        /// </para>
         /// </summary>
-        private TopRegionLayout ComputeTopRegionLayout()
+        private TopRegionLayout ComputeTopRegionLayout(int w)
         {
-            return TopRegionLayoutMath.Compute(_inputRows.Rows.Count, _treeToolbarVisible);
+            return TopRegionLayoutMath.Compute(_inputRows.RowCountFor(w), _treeToolbarVisible);
         }
 
         // phaseProgress carries live coarse-phase events for the status
@@ -706,8 +726,8 @@ namespace TaimisToolbench.Views
             _moduleLifetimeToken = moduleLifetimeToken;
 
             // Before anything that could read the row count:
-            // ComputeTopRegionLayout asks the strip how many rows there
-            // are, and an unbuilt view is still allowed to be asked.
+            // ComputeTopRegionLayout asks the strip how many grid rows its
+            // items fill, and an unbuilt view is still allowed to be asked.
             _inputRows = new ItemInputRowStrip(
                 itemSearchProvider, () => ReflowTopRegion(rebuildItemRows: true));
 
@@ -1906,7 +1926,7 @@ namespace TaimisToolbench.Views
 
             int w = _buildPanel.ContentRegion.Width;
             int h = _buildPanel.ContentRegion.Height;
-            var layout = ComputeTopRegionLayout();
+            var layout = ComputeTopRegionLayout(w);
 
             int savedScrollOffset = _contentPanel?.VerticalScrollOffset ?? 0;
             int previousContentHeight = _contentPanel?.Height ?? 0;
@@ -1990,7 +2010,7 @@ namespace TaimisToolbench.Views
             _treeRelayoutActions.Clear();
             _treeReellipsisActions.Clear();
 
-            var layout = ComputeTopRegionLayout();
+            var layout = ComputeTopRegionLayout(w);
 
             // Input rows: search box + quantity per requested item.
             _inputPanel = new Panel()
@@ -1998,6 +2018,7 @@ namespace TaimisToolbench.Views
                 Size = new Point(w, layout.InputPanelHeight),
                 Location = new Point(0, InputRowY),
                 Parent = buildPanel,
+                ZIndex = TopStripZIndex,
             };
             _inputRows.Rebuild(_inputPanel, w);
 
@@ -2007,6 +2028,7 @@ namespace TaimisToolbench.Views
                 Size = new Point(w, RowHeight),
                 Location = new Point(0, layout.ControlsRowY),
                 Parent = buildPanel,
+                ZIndex = TopStripZIndex,
             };
 
             var ownMaterialsState = OwnMaterialsGate.Resolve(_useOwnMaterials, _accountDataAvailable);
@@ -2101,7 +2123,7 @@ namespace TaimisToolbench.Views
                 Location = new Point(w - 120 - RightEdgePadding, 3),
                 Parent = _controlsPanel,
             };
-            _generateButton.Click += async (_, __) => await TriggerGenerate();
+            _generateButton.Click += async (_, __) => await TriggerGenerate(userPressedGenerate: true);
 
             // This tooltip is Generate Plan's ENTIRE safety mechanism: it
             // is the one action in the tree's vocabulary that destroys
@@ -2126,9 +2148,11 @@ namespace TaimisToolbench.Views
                 AutoSizeHeight = true,
                 Location = new Point(0, layout.StatusRowY),
                 Parent = buildPanel,
+                ZIndex = TopStripZIndex,
             };
 
             _statusSpinner = InlineSpinner.Create(buildPanel, InlineSpinnerLayout.PlanStripSize);
+            _statusSpinner.ZIndex = TopStripZIndex;
             InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
 
             // Static separator between controls and content
@@ -2138,6 +2162,7 @@ namespace TaimisToolbench.Views
                 Location = new Point(0, layout.SeparatorY),
                 BackgroundColor = new Color(180, 180, 180),
                 Parent = buildPanel,
+                ZIndex = TopStripZIndex,
             };
 
             // Scrollable content area - full width so scrollbar sits at the window edge.
@@ -2257,6 +2282,7 @@ namespace TaimisToolbench.Views
             _treeToolbarPanel = new Panel()
             {
                 Parent = buildPanel,
+                ZIndex = TopStripZIndex,
             };
 
             CreateTreeStateChips();
@@ -2777,12 +2803,12 @@ namespace TaimisToolbench.Views
             // Update widths of layout panels. Top-strip controls keep their
             // pre-existing direct updates - these were
             // never part of the dispose+rebuild problem the relayout
-            // registry below replaces. The input strip is N rows
-            // (the strip's row count) rather than a fixed one, so its own and
-            // every row panel's width need updating too, and the Y offsets
-            // below it come from the same ComputeTopRegionLayout formula
-            // Build()/ReflowTopRegion use rather than fixed constants.
-            var layout = ComputeTopRegionLayout();
+            // registry below replaces. The input strip is a grid whose
+            // column count is a function of this width, so a drag can move
+            // a cell sideways and onto another row - ResizeRows re-seats
+            // them - and the Y offsets below it come from the same
+            // ComputeTopRegionLayout formula Build()/ReflowTopRegion use.
+            var layout = ComputeTopRegionLayout(w);
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
             _inputRows.ResizeRows(w);
 
@@ -3337,12 +3363,12 @@ namespace TaimisToolbench.Views
         /// </para>
         /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
-        private async Task TriggerGenerate()
+        private async Task TriggerGenerate(bool userPressedGenerate = false)
         {
             var pending = CollectUnresolvedTypedRows();
             if (pending.Count == 0)
             {
-                await GenerateFromResolvedRows(false);
+                await GenerateFromResolvedRows(false, userPressedGenerate);
                 return;
             }
 
@@ -3375,7 +3401,7 @@ namespace TaimisToolbench.Views
                 }
 
                 bool anyAmbiguous = AdoptTypedRowMatches(matches);
-                _ = GenerateFromResolvedRows(anyAmbiguous);
+                _ = GenerateFromResolvedRows(anyAmbiguous, userPressedGenerate);
             });
 
             if (!queued)
@@ -3571,7 +3597,7 @@ namespace TaimisToolbench.Views
             return count;
         }
 
-        private async Task GenerateFromResolvedRows(bool anyAmbiguousTypedName)
+        private async Task GenerateFromResolvedRows(bool anyAmbiguousTypedName, bool userPressedGenerate)
         {
             // Gather every
             // row's selection + quantity into the request list the
@@ -3645,8 +3671,22 @@ namespace TaimisToolbench.Views
                 // typed-name pass above could not match), or a name several
                 // items share. The old single "select an item" line was
                 // misleading for the last two - the box looked filled in.
-                SetStatus(WithStandingNotices(
-                    ItemRowSelection.EmptyRequestStatus(unresolvedTypedRows > 0, anyAmbiguousTypedName)));
+                string emptyRequest = ItemRowSelection.EmptyRequestStatus(
+                    unresolvedTypedRows > 0, anyAmbiguousTypedName);
+                SetStatus(WithStandingNotices(emptyRequest));
+
+                // The status line is the persistent record and stays. It
+                // also sits under the toolbar, well away from the button
+                // just pressed, which is why a press that produced nothing
+                // read as no response at all. Only a press: a re-solve or a
+                // regeneration confirm reaching this branch has no click to
+                // answer, and a dialog raised over one the user just
+                // dismissed is a nuisance, not an explanation.
+                if (userPressedGenerate)
+                {
+                    _modalDialog?.ShowAcknowledgement(emptyRequest);
+                }
+
                 return;
             }
 

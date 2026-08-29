@@ -67,13 +67,21 @@ BASE = 18
 # live call site ship; Services/UiGlyphs and the "UI glyph escapes" CI step
 # assert this table and the module's constants agree in both directions.
 #
-# And only SOLID FILL artwork survives the trip. Bootstrap draws on a 16px
-# grid with roughly 1-unit strokes, so a stroked icon rendered to the 6-10px
-# of ink this UI has room for lands at well under one pixel of coverage: x-lg
-# at 8px measures a 0.66px diagonal, which is a paler mark than Menomonia's
-# own solid U+00D7, and check-lg, the chevrons, plus-lg and dash-lg all fail
-# the same way. The two carets below are flattened fills and stay at full
-# coverage all the way down - see the --preview output.
+# And artwork only survives the trip at a size that keeps its stroke over a
+# pixel. Bootstrap draws on a 16px grid with roughly 1-unit strokes, so a
+# stroked icon scaled to the 6-10px of ink most of these seats have lands at
+# well under one pixel of coverage: x-lg at ink_h=8 measures a 0.66px diagonal
+# peaking at alpha 183, paler than Menomonia's own solid U+00D7, and check-lg,
+# the chevrons, plus-lg and dash-lg all fail the same way. A flattened FILL -
+# the carets - loses area rather than coverage and stays solid all the way
+# down, which is why the trio can be 8px tall.
+#
+# x-lg is below anyway, at ink_h=16, because its seat is a 28px button that
+# was already giving a 16px texture the whole box. Measured with --preview:
+# alpha peaks at 255 over a 2px diagonal, and the coverage sums to 58 pixels
+# of ink against the reading carets' 61 - the same mark weight beside them,
+# which is the whole reason it is here. Judge a new row that way rather than
+# by the fill/stroke label alone.
 #
 # The wider affordance shortlist this font was scoped against is recorded in
 # dev/records/2026-08-glyph-font.md, along with which entries the stroke-weight
@@ -94,6 +102,7 @@ GLYPHS = [
     (0xE102, "caret-up-fill",         8,    7,      13, "caret up"),
     (0xE103, "caret-down-fill",       8,    7,      13, "caret down"),
     (0xE104, "caret-right-fill",     12,    7,       9, "caret right"),
+    (0xE105, "x-lg",                 16,    7,      17, "remove mark"),
 ]
 
 ATLAS_PADDING = 1
@@ -489,9 +498,9 @@ def main(argv):
                     ramp[min(len(ramp) - 1, coverage[y * width + x] * len(ramp) // 256)]
                     for x in range(width)))
 
-    # One row, left to right: thirteen glyphs under 12px tall pack into a strip
-    # narrower than a single 128px page, and a strip keeps the .fnt's x/y
-    # trivially eyeballable against the PNG during review.
+    # One row, left to right: a table this short packs into a strip narrower
+    # than a single 128px page, and a strip keeps the .fnt's x/y trivially
+    # eyeballable against the PNG during review.
     page_h = max(g["h"] for g in rendered) + 2 * ATLAS_PADDING
     page_w = sum(g["w"] + ATLAS_PADDING for g in rendered) + ATLAS_PADDING
     page = [0] * (page_w * page_h)

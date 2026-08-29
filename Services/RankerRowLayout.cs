@@ -34,12 +34,19 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// The gate strip's own pitch. Taller than a text sub-line because
         /// each cell now carries a painted bar rather than a bare number,
-        /// and the bar has to hold a Body line box with the percentage
-        /// centred inside it.
+        /// and the bar has to hold the percentage's line box with plate
+        /// left around it.
         /// </summary>
         public const int GateLineHeight = 22;
 
-        /// <summary>Height of a gate cell's bar inside <see cref="GateLineHeight"/>.</summary>
+        /// <summary>
+        /// Height of a gate cell's bar inside <see cref="GateLineHeight"/>.
+        /// The figure inside draws at Caption, one ramp tier below the gate
+        /// NAME beside it, so its 18px line box leaves a pixel of bar top
+        /// and bottom - at Body it filled the 20 exactly and the meter read
+        /// as a number with paint behind it. Seat:
+        /// Views/RankerTabContent's GateValueY.
+        /// </summary>
         public const int GateBarHeight = 20;
 
         /// <summary>Gap between a gate's label band and its bar.</summary>
@@ -76,26 +83,29 @@ namespace TaimisToolbench.Services
         // to the width of a dash.
 
         /// <summary>
-        /// Fits the bold "Ready" header (~50px) and the readiness BAR, whose
-        /// centred "100%" draws one tier above the rest of the row
-        /// (UiFonts.Status, 18 bold) and measures ~46px there. This is the
-        /// cell's floor, not its width: under distribution the bar takes its
-        /// whole track.
+        /// Fits the bold "Ready" header (~50px), which is now the binding
+        /// term: the bar's centred "100%" was derived against bold 18 at
+        /// ~46px and draws one tier down at Body, so it is narrower than the
+        /// header above it. This is the cell's floor, not its width: under
+        /// distribution the bar takes its whole track.
         /// </summary>
         public const int ReadyCellWidth = 66;
 
         /// <summary>
-        /// Height of the headline readiness bar. 24, so a Status line box
-        /// (23) centres inside it with a pixel to spare; the bar itself
+        /// Height of the headline readiness bar. 24, and the percentage
+        /// inside it is a Body line box (20), leaving 2px of plate above and
+        /// below so the bar reads around the figure instead of being filled
+        /// by it (Views/RankerTabContent's ReadyLineY). The bar itself
         /// centres in <see cref="RowHeight"/>.
         /// </summary>
         public const int ReadyBarHeight = 24;
 
         /// <summary>
         /// Floor for the headline bar. Below this the centred "100%" it
-        /// carries (bold 18, ~46px) has no plate left around it; the packed
-        /// fallback's ReadyCellWidth - CellGap is 54, so nothing at a
-        /// supported width goes under it.
+        /// carries has no plate left around it - derived when that figure
+        /// was bold 18 at ~46px, and clear by more since it dropped a tier.
+        /// The packed fallback's ReadyCellWidth - CellGap is 54, so nothing
+        /// at a supported width goes under it.
         /// </summary>
         public const int MinReadinessBarWidth = 50;
 
@@ -548,13 +558,23 @@ namespace TaimisToolbench.Services
             return new SubLineBlock(gateY, currencyY, noteY, y);
         }
 
-        /// <summary>Fits the fixed "Refresh" label with clearance; never fed status text.</summary>
-        public const int RefreshButtonWidth = 132;
+        /// <summary>
+        /// The Analyze button's plate. It carries TWO labels - "Analyze" at
+        /// rest and "Analyzing..." while a run is in flight - and must not
+        /// resize between them, so this fits the WIDER one with room to
+        /// spare. Interpolated from the module's hand-fitted button widths
+        /// (Buy All 70 at 7 characters, Clear Overrides 124 at 15): ~6.75px
+        /// per character plus ~23px of plate, so the 12-character label
+        /// wants ~104 and this leaves ~14px of padding either side of it.
+        /// Never fed status text - see <see cref="Toolbar"/> for the run's
+        /// progress line, which belongs to the status band.
+        /// </summary>
+        public const int AnalyzeButtonWidth = 132;
 
         public readonly struct ToolbarSlots
         {
-            /// <summary>Left edge of the right-anchored Refresh button.</summary>
-            public readonly int RefreshX;
+            /// <summary>Left edge of the right-anchored Analyze button.</summary>
+            public readonly int AnalyzeX;
 
             /// <summary>Left edge of the first display toggle, seated left of the second.</summary>
             public readonly int FirstToggleX;
@@ -572,9 +592,9 @@ namespace TaimisToolbench.Services
             public readonly int StatusWidth;
 
             public ToolbarSlots(
-                int refreshX, int firstToggleX, int secondToggleX, int statusX, int statusWidth)
+                int analyzeX, int firstToggleX, int secondToggleX, int statusX, int statusWidth)
             {
-                RefreshX = refreshX;
+                AnalyzeX = analyzeX;
                 FirstToggleX = firstToggleX;
                 SecondToggleX = secondToggleX;
                 StatusX = statusX;
@@ -584,9 +604,9 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// The toolbar row: one full-width status band on the left, the
-        /// Refresh button pinned right, the two display toggles between them
+        /// Analyze button pinned right, the two display toggles between them
         /// in reading order, the inline spinner after the status text.
-        /// The refresh-progress text renders in the status band and ONLY
+        /// The run-progress text renders in the status band and ONLY
         /// there - the field test showed status-length text stamped onto
         /// the fixed-width button spilling past its edges.
         /// <para>
@@ -598,16 +618,16 @@ namespace TaimisToolbench.Services
             int barWidth, int spinnerSize, int labelGap,
             int firstToggleWidth = 0, int secondToggleWidth = 0)
         {
-            int refreshX = Math.Max(0, barWidth - RefreshButtonWidth);
+            int analyzeX = Math.Max(0, barWidth - AnalyzeButtonWidth);
             int secondX = secondToggleWidth <= 0
-                ? refreshX
-                : Math.Max(Inset, refreshX - CellGap - secondToggleWidth);
+                ? analyzeX
+                : Math.Max(Inset, analyzeX - CellGap - secondToggleWidth);
             int firstX = firstToggleWidth <= 0
                 ? secondX
                 : Math.Max(Inset, secondX - CellGap - firstToggleWidth);
             int statusRight = firstX - spinnerSize - 2 * labelGap;
             return new ToolbarSlots(
-                refreshX, firstX, secondX, Inset, Math.Max(0, statusRight - Inset));
+                analyzeX, firstX, secondX, Inset, Math.Max(0, statusRight - Inset));
         }
 
         public readonly struct ModeStripSlots

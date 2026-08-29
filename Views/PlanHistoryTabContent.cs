@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Blish_HUD;
-using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
@@ -370,6 +369,7 @@ namespace TaimisToolbench.Views
             public CoinCurrencyRenderer.ValueCellHandle CostCell;
             public Label WhenLabel;
             public Label Caret;
+            public Panel CaretHit;
             public FeedbackButton Open;
             public FeedbackButton Resolve;
             public Checkbox Pin;
@@ -519,7 +519,7 @@ namespace TaimisToolbench.Views
             var hover = RowHover(entry, firstSummary, firstRarity);
 
             bool expanded = string.Equals(_expandedEntryId, entry.EntryId, StringComparison.Ordinal);
-            row.Caret = CreateCaret(row.Panel, expanded, bands.CaretX);
+            CreateCaret(row, expanded, bands);
 
             row.IconName = IconNameRowHelpers.CreateIconAndEllipsizedName(
                 row.Panel, firstSummary?.IconUrl, firstRarity,
@@ -542,7 +542,7 @@ namespace TaimisToolbench.Views
             // deepest control under the cursor and never bubbles - a
             // handler on the panel alone would answer only the gaps.
             string entryId = entry.EntryId;
-            WireExpandTarget(row.Caret, entryId);
+            WireExpandTarget(row.CaretHit, entryId);
             WireExpandTarget(row.IconName.IconFrame, entryId);
             WireExpandTarget(row.IconName.NameLabel, entryId);
 
@@ -685,11 +685,11 @@ namespace TaimisToolbench.Views
             return button;
         }
 
-        // Art, not text: the row's remove mark was U+00D7, and although
-        // Menomonia carries that codepoint, StandardButton forces black ink
-        // over parchment plate art and the multiplication sign vanished
-        // into it. Blish's own X texture with FeedbackButton's tint is what
-        // the Ranker's identical control already draws.
+        // The marks this seat has worn, in order: U+00D7, which Menomonia
+        // does carry but draws too faint to read as an action; then Blish's
+        // own X texture tinted dark, which landed within nine units of the
+        // ink this button paints DISABLED text in; now the module's own
+        // cross, which is what the Ranker's identical control draws.
         private FeedbackButton CreateRemoveButton(Panel parent, int x)
         {
             var button = new FeedbackButton
@@ -698,34 +698,48 @@ namespace TaimisToolbench.Views
                 Location = new Point(x, MainLineButtonY),
                 Parent = parent,
             };
-            button.Icon = AsyncTexture2D.FromAssetId(UiMetrics.RowRemoveMarkAssetId);
-            button.ResizeIcon = true;
-            button.IconTint = UiMetrics.RowButtonIconTint;
+            button.SetGlyph(UiGlyphs.RemoveMark);
             TooltipFacility.ApplyPlain(button, "Remove this entry from the history.");
             return button;
         }
 
         // The Recipe Tree's own expand affordance, from the module's glyph
-        // page, degrading to ASCII exactly where that page does.
-        private Label CreateCaret(Panel parent, bool expanded, int x)
+        // page, degrading to ASCII exactly where that page does. The glyph
+        // rides inside a transparent hit plate rather than being clicked
+        // directly: a caret glyph is ~7px wide on a 60px row, and the strip
+        // between it and the icon answered nothing at all
+        // (PlanHistoryRowLayout.CaretHitPadX). The plate carries the hover
+        // as well as the click, because Blish resolves a tooltip on the
+        // deepest control under the cursor and never bubbles.
+        private static void CreateCaret(
+            RenderedRow row, bool expanded, in PlanHistoryRowLayout.Bands bands)
         {
-            var caret = new Label
+            string tooltip = expanded
+                ? "Collapse this plan."
+                : "Expand this plan to see what it cost when it was generated. "
+                    + "Nothing is recalculated.";
+
+            row.CaretHit = new Panel
+            {
+                Size = new Point(bands.CaretHitWidth, PlanHistoryRowLayout.CaretHitHeight),
+                Location = new Point(bands.CaretHitX, PlanHistoryRowLayout.CaretHitY),
+                Parent = row.Panel,
+            };
+            TooltipFacility.ApplyPlain(row.CaretHit, tooltip);
+
+            row.Caret = new Label
             {
                 Font = UiFonts.BodyGlyphs,
                 Text = UiGlyphs.ExpandCaret(expanded, UiFonts.GlyphsAvailable),
                 TextColor = CaretColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(x, PlanHistoryRowLayout.MainLineTextY),
-                Parent = parent,
+                Location = new Point(
+                    bands.CaretX - bands.CaretHitX,
+                    PlanHistoryRowLayout.MainLineTextY - PlanHistoryRowLayout.CaretHitY),
+                Parent = row.CaretHit,
             };
-            TooltipFacility.ApplyPlain(
-                caret,
-                expanded
-                    ? "Collapse this plan."
-                    : "Expand this plan to see what it cost when it was generated. "
-                        + "Nothing is recalculated.");
-            return caret;
+            TooltipFacility.ApplyPlain(row.Caret, tooltip);
         }
 
         /// <summary>
@@ -1045,7 +1059,11 @@ namespace TaimisToolbench.Views
                     bands.NameX + bands.NameWidth, 0, 0);
             }
 
-            row.Caret.Location = new Point(bands.CaretX, row.Caret.Location.Y);
+            // The plate moves; the glyph keeps its offset inside it.
+            row.CaretHit.Location = new Point(
+                bands.CaretHitX, PlanHistoryRowLayout.CaretHitY);
+            row.CaretHit.Size = new Point(
+                bands.CaretHitWidth, PlanHistoryRowLayout.CaretHitHeight);
             row.IconName.IconFrame.Location = new Point(bands.IconX, row.IconName.IconFrame.Location.Y);
             row.IconName.NameLabel.Location = new Point(bands.NameX, row.IconName.NameLabel.Location.Y);
 

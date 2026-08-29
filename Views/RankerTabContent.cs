@@ -74,9 +74,16 @@ namespace TaimisToolbench.Views
 
         private const int MainLineIconY = 3;
 
-        /// <summary>The readiness percentage, centred inside its own bar.</summary>
+        /// <summary>
+        /// The readiness percentage, centred inside its own bar. One ramp
+        /// tier below the row's own Status text: Bold18's 23px line box in a
+        /// 24px bar left the number filling the paint edge to edge, and a
+        /// meter reads as a meter only if the bar is visible around its
+        /// figure. Body's 20 leaves 2px of plate above and below the box,
+        /// 5px above and below the ink.
+        /// </summary>
         private static int ReadyLineY =>
-            MainLineBarY + ((RankerRowLayout.ReadyBarHeight - TypeRampMetrics.StatusInk.LineHeight) / 2);
+            MainLineBarY + ((RankerRowLayout.ReadyBarHeight - TypeRampMetrics.BodyInk.LineHeight) / 2);
 
         /// <summary>A gate's label and its bar, centred in the gate strip's pitch.</summary>
         private static int GateTextY =>
@@ -85,9 +92,16 @@ namespace TaimisToolbench.Views
         private static int GateBarOffsetY =>
             (RankerRowLayout.GateLineHeight - RankerRowLayout.GateBarHeight) / 2;
 
-        /// <summary>The percentage centred inside a gate's bar.</summary>
+        /// <summary>
+        /// The percentage centred inside a gate's bar, one ramp tier below
+        /// the gate NAME beside it for the reason <see cref="ReadyLineY"/>
+        /// gives: Body's 20px line box exactly equalled GateBarHeight, so
+        /// the figure had no plate above or below it at all. Caption's 18
+        /// leaves a pixel of box either side and 3px of ink clearance.
+        /// </summary>
         private static int GateValueY =>
-            GateBarOffsetY + ((RankerRowLayout.GateBarHeight - TypeRampMetrics.BodyInk.LineHeight) / 2);
+            GateBarOffsetY
+                + ((RankerRowLayout.GateBarHeight - TypeRampMetrics.CaptionInk.LineHeight) / 2);
 
         // Muted grey is reserved for content meant to leave the user's
         // focus: the footer captions and the empty-state onboarding prose
@@ -179,7 +193,7 @@ namespace TaimisToolbench.Views
         private CancellationTokenSource _refreshCts;
         private bool _isRefreshing;
         private bool _firstRefreshDone;
-        private DateTime? _snapshotStamp;
+        private readonly RankerSnapshotWatch _snapshotWatch = new RankerSnapshotWatch();
         private bool _rarityDirty;
         private DateTime? _lastRefreshLocal;
         private string _statusOverride;
@@ -282,10 +296,12 @@ namespace TaimisToolbench.Views
                 RebuildRows();
 
                 // A tab switch during a run rebuilds the chrome from scratch,
-                // so the in-flight state has to be restamped onto it. The
-                // button keeps its fixed "Refresh" label - progress text
-                // belongs to the status band (field bug: status-length text
-                // on the 132px button spilled past its edges).
+                // so the in-flight state has to be restamped onto it - which
+                // includes the button's "Analyzing..." label, since the
+                // rebuild constructs it at rest. Its plate holds either word
+                // and never carries the progress text, which belongs to the
+                // status band (field bug: status-length text on the 132px
+                // button spilled past its edges).
                 if (_isRefreshing)
                 {
                     _spinner.Visible = true;
@@ -674,15 +690,29 @@ namespace TaimisToolbench.Views
             TooltipFacility.ApplyPlain(_currenciesCheckbox, CurrenciesTooltip);
             _currenciesCheckbox.CheckedChanged += (_, e) => OnShowCurrenciesChanged(e.Checked);
 
+            // Size is assigned ONCE, here. The label swaps between the two
+            // words below and the plate must not move with it, which holds
+            // because FeedbackButton.RecalculateLayout only re-seats the
+            // text and icon inside the bounds it is given - it never writes
+            // Size the way an autosizing LabelBase would.
             _refreshButton = new FeedbackButton
             {
-                Text = "Refresh",
-                Size = new Point(RankerRowLayout.RefreshButtonWidth, UiMetrics.ButtonHeight),
+                Text = AnalyzeButtonText,
+                Size = new Point(RankerRowLayout.AnalyzeButtonWidth, UiMetrics.ButtonHeight),
                 Location = new Point(0, 6),
                 Parent = _toolbarPanel,
             };
             _refreshButton.Click += (_, __) => OnRefreshClicked();
         }
+
+        /// <summary>What the button says at rest.</summary>
+        private const string AnalyzeButtonText = "Analyze";
+
+        /// <summary>
+        /// What it says while a run is in flight. The width both are drawn
+        /// on is RankerRowLayout.AnalyzeButtonWidth, derived from THIS one.
+        /// </summary>
+        private const string AnalyzeRunningButtonText = "Analyzing...";
 
         private const string CategoriesToggleText = "Show Categories";
         private const string CurrenciesToggleText = "Show Currencies";
@@ -784,7 +814,7 @@ namespace TaimisToolbench.Views
             var toolbar = RankerRowLayout.Toolbar(
                 barWidth, InlineSpinnerLayout.SnapshotStatusSize, InlineSpinnerLayout.LabelGap,
                 ToggleFootprint(_categoriesCheckbox), ToggleFootprint(_currenciesCheckbox));
-            _refreshButton.Location = new Point(toolbar.RefreshX, _refreshButton.Location.Y);
+            _refreshButton.Location = new Point(toolbar.AnalyzeX, _refreshButton.Location.Y);
             _categoriesCheckbox.Location = new Point(
                 toolbar.FirstToggleX + CheckboxArtOverhang, _categoriesCheckbox.Location.Y);
             _currenciesCheckbox.Location = new Point(
@@ -1021,7 +1051,13 @@ namespace TaimisToolbench.Views
             public readonly List<Panel> CurrencyIconFrames = new List<Panel>();
             public readonly List<Label> CurrencyNameLabels = new List<Label>();
             public readonly List<string> CurrencyNameFulls = new List<string>();
-            public readonly List<Label> CurrencyValueLabels = new List<Label>();
+            /// <summary>
+            /// A shortfall's amount as a Label, or full coverage as
+            /// LabelHelpers' shared marker panel - so this is typed at the
+            /// Control the layout pass actually needs (a Location and a
+            /// Width), not at the one the common case happens to be.
+            /// </summary>
+            public readonly List<Control> CurrencyValues = new List<Control>();
             public readonly List<Label> NoteLabels = new List<Label>();
             public RankerRowMetrics Metrics;
         }
@@ -1079,7 +1115,7 @@ namespace TaimisToolbench.Views
 
             _refreshButton.Enabled = !_isRefreshing && Entries.Count > 0;
             TooltipFacility.ApplyPlain(_refreshButton, Entries.Count > 0
-                ? "Recalculate every row. Each item is solved twice, so the first refresh of a session can take a while."
+                ? "Recalculate every row. Each item is solved twice, so the first analysis of a session can take a while."
                 : "Add an item to your list first.");
 
             UpdateColumnHeaderTooltips();
@@ -1116,29 +1152,61 @@ namespace TaimisToolbench.Views
         /// holdings of one account snapshot; a newer one makes all of them
         /// claims about an account that no longer exists.
         /// <para>
-        /// Checked when the table is being rebuilt rather than on a timer,
-        /// deliberately: the snapshot re-fetches itself on a schedule, and
-        /// blanking a table the user is reading - possibly mid-hover - to
-        /// announce a background event is worse than answering with the
-        /// numbers they were already reading until they next ask for them.
+        /// The rows on screen are NOT re-rendered here: blanking a table the
+        /// user is reading - possibly mid-hover - to announce a background
+        /// event is worse than leaving the numbers they were already reading
+        /// until the rebuild replaces them row by row.
+        /// </para>
+        /// <para>
+        /// A table that never had results does not ask for one. The first
+        /// run of a session is the user's to start: it is up to
+        /// RankerWatchlistLimits.MaxEntries rows at two plan solves each,
+        /// and nothing on screen is waiting on it.
         /// </para>
         /// </summary>
         private void InvalidateOnSnapshotChange()
         {
-            var stamp = _getSnapshot()?.CapturedAt;
-            if (stamp == _snapshotStamp)
+            if (_snapshotWatch.Observe(_getSnapshot()?.CapturedAt, _results.HasAnyResults))
+            {
+                _results.InvalidateEverything();
+            }
+        }
+
+        /// <summary>
+        /// The snapshot poll, on the same terms as the Log tab's own: a
+        /// nullable-DateTime compare per tick, run by Module.Update ONLY
+        /// while this tab is the selected tab of a window the user can see.
+        /// <para>
+        /// That gate is the whole design, and the cost it guards plus the
+        /// coalescing rule are stated on
+        /// <see cref="RankerSnapshotWatch"/>: a change that lands while the
+        /// tab is hidden is remembered there and spent on the first tick
+        /// after it is next shown.
+        /// </para>
+        /// </summary>
+        public void PollForSnapshotChange()
+        {
+            if (!_buildComplete || !IsLive)
             {
                 return;
             }
 
-            bool hadResults = _results.HasAnyResults;
-            _snapshotStamp = stamp;
-            _results.InvalidateEverything();
-
-            if (hadResults)
+            InvalidateOnSnapshotChange();
+            if (!_snapshotWatch.TryTakeRebuild(_isRefreshing, Entries.Count > 0))
             {
-                SetStatus("Your account snapshot changed - press Refresh to recalculate.", isError: false);
+                return;
             }
+
+            // Says why the numbers are about to move. The run's own
+            // per-row progress replaces it as soon as the first solve
+            // reports, and the spinner and the Analyzing... button carry it
+            // from here on.
+            SetStatus("Account snapshot changed - recalculating.", isError: false);
+
+            // recomputeAll, for the reason the button passes it: every
+            // number in the set was measured against holdings that have
+            // moved, so none of them can be replayed from cache.
+            StartRefresh(Mode, recomputeAll: true);
         }
 
         private void BuildBanner(int barWidth)
@@ -1174,7 +1242,7 @@ namespace TaimisToolbench.Views
             "",
             "Every row scores five separate barriers - materials, account currencies, time-gated daily crafts, crafting disciplines and recipe unlocks - and combines only the ones that item actually has into one Ready percentage you can rank by.",
             "",
-            "Search above to add your first item, then press Refresh.",
+            "Search above to add your first item, then press Analyze.",
         };
 
         private void BuildEmptyState(int barWidth)
@@ -1340,7 +1408,7 @@ namespace TaimisToolbench.Views
             row.CurrencyIconFrames.Clear();
             row.CurrencyNameLabels.Clear();
             row.CurrencyNameFulls.Clear();
-            row.CurrencyValueLabels.Clear();
+            row.CurrencyValues.Clear();
             row.NoteLabels.Clear();
             row.GateBarTracks.Clear();
             row.GateBarFills.Clear();
@@ -1424,7 +1492,7 @@ namespace TaimisToolbench.Views
             if (metrics == null)
             {
                 row.RemainingDash = CreateUnknownCell(
-                    row.Panel, 0, MainLineTextY, "Not yet calculated - press Refresh.");
+                    row.Panel, 0, MainLineTextY, "Not yet calculated - press Analyze.");
             }
             else if (metrics.RemainingCoinCost <= 0)
             {
@@ -1468,10 +1536,8 @@ namespace TaimisToolbench.Views
                 row.Down.Click += (_, __) => MoveRow(rowIndex, up: false);
             }
 
-            row.Remove = CreateRowButton(row.Panel, bands.RemoveX, "Remove this item from your list.");
-            row.Remove.Icon = AsyncTexture2D.FromAssetId(UiMetrics.RowRemoveMarkAssetId);
-            row.Remove.ResizeIcon = true;
-            row.Remove.IconTint = UiMetrics.RowButtonIconTint;
+            row.Remove = CreateGlyphRowButton(
+                row.Panel, UiGlyphs.RemoveMark, bands.RemoveX, "Remove this item from your list.");
             row.Remove.Enabled = !_isRefreshing;
             row.Remove.Click += (_, __) => RemoveRow(rowIndex);
 
@@ -1555,20 +1621,24 @@ namespace TaimisToolbench.Views
 
         /// <summary>
         /// A row action whose whole label is one glyph from the module's own
-        /// atlas. StandardButton exposes no Font, which is exactly why the
-        /// reorder pair could not be a button before FeedbackButton: an
-        /// up/down pair needs two symmetric triangles, and the one face
-        /// Blish ships has none. The standalone glyph face centres its ink
-        /// in the line box rather than seating it on a baseline, which is
-        /// what a button with no neighbouring text wants.
+        /// atlas. StandardButton exposes no Font, which is exactly why these
+        /// could not be buttons before FeedbackButton: they need symmetric
+        /// triangles and a cross, and the one face Blish ships has none. The
+        /// standalone glyph face centres its ink in the line box rather than
+        /// seating it on a baseline, which is what a button with no
+        /// neighbouring text wants.
+        /// <para>
+        /// All THREE row actions come through here, and that is the point:
+        /// glyph text takes the button's own enabled/disabled ink, so the
+        /// set cannot drift into two weights the way a tinted icon beside
+        /// black text did (Services/UiGlyphs.RemoveMark).
+        /// </para>
         /// </summary>
         private static FeedbackButton CreateGlyphRowButton(
             Panel parent, string glyph, int x, string tooltip)
         {
             var button = CreateRowButton(parent, x, tooltip);
-            bool available = UiFonts.GlyphsAvailable;
-            button.Font = available ? UiFonts.Glyphs : UiFonts.Caption;
-            button.Text = available ? glyph : UiGlyphs.AsciiFallback(glyph);
+            button.SetGlyph(glyph);
             return button;
         }
 
@@ -1592,7 +1662,7 @@ namespace TaimisToolbench.Views
             if (metrics == null)
             {
                 row.ReadyLabel = CreateUnknownCell(
-                    row.Panel, 0, MainLineTextY, "Not yet calculated - press Refresh.");
+                    row.Panel, 0, MainLineTextY, "Not yet calculated - press Analyze.");
                 return;
             }
 
@@ -1619,7 +1689,8 @@ namespace TaimisToolbench.Views
 
             row.ReadyLabel = new Label
             {
-                Font = UiFonts.Status,
+                // Seated with ReadyLineY, which is derived from this tier.
+                Font = UiFonts.Body,
                 Text = RankerReadinessCalculator.FormatReadiness(metrics),
                 TextColor = Color.White,
                 AutoSizeWidth = true,
@@ -1689,7 +1760,7 @@ namespace TaimisToolbench.Views
         private static string StatusPlaceholderTooltip(RankerRowMetrics metrics)
         {
             return metrics == null
-                ? "Not yet calculated - press Refresh."
+                ? "Not yet calculated - press Analyze."
                 : "Your account snapshot has not loaded, so what you can afford is not known yet.";
         }
 
@@ -1764,7 +1835,8 @@ namespace TaimisToolbench.Views
                 row.GateBarFills.Add(fill);
                 row.GateValueLabels.Add(new Label
                 {
-                    Font = UiFonts.Body,
+                    // Seated with GateValueY, which is derived from this tier.
+                    Font = UiFonts.Caption,
 
                     // White over the bar, at 5.07:1 or better at every point
                     // on the ramp (Services/RankerReadinessRamp) - which is
@@ -1795,8 +1867,8 @@ namespace TaimisToolbench.Views
                 string fullName = CurrencyName(shortfall);
                 row.CurrencyNameFulls.Add(fullName);
                 row.CurrencyIconFrames.Add(IconControls.CreateItemIcon(
-                    row.Panel, CurrencyIconUrl(shortfall), (string)null,
-                    0, y, RankerRowLayout.CurrencyIconSize, 1,
+                    row.Panel, CurrencyIconUrl(shortfall), ItemIconFrame.Currency(),
+                    0, y, ItemIconTier.CurrencyListRow,
                     CurrencyHover(shortfall.CurrencyId, fullName)));
                 row.CurrencyNameLabels.Add(new Label
                 {
@@ -1808,16 +1880,27 @@ namespace TaimisToolbench.Views
                     Location = new Point(0, textY),
                     Parent = row.Panel,
                 });
-                row.CurrencyValueLabels.Add(new Label
-                {
-                    Font = UiFonts.Caption,
-                    Text = FormatShortfall(shortfall),
-                    TextColor = shortfall.Short > 0 ? ValueTextColor : RankerReadinessColors.ForReadiness(1.0),
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(0, textY),
-                    Parent = row.Panel,
-                });
+
+                // Fully covered says the same thing here as it does in the
+                // plan Summary's currency table, so it says it with the same
+                // control (LabelHelpers.CreateFullCoverageMarker) rather than
+                // a green word only this tab uses. Seated on the ICON like
+                // the text beside it, but off the tag's own height.
+                row.CurrencyValues.Add(shortfall.Short > 0
+                    ? (Control)new Label
+                    {
+                        Font = UiFonts.Caption,
+                        Text = ShortfallText(shortfall),
+                        TextColor = ValueTextColor,
+                        AutoSizeWidth = true,
+                        AutoSizeHeight = true,
+                        Location = new Point(0, textY),
+                        Parent = row.Panel,
+                    }
+                    : LabelHelpers.CreateFullCoverageMarker(
+                        row.Panel,
+                        0,
+                        y + ((RankerRowLayout.CurrencyIconSize - LabelHelpers.SmallTagHeight) / 2)));
             }
 
             for (int i = 0; i < notes.Count; i++)
@@ -1961,8 +2044,10 @@ namespace TaimisToolbench.Views
 
                 var icon = row.CurrencyIconFrames[i];
                 var name = row.CurrencyNameLabels[i];
-                var value = row.CurrencyValueLabels[i];
-                int nameX = cellX + RankerRowLayout.CurrencyIconSize + 2
+                var value = row.CurrencyValues[i];
+                // No border term: CurrencyIconSize is the FRAMED box at the
+                // wallet-list tier, art inset inside it (ItemIconTiers).
+                int nameX = cellX + RankerRowLayout.CurrencyIconSize
                     + RankerRowLayout.CurrencyIconGap;
                 int valueX = Math.Max(nameX, cellX + cellWidth - value.Width - RankerRowLayout.CellGap);
 
@@ -2210,13 +2295,13 @@ namespace TaimisToolbench.Views
             return null;
         }
 
-        private static string FormatShortfall(RankerCurrencyShortfall shortfall)
+        /// <summary>
+        /// What a currency line still owes. Full coverage never reaches here
+        /// - it draws the shared marker instead of a word - so this only
+        /// ever formats a real shortfall.
+        /// </summary>
+        private static string ShortfallText(RankerCurrencyShortfall shortfall)
         {
-            if (shortfall.Short <= 0)
-            {
-                return "covered";
-            }
-
             return shortfall.Short.ToString("N0", CultureInfo.InvariantCulture) + " short";
         }
 
@@ -2310,7 +2395,7 @@ namespace TaimisToolbench.Views
         {
             if (metrics == null)
             {
-                return "Not yet calculated - press Refresh.";
+                return "Not yet calculated - press Analyze.";
             }
 
             if (metrics.Kind != RankerReadinessKind.Measured)
@@ -2341,7 +2426,7 @@ namespace TaimisToolbench.Views
         {
             if (metrics == null)
             {
-                return "Not yet calculated - press Refresh.";
+                return "Not yet calculated - press Analyze.";
             }
 
             if (metrics.DaysRemaining <= 0)
@@ -2434,7 +2519,7 @@ namespace TaimisToolbench.Views
             _results.InvalidateCascadeFrom(Entries, invalidatedFrom);
             Persist();
             RebuildRows();
-            SetStatus("Order changed - press Refresh to recalculate the rows below it.", isError: false);
+            SetStatus("Order changed - press Analyze to recalculate the rows below it.", isError: false);
         }
 
         private void RemoveRow(int index)
@@ -2559,7 +2644,7 @@ namespace TaimisToolbench.Views
             // used - not whatever a background re-fetch has replaced it with
             // by the time the run ends.
             var snapshot = _getSnapshot();
-            _snapshotStamp = snapshot?.CapturedAt;
+            _snapshotWatch.MeasuredAgainst(snapshot?.CapturedAt);
 
             var work = new List<RefreshRow>(Entries.Count);
             for (int i = 0; i < Entries.Count; i++)
@@ -2714,10 +2799,10 @@ namespace TaimisToolbench.Views
                 return;
             }
 
-            string text = $"Refreshing {position} of {total} - {name}";
+            string text = $"Analyzing {position} of {total} - {name}";
             if (!_firstRefreshDone)
             {
-                text += ". The first refresh of a session downloads recipe data and can take a while.";
+                text += ". The first analysis of a session downloads recipe data and can take a while.";
             }
 
             SetStatus(text, isError: false);
@@ -2809,7 +2894,7 @@ namespace TaimisToolbench.Views
             }
             else if (cancelled)
             {
-                SetStatus("Refresh cancelled - " + StatusText.Count(updated, "item") + " updated", isError: false);
+                SetStatus("Analysis cancelled - " + StatusText.Count(updated, "item") + " updated", isError: false);
             }
             else
             {
@@ -2836,6 +2921,14 @@ namespace TaimisToolbench.Views
 
             UpdateModeRadios();
             _refreshButton.Enabled = enabled && Entries.Count > 0;
+
+            // Off the FIELD, not off the parameter: every caller sets
+            // _isRefreshing first, and the label has to survive a rebuild
+            // that re-enters here with a run still going.
+            _refreshButton.Text = _isRefreshing
+                ? AnalyzeRunningButtonText
+                : AnalyzeButtonText;
+
             foreach (var row in _rows)
             {
                 bool reorder = enabled && Mode == RankerMode.Cascade;
@@ -2879,11 +2972,11 @@ namespace TaimisToolbench.Views
 
             if (!_lastRefreshLocal.HasValue)
             {
-                ApplyStatusText("Not yet calculated - press Refresh.", isError: false);
+                ApplyStatusText("Not yet calculated - press Analyze.", isError: false);
                 return;
             }
 
-            string text = StatusText.Stamp("Refreshed", _lastRefreshLocal.Value);
+            string text = StatusText.Stamp("Analyzed", _lastRefreshLocal.Value);
             var snapshot = _getSnapshot();
             if (snapshot != null)
             {

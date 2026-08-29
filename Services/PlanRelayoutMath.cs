@@ -150,7 +150,7 @@ namespace TaimisToolbench.Services
             int pillColX = panelWidth - (rightMargin + costColumnWidth) - pillColumnWidth;
             int costRightEdge = pillColX + pillColumnWidth + costColumnWidth;
 
-            int nameMaxWidth = pillColX - nameX - 8;
+            int nameMaxWidth = pillColX - nameX - TreeNameGap;
             if (nameMaxWidth < 20)
             {
                 nameMaxWidth = 20;
@@ -163,6 +163,56 @@ namespace TaimisToolbench.Services
             }
 
             return new TreeColumnEdges(pillColX, costRightEdge, nameAvailWidth);
+        }
+
+        /// <summary>
+        /// Room for the header of a right-aligned column that closes its
+        /// table, with only a flexing name column before it - the Used
+        /// Materials Amount column's shape. Bounded by the table's own edge
+        /// on the right and, on the left, by half the gap
+        /// <see cref="NameMaxWidthBeforeColumn"/> keeps before the column.
+        /// That is a narrow room: this column reserves nothing beyond its
+        /// widest value, so a header wider than the two together cannot
+        /// centre at all and degrades the way every over-wide header does
+        /// (JustifiedColumnTracks.CenteredOverContent) - left bound,
+        /// spilling rightward.
+        /// </summary>
+        public static JustifiedColumnTracks.HeaderRoom TrailingColumnHeaderRoom(
+            int rightEdge, int columnWidth, int gapBeforeColumn)
+        {
+            int inkX = rightEdge - columnWidth;
+            return JustifiedColumnTracks.HeaderRoom.Between(
+                JustifiedColumnTracks.RoomLeftBound(inkX - gapBeforeColumn, inkX), rightEdge);
+        }
+
+        /// <summary>Gap a tree row's name budget keeps before the pill
+        /// column, and so where the name column stops drawing.</summary>
+        public const int TreeNameGap = 8;
+
+        /// <summary>
+        /// Where the recipe tree's two data headers may sit: "Source" over
+        /// the pill runs, "Cost" over the coin runs, each bounded by the
+        /// column beside it rather than by its own reserve. Both reserves
+        /// overstate their ink badly - the pill column is a fixed
+        /// <see cref="TreePillColumnWidth"/> whatever a row's badges
+        /// measure, and the cost column's is a per-denomination sum no one
+        /// row draws together - so a header clamped into one right-aligns
+        /// on values it should sit over. Cost's own right-hand neighbour is
+        /// the table's pinned edge.
+        /// </summary>
+        public static void ComputeTreeHeaderRooms(
+            TreeColumnEdges edges, int sourceInk, int costInk,
+            out JustifiedColumnTracks.HeaderRoom source,
+            out JustifiedColumnTracks.HeaderRoom cost)
+        {
+            int sourceInkRight = edges.PillColX + sourceInk;
+            int costInkX = edges.CostRightEdge - costInk;
+            source = JustifiedColumnTracks.HeaderRoom.Between(
+                JustifiedColumnTracks.RoomLeftBound(edges.PillColX - TreeNameGap, edges.PillColX),
+                JustifiedColumnTracks.RoomRightBound(sourceInkRight, costInkX));
+            cost = JustifiedColumnTracks.HeaderRoom.Between(
+                JustifiedColumnTracks.RoomLeftBound(sourceInkRight, costInkX),
+                edges.CostRightEdge);
         }
 
         /// <summary>

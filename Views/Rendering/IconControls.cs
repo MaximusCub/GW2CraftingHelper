@@ -8,10 +8,11 @@ namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// THE item-icon component: every item, currency and search-result icon
-    /// is built here, so all get one rarity frame (neutral at unknown
-    /// rarity, never guessed), one empty-slot placeholder, and one hover
-    /// wiring stamped on every control in the icon's tree - Blish resolves
-    /// a tooltip on the deepest control and never bubbles.
+    /// is built here, so all get one frame (the rarity palette for an item,
+    /// neutral at unknown rarity and never guessed; one shared grey for a
+    /// currency), one empty-slot placeholder, and one hover wiring stamped
+    /// on every control in the icon's tree - Blish resolves a tooltip on the
+    /// deepest control and never bubbles.
     /// <see cref="CreateUnframedIcon"/> and <see cref="CreateAssetIcon"/>
     /// are the only unframed paths, and say why themselves.
     /// <para>
@@ -20,7 +21,9 @@ namespace TaimisToolbench.Views.Rendering
     /// with an <see cref="ItemIconFrame"/> that says why it is the colour it
     /// is and an <see cref="ItemIconTooltip"/> that says what it shows on
     /// hover. No pixel size, no rarity string and no hover reaches this file
-    /// from a call site that did not name one.
+    /// from a call site that did not name one. A currency has no rarity to
+    /// name, so it takes <see cref="CreateCurrencyIcon"/> instead - one
+    /// entry point, one colour, no per-surface border.
     /// </para>
     /// </summary>
     internal static class IconControls
@@ -57,21 +60,13 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// The pre-tier signature, kept ONLY so the one call site still owned
-        /// by an in-flight branch keeps compiling until it migrates; the
-        /// defaults are gone so nothing new can drift into it by accident,
-        /// and the tests workflow's "Every item icon renders at a named
-        /// tier" step allow-lists exactly that file and fails on any other
-        /// caller.
-        ///
-        /// <para>
-        /// The only remaining caller is Views/RankerTabContent.cs, whose
-        /// shortfall cells become ItemIconTier.CurrencyBarRun. That one is
-        /// NOT pixel-neutral: it passes the wallet-bar measurement as ART
-        /// and frames outside it, so its box is 18 where the measured window
-        /// is 16, and the tier insets as the other two currency sites
-        /// already do. Whoever owns that file makes the call.
-        /// </para>
+        /// The pre-tier signature, kept ONLY so the one row builder still
+        /// owned by an in-flight branch keeps compiling until it migrates -
+        /// Views/Rendering/IconNameRowHelpers.cs, which forwards the size
+        /// its own pre-tier caller passed. The defaults are gone so nothing
+        /// new can drift into it by accident, and the tests workflow's
+        /// "Every item icon renders at a named tier" step allow-lists
+        /// exactly that file and fails on any other caller.
         /// </summary>
         internal static Panel CreateItemIcon(
             Panel parent, string iconUrl, string rarity, int x, int y,
@@ -83,20 +78,49 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// The explicit-colour twin of the pre-tier signature above, kept on
-        /// the same terms and for the same allow-listed callers.
+        /// THE currency icon: a wallet currency, framed in the module's one
+        /// currency grey (<see cref="ItemIconFrame.Currency"/>) so no
+        /// surface has to choose a border of its own. Takes one of the two
+        /// CURRENCY tiers.
+        /// <para>
+        /// Pixel-neutral by construction: a currency tier's measured window
+        /// is the whole BOX, so <c>ItemIconTiers.ArtSize</c> insets the art
+        /// by the frame and the framed square lands exactly where the
+        /// unframed one did. An inline coin run's advance is a term in the
+        /// minimum-window-width derivation and does not move.
+        /// </para>
+        /// <paramref name="tooltipText"/> is required, not defaulted: these
+        /// icons mostly draw with no name text beside them, so a hover is
+        /// the only thing that can identify one.
         /// </summary>
-        internal static Panel CreateItemIcon(
-            Panel parent, string iconUrl, Color frameColor, int x, int y,
-            int iconSize, int borderThickness, ItemIconTooltip tooltip)
+        internal static Panel CreateCurrencyIcon(
+            Panel parent, string iconUrl, int x, int y, ItemIconTier tier, string tooltipText)
         {
-            return CreateFramedIcon(
-                parent, iconUrl, frameColor, x, y, iconSize, borderThickness, tooltip);
+            return CreateFramePlate(
+                parent, iconUrl, ItemIconFrame.Currency().Color, x, y,
+                ItemIconTiers.ArtSize(tier), ItemIconTiers.BorderThickness(tier), tooltipText);
         }
 
         private static Panel CreateFramedIcon(
             Panel parent, string iconUrl, Color frameColor, int x, int y,
             int iconSize, int borderThickness, ItemIconTooltip tooltip)
+        {
+            var frame = CreateFramePlate(
+                parent, iconUrl, frameColor, x, y, iconSize, borderThickness, tooltip.PlainText);
+
+            // The rich half goes on last and on the whole tree, over the
+            // plain notes just written: a builder that composes nothing
+            // keeps them as its fallback (TooltipFacility.Register).
+            tooltip.StampOnIconTree(frame);
+            return frame;
+        }
+
+        /// <summary>The frame plate and its art, with the plain half of the
+        /// hover on both - an unstamped frame is a hole in the icon's hover,
+        /// and it resolves from the SAME rule the square gets.</summary>
+        private static Panel CreateFramePlate(
+            Panel parent, string iconUrl, Color frameColor, int x, int y,
+            int iconSize, int borderThickness, string plainText)
         {
             int frameSize = iconSize + borderThickness * 2;
             var frame = new Panel()
@@ -106,16 +130,8 @@ namespace TaimisToolbench.Views.Rendering
                 BackgroundColor = frameColor,
                 Parent = parent,
             };
-            CreateUnframedIcon(frame, iconUrl, borderThickness, borderThickness, iconSize, tooltip.PlainText);
-
-            // Thin, but hoverable: an unstamped frame is a hole in the
-            // icon's hover. From the SAME resolution the square gets.
-            TooltipFacility.ApplyPlain(frame, ResolveTooltip(iconUrl, tooltip.PlainText));
-
-            // The rich half goes on last and on the whole tree, over the
-            // plain notes just written: a builder that composes nothing
-            // keeps them as its fallback (TooltipFacility.Register).
-            tooltip.StampOnIconTree(frame);
+            CreateUnframedIcon(frame, iconUrl, borderThickness, borderThickness, iconSize, plainText);
+            TooltipFacility.ApplyPlain(frame, ResolveTooltip(iconUrl, plainText));
             return frame;
         }
 

@@ -17,6 +17,13 @@ namespace TaimisToolbench.Services
         private readonly ItemMetadataService _itemMetadataService;
         private readonly VendorOfferStore _vendorOfferStore;
 
+        /// <summary>
+        /// How many times cost-line expansion may look at what the previous
+        /// round's subtrees exposed. Measured on the shipped corpus, the
+        /// deepest real case (item 101521) closes after 3.
+        /// </summary>
+        private const int MaxVendorCostLineRounds = 6;
+
         // Computed once so a null store degrades to a null delegate,
         // matching RecipeSheetSavingsCalculator's no-offer-source guard.
         private readonly Func<int, IReadOnlyList<VendorOffer>> _offersForRecipeSheetItem;
@@ -194,9 +201,10 @@ namespace TaimisToolbench.Services
 
             // Query vendor offers, then price any vendor-only cost items
             var vendorContext = await FetchPricedVendorContextAsync(
-                allItemIds, prices, progress, sw, timingLog, ct);
+                allItemIds, prices, priceBasis, progress, sw, timingLog, ct);
             var vendorOffers = vendorContext.VendorOffers;
             prices = vendorContext.Prices;
+            var costLineSubtrees = vendorContext.CostLineSubtrees;
 
             // The solver's offer set excludes seasonal offers (see
             // SeasonalOfferFilter); `vendorOffers` stays the raw, unfiltered
@@ -245,7 +253,8 @@ namespace TaimisToolbench.Services
             {
                 var forceBuyPrePassResult = OwnedMaterialsForceBuyPrePass.ComputeForceBuyOnlyNodeIds(
                     _solver, tree, prices, solverVendorOffers, priceBasis, valuation,
-                    characterDisciplines: effectiveCharacterDisciplines);
+                    characterDisciplines: effectiveCharacterDisciplines,
+                    vendorCostSubtrees: costLineSubtrees);
                 forceBuyOnlyNodeIds = forceBuyPrePassResult.ForceBuyOnlyNodeIds;
                 competencyIndependentForceBuyNodeIds = forceBuyPrePassResult.CompetencyIndependentForceBuyNodeIds;
 
@@ -255,7 +264,8 @@ namespace TaimisToolbench.Services
                     forceBuyOnlyNodeIds: forceBuyOnlyNodeIds,
                     competencyIndependentForceBuyNodeIds: competencyIndependentForceBuyNodeIds,
                     homesteadTiers: tiers,
-                    characterDisciplines: effectiveCharacterDisciplines);
+                    characterDisciplines: effectiveCharacterDisciplines,
+                    vendorCostSubtrees: costLineSubtrees);
                 zeroOwnedDecisions = zeroOwnedSolve.Decisions;
             }
 
@@ -296,7 +306,8 @@ namespace TaimisToolbench.Services
                 homesteadTiers: tiers,
                 characterDisciplines: effectiveCharacterDisciplines,
                 // See PlanSolver.Evaluate's ownedQuantityUsedByNode doc comment.
-                ownedQuantityUsedByNode: ownedQuantityUsedByNode);
+                ownedQuantityUsedByNode: ownedQuantityUsedByNode,
+                vendorCostSubtrees: costLineSubtrees);
             var plan = solveResult.Plan;
             sw.Stop();
             timingLog.Add($"Solve: {sw.ElapsedMilliseconds}ms");
@@ -426,6 +437,7 @@ namespace TaimisToolbench.Services
                 Tree = treeUsedForSolve,
                 Prices = prices,
                 VendorOffers = vendorOffers,
+                VendorCostLineValues = solveResult.VendorCostLineValues,
                 Metadata = metadata,
                 LearnedRecipeIds = learnedRecipeIds,
                 UsedMaterials = usedMaterials,
@@ -652,7 +664,8 @@ namespace TaimisToolbench.Services
                     assignNodeIds: false,
                     ignoredItemIds: ignoredItemIds,
                     homesteadTiers: context.HomesteadTiers,
-                    characterDisciplines: context.CharacterDisciplines);
+                    characterDisciplines: context.CharacterDisciplines,
+                    vendorCostLineValues: context.VendorCostLineValues);
 
                 var accountIndex = GetOrBuildAccountItemIndex(context);
                 var reduced = _reducer.Reduce(
@@ -679,7 +692,8 @@ namespace TaimisToolbench.Services
                 ignoredItemIds: ignoredItemIds,
                 homesteadTiers: context.HomesteadTiers,
                 characterDisciplines: context.CharacterDisciplines,
-                ownedQuantityUsedByNode: resolveOwnedQuantityUsedByNode);
+                ownedQuantityUsedByNode: resolveOwnedQuantityUsedByNode,
+                vendorCostLineValues: context.VendorCostLineValues);
 
             var resultBuilder = new PlanResultBuilder();
             var result = resultBuilder.Build(
@@ -745,15 +759,20 @@ namespace TaimisToolbench.Services
         {
             public PricedVendorContext(
                 IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
-                IReadOnlyDictionary<int, ItemPrice> prices)
+                IReadOnlyDictionary<int, ItemPrice> prices,
+                VendorCostLineSubtrees costLineSubtrees)
             {
                 VendorOffers = vendorOffers;
                 Prices = prices;
+                CostLineSubtrees = costLineSubtrees;
             }
 
             public IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> VendorOffers { get; }
 
             public IReadOnlyDictionary<int, ItemPrice> Prices { get; }
+
+            /// <summary>Null when no cost line needed one.</summary>
+            public VendorCostLineSubtrees CostLineSubtrees { get; }
         }
 
         /// <summary>
@@ -764,6 +783,7 @@ namespace TaimisToolbench.Services
         private async Task<PricedVendorContext> FetchPricedVendorContextAsync(
             HashSet<int> allItemIds,
             IReadOnlyDictionary<int, ItemPrice> prices,
+            PriceBasis priceBasis,
             IProgress<PlanStatus> progress,
             Stopwatch sw,
             List<string> timingLog,
@@ -781,7 +801,210 @@ namespace TaimisToolbench.Services
             timingLog.Add($"Query vendor offers: {sw.ElapsedMilliseconds}ms");
 
             var mergedPrices = await AugmentWithVendorCostPricesAsync(prices, vendorOffers, ct);
-            return new PricedVendorContext(vendorOffers, mergedPrices);
+
+            sw.Restart();
+            VendorCostLineExpansion expansion;
+            try
+            {
+                expansion = await ExpandVendorCostLinesAsync(
+                    allItemIds, vendorOffers, mergedPrices, priceBasis, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Expansion makes an existing plan MORE honest; it must never
+                // be the reason there is no plan. Its own price and offer
+                // lookups are extra calls this method did not used to make, so
+                // a failure here degrades to no subtrees - the solver's
+                // pre-expansion behaviour - rather than losing the generation.
+                _moduleLog.Write(
+                    ModuleLogLevel.Warn,
+                    "plan",
+                    $"Vendor cost-line expansion failed; vendor cost lines will not be costed: {ex.GetType().Name} - {ex.Message}");
+                expansion = new VendorCostLineExpansion(vendorOffers, mergedPrices, null);
+            }
+
+            sw.Stop();
+            timingLog.Add(
+                $"Expand vendor cost lines: {sw.ElapsedMilliseconds}ms ({expansion.Subtrees?.Count ?? 0} items)");
+
+            return new PricedVendorContext(
+                expansion.VendorOffers, expansion.Prices, expansion.Subtrees);
+        }
+
+        /// <summary>
+        /// Builds a quantity-1 acquisition subtree for every Item cost line
+        /// the Trading Post cannot price, so PlanSolver can cost it instead of
+        /// counting it as free (docs/ARCHITECTURE.md section 7.4). Each round
+        /// prices and looks up offers for what the previous round's subtrees
+        /// introduced, then expands whatever THAT exposed, until nothing new
+        /// appears or a bound is hit.
+        /// </summary>
+        /// <remarks>
+        /// The loop cannot run away: an id is expanded at most once
+        /// (<c>built</c>), so it terminates on the finite set of cost item ids
+        /// in the corpus whatever cycles that set contains - the shipped one
+        /// has them. DefaultMaxDistinctItems and the round cap are belt and
+        /// braces against a corpus larger than the one measured. Measured on
+        /// item 101521 over the shipped data: 3 rounds, 77 items, 4,215 nodes.
+        /// <para>
+        /// Failure here is never fatal to the plan: with no subtrees the
+        /// solver behaves exactly as it did before expansion existed.
+        /// </para>
+        /// </remarks>
+        private async Task<VendorCostLineExpansion> ExpandVendorCostLinesAsync(
+            HashSet<int> allItemIds,
+            IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
+            IReadOnlyDictionary<int, ItemPrice> prices,
+            PriceBasis priceBasis,
+            CancellationToken ct)
+        {
+            if (vendorOffers == null || vendorOffers.Count == 0 ||
+                _vendorOfferStore == null || _recipeService == null)
+            {
+                return new VendorCostLineExpansion(vendorOffers, prices, null);
+            }
+
+            var offers = new Dictionary<int, IReadOnlyList<VendorOffer>>(vendorOffers.Count);
+            foreach (var kvp in vendorOffers)
+            {
+                offers[kvp.Key] = kvp.Value;
+            }
+
+            var subtreesByItemId = new Dictionary<int, RecipeNode>();
+            var built = new HashSet<int>();
+            var frontierOffers = new List<IReadOnlyList<VendorOffer>>(offers.Values);
+            var knownItemIds = new HashSet<int>(allItemIds);
+            var mergedPrices = prices;
+
+            for (int round = 0; round < MaxVendorCostLineRounds; round++)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var wanted = VendorCostLineSubtrees.CollectUnpricedCostItemIds(
+                    frontierOffers, mergedPrices, priceBasis, built);
+                if (wanted.Count == 0)
+                {
+                    break;
+                }
+
+                var newItemIds = new HashSet<int>();
+                var nextFrontier = new List<IReadOnlyList<VendorOffer>>();
+                foreach (int itemId in Ordered(wanted))
+                {
+                    if (subtreesByItemId.Count >= VendorCostLineSubtrees.DefaultMaxDistinctItems)
+                    {
+                        break;
+                    }
+
+                    built.Add(itemId);
+                    RecipeNode subtree;
+                    try
+                    {
+                        subtree = await _recipeService.BuildTreeAsync(itemId, 1, ct);
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception)
+                    {
+                        // One unbuildable cost item leaves its own line a
+                        // barter line; it must not cost the plan every other
+                        // line's honest price.
+                        continue;
+                    }
+
+                    subtreesByItemId[itemId] = subtree;
+
+                    var subtreeIds = new HashSet<int>();
+                    CollectItemIds(subtree, subtreeIds);
+                    foreach (int id in subtreeIds)
+                    {
+                        if (knownItemIds.Add(id))
+                        {
+                            newItemIds.Add(id);
+                        }
+                    }
+                }
+
+                if (newItemIds.Count == 0)
+                {
+                    break;
+                }
+
+                // A subtree's own nodes need the same two lookups the plan
+                // tree's did, or the round that follows would judge them
+                // unpriced purely because nobody asked.
+                mergedPrices = await MergePricesAsync(mergedPrices, newItemIds, ct);
+                foreach (var kvp in _vendorOfferStore.GetOffersForItems(newItemIds))
+                {
+                    offers[kvp.Key] = kvp.Value;
+                    nextFrontier.Add(kvp.Value);
+                }
+
+                frontierOffers = nextFrontier;
+            }
+
+            return new VendorCostLineExpansion(
+                offers, mergedPrices, VendorCostLineSubtrees.Create(subtreesByItemId));
+        }
+
+        /// <summary>
+        /// Ascending item-id order, so which ids a
+        /// DefaultMaxDistinctItems cut-off drops is deterministic rather than
+        /// whatever a HashSet happened to enumerate.
+        /// </summary>
+        private static List<int> Ordered(HashSet<int> ids)
+        {
+            var list = new List<int>(ids);
+            list.Sort();
+            return list;
+        }
+
+        private async Task<IReadOnlyDictionary<int, ItemPrice>> MergePricesAsync(
+            IReadOnlyDictionary<int, ItemPrice> prices, HashSet<int> newIds, CancellationToken ct)
+        {
+            var fetched = await _tradingPostService.GetPricesAsync(newIds, ct);
+            if (fetched == null || fetched.Count == 0)
+            {
+                return prices;
+            }
+
+            var merged = new Dictionary<int, ItemPrice>(prices.Count + fetched.Count);
+            foreach (var kvp in prices)
+            {
+                merged[kvp.Key] = kvp.Value;
+            }
+
+            foreach (var kvp in fetched)
+            {
+                merged[kvp.Key] = kvp.Value;
+            }
+
+            return merged;
+        }
+
+        private readonly struct VendorCostLineExpansion
+        {
+            public VendorCostLineExpansion(
+                IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
+                IReadOnlyDictionary<int, ItemPrice> prices,
+                VendorCostLineSubtrees subtrees)
+            {
+                VendorOffers = vendorOffers;
+                Prices = prices;
+                Subtrees = subtrees;
+            }
+
+            public IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> VendorOffers { get; }
+
+            public IReadOnlyDictionary<int, ItemPrice> Prices { get; }
+
+            public VendorCostLineSubtrees Subtrees { get; }
         }
 
         /// <summary>

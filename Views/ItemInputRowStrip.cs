@@ -12,7 +12,9 @@ namespace TaimisToolbench.Views
     /// The multi-item request editor at the top of the Crafting Plan tab
     /// (gw2efficiency parity): the session-persistent row list, the live
     /// Blish controls each row owns, and the +/- buttons that grow and
-    /// shrink it.
+    /// shrink it. Rows are laid out as a grid of cells rather than a stack
+    /// of full-width rows - Services/ItemInputGridLayout owns that
+    /// arithmetic and the reason for it.
     /// <para>
     /// The strip owns row state and row controls and nothing else. It does
     /// not own the panel it draws into (<c>CraftingPlanView</c> creates and
@@ -27,26 +29,21 @@ namespace TaimisToolbench.Views
     /// </summary>
     internal sealed class ItemInputRowStrip
     {
-        // Item-row geometry, left to right: search box, "Qty:" label,
-        // quantity field, then the add/remove buttons. The buttons keep a
-        // clear gap from the quantity field so "+" does not read as its
-        // stepper.
-        private const int QtyInputX = 240;
-        private const int QtyInputWidth = 50;
-        private const int RowButtonsX = 320;
-
-        // The row's +/- pair: square, and the same height as every other
-        // button in the module - which is also the height of the search and
-        // quantity boxes they sit beside, so the run now shares one baseline
-        // instead of mixing 28px inputs with 24px buttons.
+        // A cell's controls, left to right: "Qty:" label, quantity field,
+        // search box, remove button. Their X offsets and widths are the
+        // grid's (ItemInputGridLayout) - only the in-row Y offsets and the
+        // input height are this file's, because only this file knows which
+        // Blish control goes where.
         private const int RowButtonSize = UiMetrics.ButtonHeight;
-        private const int RowButtonGap = 8;
         private const int RowButtonY = 3;
+        private const int InputY = 3;
+        private const int InputHeight = 28;
+        private const int QtyLabelY = 7;
 
-        // The strip's rows are the top region's rows: read straight from
-        // TopRegionLayoutMath rather than re-aliased here, so a row panel
-        // can never disagree with the height the strip was laid out for.
-        private const int RowHeight = TopRegionLayoutMath.TopRegionRowHeight;
+        // The strip's rows are the top region's rows: read through the grid
+        // rather than re-aliased here, so a cell can never disagree with the
+        // height the strip was laid out for.
+        private const int RowHeight = ItemInputGridLayout.RowHeight;
 
         // Session-persistent row list, mirroring gw2e's `e.recipes`
         // array. Populated with one empty row on the first Build();
@@ -63,6 +60,11 @@ namespace TaimisToolbench.Views
         // add/remove hands back the live one.
         private Panel _inputPanel;
 
+        // Parented to _inputPanel, not to a cell: on a full last row the
+        // button sits in the strip's right-edge gutter, which is outside
+        // every cell's bounds (ItemInputGridLayout.AddButtonGutter).
+        private FeedbackButton _addButton;
+
         internal ItemInputRowStrip(IItemSearchProvider itemSearchProvider, Action onRowCountChanged)
         {
             _itemSearchProvider = itemSearchProvider;
@@ -77,6 +79,19 @@ namespace TaimisToolbench.Views
         /// controls and the reflow that go with it.
         /// </summary>
         internal IReadOnlyList<ItemRowState> Rows => _rows;
+
+        /// <summary>
+        /// Grid rows the current item list occupies at
+        /// <paramref name="panelWidth"/> - what the top strip's Y
+        /// arithmetic needs, and no longer the same number as
+        /// <see cref="Rows"/>.Count. Asked of the strip rather than of the
+        /// grid directly so the caller does not have to know the button
+        /// size the column count is measured against.
+        /// </summary>
+        internal int RowCountFor(int panelWidth)
+        {
+            return ItemInputGridLayout.RowCount(_rows.Count, panelWidth, RowButtonSize);
+        }
 
         /// <summary>
         /// Gw2e's own initial state is one empty row
@@ -191,28 +206,90 @@ namespace TaimisToolbench.Views
                 row.RowPanel = null;
                 row.SearchBox = null;
                 row.QtyInput = null;
+                row.QtyLabel = null;
+                row.RemoveButton = null;
             }
 
+            // Same Parent guard as RowPanel above, for the same reason: a
+            // tab-switch Build has already torn this button down with its
+            // old panel, a same-cycle add/remove has not.
+            if (_addButton != null)
+            {
+                if (_addButton.Parent != null)
+                {
+                    _addButton.Dispose();
+                }
+
+                _addButton = null;
+            }
+
+            var grid = ItemInputGridLayout.Compute(_rows.Count, w, RowButtonSize);
             for (int i = 0; i < _rows.Count; i++)
             {
-                CreateItemRowControls(_rows[i], i, w);
+                CreateItemRowControls(_rows[i], grid, i);
             }
+
+            CreateAddButton(grid);
         }
 
         /// <summary>
-        /// Widths only, for a resize that did not change the row count -
-        /// the counterpart of <see cref="Rebuild"/>, which a drag must
-        /// never reach (it would tear down the user's in-progress typing
-        /// and their open suggestion list on every tick).
+        /// Re-seats every live control at the width the panel now has - the
+        /// counterpart of <see cref="Rebuild"/>, which a drag must never
+        /// reach (it would tear down the user's in-progress typing and
+        /// their open suggestion list on every tick). A drag that crosses a
+        /// column-count boundary moves cells sideways and onto other rows,
+        /// so this places them all rather than only resizing them.
         /// </summary>
         internal void ResizeRows(int w)
         {
-            foreach (var row in _rows)
+            var grid = ItemInputGridLayout.Compute(_rows.Count, w, RowButtonSize);
+
+            for (int i = 0; i < _rows.Count && i < grid.Cells.Count; i++)
             {
-                if (row.RowPanel != null)
-                {
-                    row.RowPanel.Size = new Point(w, RowHeight);
-                }
+                PlaceRowControls(_rows[i], grid, i);
+            }
+
+            PlaceAddButton(grid);
+        }
+
+        /// <summary>
+        /// The one place a cell's controls are positioned, so the build
+        /// pass and the resize pass cannot seat the same control
+        /// differently. Every control is optional: a row whose controls
+        /// have not been built yet (or whose remove button is suppressed on
+        /// the single-row strip) is skipped rather than special-cased by
+        /// the caller.
+        /// </summary>
+        private static void PlaceRowControls(ItemRowState row, ItemInputGridLayout.Grid grid, int index)
+        {
+            if (row.RowPanel == null)
+            {
+                return;
+            }
+
+            var cell = grid.Cells[index];
+            row.RowPanel.Location = new Point(cell.X, cell.Y);
+            row.RowPanel.Size = new Point(grid.CellPanelWidth, RowHeight);
+
+            if (row.SearchBox != null)
+            {
+                row.SearchBox.Location = new Point(grid.SearchBoxX, InputY);
+                row.SearchBox.Size = new Point(grid.SearchBoxWidth, InputHeight);
+            }
+
+            if (row.QtyLabel != null)
+            {
+                row.QtyLabel.Location = new Point(grid.QtyLabelX, QtyLabelY);
+            }
+
+            if (row.QtyInput != null)
+            {
+                row.QtyInput.Location = new Point(grid.QtyBoxX, InputY);
+            }
+
+            if (row.RemoveButton != null)
+            {
+                row.RemoveButton.Location = new Point(grid.RemoveButtonX, RowButtonY);
             }
         }
 
@@ -234,17 +311,19 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// One input row's controls: search box + qty, a Remove button
-        /// (gw2e's own 2+-rows gate), and on the last row only an Add
-        /// button - attached to the last row rather than its own strip
-        /// row so the single-row case keeps the exact original layout.
+        /// One input cell's controls: qty + search box, and a Remove button
+        /// (gw2e's own 2+-rows gate). The Add button is not one of them -
+        /// it belongs to the strip, not to a cell; see
+        /// <see cref="CreateAddButton"/>.
         /// </summary>
-        private void CreateItemRowControls(ItemRowState row, int index, int w)
+        private void CreateItemRowControls(ItemRowState row, ItemInputGridLayout.Grid grid, int index)
         {
+            // Nothing here sets a grid-derived Location or Size: the
+            // PlaceRowControls call at the bottom does that for the built
+            // row and again for every later resize, so the two passes
+            // cannot seat the same control differently.
             var rowPanel = new Panel()
             {
-                Size = new Point(w, RowHeight),
-                Location = new Point(0, index * RowHeight),
                 Parent = _inputPanel,
             };
             row.RowPanel = rowPanel;
@@ -261,8 +340,6 @@ namespace TaimisToolbench.Views
                     ? RestoredRequestInputs.UnnamedRowPlaceholder
                     : "Search items...",
                 Text = text,
-                Size = new Point(200, 28),
-                Location = new Point(0, 3),
                 Parent = rowPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
             row.SearchBox = searchBox;
@@ -296,54 +373,67 @@ namespace TaimisToolbench.Views
                 row.ItemName = null;
             };
 
-            new Label()
+            row.QtyLabel = new Label()
             {
                 Font = UiFonts.Body,
                 Text = "Qty:",
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(210, 7),
                 Parent = rowPanel,
             };
 
             var qtyInput = new TextBox()
             {
                 Text = string.IsNullOrEmpty(row.QuantityText) ? "1" : row.QuantityText,
-                Size = new Point(QtyInputWidth, 28),
-                Location = new Point(QtyInputX, 3),
+                Size = new Point(ItemInputGridLayout.QtyBoxWidth, InputHeight),
                 Parent = rowPanel,
             }.ReleaseOnDispose().ReleaseOnEnter();
             qtyInput.TextChanged += (_, __) => row.QuantityText = qtyInput.Text;
             row.QtyInput = qtyInput;
 
-            int nextX = RowButtonsX;
             if (ItemRowRequestBuilder.CanRemoveRow(_rows.Count))
             {
                 var removeButton = new FeedbackButton()
                 {
                     Text = "-",
                     Size = new Point(RowButtonSize, RowButtonSize),
-                    Location = new Point(nextX, RowButtonY),
                     Parent = rowPanel,
                     BasicTooltipText = "Remove this item from the plan",
                 };
                 removeButton.Click += (_, __) => RemoveItemRow(row);
-                nextX += RowButtonSize + RowButtonGap;
+                row.RemoveButton = removeButton;
             }
 
-            if (index == _rows.Count - 1)
+            PlaceRowControls(row, grid, index);
+        }
+
+        /// <summary>
+        /// The strip's one Add button, seated in the column immediately
+        /// after the last item's cell so it stands exactly where the next
+        /// item's search box will appear. Parented to the strip panel
+        /// rather than to that last cell: on a full row that column is the
+        /// right-edge gutter, outside every cell's bounds.
+        /// </summary>
+        private void CreateAddButton(ItemInputGridLayout.Grid grid)
+        {
+            _addButton = new FeedbackButton()
             {
-                var addButton = new FeedbackButton()
-                {
-                    Text = "+",
-                    Size = new Point(RowButtonSize, RowButtonSize),
-                    Location = new Point(nextX, RowButtonY),
-                    Parent = rowPanel,
-                    // Sitting next to the quantity field, a bare "+" reads
-                    // as a stepper. Say what it actually adds.
-                    BasicTooltipText = "Add another item to this plan",
-                };
-                addButton.Click += (_, __) => AddItemRow();
+                Text = "+",
+                Size = new Point(RowButtonSize, RowButtonSize),
+                Parent = _inputPanel,
+                // Sitting next to a quantity field, a bare "+" reads as a
+                // stepper. Say what it actually adds.
+                BasicTooltipText = "Add another item to this plan",
+            };
+            _addButton.Click += (_, __) => AddItemRow();
+            PlaceAddButton(grid);
+        }
+
+        private void PlaceAddButton(ItemInputGridLayout.Grid grid)
+        {
+            if (_addButton != null)
+            {
+                _addButton.Location = new Point(grid.AddButtonX, grid.AddButtonY + RowButtonY);
             }
         }
 

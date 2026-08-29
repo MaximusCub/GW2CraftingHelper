@@ -5,6 +5,7 @@ using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
 using MonoGame.Extended.BitmapFonts;
+using TaimisToolbench.Services;
 using TaimisToolbench.Views.Rendering;
 
 namespace TaimisToolbench.Views
@@ -16,11 +17,12 @@ namespace TaimisToolbench.Views
     /// call fails with an invalid/missing API key. Lists the three things to
     /// check, then offers Retry/Close.
     /// <para>
-    /// Text is pre-wrapped with Blish HUD's own DrawUtil.WrapText rather
-    /// than the Label control's WrapText property, whose wrap width is
-    /// pinned at the control's first internal layout pass - a pass that
-    /// fires before a later Width assignment in the same object initializer
-    /// takes effect (confirmed by decompiling the shipped assembly).
+    /// Text is pre-wrapped by Services/DialogLayoutMath rather than by the
+    /// Label control's WrapText property, whose wrap width is pinned at the
+    /// control's first internal layout pass - a pass that fires before a
+    /// later Width assignment in the same object initializer takes effect
+    /// (confirmed by decompiling the shipped assembly). The same service
+    /// sizes the window around the three checks below.
     /// </para>
     /// Centers on every Show(); it persists no drag position, so it needs no
     /// ModuleSettings entries. Why this is a separate class rather than a
@@ -31,27 +33,9 @@ namespace TaimisToolbench.Views
     {
         private const string WindowId = "TaimisToolbench_ApiAccessDialog_7d2c31";
 
-        // 480 before: at that width the title ran into the title bar's
-        // close X and was clipped mid-word ("GW2 API access is not read|y|X").
-        // Measured against BlishHUD 1.3.0's WindowBase2: the title is drawn
-        // in DefaultFont32 - the largest font in the toolkit, and NOT the
-        // font a title this long was sized against - at a fixed 80px offset
-        // into the left title-bar texture, clipped to that texture's own
-        // bounds, which end 2px short of the right title-bar section; the
-        // exit button then sits 32px plus its own width inside that section's
-        // right edge. So the title's budget is (window width - 80 - the
-        // right section's reserved run), and widening the window buys title
-        // room 1:1. This carries roughly 80px more than the clip needed, on
-        // top of the three characters the title itself dropped, because
-        // Font32's per-character cost is ~15px and neither figure is
-        // available to a unit test.
-        private const int WindowWidth = 560;
-        private const int WindowHeight = 300;
-        private const int ContentX = 10;
-        private const int ContentY = 35;
-        private const int ContentWidth = WindowWidth - (2 * ContentX);
-        private const int LineSpacing = 8;
-        private const int ButtonTopMargin = 20;
+        private const string RetryText = "Retry";
+
+        private const string CloseText = "Close";
 
         private static readonly string[] Checks =
         {
@@ -60,17 +44,23 @@ namespace TaimisToolbench.Views
             "3. This module has permission to use the API key (Blish settings > Manage Modules > Taimi's Toolbench).",
         };
 
-        private readonly StandardWindow _window;
+        // Width, height and every inner offset: Services/DialogLayoutMath.
+        // This dialog is why its title floor exists - at a 480px window the
+        // title ran into the title bar's close X and was clipped mid-word
+        // ("GW2 API access is not read|y|X"), and the fix was a wider
+        // window, because Blish draws the title at a fixed indent in
+        // DefaultFont32 with no alignment control.
+        private readonly DialogWindow _window;
         private bool _isShowing;
         private bool _disposed;
         private Action _onRetry;
 
         public ApiAccessDialog()
         {
-            _window = new StandardWindow(
+            _window = new DialogWindow(
                 new AsyncTexture2D(ContentService.Textures.Pixel),
-                new Rectangle(0, 0, WindowWidth, WindowHeight),
-                new Rectangle(ContentX, ContentY, ContentWidth, WindowHeight - ContentY - 10))
+                DialogLayoutMath.MinContentWidth,
+                DialogLayoutMath.MinContentHeight(0))
             {
                 BackgroundColor = new Color(30, 30, 30),
                 Parent = GameService.Graphics.SpriteScreen,
@@ -116,25 +106,35 @@ namespace TaimisToolbench.Views
             }
 
             var font = UiFonts.Body;
-            int y = 4;
+            var measure = LabelHelpers.MeasureWith(font);
+            var buttonMeasure = LabelHelpers.MeasureWith(UiFonts.Caption);
+            int lineHeight = font.LineHeight > 0 ? font.LineHeight : 1;
 
-            foreach (var check in Checks)
+            var screen = GameService.Graphics.SpriteScreen;
+            var layout = DialogLayoutMath.Measure(
+                Checks,
+                measure,
+                lineHeight,
+                LabelHelpers.MeasureWith(UiFonts.Display)(_window.Title),
+                buttonMeasure(RetryText),
+                buttonMeasure(CloseText),
+                DialogLayoutMath.MaxContentWidth(screen.Width, DialogWindow.ChromeWidth),
+                DialogLayoutMath.MaxContentHeight(screen.Height, DialogWindow.ChromeHeight, lineHeight));
+
+            // Before the children: they are placed against the region this
+            // call establishes.
+            _window.Resize(layout.ContentWidth, layout.ContentHeight);
+
+            for (int i = 0; i < layout.Blocks.Count; i++)
             {
-                y = AddWrappedLine(font, check, y);
+                AddWrappedLine(font, layout.Blocks[i], Checks[i]);
             }
-
-            int btnW = 100;
-            int closeW = 70;
-            int btnGap = 16;
-            int totalBtnW = btnW + btnGap + closeW;
-            int btnX = (ContentWidth - totalBtnW) / 2;
-            int btnY = y + ButtonTopMargin;
 
             var retryBtn = new FeedbackButton()
             {
-                Text = "Retry",
-                Size = new Point(btnW, 25),
-                Location = new Point(btnX, btnY),
+                Text = RetryText,
+                Size = new Point(layout.ConfirmWidth, DialogLayoutMath.ButtonHeight),
+                Location = new Point(layout.ConfirmX, layout.ButtonY),
                 Parent = _window,
             };
             retryBtn.Click += (_, __) =>
@@ -146,9 +146,9 @@ namespace TaimisToolbench.Views
 
             var closeBtn = new FeedbackButton()
             {
-                Text = "Close",
-                Size = new Point(closeW, 25),
-                Location = new Point(btnX + btnW + btnGap, btnY),
+                Text = CloseText,
+                Size = new Point(layout.CancelWidth, DialogLayoutMath.ButtonHeight),
+                Location = new Point(layout.CancelX, layout.ButtonY),
                 Parent = _window,
             };
             closeBtn.Click += (_, __) =>
@@ -157,7 +157,6 @@ namespace TaimisToolbench.Views
                 _window.Hide();
             };
 
-            var screen = GameService.Graphics.SpriteScreen;
             _window.Location = new Point(
                 (screen.Width - _window.Width) / 2,
                 (screen.Height - _window.Height) / 2);
@@ -206,30 +205,27 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// Adds one pre-wrapped, left-aligned Label at the given Y and
-        /// returns the Y for the next line - see the class doc comment for
-        /// why DrawUtil.WrapText is used instead of the Label control's own
-        /// WrapText property. Constructed without a Parent so Height
-        /// reflects only the wrapped text itself, then parented once the
-        /// next line's Y is already computed - mirrors
+        /// Adds one pre-wrapped, left-aligned Label at the Y the layout put
+        /// it. Constructed without a Parent so Height reflects only the
+        /// wrapped text itself, then parented - mirrors
         /// AboutTabContent.AddInfoLine's own ordering.
         /// </summary>
-        private int AddWrappedLine(BitmapFont font, string text, int y)
+        private void AddWrappedLine(BitmapFont font, DialogLayoutMath.MessageBlock block, string fullText)
         {
-            string wrapped = DrawUtil.WrapText(font, text, ContentWidth);
-
             var label = new Label()
             {
-                Text = wrapped,
+                Text = string.Join("\n", block.Lines),
                 Font = font,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, y),
+                Location = new Point(0, block.Y),
             };
 
-            int nextY = y + label.Height + LineSpacing;
             label.Parent = _window;
-            return nextY;
+
+            // Only a screen too short for all three checks drops text, and
+            // only then is the tooltip anything but a repeat of the line.
+            TooltipFacility.ApplyPlain(label, block.Truncated ? fullText : null);
         }
     }
 }

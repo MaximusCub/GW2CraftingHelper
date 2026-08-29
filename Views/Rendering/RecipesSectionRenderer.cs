@@ -73,17 +73,17 @@ namespace TaimisToolbench.Views.Rendering
             var font = UiFonts.Body;
             var headerFont = HeaderBands.Font;
 
-            int statusColumnWidth = MeasureWidth(headerFont, StatusHeaderText);
-            int disciplineColumnWidth = 0;
+            int statusInk = 0;
+            int disciplineInk = 0;
             bool anyDiscipline = false;
             for (int i = 0; i < section.Rows.Count; i++)
             {
                 var row = section.Rows[i];
 
                 int statusWidth = MeasureWidth(font, row.StatusTag);
-                if (statusWidth > statusColumnWidth)
+                if (statusWidth > statusInk)
                 {
-                    statusColumnWidth = statusWidth;
+                    statusInk = statusWidth;
                 }
 
                 if (string.IsNullOrEmpty(row.Sublabel))
@@ -91,40 +91,54 @@ namespace TaimisToolbench.Views.Rendering
                     continue;
                 }
 
-                if (!anyDiscipline)
-                {
-                    anyDiscipline = true;
-                    disciplineColumnWidth = MeasureWidth(headerFont, DisciplineHeaderText);
-                }
-
+                anyDiscipline = true;
                 int disciplineWidth = MeasureWidth(font, row.Sublabel);
-                if (disciplineWidth > disciplineColumnWidth)
+                if (disciplineWidth > disciplineInk)
                 {
-                    disciplineColumnWidth = disciplineWidth;
+                    disciplineInk = disciplineWidth;
                 }
             }
 
+            // Bands stay floored at their own header label - a band
+            // narrower than the word over it would let the column beside it
+            // run underneath - while the ink above stays unfloored, because
+            // the ink is what the headers centre over.
+            int statusColumnWidth = Max(statusInk, MeasureWidth(headerFont, StatusHeaderText));
+            int disciplineColumnWidth = anyDiscipline
+                ? Max(disciplineInk, MeasureWidth(headerFont, DisciplineHeaderText))
+                : 0;
+
             var scan = new ColumnScan(statusColumnWidth, disciplineColumnWidth);
 
-            // Both data headers centre over the band their own cells
-            // occupy rather than sharing an edge with them - the module's
-            // centred column law, see Services/JustifiedColumnTracks. Only
+            // Both data headers centre over the INK their own cells cover
+            // rather than sharing an edge with them, and are bounded by the
+            // columns either side rather than by their own bands - the
+            // module's header law, JustifiedColumnTracks.HeaderRoom. Only
             // Recipe stays on a rule: it is the flexing column, and its
             // names start at NameX on every row.
             int disciplineHeaderWidth = MeasureWidth(headerFont, DisciplineHeaderText);
             int statusHeaderWidth = MeasureWidth(headerFont, StatusHeaderText);
-            Func<int, int> statusLabelX = w => JustifiedColumnTracks.CenteredInBand(
-                scan.EdgesFor(w).StatusRightEdge - statusColumnWidth,
-                statusColumnWidth,
-                statusHeaderWidth);
+            Func<int, int> statusLabelX = w =>
+            {
+                var e = scan.EdgesFor(w);
+                RecipesColumnMath.HeaderRooms(e, disciplineInk, statusInk, out _, out var statusRoom);
+                return JustifiedColumnTracks.CenteredOverContentRightAligned(
+                    e.StatusRightEdge, statusInk, statusHeaderWidth, statusRoom);
+            };
 
             if (anyDiscipline)
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink,
                     middleLabel: DisciplineHeaderText,
-                    middleXForWidth: w => JustifiedColumnTracks.CenteredInBand(
-                        scan.EdgesFor(w).DisciplineX, disciplineColumnWidth, disciplineHeaderWidth),
+                    middleXForWidth: w =>
+                    {
+                        var e = scan.EdgesFor(w);
+                        RecipesColumnMath.HeaderRooms(
+                            e, disciplineInk, statusInk, out var disciplineRoom, out _);
+                        return JustifiedColumnTracks.CenteredOverContent(
+                            e.DisciplineX, disciplineInk, disciplineHeaderWidth, disciplineRoom);
+                    },
                     rightLabelXForWidth: statusLabelX);
             }
             else
@@ -163,6 +177,11 @@ namespace TaimisToolbench.Views.Rendering
                 return RecipesColumnMath.ComputeEdges(
                     panelWidth, _statusColumnWidth, _disciplineColumnWidth, NameX);
             }
+        }
+
+        private static int Max(int a, int b)
+        {
+            return a > b ? a : b;
         }
 
         private static int MeasureWidth(BitmapFont font, string text)

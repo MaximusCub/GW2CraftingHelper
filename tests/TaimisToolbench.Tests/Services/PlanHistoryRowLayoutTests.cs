@@ -154,6 +154,39 @@ namespace TaimisToolbench.Tests.Services
                 bands.NameX);
         }
 
+        [Theory]
+        [MemberData(nameof(GateWidths))]
+        public void TheCaretHitTargetPadsTheGlyphAndReachesTheIcon(int rowWidth)
+        {
+            var bands = PlanHistoryRowLayout.Compute(rowWidth, CostWidth, WhenWidth);
+
+            // Padding on the left of the glyph...
+            Assert.Equal(PlanHistoryRowLayout.CaretHitPadX, bands.CaretX - bands.CaretHitX);
+            Assert.True(bands.CaretHitX >= 0);
+
+            // ...and no dead strip on the right: the target ends exactly
+            // where the icon - itself an expand target - begins.
+            Assert.Equal(bands.IconX, bands.CaretHitX + bands.CaretHitWidth);
+
+            // Wider than the glyph column it replaces, on both sides.
+            Assert.True(bands.CaretHitWidth > PlanHistoryRowLayout.CaretColumnWidth);
+        }
+
+        [Fact]
+        public void TheCaretHitTargetIsAsTallAsTheIconBesideIt()
+        {
+            Assert.Equal(PlanHistoryRowLayout.IconY, PlanHistoryRowLayout.CaretHitY);
+            Assert.Equal(PlanHistoryRowLayout.IconTotal, PlanHistoryRowLayout.CaretHitHeight);
+
+            // The glyph seat stays inside the plate it now hangs off, at
+            // the offset the view draws it at.
+            int glyphY = PlanHistoryRowLayout.MainLineTextY - PlanHistoryRowLayout.CaretHitY;
+            Assert.True(glyphY >= 0);
+            Assert.True(
+                glyphY + TypeRampMetrics.Regular16.LineHeight
+                    <= PlanHistoryRowLayout.CaretHitHeight);
+        }
+
         [Fact]
         public void EveryTextSeatCentresItsLineBoxOnTheIconBesideIt()
         {

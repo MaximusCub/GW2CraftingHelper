@@ -128,6 +128,7 @@
     <Compile Include="Models\OwnMaterialsMode.cs" />
     <Compile Include="Services\InlineSpinnerLayout.cs" />
     <Compile Include="Services\TopRegionLayoutMath.cs" />
+    <Compile Include="Services\ItemInputGridLayout.cs" />
     <Compile Include="Services\TreeChipStripLayout.cs" />
     <Compile Include="Services\TreeToolbarRowLayout.cs" />
     <Compile Include="Services\TreeRowIdentity.cs" />
@@ -140,17 +141,21 @@
     <Compile Include="Services\ScrollMath.cs" />
     <Compile Include="Services\WheelDeltaSanitizer.cs" />
     <Compile Include="Services\ShoppingColumnMath.cs" />
+    <Compile Include="Services\DisciplinesColumnMath.cs" />
     <Compile Include="Services\RecipesColumnMath.cs" />
     <Compile Include="Services\TableSortState.cs" />
     <Compile Include="Services\UiGlyphs.cs" />
     <Compile Include="Services\GlyphFontDescriptor.cs" />
     <Compile Include="Services\PlanTableSorter.cs" />
     <Compile Include="Services\CoinSegmentMath.cs" />
+    <Compile Include="Services\DialogLayoutMath.cs" />
     <Compile Include="Services\ClickSoundVolume.cs" />
     <Compile Include="Services\PlanContentHeightMath.cs" />
     <Compile Include="Services\PlanRelayoutMath.cs" />
     <Compile Include="Services\SummarySectionLayoutMath.cs" />
     <Compile Include="Services\TreeCostColumnMath.cs" />
+    <Compile Include="Services\TreeCostColumnFloor.cs" />
+    <Compile Include="Services\TreePillRunLayout.cs" />
     <Compile Include="Services\TextWrapMath.cs" />
     <Compile Include="Services\MultiItemHeaderLayout.cs" />
     <Compile Include="Services\MultiItemHeaderTooltipComposer.cs" />
@@ -172,6 +177,8 @@
     <Compile Include="Models\TimegatedItem.cs" />
     <Compile Include="Services\PlanSolver.cs" />
     <Compile Include="Services\VendorBatchSolver.cs" />
+    <Compile Include="Services\VendorCostLineSubtrees.cs" />
+    <Compile Include="Services\VendorOfferDomination.cs" />
     <Compile Include="Services\StatusUpdateGuard.cs" />
     <Compile Include="Services\PhaseOrdinalGuard.cs" />
     <Compile Include="Services\PlanStripStatusBoard.cs" />
@@ -285,6 +292,7 @@
     <Compile Include="Views\Rendering\RowRelayoutHelpers.cs" />
     <Compile Include="Views\Rendering\TreeSectionController.cs" />
     <Compile Include="Views\Rendering\TreeToolbarCommands.cs" />
+    <Compile Include="Views\DialogWindow.cs" />
     <Compile Include="Views\ModalBackdrop.cs" />
     <Compile Include="Views\ModalDialog.cs" />
     <Compile Include="Views\ApiAccessDialog.cs" />
@@ -302,6 +310,7 @@
     <Compile Include="Services\RankerReadinessRamp.cs" />
     <Compile Include="Services\RankerRowLayout.cs" />
     <Compile Include="Services\RankerResultCache.cs" />
+    <Compile Include="Services\RankerSnapshotWatch.cs" />
     <Compile Include="Views\Rendering\RankerReadinessColors.cs" />
     <Compile Include="Views\RankerTabContent.cs" />
     <Compile Include="Views\SettingsTabContent.cs" />
@@ -333,6 +342,7 @@
     <Compile Include="Services\LogRowLayout.cs" />
     <Compile Include="Models\Gw2Constants.cs" />
     <Compile Include="Models\CostLine.cs" />
+    <Compile Include="Models\CostLineUnitValue.cs" />
     <Compile Include="Models\PillSourceCostBreakdown.cs" />
     <Compile Include="Models\VendorOffer.cs" />
     <Compile Include="Models\VendorOfferDataset.cs" />

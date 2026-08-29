@@ -39,6 +39,16 @@ namespace TaimisToolbench.Tests.Services
             // column - measures and draws through CoinSegmentMath, so this
             // one equality is what puts all of them on the bar tier.
             Assert.Equal(CurrencyIconTiers.WalletBarIconSize, CoinSegmentMath.CoinIconSize);
+
+            // The currency half of such a run is FRAMED (the module's grey
+            // currency border) and the coin half is not, but the framed box
+            // is the measured window either way: the art is inset inside it.
+            // That equality is what let the border go on without moving a
+            // single segment advance - CoinIconSize is a term in the
+            // minimum-window-width derivation.
+            Assert.Equal(
+                CoinSegmentMath.CoinIconSize,
+                ItemIconTiers.FrameSize(ItemIconTier.CurrencyBarRun));
         }
 
         [Fact]
@@ -73,6 +83,15 @@ namespace TaimisToolbench.Tests.Services
             // taller pitch to hold it.
             Assert.Equal(CurrencyIconTiers.WalletListIconSize, RankerRowLayout.CurrencyIconSize);
             Assert.True(RankerRowLayout.CurrencyLineHeight >= RankerRowLayout.CurrencyIconSize);
+
+            // The line reserves the FRAMED box, and the tier insets its art
+            // inside the measured window - so the constant the view lays the
+            // name out against is the same number the icon actually
+            // occupies. It was 34 against a reserved 32 while the frame was
+            // added outside the measurement.
+            Assert.Equal(
+                RankerRowLayout.CurrencyIconSize,
+                ItemIconTiers.FrameSize(ItemIconTier.CurrencyListRow));
         }
 
         [Fact]

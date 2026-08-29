@@ -205,8 +205,8 @@ namespace TaimisToolbench.Tests.Services
             Assert.Throws<ArgumentNullException>(() => TextWrapMath.Wrap("abc", 100, 100, null));
         }
 
-        // --- Caller-supplied line cap (ModalDialog: the dialog cannot grow,
-        // so the message is capped to the lines that fit above its buttons) ---
+        // --- Caller-supplied line cap (DialogLayoutMath: a dialog grows to
+        // fit its message until the screen runs out, then caps it) ---
         [Fact]
         public void Wrap_CallerLineCap_CapsBelowTheDefaultAndEllipsizesTheTail()
         {

@@ -696,5 +696,51 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(60, PlanRelayoutMath.ReducedWidth(60, 0));
             Assert.Equal(1, PlanRelayoutMath.ReducedWidth(4, 20));
         }
+
+        [Fact]
+        public void TrailingColumnHeaderRoom_HeaderWiderThanTheWholeRoom_PinsLeftAndSpillsOneWay()
+        {
+            // Used Materials' Amount column: "12x" is ~24px of ink under a
+            // ~50px word, and the values pin to the table's own edge, so
+            // this column has 27px of room for a 50px header. It cannot
+            // centre at all - it pins to the room's left bound and spills
+            // rightward, the one direction an over-wide header ever spills.
+            var room = PlanRelayoutMath.TrailingColumnHeaderRoom(1000, 24, 12);
+
+            Assert.Equal(1000, room.Right);
+            Assert.Equal(27, room.Width);
+            Assert.Equal(
+                room.Left,
+                JustifiedColumnTracks.CenteredOverContentRightAligned(1000, 24, 50, room));
+        }
+
+        [Fact]
+        public void TrailingColumnHeaderRoom_HeaderThatFitsTheRoom_CentresOnTheValues()
+        {
+            var room = PlanRelayoutMath.TrailingColumnHeaderRoom(1000, 24, 12);
+
+            Assert.Equal(
+                2 * 1000 - 24,
+                2 * JustifiedColumnTracks.CenteredOverContentRightAligned(1000, 24, 20, room) + 20);
+        }
+
+        [Fact]
+        public void TrailingColumnHeaderRoom_HeaderNarrowerThanTheValues_CentresOnThem()
+        {
+            var room = PlanRelayoutMath.TrailingColumnHeaderRoom(1000, 80, 12);
+
+            Assert.Equal(
+                2 * 1000 - 80,
+                2 * JustifiedColumnTracks.CenteredOverContentRightAligned(1000, 80, 40, room) + 40);
+        }
+
+        [Fact]
+        public void TrailingColumnHeaderRoom_LeftBoundSplitsTheNameGap_NotTheNamesThemselves()
+        {
+            var room = PlanRelayoutMath.TrailingColumnHeaderRoom(1000, 24, 12);
+
+            Assert.Equal(973, room.Left);
+            Assert.True(room.Left > 1000 - 24 - 12, "the room reached into the name column");
+        }
     }
 }

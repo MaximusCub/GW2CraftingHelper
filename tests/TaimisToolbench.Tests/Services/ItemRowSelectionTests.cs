@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using TaimisToolbench.Contracts;
 using TaimisToolbench.Services;
 using Xunit;
@@ -197,6 +198,41 @@ namespace TaimisToolbench.Tests.Services
             // "No item matched what you typed" would be a lie here - several
             // did, which is exactly the problem.
             Assert.Equal(ItemRowSelection.AmbiguousTextStatus, ItemRowSelection.EmptyRequestStatus(true, true));
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public void EmptyRequestStatus_ReadsAsAStandaloneSentence(bool anyText, bool anyAmbiguous)
+        {
+            // These three now carry an acknowledgement dialog as well as the
+            // status line. A dialog has none of the line's surrounding
+            // context - no toolbar above it, no strip beside it - so each
+            // has to say what happened and what to do about it on its own,
+            // and none may be a fragment the status line was completing.
+            string status = ItemRowSelection.EmptyRequestStatus(anyText, anyAmbiguous);
+
+            Assert.False(string.IsNullOrWhiteSpace(status));
+            Assert.EndsWith(".", status);
+            Assert.True(status.Length > 20, $"too terse to stand alone: '{status}'");
+            Assert.Equal(status.Trim(), status);
+        }
+
+        [Fact]
+        public void EmptyRequestStatus_TellsTheThreeMistakesApart()
+        {
+            // The dialog carries whichever of these applies, so collapsing
+            // any two would put "add an item" in front of a user whose box
+            // is visibly full.
+            var distinct = new[]
+            {
+                ItemRowSelection.EmptyRequestStatus(false, false),
+                ItemRowSelection.EmptyRequestStatus(true, false),
+                ItemRowSelection.EmptyRequestStatus(true, true),
+            };
+
+            Assert.Equal(3, distinct.Distinct().Count());
         }
 
         [Fact]

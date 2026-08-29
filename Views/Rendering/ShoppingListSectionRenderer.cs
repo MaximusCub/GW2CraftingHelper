@@ -89,12 +89,10 @@ namespace TaimisToolbench.Views.Rendering
             // #16). One pass over the section's rows (shopping lists run to
             // maybe 50-60 rows in practice) - negligible next to the
             // per-row control creation this method already does.
-            // The same pass measures the widest "Nx" amount string and the
-            // widest source badge - both BAND widths, so the Source
-            // column's own left edge (where the Item column's ellipsis
-            // budget now stops) is one x for the whole table. Every band's
-            // floor is its own header label: at the ColumnHeader tier a
-            // header routinely out-measures the data under it.
+            // The same pass measures the widest "Nx" amount string, the
+            // widest source badge and the widest item NAME - the last of
+            // which sizes the Item column's own reserve, so the four data
+            // columns divide everything it does not need.
             // Row ORDER only - the pre-scan sees the same rows either way,
             // so every column edge (and the row count PlanContentHeightMath
             // measures this section by) is identical sorted or not.
@@ -106,16 +104,17 @@ namespace TaimisToolbench.Views.Rendering
                 SortableHeaderLabel.Decorate("Source", _sortState.IndicatorFor(PlanTableColumn.Source));
             int maxEachWidth = 0;
             int maxTotalWidth = 0;
-            int maxQtyWidth =
-                (int)System.Math.Ceiling(HeaderBands.Font.MeasureString(amountHeaderText).Width);
-            // The Source band is floored at its own header too, but for the
-            // mirror-image reason the right-aligned bands are: this column
-            // is LEFT-ruled, so a header wider than the widest badge would
-            // overhang to the RIGHT, into the Amount column beside it.
-            int sourceColumnWidth =
-                (int)System.Math.Ceiling(HeaderBands.Font.MeasureString(sourceHeaderText).Width);
+            int maxQtyInk = 0;
+            int maxSourceInk = 0;
+            int maxNameWidth = 0;
             foreach (var row in rows)
             {
+                int nameW = (int)System.Math.Ceiling(coinFont.MeasureString(row.Label ?? "").Width);
+                if (nameW > maxNameWidth)
+                {
+                    maxNameWidth = nameW;
+                }
+
                 int eachW = CoinCurrencyRenderer.MeasureValueWidth(row.UnitCoinValue, row.UnitCurrencyCosts, coinFont);
                 if (eachW > maxEachWidth)
                 {
@@ -129,9 +128,9 @@ namespace TaimisToolbench.Views.Rendering
                 }
 
                 int qtyW = (int)System.Math.Ceiling(coinFont.MeasureString($"{row.Quantity}x").Width);
-                if (qtyW > maxQtyWidth)
+                if (qtyW > maxQtyInk)
                 {
-                    maxQtyWidth = qtyW;
+                    maxQtyInk = qtyW;
                 }
 
                 string badge = ShoppingSourceBadge.ForRow(row);
@@ -141,18 +140,34 @@ namespace TaimisToolbench.Views.Rendering
                 }
 
                 int badgeW = LabelHelpers.MeasureSmallTagWidth(badge);
-                if (badgeW > sourceColumnWidth)
+                if (badgeW > maxSourceInk)
                 {
-                    sourceColumnWidth = badgeW;
+                    maxSourceInk = badgeW;
                 }
             }
+
+            // Every band's floor is its own header label: at the
+            // ColumnHeader tier a header routinely out-measures the data,
+            // and a band narrower than its own header would let the
+            // neighbouring column run under that header. The Source band
+            // is floored for the mirror-image reason the right-aligned ones
+            // are: it is LEFT-ruled, so an over-wide header would overhang
+            // to the RIGHT, into the Amount column beside it. The INK
+            // widths stay separate - they are what each header centres
+            // over, and the floor is exactly the difference.
+            int maxQtyWidth = Max(
+                maxQtyInk, Measure(HeaderBands.Font, amountHeaderText));
+            int sourceColumnWidth = Max(
+                maxSourceInk, Measure(HeaderBands.Font, sourceHeaderText));
 
             // The header and every data row derive their build-time edges
             // from this SAME scan, and their relayout closures re-derive
             // them from it too - the pre-scan depends only on row data,
             // never on panelWidth, so it does not need to re-run on resize
             // at all and no two rows can anchor the table differently.
-            var scan = new ColumnScan(maxEachWidth, maxTotalWidth, maxQtyWidth, sourceColumnWidth);
+            var scan = new ColumnScan(
+                maxEachWidth, maxTotalWidth, maxQtyWidth, sourceColumnWidth, maxNameWidth,
+                maxQtyInk, maxSourceInk);
             CreateShoppingListHeaderRow(contentFlow, panelWidth, scan, amountHeaderText, sourceHeaderText);
             for (int i = 0; i < rows.Count; i++)
             {
@@ -160,31 +175,48 @@ namespace TaimisToolbench.Views.Rendering
             }
         }
 
-        // The four data-derived (panelWidth-invariant) measurements every
-        // row and header closure needs to recompute its column edges -
-        // grouped so a fifth cannot be added to one call site and
-        // forgotten at another.
+        // The data-derived (panelWidth-invariant) measurements every row
+        // and header closure needs to recompute its column edges - grouped
+        // so another cannot be added to one call site and forgotten at
+        // another. The Max* fields are BAND widths (floored at their own
+        // header); the *Ink fields are the same columns' unfloored content,
+        // which is what a header centres over. Each/Total need no separate
+        // ink field: their measured value IS the ink, and the band is
+        // EffectiveEach/TotalWidth of it.
         private readonly struct ColumnScan
         {
             internal readonly int MaxEachWidth;
             internal readonly int MaxTotalWidth;
             internal readonly int MaxQtyWidth;
             internal readonly int SourceColumnWidth;
+            internal readonly int MaxNameWidth;
+            internal readonly int QtyInk;
+            internal readonly int SourceInk;
 
             internal ColumnScan(
-                int maxEachWidth, int maxTotalWidth, int maxQtyWidth, int sourceColumnWidth)
+                int maxEachWidth, int maxTotalWidth, int maxQtyWidth, int sourceColumnWidth,
+                int maxNameWidth, int qtyInk, int sourceInk)
             {
                 MaxEachWidth = maxEachWidth;
                 MaxTotalWidth = maxTotalWidth;
                 MaxQtyWidth = maxQtyWidth;
                 SourceColumnWidth = sourceColumnWidth;
+                MaxNameWidth = maxNameWidth;
+                QtyInk = qtyInk;
+                SourceInk = sourceInk;
             }
 
             internal ShoppingColumnMath.ColumnEdges EdgesFor(int panelWidth)
             {
                 return ShoppingColumnMath.ComputeEdgesForPanel(
-                    panelWidth, MaxEachWidth, MaxTotalWidth, MaxQtyWidth, SourceColumnWidth);
+                    panelWidth, MaxEachWidth, MaxTotalWidth, MaxQtyWidth, SourceColumnWidth,
+                    MaxNameWidth);
             }
+        }
+
+        private static int Max(int a, int b)
+        {
+            return a > b ? a : b;
         }
 
         // Column edges come from Render()'s shared pre-scan, so the header
@@ -215,8 +247,9 @@ namespace TaimisToolbench.Views.Rendering
 
             // The Item column flexes and its cells rule left, so its header
             // stays on that rule at NameX. Every other header CENTRES over
-            // the band its own cells occupy rather than sharing an edge with
-            // them - see Services/JustifiedColumnTracks. Widths measured
+            // the INK its own cells cover, bounded by the columns either
+            // side of it and not by the band around that ink - see
+            // Services/JustifiedColumnTracks.HeaderRoom. Widths measured
             // from the strings (each carries its own sort indicator), so the
             // resize closure below never measures and never reads a Blish
             // Label's Width, which is not settled until its next layout
@@ -230,18 +263,22 @@ namespace TaimisToolbench.Views.Rendering
             int eachHeaderWidth = Measure(font, eachHeaderText);
             int totalHeaderWidth = Measure(font, totalHeaderText);
 
-            var sourceLabel = CreateBandCenteredHeader(
+            var rooms = HeaderRoomsFor(edges, scan);
+            var sourceLabel = CreateHeaderLabelAt(
                 rowPanel, sourceHeaderText, font, color,
-                edges.SourceX, edges.SourceBandWidth, sourceHeaderWidth);
-            var amountLabel = CreateBandCenteredHeader(
+                SourceHeaderX(edges, scan, sourceHeaderWidth, rooms.Source));
+            var amountLabel = CreateHeaderLabelAt(
                 rowPanel, amountHeaderText, font, color,
-                edges.QtyBandX, edges.QtyBandWidth, amountHeaderWidth);
-            var eachLabel = CreateBandCenteredHeader(
+                JustifiedColumnTracks.CenteredOverContentRightAligned(
+                    edges.QtyRightEdge, scan.QtyInk, amountHeaderWidth, rooms.Amount));
+            var eachLabel = CreateHeaderLabelAt(
                 rowPanel, eachHeaderText, font, color,
-                edges.EachBandX, edges.EachBandWidth, eachHeaderWidth);
-            var totalLabel = CreateBandCenteredHeader(
+                JustifiedColumnTracks.CenteredOverContentRightAligned(
+                    edges.EachRightEdge, scan.MaxEachWidth, eachHeaderWidth, rooms.Each));
+            var totalLabel = CreateHeaderLabelAt(
                 rowPanel, totalHeaderText, font, color,
-                edges.TotalBandX, edges.TotalBandWidth, totalHeaderWidth);
+                JustifiedColumnTracks.CenteredOverContentRightAligned(
+                    edges.TotalRightEdge, scan.MaxTotalWidth, totalHeaderWidth, rooms.Total));
 
             // The hit area is each column's whole header CELL (see
             // SortableHeaderCells); the labels carry only the note.
@@ -280,18 +317,21 @@ namespace TaimisToolbench.Views.Rendering
             _sink.AddRelayout(w =>
             {
                 var e = scan.EdgesFor(w);
+                var moved = HeaderRoomsFor(e, scan);
                 rowPanel.Size = new Point(w, HeaderBands.RowHeight);
                 sourceLabel.Location = new Point(
-                    JustifiedColumnTracks.CenteredInBand(e.SourceX, e.SourceBandWidth, sourceHeaderWidth),
-                    HeaderBands.LabelY);
+                    SourceHeaderX(e, scan, sourceHeaderWidth, moved.Source), HeaderBands.LabelY);
                 amountLabel.Location = new Point(
-                    JustifiedColumnTracks.CenteredInBand(e.QtyBandX, e.QtyBandWidth, amountHeaderWidth),
+                    JustifiedColumnTracks.CenteredOverContentRightAligned(
+                        e.QtyRightEdge, scan.QtyInk, amountHeaderWidth, moved.Amount),
                     HeaderBands.LabelY);
                 eachLabel.Location = new Point(
-                    JustifiedColumnTracks.CenteredInBand(e.EachBandX, e.EachBandWidth, eachHeaderWidth),
+                    JustifiedColumnTracks.CenteredOverContentRightAligned(
+                        e.EachRightEdge, scan.MaxEachWidth, eachHeaderWidth, moved.Each),
                     HeaderBands.LabelY);
                 totalLabel.Location = new Point(
-                    JustifiedColumnTracks.CenteredInBand(e.TotalBandX, e.TotalBandWidth, totalHeaderWidth),
+                    JustifiedColumnTracks.CenteredOverContentRightAligned(
+                        e.TotalRightEdge, scan.MaxTotalWidth, totalHeaderWidth, moved.Total),
                     HeaderBands.LabelY);
 
                 // Every data column's x is width-derived - a track under
@@ -307,9 +347,29 @@ namespace TaimisToolbench.Views.Rendering
             return (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width);
         }
 
-        private static Label CreateBandCenteredHeader(
-            Panel parent, string text, BitmapFont font, Color color,
-            int bandX, int bandWidth, int headerWidth)
+        /// <summary>
+        /// The Source header's x. Its badges are LEFT-ruled on SourceX, so
+        /// the ink runs rightward from there - the mirror of the three
+        /// right-aligned columns beside it.
+        /// </summary>
+        private static int SourceHeaderX(
+            ShoppingColumnMath.ColumnEdges edges, ColumnScan scan, int headerWidth,
+            JustifiedColumnTracks.HeaderRoom room)
+        {
+            return JustifiedColumnTracks.CenteredOverContent(
+                edges.SourceX, scan.SourceInk, headerWidth, room);
+        }
+
+        private static ShoppingColumnMath.HeaderRooms HeaderRoomsFor(
+            ShoppingColumnMath.ColumnEdges edges, ColumnScan scan)
+        {
+            return ShoppingColumnMath.HeaderRoomsFor(
+                edges, NameToQtyGap, scan.SourceInk, scan.QtyInk,
+                scan.MaxEachWidth, scan.MaxTotalWidth);
+        }
+
+        private static Label CreateHeaderLabelAt(
+            Panel parent, string text, BitmapFont font, Color color, int x)
         {
             return LabelHelpers.WithDescenderClearance(new Label()
             {
@@ -318,8 +378,7 @@ namespace TaimisToolbench.Views.Rendering
                 TextColor = color,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(
-                    JustifiedColumnTracks.CenteredInBand(bandX, bandWidth, headerWidth), HeaderBands.LabelY),
+                Location = new Point(x, HeaderBands.LabelY),
                 Parent = parent,
             });
         }

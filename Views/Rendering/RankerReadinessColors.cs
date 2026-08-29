@@ -4,14 +4,14 @@ using TaimisToolbench.Services;
 namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
-    /// Chrome for the Crafting Ranker's readiness percentages.
+    /// Chrome for the Crafting Ranker's readiness bars and day counts.
     ///
     /// <para>
-    /// Three bands, not a gradient. A ranked list is read by scanning, and a
-    /// continuous ramp gives a scanning eye nothing to catch on - two rows
-    /// four points apart would be indistinguishable while claiming to differ.
-    /// Three steps make "nearly there", "under way" and "barely started" legible
-    /// at a glance, which is the only judgement the colour is being asked for.
+    /// Three bands, not a gradient, wherever a figure is coloured rather than
+    /// drawn. A ranked list is read by scanning, and a continuous ramp gives a
+    /// scanning eye nothing to catch on - two rows a few points apart would be
+    /// indistinguishable while claiming to differ. Three steps stay legible at
+    /// a glance, which is the only judgement the colour is asked for.
     /// </para>
     ///
     /// <para>
@@ -25,9 +25,6 @@ namespace TaimisToolbench.Views.Rendering
     /// </summary>
     internal static class RankerReadinessColors
     {
-        internal const double NearDoneThreshold = 0.90;
-        internal const double InProgressThreshold = 0.50;
-
         /// <summary>Muted enough to sit under body text without reading as a success banner.</summary>
         private static readonly Color NearDone = new Color(126, 186, 126);    // #7EBA7E
 
@@ -64,16 +61,6 @@ namespace TaimisToolbench.Views.Rendering
         private static Color Rgb(RankerReadinessRamp.Rgb color)
         {
             return new Color(color.R, color.G, color.B);
-        }
-
-        internal static Color ForReadiness(double readiness)
-        {
-            if (readiness >= NearDoneThreshold)
-            {
-                return NearDone;
-            }
-
-            return readiness >= InProgressThreshold ? InProgress : Early;
         }
 
         /// <summary>

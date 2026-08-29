@@ -27,5 +27,13 @@ namespace TaimisToolbench.Views
         internal AutocompleteTextBox SearchBox;
         internal SuggestionPanel SuggestionPanel;
         internal TextBox QtyInput;
+
+        // Held for the width-only relayout: a resize that changes the input
+        // grid's column count moves every control inside a cell, and
+        // ItemInputRowStrip.ResizeRows must reach them without disposing
+        // the search box the user may be typing into. RemoveButton is null
+        // on the single row that has none.
+        internal Label QtyLabel;
+        internal Control RemoveButton;
     }
 }
