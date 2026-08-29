@@ -1409,42 +1409,19 @@ namespace TaimisToolbench
 
         /// <summary>
         /// Asks whether to keep or drop unsaved Settings edits, once the
-        /// user has already left the tab.
+        /// user has already left the tab. Blish 1.3.0 raises TabChanged
+        /// only after the switch has happened and offers nothing to veto
+        /// it, so there is no earlier point to ask from (KNOWN-ISSUES #51).
         ///
-        /// <para>
-        /// The prompt is after the fact because Blish 1.3.0 has nowhere to
-        /// put it earlier. Measured from the vendored binary:
-        /// TabbedWindow2.SelectedTab's setter assigns the backing field via
-        /// SetProperty and only then calls OnTabChanged, which itself calls
-        /// ShowView (tearing down the old view) BEFORE raising the public
-        /// TabChanged event. There is no pre-change event, nothing the
-        /// handler can set to veto, and the one virtual member in the chain
-        /// already runs after the assignment - so by the time any module
-        /// code is reached, the tab has changed and cannot be changed back
-        /// without triggering a second switch. See KNOWN-ISSUES #51 for
-        /// the alternatives that were measured and rejected.
-        /// </para>
+        /// The outgoing view's controls are unparented, not disposed, so
+        /// the Settings TextBoxes still hold the user's typed text when
+        /// this runs and Save persists exactly what was on screen.
         ///
-        /// <para>
-        /// Blish only unparents the outgoing view's controls
-        /// (Container.ClearChildren sets Parent = null; it does not
-        /// dispose), so the Settings TextBoxes still hold the user's typed
-        /// text when this runs and Save persists exactly what was on
-        /// screen.
-        /// </para>
-        ///
-        /// <para>
-        /// Only the tab path is hooked. The window's own Hidden event is
-        /// NOT: measured in the vendored 1.3.0 binary, every WindowBase2
-        /// subscribes to Gw2Mumble.PlayerCharacter.IsInCombatChanged and
-        /// Gw2Instance.IsInGameChanged, both of which call Hide() when the
-        /// user has Blish's "hide windows in combat" / "hide during
-        /// loading" overlay options on - so entering combat with an edited
-        /// field would pop a modal over gameplay. Closing the window
-        /// leaves the edits in the live TextBoxes exactly as it always
-        /// has: nothing tears the view down, so reopening the window shows
-        /// the typed text again.
-        /// </para>
+        /// Only the tab path is hooked; the window's own Hidden event
+        /// deliberately is NOT, because Blish fires it on entering combat
+        /// and on loading screens, which would pop a modal over gameplay.
+        /// The measured call chains behind all three: docs/ARCHITECTURE.md
+        /// section 1.
         /// </summary>
         private void PromptForUnsavedSettings()
         {

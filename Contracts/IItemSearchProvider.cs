@@ -51,13 +51,10 @@ namespace TaimisToolbench.Contracts
         /// <paramref name="maxResults"/>).
         /// </summary>
         /// <remarks>
-        /// Implementations MUST NOT perform an arbitrary search over all GW2
-        /// items. Only items that the <c>CraftingPlanPipeline</c> can resolve
-        /// into a crafting plan may be returned. The provider - not the UI -
-        /// is responsible for guaranteeing plan validity of every result.
-        /// Implementations may also complete asynchronously; the caller
-        /// (SuggestionPanel) marshals UI application of the result back to
-        /// the main thread rather than assuming this runs inline.
+        /// The interface contract above governs every result. Implementations
+        /// may complete asynchronously; the caller (SuggestionPanel) marshals
+        /// UI application of the result back to the main thread rather than
+        /// assuming this runs inline.
         /// </remarks>
         /// <param name="query">
         /// Case-insensitive substring filter. Empty/null returns all items.
