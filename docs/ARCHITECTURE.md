@@ -588,6 +588,88 @@ it carries characterization tests of current behavior, the standard
 adversarial review pipeline, and an explicit improved/regressed-nothing
 statement, per the high-evidence-zone policy.
 
+### 7.1 Offer tiering, in full
+
+`EvaluateVendorOffers` splits offers on their non-coin cost lines, and two
+kinds of line obey one rule: a non-coin wallet currency line, and a
+*barter* line - an `Item` cost line whose item has no Trading Post price,
+which is what an account-bound vendor token is. An `Item` line that does
+have a TP price is money, not a barter line: it folds into the offer's
+real coin cost and never consults a valuation.
+
+An offer is **comparable** (competes with TP/craft coin costs in
+`PickCheapest`) when it has no non-coin lines at all, or every one of them
+has a valuation. Its comparison value is then coin part +
+`sum(count * copperPerUnit)` over those valued lines, reported via
+`VendorOfferEvaluation.BestComparableValue`. The winning comparable
+offer's real coin part and (if any) currency lines are reported
+separately, via `BestComparableCoinCost` and `BestComparableCurrencyCosts`
+- the valuation affects comparison only, never the amounts committed to
+the plan. A barter line's own scaled quantity rides on
+`BestComparableItemCosts` with a null `GoldValue`, for the same reason.
+
+An offer with at least one non-coin line that has **no** valuation
+(including when it is mixed with other, valued lines) is incomparable with
+coin costs and is reported only as a **fallback**, ranked by lowest coin
+part. A fallback coin-part tie is broken by unit count only when both
+offers cost the same single non-coin line, kind included; ties across
+different lines keep the first-listed offer, because ranking across them
+has no exchange rate and their unit counts must never be compared.
+
+A `DailyCap`/`WeeklyCap`/`SeasonalCap` never excludes an offer or affects
+its tier - gw2efficiency only ever surfaces a cap as a post-solve notice,
+never re-routing the tree - so both tiers carry the raw caps through for
+`FinalizeVendorBatches` to check once against aggregate demand.
+
+### 7.2 Why the ceil is merged, and why a conflict is not
+
+The sum of independently-ceil'd per-occurrence costs overstates the true
+cost whenever an item is needed via 2+ occurrences and bought via a bulk
+offer, so `FinalizeVendorBatches` re-derives the cost from the aggregate
+quantity and ceils once. It only does so when every occurrence resolved to
+the identical winning offer: re-deriving one "true" cost across genuinely
+different offers has no principled answer, so a `Conflict` step keeps
+`AggregateStep`'s sum of real per-occurrence purchases - a deliberately
+conservative fallback.
+
+### 7.3 Allocating a corrected total back to occurrences
+
+Without `AllocateVendorNodeCosts`, `CraftingTreeNode.SubtreeCost` (via the
+public `Decisions` dict) kept showing the stale, per-occurrence-overcounted
+sum after `FinalizeVendorBatches` had corrected only the merged
+`PlanStep`/`currencyMap` view.
+
+It touches only the stepKeys that method actually corrected -
+`step.VendorOfferOutputCount > 0`, which is only ever set inside its
+single-winning-offer branch and is 0 for the conflict/mixed-offer case.
+Where occurrences disagreed on the winning offer, each occurrence's own
+memo `TotalCost` is already individually correct (a genuinely different
+real purchase), so redistributing a uniform rate across them would replace
+correct values with a wrong blended one - the same reasoning
+`FinalizeVendorBatches` itself applies to `step.TotalCost`.
+
+The allocation is largest-remainder (Hamilton) apportionment, proportional
+to each occurrence's own `Quantity` share of the step's total demand:
+`floor(step.TotalCost * quantity / totalQuantity)` per occurrence, then the
+leftover copper(s) - `step.TotalCost` minus the sum of floors, always fewer
+than `occurrences.Count` - go one each to the occurrences with the largest
+fractional remainder (numerator mod `totalQuantity`), ties broken by
+first-seen (DFS) order for determinism. The allocated shares always sum to
+precisely `step.TotalCost` (no drift, no invented precision) and any two
+occurrences of equal quantity diverge by at most 1 copper. The multiply
+widens to `decimal` so this holds unconditionally - no `long` overflow is
+possible for any `step.TotalCost`/`Quantity` pair. A "last occurrence
+absorbs the remainder" shape is not acceptable here: it dumps the entire
+batch-overrun cost, unbounded for equal-quantity occurrences, onto
+whichever occurrence lands last in DFS order.
+
+A component leaf's raw `VendorItemCosts`/`VendorCurrencyCosts` are captured
+pre-merge, per occurrence, and are *not* re-derived here - they can
+disagree with the corrected share whenever a step merges 2+ occurrences.
+The caller reads this method's outputs afterward to mark which decisions
+must suppress component-leaf display, in
+`FlagUnreliableVendorComponentCosts`.
+
 **Full history:** KNOWN-ISSUES items 20.1, 20.2, 28, 33.
 
 ---
@@ -916,3 +998,62 @@ case), `Views/CraftingPlanView.cs` (`ApplyRestoredRequest`, the
 request-only restore), `Models/PlanHistoryEntry.cs` and
 `Services/PlanHistoryStore.cs` (the index's readable range and the
 additive-only row graph behind it).
+
+---
+
+## S2. Services Q-Z: relocated design narrative
+
+Design narrative moved out of doc comments in `Services/` (files whose
+names begin Q-Z) under CLAUDE.md's comment rule: the invariant a caller can
+violate stays at the member, the derivation that explains it lives here.
+Each subsection names the class and member it came from, so a reader who
+arrives from the citation lands on the same argument the comment used to
+carry.
+
+### S2.1 Sell-side economics for a batch
+
+**`SellSideEconomics.ApplyBatchSellSideEconomics`.** The batch rollup is
+gw2efficiency parity work (KNOWN-ISSUES #25), and it diverges from gw2e's
+own multi-item rollup - the `o()` function in the live app bundle, see
+[`docs/research/m37-r2-batch-economics.md`](research/m37-r2-batch-economics.md)
+sections 1.2 and 4.1 - in three deliberate ways:
+
+1. **No craft-vs-buy filter.** Any requested root with a live TP sell
+   price contributes its own `SellableQuantity`/`NetSaleValue`/
+   `CraftingProfit` regardless of whether the solver bought or crafted it.
+   This matches the module's already-shipped single-item
+   `ApplySellSideEconomics` semantics, which has never filtered by
+   craft-vs-buy - a flip/arbitrage number is still meaningful - and the
+   research report's explicit recommendation (4.1.1) *not* to adopt gw2e's
+   `craft === true` filter. Pinned by
+   `MultiItemPlanTests.GenerateStructuredAsync_MultiItem_OneRootBoughtButTradable_IncludedInSum`.
+2. **A crafted root with no live TP sell price contributes nothing** -
+   excluded entirely, its revenue and its own craft cost dropping out
+   together - rather than gw2e's silent "-cost" drag for an untradable
+   crafted root.
+3. **A single profit basis** (instant-sell/buy-order, via `SellInstant`),
+   matching the single-item row. gw2e always shows a second
+   sell-listing-basis figure this module has never surfaced.
+
+**Why `MaterialOpportunityCost` is a single batch-wide sum.** `Reduce`
+still runs on the entire wrapper tree before `Solve` ever picks buy vs
+craft per root (see `GenerateStructuredMultiAsync`'s step ordering), so the
+figure is one sum over the merged `UsedMaterials` list and is not scoped
+down to the roots that end up contributing to the sellable totals. What
+makes that safe is that `UsedMaterials` is itself decision-aware:
+`InventoryReducer.Reduce`'s `zeroOwnedDecisions` guide, fed by a throwaway
+zero-owned `Solve()` on the same unreduced tree, means a root the solver
+decides to buy no longer has its never-crafted subtree's owned ingredient
+stock recorded as "used" at all, so there is nothing left to deduct from
+`CraftingProfit` for that root. The single-item path was updated to the
+same guided reduction, so both behave identically. Pinned by
+`MultiItemPlanTests.GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostNullForBoughtRootOwnedIngredient`.
+
+**`SellSideEconomics.PerItemEconomics`.** `itemId` is passed explicitly
+rather than read from `itemRoot.Id`. Both call sites already guarantee
+`itemRoot.Id == itemId` by construction (`RecipeService.BuildTreeAsync` and
+`BuildMultiItemTreeAsync`), but keeping it explicit means the struct never
+silently depends on that invariant holding.
+
+**Full history:** KNOWN-ISSUES item 25;
+[`docs/research/m37-r2-batch-economics.md`](research/m37-r2-batch-economics.md).

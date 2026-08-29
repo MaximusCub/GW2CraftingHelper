@@ -119,44 +119,24 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Splits vendor offers into two tiers, on the offer's NON-COIN cost
-        /// lines. Two kinds of those obey one rule: a non-coin wallet
-        /// currency line, and a BARTER line - an Item cost line whose item
-        /// has no Trading Post price, which is what an account-bound vendor
-        /// token is. An Item line that DOES have a TP price is money, not a
-        /// barter line: it folds into the offer's real coin cost as before
-        /// and never consults a valuation.
-        ///
-        /// An offer is COMPARABLE (competes with TP/craft coin costs in
-        /// PickCheapest) when it has no non-coin lines at all, OR every one
-        /// of them has a valuation (<paramref name="currencyValuation"/>):
-        /// its comparison value is coin part + sum(count * copperPerUnit)
-        /// over those valued lines, reported via
-        /// <see cref="VendorOfferEvaluation.BestComparableValue"/>.
-        /// The winning comparable offer's real coin part and (if any) currency
-        /// lines are reported separately via
-        /// <see cref="VendorOfferEvaluation.BestComparableCoinCost"/>
-        /// and <see cref="VendorOfferEvaluation.BestComparableCurrencyCosts"/> -
-        /// the valuation affects comparison only, never the amounts committed
-        /// to the plan. A barter line's own scaled quantity rides on
-        /// <see cref="VendorOfferEvaluation.BestComparableItemCosts"/> with a
-        /// null GoldValue, for the same reason.
-        ///
-        /// An offer with at least one non-coin line that has NO valuation
-        /// (including when it is mixed with other, valued lines) is
-        /// incomparable with coin costs and reported only as a FALLBACK,
-        /// ranked by lowest coin part. A fallback coin-part tie is broken by
-        /// unit count only when both offers cost the same single non-coin
-        /// line, kind included; ties across different lines keep the
-        /// first-listed offer, because ranking across them has no exchange
-        /// rate and their unit counts must never be compared.
+        /// Splits vendor offers into comparable and fallback tiers on their NON-COIN
+        /// cost lines (a non-coin wallet currency, or a BARTER line - an Item cost
+        /// line whose item has no Trading Post price; an Item line that HAS a TP
+        /// price is money, folds into the offer's real coin cost, and consults no
+        /// valuation). COMPARABLE means no non-coin lines at all, or a valuation for
+        /// every one of them; any unvalued non-coin line makes the offer
+        /// fallback-only. A valuation moves the comparison value alone - the coin,
+        /// currency and barter amounts committed to the plan are never scaled by it.
+        /// A fallback coin-part tie breaks on unit count ONLY when both offers cost
+        /// the same single non-coin line, kind included; across different lines
+        /// there is no exchange rate, so their unit counts must never be compared
+        /// and the first-listed offer keeps the tie.
+        /// Tiers: docs/ARCHITECTURE.md, "Merged-ceil vendor batching".
         /// </summary>
         /// <remarks>
-        /// A DailyCap/WeeklyCap/SeasonalCap NEVER excludes an offer or
-        /// affects its tier - gw2e only ever surfaces a cap as a post-solve
-        /// notice, never re-routing the tree, so both tiers carry the raw
-        /// caps through for FinalizeVendorBatches to check once against
-        /// aggregate demand (docs/ARCHITECTURE.md section 7).
+        /// A DailyCap/WeeklyCap/SeasonalCap NEVER excludes an offer or affects its
+        /// tier: both tiers carry the raw caps through for FinalizeVendorBatches to
+        /// check once against aggregate demand.
         /// </remarks>
         internal VendorOfferEvaluation EvaluateVendorOffers(
             RecipeNode node,
@@ -658,34 +638,24 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Re-derives every merged BuyFromVendor PlanStep's true cost from
-        /// its AGGREGATE Quantity and the winning offer's batch shape,
-        /// ceiling the purchase count exactly once (gw2e's convention).
-        /// The sum of independently-ceil'd per-occurrence costs overstates
-        /// the true cost whenever an item is needed via 2+ occurrences and
-        /// bought via a bulk offer.
+        /// Re-derives every merged BuyFromVendor PlanStep's true cost from its
+        /// AGGREGATE Quantity and the winning offer's batch shape, ceiling the
+        /// purchase count exactly once. Applied only when every occurrence resolved
+        /// to the identical winning offer (Conflict false); a Conflict step keeps
+        /// AggregateStep's sum of real per-occurrence purchases. Do not re-add a
+        /// branch that sums a cap notice for Conflict steps whose occurrences agree
+        /// on the raw cap tuple - the premise is false, see VendorBatchState.
         ///
-        /// Only applied when every occurrence resolved to the identical
-        /// winning offer (Conflict false) - re-deriving one "true" cost
-        /// across genuinely different offers has no principled answer, so
-        /// a Conflict step keeps AggregateStep's sum of real
-        /// per-occurrence purchases, a deliberately conservative fallback.
-        ///
-        /// Also folds every vendor step's final VendorCurrencyCosts into
-        /// currencyMap (the single place vendor currency reaches the
-        /// plan-wide total) and collects timegated notices for any uniform
-        /// step whose aggregate purchase count exceeds the daily
-        /// (preferred) or weekly cap, plus an independent Seasonal-cap
-        /// notice - the checks do not suppress each other. Caps never
+        /// Also folds every vendor step's final VendorCurrencyCosts into currencyMap
+        /// (the single place vendor currency reaches the plan-wide total) and
+        /// collects timegated notices for any uniform step whose aggregate purchase
+        /// count exceeds the daily (preferred) or weekly cap, plus an independent
+        /// Seasonal-cap notice - the checks do not suppress each other. Caps never
         /// exclude an offer or change Source/TotalCost.
         ///
         /// The recomputed step.UnitCost is the winning offer's own
-        /// CoinCostPerBatch/OutputCount rate, not a truncating
-        /// total/Quantity average.
-        ///
-        /// Do not re-add a branch that sums a cap notice for Conflict
-        /// steps whose occurrences agree on the raw cap tuple - the
-        /// premise is false, see VendorBatchState's own comment.
+        /// CoinCostPerBatch/OutputCount rate, not a truncating total/Quantity
+        /// average. Derivation: docs/ARCHITECTURE.md, "Merged-ceil vendor batching".
         /// </summary>
         internal List<TimegatedItem> FinalizeVendorBatches(
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
@@ -779,49 +749,24 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Redistributes each FinalizeVendorBatches-corrected merged vendor
-        /// step's true aggregate TotalCost back to the individual per-
-        /// occurrence memo (Decision) entries that fed it - without this,
-        /// CraftingTreeNode.SubtreeCost (via the public Decisions dict)
-        /// kept showing the stale, per-occurrence-overcounted sum after
-        /// FinalizeVendorBatches corrected only the merged PlanStep/
-        /// currencyMap view.
+        /// Redistributes each FinalizeVendorBatches-corrected merged vendor step's
+        /// true aggregate TotalCost back to the per-occurrence memo (Decision)
+        /// entries that fed it, so CraftingTreeNode.SubtreeCost stops reporting the
+        /// stale per-occurrence overcount. Only stepKeys that method actually
+        /// corrected are touched (step.VendorOfferOutputCount &gt; 0): where
+        /// occurrences disagreed on the winning offer each memo TotalCost is already
+        /// individually correct, and blending them would replace correct values.
         ///
-        /// Only touches stepKeys FinalizeVendorBatches actually corrected
-        /// (step.VendorOfferOutputCount &gt; 0 - only ever set inside that
-        /// method's own single-winning-offer branch, 0 for the Conflict/
-        /// mixed-offer case - see FinalizeVendorBatches). When occurrences
-        /// disagreed on the winning offer, each occurrence's own memo
-        /// TotalCost is already individually correct (a genuinely different
-        /// real purchase), so redistributing a uniform rate across them
-        /// would REPLACE correct values with a wrong blended one - the same
-        /// reasoning FinalizeVendorBatches itself already applies to
-        /// step.TotalCost.
+        /// Allocation is largest-remainder (Hamilton) apportionment by Quantity
+        /// share. The shares always sum to precisely step.TotalCost, and two
+        /// occurrences of equal quantity diverge by at most 1 copper; the multiply
+        /// widens to decimal so that holds for any TotalCost/Quantity pair.
         ///
-        /// Allocation is largest-remainder (Hamilton) apportionment,
-        /// proportional to each occurrence's own Quantity share of the
-        /// step's total demand: floor(step.TotalCost * quantity /
-        /// totalQuantity) per occurrence, then the leftover copper(s) -
-        /// step.TotalCost minus the sum of floors, always fewer than
-        /// occurrences.Count - go one each to the occurrences with the
-        /// largest fractional remainder (numerator mod totalQuantity),
-        /// ties broken by first-seen (DFS) order for determinism. The
-        /// allocated shares always sum to precisely step.TotalCost - no
-        /// drift, no invented precision - and any two occurrences of
-        /// equal quantity diverge by at most 1 copper. The multiply
-        /// widens to decimal so this holds unconditionally - no long
-        /// overflow is possible for any step.TotalCost/Quantity pair.
-        /// A "last occurrence absorbs the remainder" shape is not
-        /// acceptable here: it dumps the entire batch-overrun cost,
-        /// unbounded for equal-quantity occurrences, onto whichever
-        /// occurrence lands last in DFS order.
-        ///
-        /// A component leaf's raw VendorItemCosts/VendorCurrencyCosts
-        /// (captured pre-merge, per occurrence) are NOT re-derived here -
-        /// they can disagree with the corrected share whenever a step
-        /// merges 2+ occurrences. The caller reads this method's outputs
-        /// afterward to mark which decisions must suppress component-leaf
-        /// display (see FlagUnreliableVendorComponentCosts).
+        /// A component leaf's raw VendorItemCosts/VendorCurrencyCosts are NOT
+        /// re-derived here and can disagree with the corrected share; the caller
+        /// reads this method's outputs to mark which decisions must suppress
+        /// component-leaf display (see FlagUnreliableVendorComponentCosts).
+        /// Derivation: docs/ARCHITECTURE.md, "Merged-ceil vendor batching".
         /// </summary>
         internal void AllocateVendorNodeCosts(
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
