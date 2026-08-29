@@ -407,14 +407,19 @@ namespace TaimisToolbench.Services
         /// <summary>Reserved band width for each of Required/Have/Needed.</summary>
         public const int CurrencyNumberColumnWidth = 60;
 
-        /// <summary>Reserved band width for the full-coverage marker.</summary>
+        /// <summary>
+        /// Floor for the full-coverage marker column's band. Widened per
+        /// render to whichever is larger, the marker pill or the "Status"
+        /// header over it (<see cref="EffectiveCurrencyMarkerWidth"/>) -
+        /// both are Blish measurements, so both arrive from the caller.
+        /// </summary>
         public const int CurrencyMarkerWidth = 34;
 
         /// <summary>
         /// Columns the row's width is divided evenly between: the currency
-        /// name, then Required, Have and Needed. The trailing coverage
-        /// marker is NOT one of them - it is a per-row badge pinned outside
-        /// the table's own right edge, and it has no header label.
+        /// name, then Required, Have and Needed. The trailing Status column
+        /// is NOT one of them - its badges are pinned outside the table's
+        /// own right edge, on a band of their own.
         /// </summary>
         public const int CurrencyTrackCount = 4;
 
@@ -426,24 +431,37 @@ namespace TaimisToolbench.Services
             public readonly int MarkerX;
 
             /// <summary>
-            /// The band all three number columns reserve - what each
-            /// header centres over
-            /// (JustifiedColumnTracks.CenteredInBand). Floored at the
-            /// widest of the three header labels
-            /// (SummarySectionRenderer.WidestCurrencyHeaderLabel), so a
-            /// header always fits the band it centres in.
+            /// Band the marker column reserves, from <see cref="MarkerX"/>
+            /// to the table's pinned right edge. The pills inside it are
+            /// LEFT-ruled on MarkerX, so this is the clamp for the "Status"
+            /// header rather than the extent it centres over - see
+            /// JustifiedColumnTracks.CenteredOverContent.
+            /// </summary>
+            public readonly int MarkerWidth;
+
+            /// <summary>
+            /// The band all three number columns reserve, and so the clamp
+            /// each header centres inside - never the extent it centres
+            /// OVER, which is that one column's own widest number (see
+            /// JustifiedColumnTracks.CenteredOverContent). One band for
+            /// three columns is why: it is floored at the widest of the
+            /// three header labels
+            /// (SummarySectionRenderer.WidestCurrencyHeaderLabel) and at
+            /// the widest number in ANY of them, so it routinely exceeds
+            /// what a given column draws.
             /// </summary>
             public readonly int NumberColumnWidth;
 
             public CurrencyColumnEdges(
                 int requiredRightEdge, int haveRightEdge, int neededRightEdge, int markerX,
-                int numberColumnWidth)
+                int numberColumnWidth, int markerWidth)
             {
                 RequiredRightEdge = requiredRightEdge;
                 HaveRightEdge = haveRightEdge;
                 NeededRightEdge = neededRightEdge;
                 MarkerX = markerX;
                 NumberColumnWidth = numberColumnWidth;
+                MarkerWidth = markerWidth;
             }
 
             /// <summary>Left edge of the band each column's numbers grow
@@ -469,6 +487,21 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// The marker column's band this render: its
+        /// <see cref="CurrencyMarkerWidth"/> floor, widened to
+        /// markerColumnWidth (the wider of the marker pill and its "Status"
+        /// header, both measured by the caller) when that exceeds it. The
+        /// column is reserved whether or not any row is covered, exactly as
+        /// the number columns are - a table whose reserve moved with its
+        /// data would shift every other column when one currency crossed
+        /// into full coverage.
+        /// </summary>
+        public static int EffectiveCurrencyMarkerWidth(int markerColumnWidth)
+        {
+            return markerColumnWidth > CurrencyMarkerWidth ? markerColumnWidth : CurrencyMarkerWidth;
+        }
+
+        /// <summary>
         /// Column layout for the currency table's Required/Have/Needed
         /// numeric columns plus the trailing full-coverage marker, derived
         /// from panelWidth plus (optionally) this render's actual widest
@@ -482,11 +515,13 @@ namespace TaimisToolbench.Services
         /// behavior) for callers - existing tests among them - that don't
         /// need to pass a data-driven width.
         /// </summary>
-        public static CurrencyColumnEdges ComputeCurrencyColumnEdges(int panelWidth, int widestNumberWidth = 0)
+        public static CurrencyColumnEdges ComputeCurrencyColumnEdges(
+            int panelWidth, int widestNumberWidth = 0, int markerColumnWidth = 0)
         {
             return EdgesFromRightEdge(
                 PlanRelayoutMath.PinnedRightEdge(panelWidth),
-                EffectiveCurrencyNumberColumnWidth(widestNumberWidth));
+                EffectiveCurrencyNumberColumnWidth(widestNumberWidth),
+                EffectiveCurrencyMarkerWidth(markerColumnWidth));
         }
 
         /// <summary>
@@ -511,9 +546,10 @@ namespace TaimisToolbench.Services
                 + numberColumnWidth;
         }
 
-        private static CurrencyColumnEdges EdgesFromRightEdge(int rightEdge, int numberColumnWidth)
+        private static CurrencyColumnEdges EdgesFromRightEdge(
+            int rightEdge, int numberColumnWidth, int markerWidth)
         {
-            int markerX = rightEdge - CurrencyMarkerWidth;
+            int markerX = rightEdge - markerWidth;
 
             // The table's own right edge, which the marker trails: the
             // packed stack's Needed column, and the last track's end under
@@ -534,13 +570,14 @@ namespace TaimisToolbench.Services
                     TrackBandRightEdge(trackSpan, 2, numberColumnWidth),
                     TrackBandRightEdge(trackSpan, 3, numberColumnWidth),
                     markerX,
-                    numberColumnWidth);
+                    numberColumnWidth,
+                    markerWidth);
             }
 
             int haveRightEdge = neededRightEdge - numberColumnWidth - CurrencyColumnGap;
             int requiredRightEdge = haveRightEdge - numberColumnWidth - CurrencyColumnGap;
             return new CurrencyColumnEdges(
-                requiredRightEdge, haveRightEdge, neededRightEdge, markerX, numberColumnWidth);
+                requiredRightEdge, haveRightEdge, neededRightEdge, markerX, numberColumnWidth, markerWidth);
         }
     }
 }

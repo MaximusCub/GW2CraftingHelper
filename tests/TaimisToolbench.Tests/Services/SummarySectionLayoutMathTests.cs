@@ -799,6 +799,82 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(
                 PlanRelayoutMath.PinnedRightEdge(800),
                 edges.MarkerX + SummarySectionLayoutMath.CurrencyMarkerWidth);
+            Assert.Equal(SummarySectionLayoutMath.CurrencyMarkerWidth, edges.MarkerWidth);
+        }
+
+        // --- The Status column (the marker column shipped unlabelled; its
+        // band now has to hold a header too) ---
+        [Fact]
+        public void EffectiveCurrencyMarkerWidth_TakesTheWiderOfItsFloorAndTheCallersMeasurement()
+        {
+            Assert.Equal(
+                SummarySectionLayoutMath.CurrencyMarkerWidth,
+                SummarySectionLayoutMath.EffectiveCurrencyMarkerWidth(0));
+            Assert.Equal(
+                SummarySectionLayoutMath.CurrencyMarkerWidth,
+                SummarySectionLayoutMath.EffectiveCurrencyMarkerWidth(
+                    SummarySectionLayoutMath.CurrencyMarkerWidth - 1));
+            Assert.Equal(70, SummarySectionLayoutMath.EffectiveCurrencyMarkerWidth(70));
+        }
+
+        [Fact]
+        public void ComputeCurrencyColumnEdges_AWiderMarkerBand_StillEndsOnThePinnedEdge()
+        {
+            // A "Status" header out-measures the 34px pill under it, so the
+            // band widens leftward: the pinned edge is the one thing that
+            // cannot move, and the number columns give up the difference.
+            var floor = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200, 90);
+            var widened = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200, 90, 70);
+
+            Assert.Equal(70, widened.MarkerWidth);
+            Assert.Equal(PlanRelayoutMath.PinnedRightEdge(1200), widened.MarkerX + widened.MarkerWidth);
+            Assert.Equal(
+                floor.MarkerX - (70 - SummarySectionLayoutMath.CurrencyMarkerWidth),
+                widened.MarkerX);
+            Assert.True(widened.NeededRightEdge < floor.NeededRightEdge);
+        }
+
+        [Fact]
+        public void ComputeCurrencyColumnEdges_AMarkerBandUnderTheFloor_ChangesNothing()
+        {
+            // A table with no covered row at all measures no pill, and the
+            // column is reserved anyway - a reserve that came and went with
+            // the data would shift every other column the moment one
+            // currency crossed into full coverage.
+            var floor = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200, 90);
+            var unmeasured = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200, 90, 0);
+
+            Assert.Equal(floor.MarkerX, unmeasured.MarkerX);
+            Assert.Equal(floor.NeededRightEdge, unmeasured.NeededRightEdge);
+            Assert.Equal(floor.HaveRightEdge, unmeasured.HaveRightEdge);
+            Assert.Equal(floor.RequiredRightEdge, unmeasured.RequiredRightEdge);
+        }
+
+        // The defect the header law fixes, stated against the real edges:
+        // the three columns share ONE band, so a column whose own numbers
+        // are narrow than the widest of the three has its header land off
+        // its own ink unless the ink is what the header centres over.
+        [Fact]
+        public void CurrencyHeaders_CentreOnTheirOwnColumnsInk_NotOnTheSharedBand()
+        {
+            // Have carries a 7-digit Karma balance and sizes the shared
+            // 120px band on its own; Required's counts reach 80px.
+            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(1200, 120);
+            const int requiredInk = 80;
+            const int headerWidth = 56;
+
+            int overInk = JustifiedColumnTracks.CenteredOverContentRightAligned(
+                edges.RequiredRightEdge, edges.NumberColumnWidth, requiredInk, headerWidth);
+            int overBand = JustifiedColumnTracks.CenteredInBand(
+                edges.RequiredBandX, edges.NumberColumnWidth, headerWidth);
+
+            // Centred on the two-digit numbers themselves...
+            Assert.Equal(
+                edges.RequiredRightEdge - (requiredInk / 2),
+                overInk + (headerWidth / 2));
+
+            // ...which is 20px right of where the band put it.
+            Assert.Equal(20, overInk - overBand);
         }
 
         [Fact]

@@ -604,28 +604,124 @@ namespace TaimisToolbench.Views.Rendering
             // ColumnHeader tier "Required"/"Have"/"Needed" routinely
             // out-measure a short value, so a band sized to the value alone
             // would let the currency name run under its own header.
-            var font = UiFonts.Body;
-            int widestNumberWidth = WidestCurrencyHeaderLabel();
-            foreach (var row in rows)
-            {
-                int rowWidest = MeasureWidestCurrencyNumber(row, font);
-                if (rowWidest > widestNumberWidth)
-                {
-                    widestNumberWidth = rowWidest;
-                }
-            }
+            var scan = ScanCurrencyColumns(rows);
 
             CreateCurrencyTableTopGap(parent, panelWidth);
-            CreateCurrencyTableHeaderRow(parent, panelWidth, widestNumberWidth);
+            CreateCurrencyTableHeaderRow(parent, panelWidth, scan);
             for (int i = 0; i < rows.Count; i++)
             {
-                CreateCurrencyTableRow(rows[i], parent, panelWidth, widestNumberWidth);
+                CreateCurrencyTableRow(rows[i], parent, panelWidth, scan);
             }
+        }
+
+        /// <summary>
+        /// The panelWidth-invariant measurements the header row, every data
+        /// row and all of their resize closures re-derive their edges from,
+        /// grouped so a sixth cannot be added at one call site and forgotten
+        /// at another (ShoppingListSectionRenderer.ColumnScan's shape).
+        /// <para>
+        /// The three Ink widths are what each header centres OVER; the
+        /// shared band is only the clamp. They differ per column - a wallet
+        /// Have of 1,204,882 beside a Required of 40 - which is why one
+        /// shared width cannot place all three headers.
+        /// </para>
+        /// </summary>
+        private readonly struct CurrencyColumnScan
+        {
+            internal readonly int NumberBandWidth;
+            internal readonly int RequiredInk;
+            internal readonly int HaveInk;
+            internal readonly int NeededInk;
+            internal readonly int MarkerInk;
+            internal readonly int MarkerBandWidth;
+
+            internal CurrencyColumnScan(
+                int numberBandWidth, int requiredInk, int haveInk, int neededInk,
+                int markerInk, int markerBandWidth)
+            {
+                NumberBandWidth = numberBandWidth;
+                RequiredInk = requiredInk;
+                HaveInk = haveInk;
+                NeededInk = neededInk;
+                MarkerInk = markerInk;
+                MarkerBandWidth = markerBandWidth;
+            }
+
+            internal SummarySectionLayoutMath.CurrencyColumnEdges EdgesFor(int panelWidth)
+            {
+                return SummarySectionLayoutMath.ComputeCurrencyColumnEdges(
+                    panelWidth, NumberBandWidth, MarkerBandWidth);
+            }
+        }
+
+        /// <summary>
+        /// One pass over the rows (a plan's currency list runs to a handful
+        /// of entries) in the SAME font the data rows draw in. The shared
+        /// number band is floored at the widest of the three header labels
+        /// as well as at the widest number in any of them: at the
+        /// ColumnHeader tier "Required" routinely out-measures the value
+        /// under it, and a band narrower than its own header would let the
+        /// currency name run under that header.
+        /// </summary>
+        private static CurrencyColumnScan ScanCurrencyColumns(List<PlanRowViewModel> rows)
+        {
+            var font = UiFonts.Body;
+            int required = 0, have = 0, needed = 0;
+            bool anyCovered = false;
+            foreach (var row in rows)
+            {
+                required = Max(required, MeasureNumber(font, row.Quantity.ToString()));
+                have = Max(have, MeasureNumber(font, CurrencyHaveText(row)));
+                needed = Max(needed, MeasureNumber(font, CurrencyNeededText(row)));
+                anyCovered |= row.CurrencyFullyCovered;
+            }
+
+            int band = Max(WidestCurrencyHeaderLabel(), Max(required, Max(have, needed)));
+            int markerInk = anyCovered ? LabelHelpers.MeasureSmallTagWidth(FullCoverageMarkerText) : 0;
+            int markerBand = SummarySectionLayoutMath.EffectiveCurrencyMarkerWidth(
+                Max(markerInk, MeasureHeader(HeaderBands.Font, StatusHeaderText)));
+
+            return new CurrencyColumnScan(band, required, have, needed, markerInk, markerBand);
+        }
+
+        private static int Max(int a, int b)
+        {
+            return a > b ? a : b;
+        }
+
+        private static int MeasureNumber(BitmapFont font, string text)
+        {
+            return (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width);
+        }
+
+        /// <summary>
+        /// Have/Needed already read "-" rather than a fabricated number when
+        /// no wallet snapshot exists - see
+        /// PlanRowViewModel.CurrencyOwnedQuantity's doc comment. Spelled
+        /// once so the pre-scan and the row can never disagree about what
+        /// the column actually draws.
+        /// </summary>
+        private static string CurrencyHaveText(PlanRowViewModel row)
+        {
+            return row.CurrencyOwnedQuantity.HasValue ? row.CurrencyOwnedQuantity.Value.ToString() : "-";
+        }
+
+        private static string CurrencyNeededText(PlanRowViewModel row)
+        {
+            return row.CurrencyNeededQuantity.HasValue ? row.CurrencyNeededQuantity.Value.ToString() : "-";
         }
 
         private const string RequiredHeaderText = "Required";
         private const string HaveHeaderText = "Have";
         private const string NeededHeaderText = "Needed";
+
+        /// <summary>
+        /// Names the trailing full-coverage column, which shipped
+        /// unlabelled: a reader met a green pill in a column no header
+        /// claimed. Not one of CurrencyHeaderLabels below - those three
+        /// share one number band and this one has its own.
+        /// </summary>
+        private const string StatusHeaderText = "Status";
 
         // The same three strings the header row draws, so the floor they
         // set can never be measured from a label that is no longer there.
@@ -649,34 +745,6 @@ namespace TaimisToolbench.Views.Rendering
                 {
                     widest = width;
                 }
-            }
-
-            return widest;
-        }
-
-        /// <summary>
-        /// Widest of a single currency row's own rendered Required/Have/
-        /// Needed strings (Have/Needed already "-" rather than a fabricated
-        /// number when no wallet snapshot exists - see
-        /// PlanRowViewModel.CurrencyOwnedQuantity's doc comment - "-" is
-        /// always narrower than a real value, so it never drives the max).
-        /// </summary>
-        private static int MeasureWidestCurrencyNumber(PlanRowViewModel row, BitmapFont font)
-        {
-            int widest = (int)System.Math.Ceiling(font.MeasureString(row.Quantity.ToString()).Width);
-
-            string haveText = row.CurrencyOwnedQuantity.HasValue ? row.CurrencyOwnedQuantity.Value.ToString() : "-";
-            int haveWidth = (int)System.Math.Ceiling(font.MeasureString(haveText).Width);
-            if (haveWidth > widest)
-            {
-                widest = haveWidth;
-            }
-
-            string neededText = row.CurrencyNeededQuantity.HasValue ? row.CurrencyNeededQuantity.Value.ToString() : "-";
-            int neededWidth = (int)System.Math.Ceiling(font.MeasureString(neededText).Width);
-            if (neededWidth > widest)
-            {
-                widest = neededWidth;
             }
 
             return widest;
@@ -721,7 +789,7 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         private void CreateCurrencyTableHeaderRow(
-            FlowPanel parent, int panelWidth, int widestNumberWidth)
+            FlowPanel parent, int panelWidth, CurrencyColumnScan scan)
         {
             var band = HeaderBands.CreateColumnHeaderBand(parent, panelWidth);
             var font = HeaderBands.Font;
@@ -733,49 +801,72 @@ namespace TaimisToolbench.Views.Rendering
                 Parent = band,
             });
 
-            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(
-                panelWidth, widestNumberWidth);
+            var edges = scan.EdgesFor(panelWidth);
 
-            // Each header centres over the band its own numbers occupy, not
-            // against that band's right edge - see JustifiedColumnTracks.
-            // Measured from the strings, which are fixed, so the resize
-            // closure below neither measures nor reads a Blish Label's Width
-            // (not settled until its next layout pass).
+            // Each header centres over its OWN column's widest number, not
+            // over the band all three share - see JustifiedColumnTracks.
+            // Header widths measured from the strings, which are fixed, so
+            // the resize closure below neither measures nor reads a Blish
+            // Label's Width (not settled until its next layout pass).
             int requiredHeaderWidth = MeasureHeader(font, RequiredHeaderText);
             int haveHeaderWidth = MeasureHeader(font, HaveHeaderText);
             int neededHeaderWidth = MeasureHeader(font, NeededHeaderText);
-            var requiredLabel = CreateCurrencyHeaderLabel(
+            int statusHeaderWidth = MeasureHeader(font, StatusHeaderText);
+            var requiredLabel = CreateHeaderLabelAt(
                 band, RequiredHeaderText, font,
-                edges.RequiredBandX, edges.NumberColumnWidth, requiredHeaderWidth);
-            var haveLabel = CreateCurrencyHeaderLabel(
+                NumberHeaderX(edges.RequiredRightEdge, edges, scan.RequiredInk, requiredHeaderWidth));
+            var haveLabel = CreateHeaderLabelAt(
                 band, HaveHeaderText, font,
-                edges.HaveBandX, edges.NumberColumnWidth, haveHeaderWidth);
-            var neededLabel = CreateCurrencyHeaderLabel(
+                NumberHeaderX(edges.HaveRightEdge, edges, scan.HaveInk, haveHeaderWidth));
+            var neededLabel = CreateHeaderLabelAt(
                 band, NeededHeaderText, font,
-                edges.NeededBandX, edges.NumberColumnWidth, neededHeaderWidth);
+                NumberHeaderX(edges.NeededRightEdge, edges, scan.NeededInk, neededHeaderWidth));
+            var statusLabel = CreateHeaderLabelAt(
+                band, StatusHeaderText, font, StatusHeaderX(edges, scan, statusHeaderWidth));
 
-            // WidestNumberWidth is cached from the build-time
-            // pre-scan (data-derived, not panelWidth-derived - it never
-            // needs to re-run on resize, same reasoning as
-            // ShoppingListSectionRenderer's own cached maxEachWidth/
-            // maxTotalWidth).
+            // The scan is data-derived, not panelWidth-derived, so it never
+            // needs to re-run on resize (same reasoning as
+            // ShoppingListSectionRenderer's own cached column scan).
             _sink.AddRelayout(w =>
             {
                 band.Size = new Point(w, HeaderBands.RowHeight);
-                var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w, widestNumberWidth);
+                var e = scan.EdgesFor(w);
                 requiredLabel.Location = new Point(
-                    JustifiedColumnTracks.CenteredInBand(
-                        e.RequiredBandX, e.NumberColumnWidth, requiredHeaderWidth),
+                    NumberHeaderX(e.RequiredRightEdge, e, scan.RequiredInk, requiredHeaderWidth),
                     HeaderBands.LabelY);
                 haveLabel.Location = new Point(
-                    JustifiedColumnTracks.CenteredInBand(
-                        e.HaveBandX, e.NumberColumnWidth, haveHeaderWidth),
+                    NumberHeaderX(e.HaveRightEdge, e, scan.HaveInk, haveHeaderWidth),
                     HeaderBands.LabelY);
                 neededLabel.Location = new Point(
-                    JustifiedColumnTracks.CenteredInBand(
-                        e.NeededBandX, e.NumberColumnWidth, neededHeaderWidth),
+                    NumberHeaderX(e.NeededRightEdge, e, scan.NeededInk, neededHeaderWidth),
                     HeaderBands.LabelY);
+                statusLabel.Location = new Point(
+                    StatusHeaderX(e, scan, statusHeaderWidth), HeaderBands.LabelY);
             });
+        }
+
+        /// <summary>
+        /// One number column's header x: its own widest value is the ink,
+        /// the band the three columns share is only the clamp.
+        /// </summary>
+        private static int NumberHeaderX(
+            int rightEdge, SummarySectionLayoutMath.CurrencyColumnEdges edges,
+            int inkWidth, int headerWidth)
+        {
+            return JustifiedColumnTracks.CenteredOverContentRightAligned(
+                rightEdge, edges.NumberColumnWidth, inkWidth, headerWidth);
+        }
+
+        /// <summary>
+        /// The Status header's x. Its pills are LEFT-ruled on MarkerX, so
+        /// the ink runs rightward from there - the mirror of the number
+        /// columns, and the reason this cannot go through NumberHeaderX.
+        /// </summary>
+        private static int StatusHeaderX(
+            SummarySectionLayoutMath.CurrencyColumnEdges edges, CurrencyColumnScan scan, int headerWidth)
+        {
+            return JustifiedColumnTracks.CenteredOverContent(
+                edges.MarkerX, edges.MarkerWidth, edges.MarkerX, scan.MarkerInk, headerWidth);
         }
 
         private static int MeasureHeader(BitmapFont font, string text)
@@ -783,9 +874,7 @@ namespace TaimisToolbench.Views.Rendering
             return (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width);
         }
 
-        private static Label CreateCurrencyHeaderLabel(
-            Panel band, string text, BitmapFont font,
-            int bandX, int numberColumnWidth, int headerWidth)
+        private static Label CreateHeaderLabelAt(Panel band, string text, BitmapFont font, int x)
         {
             return LabelHelpers.WithDescenderClearance(new Label()
             {
@@ -794,9 +883,7 @@ namespace TaimisToolbench.Views.Rendering
                 TextColor = HeaderBands.LabelColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(
-                    JustifiedColumnTracks.CenteredInBand(bandX, numberColumnWidth, headerWidth),
-                    HeaderBands.LabelY),
+                Location = new Point(x, HeaderBands.LabelY),
                 Parent = band,
             });
         }
@@ -821,7 +908,7 @@ namespace TaimisToolbench.Views.Rendering
         private const string FullCoverageMarkerText = "OK";
 
         private void CreateCurrencyTableRow(
-            PlanRowViewModel row, FlowPanel parent, int panelWidth, int widestNumberWidth)
+            PlanRowViewModel row, FlowPanel parent, int panelWidth, CurrencyColumnScan scan)
         {
             const int rowHeight = CurrencyRowHeight;
             var rowPanel = CreateCurrencyRowPanel(
@@ -851,9 +938,8 @@ namespace TaimisToolbench.Views.Rendering
             }
 
             const int nameX = SummarySectionLayoutMath.CurrencyNameX;
-            var edges = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(
-                panelWidth, widestNumberWidth);
-            int numberColumnWidth = SummarySectionLayoutMath.EffectiveCurrencyNumberColumnWidth(widestNumberWidth);
+            var edges = scan.EdgesFor(panelWidth);
+            int numberColumnWidth = edges.NumberColumnWidth;
             int nameMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
                 edges.RequiredRightEdge, numberColumnWidth, SummarySectionLayoutMath.CurrencyColumnGap, nameX);
             string fullName = row.Label ?? "";
@@ -871,10 +957,8 @@ namespace TaimisToolbench.Views.Rendering
             // does.
             var numberColor = new Color(220, 220, 220);
             var requiredLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Quantity.ToString(), font, numberColor, edges.RequiredRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
-            string haveText = row.CurrencyOwnedQuantity.HasValue ? row.CurrencyOwnedQuantity.Value.ToString() : "-";
-            var haveLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, haveText, font, numberColor, edges.HaveRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
-            string neededText = row.CurrencyNeededQuantity.HasValue ? row.CurrencyNeededQuantity.Value.ToString() : "-";
-            var neededLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, neededText, font, numberColor, edges.NeededRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
+            var haveLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, CurrencyHaveText(row), font, numberColor, edges.HaveRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
+            var neededLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, CurrencyNeededText(row), font, numberColor, edges.NeededRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
 
             Panel marker = null;
             if (row.CurrencyFullyCovered)
@@ -901,7 +985,7 @@ namespace TaimisToolbench.Views.Rendering
             _sink.AddRelayout(w =>
             {
                 rowPanel.Size = new Point(w, rowHeight);
-                var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w, widestNumberWidth);
+                var e = scan.EdgesFor(w);
                 requiredLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.RequiredRightEdge, requiredLabel.Width), SummarySectionLayoutMath.CurrencyRowTextY);
                 haveLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.HaveRightEdge, haveLabel.Width), SummarySectionLayoutMath.CurrencyRowTextY);
                 neededLabel.Location = new Point(PlanRelayoutMath.RightAlignedX(e.NeededRightEdge, neededLabel.Width), SummarySectionLayoutMath.CurrencyRowTextY);
@@ -913,7 +997,7 @@ namespace TaimisToolbench.Views.Rendering
             });
             _sink.AddReellipsis(w =>
             {
-                var e = SummarySectionLayoutMath.ComputeCurrencyColumnEdges(w, widestNumberWidth);
+                var e = scan.EdgesFor(w);
                 int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
                     e.RequiredRightEdge, numberColumnWidth, SummarySectionLayoutMath.CurrencyColumnGap, nameX);
                 string newDisplayName = LabelHelpers.EllipsizeToWidth(font, fullName, newMaxWidth);
