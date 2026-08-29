@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Blish_HUD;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
+using MonoGame.Extended.BitmapFonts;
 using TaimisToolbench.Models;
 using TaimisToolbench.Services;
 
@@ -210,23 +211,36 @@ namespace TaimisToolbench.Views.Rendering
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(NameX, HeaderBands.LabelY), Parent = rowPanel,
             });
-            // Left-aligned at the column's x, like the badges under it -
-            // the other three right-align off their own bands.
-            var sourceLabel = LabelHelpers.WithDescenderClearance(new Label()
-            {
-                Text = sourceHeaderText, Font = font, TextColor = color,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(edges.SourceX, HeaderBands.LabelY), Parent = rowPanel,
-            });
-            var amountLabel = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, amountHeaderText,
-                font, color, edges.QtyRightEdge, HeaderBands.LabelY);
-            var eachLabel = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, SortableHeaderLabel.Decorate("Each", _sortState.IndicatorFor(PlanTableColumn.Each)),
-                font, color, edges.EachRightEdge, HeaderBands.LabelY);
-            var totalLabel = LabelHelpers.CreateRightAlignedLabel(
-                rowPanel, SortableHeaderLabel.Decorate("Total", _sortState.IndicatorFor(PlanTableColumn.Total)),
-                font, color, edges.TotalRightEdge, HeaderBands.LabelY);
+
+            // The Item column flexes and its cells rule left, so its header
+            // stays on that rule at NameX. Every other header CENTRES over
+            // the band its own cells occupy rather than sharing an edge with
+            // them - see Services/JustifiedColumnTracks. Widths measured
+            // from the strings (each carries its own sort indicator), so the
+            // resize closure below never measures and never reads a Blish
+            // Label's Width, which is not settled until its next layout
+            // pass.
+            string eachHeaderText =
+                SortableHeaderLabel.Decorate("Each", _sortState.IndicatorFor(PlanTableColumn.Each));
+            string totalHeaderText =
+                SortableHeaderLabel.Decorate("Total", _sortState.IndicatorFor(PlanTableColumn.Total));
+            int sourceHeaderWidth = Measure(font, sourceHeaderText);
+            int amountHeaderWidth = Measure(font, amountHeaderText);
+            int eachHeaderWidth = Measure(font, eachHeaderText);
+            int totalHeaderWidth = Measure(font, totalHeaderText);
+
+            var sourceLabel = CreateBandCenteredHeader(
+                rowPanel, sourceHeaderText, font, color,
+                edges.SourceX, edges.SourceBandWidth, sourceHeaderWidth);
+            var amountLabel = CreateBandCenteredHeader(
+                rowPanel, amountHeaderText, font, color,
+                edges.QtyBandX, edges.QtyBandWidth, amountHeaderWidth);
+            var eachLabel = CreateBandCenteredHeader(
+                rowPanel, eachHeaderText, font, color,
+                edges.EachBandX, edges.EachBandWidth, eachHeaderWidth);
+            var totalLabel = CreateBandCenteredHeader(
+                rowPanel, totalHeaderText, font, color,
+                edges.TotalBandX, edges.TotalBandWidth, totalHeaderWidth);
 
             // The hit area is each column's whole header CELL (see
             // SortableHeaderCells); the labels carry only the note.
@@ -236,23 +250,18 @@ namespace TaimisToolbench.Views.Rendering
                 PlanTableColumn.Item, PlanTableColumn.Source, PlanTableColumn.Amount,
                 PlanTableColumn.Each, PlanTableColumn.Total,
             };
-            var texts = new[]
+            var widths = new[]
             {
-                itemLabel.Text, sourceHeaderText, amountHeaderText, eachLabel.Text, totalLabel.Text,
+                Measure(font, itemLabel.Text), sourceHeaderWidth, amountHeaderWidth,
+                eachHeaderWidth, totalHeaderWidth,
             };
 
-            // Measured once, and from the strings rather than off the
-            // controls: a Blish Label's Width is not settled until its next
-            // layout pass.
             var plan = new HeaderCellPlan(labels.Length, new SortableHeaderCells(rowPanel));
             for (int i = 0; i < labels.Length; i++)
             {
                 var column = columns[i];
                 SortableHeaderLabel.MarkSortable(labels[i]);
-                plan.Set(
-                    i, labels[i],
-                    (int)System.Math.Ceiling(font.MeasureString(texts[i] ?? "").Width),
-                    () => SortBy(column));
+                plan.Set(i, labels[i], widths[i], () => SortBy(column));
             }
 
             // Each cell owns its COLUMN, not the pixels its word covers,
@@ -271,18 +280,45 @@ namespace TaimisToolbench.Views.Rendering
             {
                 var e = scan.EdgesFor(w);
                 rowPanel.Size = new Point(w, HeaderBands.RowHeight);
-                sourceLabel.Location = new Point(e.SourceX, HeaderBands.LabelY);
+                sourceLabel.Location = new Point(
+                    ShoppingColumnMath.HeaderX(e.SourceX, e.SourceBandWidth, sourceHeaderWidth),
+                    HeaderBands.LabelY);
                 amountLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.QtyRightEdge, amountLabel.Width), HeaderBands.LabelY);
+                    ShoppingColumnMath.HeaderX(e.QtyBandX, e.QtyBandWidth, amountHeaderWidth),
+                    HeaderBands.LabelY);
                 eachLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.EachRightEdge, eachLabel.Width), HeaderBands.LabelY);
+                    ShoppingColumnMath.HeaderX(e.EachBandX, e.EachBandWidth, eachHeaderWidth),
+                    HeaderBands.LabelY);
                 totalLabel.Location = new Point(
-                    PlanRelayoutMath.RightAlignedX(e.TotalRightEdge, totalLabel.Width), HeaderBands.LabelY);
+                    ShoppingColumnMath.HeaderX(e.TotalBandX, e.TotalBandWidth, totalHeaderWidth),
+                    HeaderBands.LabelY);
 
                 // Four of the five columns are pinned off the panel edge,
                 // so their cells move with them.
                 ApplyHeaderBoundaries(plan, scan, w, boundaries);
                 plan.Sync(rowPanel.Width);
+            });
+        }
+
+        private static int Measure(BitmapFont font, string text)
+        {
+            return (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width);
+        }
+
+        private static Label CreateBandCenteredHeader(
+            Panel parent, string text, BitmapFont font, Color color,
+            int bandX, int bandWidth, int headerWidth)
+        {
+            return LabelHelpers.WithDescenderClearance(new Label()
+            {
+                Text = text ?? "",
+                Font = font,
+                TextColor = color,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(
+                    ShoppingColumnMath.HeaderX(bandX, bandWidth, headerWidth), HeaderBands.LabelY),
+                Parent = parent,
             });
         }
 

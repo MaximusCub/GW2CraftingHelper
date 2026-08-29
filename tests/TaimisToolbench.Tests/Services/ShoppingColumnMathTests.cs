@@ -125,6 +125,58 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(PlanRelayoutMath.PinnedRightEdge(1252), edges.TotalRightEdge);
         }
 
+        // --- Header centring (a header sits over the band its own cells
+        // occupy, not against the edge they share) ---
+        [Fact]
+        public void BandWidths_AreTheReservesTheColumnsActuallyUse()
+        {
+            var edges = ShoppingColumnMath.ComputeEdges(
+                totalRightEdge: 792, maxEachWidth: 180, maxTotalWidth: 40,
+                maxQtyWidth: 79, sourceColumnWidth: 96);
+
+            // Measured where it beats the floor, floored where it does not.
+            Assert.Equal(180, edges.EachBandWidth);
+            Assert.Equal(150, edges.TotalBandWidth);
+            Assert.Equal(79, edges.QtyBandWidth);
+            Assert.Equal(96, edges.SourceBandWidth);
+
+            // And each band ends exactly on its column's own edge, which is
+            // what makes centring a header in it centre it over the cells.
+            Assert.Equal(edges.QtyRightEdge - 79, edges.QtyBandX);
+            Assert.Equal(edges.EachRightEdge - 180, edges.EachBandX);
+            Assert.Equal(edges.TotalRightEdge - 150, edges.TotalBandX);
+        }
+
+        [Fact]
+        public void HeaderX_CentresTheHeaderInItsBand()
+        {
+            // A 40px word in a 150px band starts 55px in - not at 110,
+            // where right-aligning it to the band's edge would have put it.
+            Assert.Equal(155, ShoppingColumnMath.HeaderX(100, 150, 40));
+
+            // A header exactly as wide as its band fills it.
+            Assert.Equal(100, ShoppingColumnMath.HeaderX(100, 150, 150));
+        }
+
+        [Fact]
+        public void HeaderX_AndTheCellsUnderIt_ShareTheBandsCentreLine()
+        {
+            // The law: a header and its cells centre on one axis. The Total
+            // column's values right-align inside their band, so the band's
+            // centre is the axis the header has to meet them on.
+            var edges = ShoppingColumnMath.ComputeEdgesForPanel(
+                panelWidth: 1000, maxEachWidth: 0, maxTotalWidth: 0,
+                maxQtyWidth: 79, sourceColumnWidth: 96);
+            const int headerWidth = 44;
+
+            int headerX = ShoppingColumnMath.HeaderX(
+                edges.TotalBandX, edges.TotalBandWidth, headerWidth);
+
+            Assert.Equal(
+                edges.TotalBandX + (edges.TotalBandWidth / 2),
+                headerX + (headerWidth / 2));
+        }
+
         // --- SegmentRunWidth (currency-segment width computation, KNOWN-ISSUES #16) ---
         [Fact]
         public void SegmentRunWidth_Null_ReturnsZero()

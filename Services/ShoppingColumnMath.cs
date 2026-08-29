@@ -12,6 +12,15 @@ namespace TaimisToolbench.Services
     /// tested here), clamped to fixed minimums so short/low-value lists
     /// don't look cramped. See ShoppingListSectionRenderer.Render for
     /// the pre-scan that produces maxEachWidth/maxTotalWidth.
+    ///
+    /// <para>
+    /// Cells keep their own rule inside their band - badges left, numbers
+    /// and coin runs right - and each HEADER centres over that band
+    /// (<see cref="HeaderX"/>) rather than sharing an edge with it. See
+    /// <see cref="JustifiedColumnTracks"/> for why a shared edge is not
+    /// enough. The Item column is the exception: it flexes, and a flexing
+    /// column's header stays on the left rule its names keep.
+    /// </para>
     /// </summary>
     internal static class ShoppingColumnMath
     {
@@ -26,21 +35,60 @@ namespace TaimisToolbench.Services
             public readonly int QtyRightEdge;
 
             /// <summary>
-            /// LEFT edge of the source-badge column, and where its header
-            /// label sits. Left, not right: badges are words of different
-            /// lengths, and a column of them reads as a column because
-            /// their left edges rule - the same choice Required Recipes'
-            /// Discipline column makes.
+            /// LEFT edge of the source-badge column. Left, not right:
+            /// badges are words of different lengths, and a column of them
+            /// reads as a column because their left edges rule - the same
+            /// choice Required Recipes' Discipline column makes.
             /// </summary>
             public readonly int SourceX;
 
-            public ColumnEdges(int totalRightEdge, int eachRightEdge, int qtyRightEdge, int sourceX)
+            /// <summary>
+            /// Each column's reserved BAND width - what its header has to
+            /// centre over (<see cref="HeaderX"/>). Carried on the edges
+            /// rather than re-derived by the caller: the header row and the
+            /// data rows both read them off one instance, so neither can
+            /// centre over a band the other did not reserve.
+            /// </summary>
+            public readonly int SourceBandWidth;
+            public readonly int QtyBandWidth;
+            public readonly int EachBandWidth;
+            public readonly int TotalBandWidth;
+
+            public ColumnEdges(
+                int totalRightEdge, int eachRightEdge, int qtyRightEdge, int sourceX,
+                int sourceBandWidth, int qtyBandWidth, int eachBandWidth, int totalBandWidth)
             {
                 TotalRightEdge = totalRightEdge;
                 EachRightEdge = eachRightEdge;
                 QtyRightEdge = qtyRightEdge;
                 SourceX = sourceX;
+                SourceBandWidth = sourceBandWidth;
+                QtyBandWidth = qtyBandWidth;
+                EachBandWidth = eachBandWidth;
+                TotalBandWidth = totalBandWidth;
             }
+
+            /// <summary>Left edge of the band each right-aligned column's
+            /// cells grow leftward into.</summary>
+            public int QtyBandX => QtyRightEdge - QtyBandWidth;
+
+            public int EachBandX => EachRightEdge - EachBandWidth;
+
+            public int TotalBandX => TotalRightEdge - TotalBandWidth;
+        }
+
+        /// <summary>
+        /// Left edge of a column header centred over the band its own cells
+        /// occupy - the module's centred column law, see
+        /// <see cref="JustifiedColumnTracks"/>. Every band here is floored
+        /// at its own header (the Source and Amount bands explicitly, in
+        /// ShoppingListSectionRenderer's pre-scan; Each and Total by their
+        /// fixed minimums, both far wider than the words over them), so a
+        /// header always fits the band it centres in.
+        /// </summary>
+        public static int HeaderX(int bandX, int bandWidth, int headerWidth)
+        {
+            return JustifiedColumnTracks.CenteredInBand(bandX, bandWidth, headerWidth);
         }
 
         /// <summary>
@@ -65,11 +113,15 @@ namespace TaimisToolbench.Services
             int totalRightEdge, int maxEachWidth, int maxTotalWidth,
             int maxQtyWidth = 0, int sourceColumnWidth = 0)
         {
-            int eachRightEdge = totalRightEdge - EffectiveTotalWidth(maxTotalWidth) - ColumnGap;
-            int qtyRightEdge = eachRightEdge - EffectiveEachWidth(maxEachWidth) - ColumnGap;
+            int totalBand = EffectiveTotalWidth(maxTotalWidth);
+            int eachBand = EffectiveEachWidth(maxEachWidth);
+            int eachRightEdge = totalRightEdge - totalBand - ColumnGap;
+            int qtyRightEdge = eachRightEdge - eachBand - ColumnGap;
             int sourceX = qtyRightEdge - maxQtyWidth - ColumnGap - sourceColumnWidth;
 
-            return new ColumnEdges(totalRightEdge, eachRightEdge, qtyRightEdge, sourceX);
+            return new ColumnEdges(
+                totalRightEdge, eachRightEdge, qtyRightEdge, sourceX,
+                sourceColumnWidth, maxQtyWidth, eachBand, totalBand);
         }
 
         /// <summary>
