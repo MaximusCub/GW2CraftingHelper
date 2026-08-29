@@ -58,11 +58,11 @@ namespace TaimisToolbench.Views.Rendering
         /// the header and the rows, all anchored through the same
         /// RecipesColumnMath call.
         /// <para>
-        /// Each band is max(widest data, its own header label): the Status
-        /// header right-aligns onto the same pinned edge as the tags, and
-        /// at the ColumnHeader tier "Discipline" out-measures a short
-        /// "Chef 400" - a band narrower than its own header would let the
-        /// column beside it run underneath that header. The Discipline
+        /// Each band is max(widest data, its own header label): the header
+        /// centres over the band its own cells occupy, and at the
+        /// ColumnHeader tier "Discipline" out-measures a short "Chef 400" -
+        /// a band narrower than its own header would let the column beside
+        /// it run underneath that header. The Discipline
         /// column is reserved only when some row actually has one (a
         /// mystic-forge-only recipe list has no disciplines at all), the
         /// same gate Required Disciplines puts on its Characters column.
@@ -106,17 +106,32 @@ namespace TaimisToolbench.Views.Rendering
 
             var scan = new ColumnScan(statusColumnWidth, disciplineColumnWidth);
 
+            // Both data headers centre over the band their own cells
+            // occupy rather than sharing an edge with them - the module's
+            // centred column law, see Services/JustifiedColumnTracks. Only
+            // Recipe stays on a rule: it is the flexing column, and its
+            // names start at NameX on every row.
+            int disciplineHeaderWidth = MeasureWidth(headerFont, DisciplineHeaderText);
+            int statusHeaderWidth = MeasureWidth(headerFont, StatusHeaderText);
+            Func<int, int> statusLabelX = w => JustifiedColumnTracks.CenteredInBand(
+                scan.EdgesFor(w).StatusRightEdge - statusColumnWidth,
+                statusColumnWidth,
+                statusHeaderWidth);
+
             if (anyDiscipline)
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink,
                     middleLabel: DisciplineHeaderText,
-                    middleXForWidth: w => scan.EdgesFor(w).DisciplineX);
+                    middleXForWidth: w => JustifiedColumnTracks.CenteredInBand(
+                        scan.EdgesFor(w).DisciplineX, disciplineColumnWidth, disciplineHeaderWidth),
+                    rightLabelXForWidth: statusLabelX);
             }
             else
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
-                    contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink);
+                    contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink,
+                    rightLabelXForWidth: statusLabelX);
             }
 
             for (int i = 0; i < section.Rows.Count; i++)
