@@ -177,6 +177,8 @@
     <Compile Include="Models\TimegatedItem.cs" />
     <Compile Include="Services\PlanSolver.cs" />
     <Compile Include="Services\VendorBatchSolver.cs" />
+    <Compile Include="Services\VendorCostLineSubtrees.cs" />
+    <Compile Include="Services\VendorOfferDomination.cs" />
     <Compile Include="Services\StatusUpdateGuard.cs" />
     <Compile Include="Services\PhaseOrdinalGuard.cs" />
     <Compile Include="Services\PlanStripStatusBoard.cs" />
@@ -340,6 +342,7 @@
     <Compile Include="Services\LogRowLayout.cs" />
     <Compile Include="Models\Gw2Constants.cs" />
     <Compile Include="Models\CostLine.cs" />
+    <Compile Include="Models\CostLineUnitValue.cs" />
     <Compile Include="Models\PillSourceCostBreakdown.cs" />
     <Compile Include="Models\VendorOffer.cs" />
     <Compile Include="Models\VendorOfferDataset.cs" />

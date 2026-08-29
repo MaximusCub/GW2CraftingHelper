@@ -30,6 +30,17 @@ namespace TaimisToolbench.Services
             AssignRecursive(root, ref nextNodeId);
         }
 
+        /// <summary>
+        /// Continues one id sequence across SEVERAL roots, so a set of
+        /// separately-built trees shares a single collision-free id space -
+        /// what VendorCostLineSubtrees needs, since every subtree it builds
+        /// is evaluated into one shared memo.
+        /// </summary>
+        public static void Assign(RecipeNode root, ref int nextNodeId)
+        {
+            AssignRecursive(root, ref nextNodeId);
+        }
+
         private static void AssignRecursive(RecipeNode node, ref int nextNodeId)
         {
             node.NodeId = nextNodeId++;

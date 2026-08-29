@@ -20,6 +20,22 @@ namespace TaimisToolbench.Models
 
         public IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> VendorOffers { get; set; }
 
+        /// <summary>
+        /// What one unit of each vendor cost-line item cost at GENERATION
+        /// time, snapshotted for the same reason as Prices/VendorOffers
+        /// above: an override re-solve must cost a vendor offer's cost lines
+        /// exactly the way the original Generate did, and re-deriving them
+        /// would need the recipe corpus and a fresh price fetch.
+        /// <para>
+        /// The VALUES are snapshotted, not the acquisition subtrees behind
+        /// them - a few dozen small rows rather than several thousand
+        /// RecipeNodes, on a path that re-serializes the whole context on
+        /// every override click. Null when no cost line needed one, which
+        /// behaves as the solver did before cost lines were solved.
+        /// </para>
+        /// </summary>
+        public IReadOnlyDictionary<int, CostLineUnitValue> VendorCostLineValues { get; set; }
+
         public IReadOnlyDictionary<int, ItemMetadata> Metadata { get; set; }
 
         public ISet<int> LearnedRecipeIds { get; set; }

@@ -11,6 +11,9 @@ CompetencyOpportunity.MinRating:Int32
 CostLine.Count:Int32
 CostLine.Id:Int32
 CostLine.Type:String
+CostLineUnitValue.ComparisonExtra:Int64
+CostLineUnitValue.HasUnvaluedCost:Boolean
+CostLineUnitValue.RealCoin:Int64
 CraftingPlan.CurrencyCosts:List`1<CurrencyCost>
 CraftingPlan.Steps:List`1<PlanStep>
 CraftingPlan.TargetItemId:Int32
@@ -160,6 +163,7 @@ PlanSolveContext.TargetItemId:Int32
 PlanSolveContext.Tree:RecipeNode
 PlanSolveContext.UnreducedTree:RecipeNode
 PlanSolveContext.UsedMaterials:List`1<UsedMaterial>
+PlanSolveContext.VendorCostLineValues:IReadOnlyDictionary`2<Int32,CostLineUnitValue>
 PlanSolveContext.VendorOffers:IReadOnlyDictionary`2<Int32,IReadOnlyList`1<VendorOffer>>
 PlanStep.ItemId:Int32
 PlanStep.Quantity:Int32

@@ -713,6 +713,70 @@ graph that is measurably cyclic (86094 <-> 91232 among 12 cycles found
 before the search was cut short). Coverage:
 `tests/TaimisToolbench.Tests/Services/PlanSolverUnpricedBarterOfferTests.cs`.
 
+**Follow-up (FIXED): the second residual, closed by construction.** Cost
+lines are now solved. A vendor offer's `Item` cost line with no Trading
+Post price gets a per-unit acquisition cost from the same
+`PlanSolver.Evaluate` a recipe ingredient gets, run over a quantity-1
+subtree, and folds into the offer's real coin cost by the same
+`unit x count` multiplication a TP-priced line already used. Only a line
+nothing can price at all stays a barter line.
+
+The guard above is no longer what produces the right answer here, and
+that was measured rather than assumed: with BOTH the barter guard and the
+domination check disabled, 101521 still commits Craft, because the offer's
+own coin figure now exceeds the craft it mirrors. Both routes are still
+fallback-tier for this item (legendary crafting bottoms out in Spirit
+Shards and Karma, which carry no valuation by default), so the terminal
+fallback branch is still REACHED - the guards simply no longer decide it.
+They remain the answer for the cases pricing genuinely cannot reach. The cost-line graph's cycles are
+cut by a visiting set and every id is memoized on first ask, resolved or
+not, which makes the work linear in the number of cost items. Design,
+bounds and the (i)-not-(ii) display decision: `docs/ARCHITECTURE.md`
+section 7.4. A second, price-free check (`Services/VendorOfferDomination.cs`)
+reaches the same verdict from the offer's shape alone. Coverage:
+`tests/TaimisToolbench.Tests/Services/VendorCostLineExpansionRealCorpusTests.cs`
+and `.../VendorOfferDominationTests.cs`.
+
+Measured on the same corpus and the same single price the report above
+used (Globs of Ectoplasm at 2,916c): the forced vendor route for 101521
+went from 29,160c - the ectoplasm alone - to the craft route's cost plus
+exactly 29,160c, which is what the wiki says Lyhr's offer is.
+
+**Gates this model still does not have (REPORTED, not implemented).** The
+wiki names three conditions that decide whether a route is available at
+all, and the module expresses none of them:
+
+- **"Recipe: Legendary Obsidian Armor"**, the item that unlocks Lyhr's
+  exchange. The module has vocabulary for a recipe gate (`RequiredRecipe`,
+  `learnedRecipeIds` from `/v2/account/recipes`) but it is CRAFT-side
+  only: an offer has no notion of a required item, and `VendorOffer` has
+  no field for one. Without it the plan can recommend a vendor route the
+  player cannot use until they buy a 60-Provisioner-Token recipe sheet
+  first. This is the one worth doing: it needs a `VendorOffer` field, a
+  `tools/VendorOfferUpdater` scrape for it, and a check beside the
+  existing discipline gate.
+- **The "Astral Heartbeat" achievement** gating 100509 Arcanum of Astral
+  Heartbeat, the one cost item in this chain with no recipe at all. The
+  module reads achievement *bits* (`AchievementBitDedupPrePass`,
+  `RawIngredient.AchievementId/AchievementBit`) but only to dedup
+  one-time reward ingredients; nothing consults account achievement
+  completion, and `/v2/account/achievements` is not fetched. The
+  achievement is account-wide and one-time, so the failure mode is
+  narrow: a plan costs the Arcanum honestly and the player finds it
+  unpurchasable until they finish the achievement.
+- **Station locality** - Obsidian armour is craftable only at the
+  Wizard's Tower Armorsmithing stations, not at every Armorsmith. The
+  module models discipline and rating but has no concept of WHERE a
+  craft happens, and neither `RawRecipe` nor the API's recipe schema
+  carries one; it would be wiki-scraped data, like the vendor corpus.
+  Purely informational in effect - the cost is right, the trip is longer
+  than the plan implies.
+
+None of the three changes a COST, which is why none was implemented here:
+each turns a route from available into unavailable, and getting that
+wrong hides a route the player can actually take - the failure this whole
+item is about, in the other direction.
+
 ### 45. W3B: generation progress + rich logging
 
 The plan-strip status board and the phase-by-phase progress reporting a

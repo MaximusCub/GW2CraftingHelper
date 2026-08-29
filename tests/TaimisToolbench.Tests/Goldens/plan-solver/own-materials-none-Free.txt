@@ -248,6 +248,7 @@ result.SolveContext.Tree.Recipes[0].OutputCount = 1
 result.SolveContext.Tree.Recipes[0].RecipeId = 10
 result.SolveContext.UnreducedTree = null
 result.SolveContext.UsedMaterials = null
+result.SolveContext.VendorCostLineValues = null
 result.SolveContext.VendorOffers = null
 result.TargetUnitSellPrice = 1000
 result.UsedMaterials.count = 0
