@@ -131,6 +131,9 @@ namespace TaimisToolbench.Services
         /// the same single non-coin line, kind included; across different lines
         /// there is no exchange rate, so their unit counts must never be compared
         /// and the first-listed offer keeps the tie.
+        /// An Item line the Trading Post cannot price is still money whenever
+        /// <paramref name="costLineResolver"/> can cost it by solving it (section
+        /// 7.4): only a line nothing can price at all stays a barter line.
         /// Tiers: docs/ARCHITECTURE.md, "Merged-ceil vendor batching".
         /// </summary>
         /// <remarks>
@@ -144,7 +147,14 @@ namespace TaimisToolbench.Services
             IReadOnlyDictionary<int, IReadOnlyList<VendorOffer>> vendorOffers,
             PriceBasis priceBasis,
             CurrencyValuation currencyValuation,
-            HomesteadEfficiencyTiers homesteadTiers)
+            HomesteadEfficiencyTiers homesteadTiers,
+            // Answers "what does one of this Item cost line cost to
+            // acquire" for a line the Trading Post cannot price, by solving
+            // that item the way a recipe ingredient is solved. Null keeps
+            // every such line a barter line, which is what this method did
+            // before cost-line expansion existed. See
+            // PlanSolver.ResolveCostLineUnitValue.
+            Func<int, CostLineUnitValue> costLineResolver = null)
         {
             long? bestComparableValue = null;
             long? bestComparableCoinCost = null;
@@ -215,7 +225,19 @@ namespace TaimisToolbench.Services
                 // line (see the Item branch below).
                 bool hasRawCoin = false;
                 int barterLineCount = 0;
-                List<(int ItemId, int Count, int UnitPrice, bool PriceSideFellBack)> itemCostRaw = null;
+                // UnitCoin is a long, not the int a raw TP price fits in:
+                // a resolved cost line's unit coin is a whole solved
+                // acquisition, which for a legendary component runs well past
+                // int range. UnitCoin == 0 still means "barter line" - the one
+                // encoding every reader below keys on.
+                List<(int ItemId, int Count, long UnitCoin, bool PriceSideFellBack, long ComparisonExtraPerUnit)> itemCostRaw = null;
+
+                // Set when a RESOLVED cost line's own subtree carries a cost
+                // with no honest coin equivalent. Its coin part is real and
+                // folded in below, but it is not the whole story, so the offer
+                // is fallback-tier exactly as an unvalued line has always made
+                // it.
+                bool resolvedLineHasUnvaluedCost = false;
 
                 foreach (var cost in offer.CostLines ?? Enumerable.Empty<CostLine>())
                 {
@@ -287,26 +309,67 @@ namespace TaimisToolbench.Services
                             // way.
                             if (cost.Count > 0)
                             {
-                                (itemCostRaw ?? (itemCostRaw = new List<(int, int, int, bool)>()))
-                                    .Add((cost.Id, cost.Count, unitPrice, itemPriceSideFellBack));
+                                (itemCostRaw ?? (itemCostRaw = NewItemCostRaw()))
+                                    .Add((cost.Id, cost.Count, unitPrice, itemPriceSideFellBack, 0L));
                             }
                         }
                         else if (cost.Count > 0)
                         {
-                            // A barter line: an untradeable token (654 of
-                            // the 1,032 item ids used as costs in
-                            // ref/vendor_offers.json have no TP price at
-                            // all, nearly all AccountBound). Its units are
-                            // the cost, so nothing is folded into coinCost
-                            // - it is valued for COMPARISON only, exactly
-                            // like a non-coin currency line, and leaves the
-                            // offer fallback-tier when it has no valuation.
-                            // Discarding the whole offer here instead would
-                            // report "no vendor route" for an item that is
-                            // genuinely purchasable, just not with gold.
-                            barterLineCount++;
-                            (itemCostRaw ?? (itemCostRaw = new List<(int, int, int, bool)>()))
-                                .Add((cost.Id, cost.Count, 0, false));
+                            // No Trading Post price. Before asking the solver
+                            // to cost the line, this was the end of the road:
+                            // a barter line, folded into no coin at all, which
+                            // is how an offer that mirrors a recipe and adds a
+                            // fee came to look cheaper than the recipe.
+                            var solved = costLineResolver != null
+                                ? costLineResolver(cost.Id)
+                                : CostLineUnitValue.Unresolved;
+
+                            long lineCoin = 0L;
+                            if (solved.IsResolved && solved.RealCoin > 0L)
+                            {
+                                try
+                                {
+                                    lineCoin = checked((long)cost.Count * solved.RealCoin);
+                                    coinCost = checked(coinCost + lineCoin);
+                                }
+                                catch (OverflowException)
+                                {
+                                    // Fall back to treating it as a barter
+                                    // line rather than committing a wrapped
+                                    // total; the same demote-never-crash
+                                    // posture the valuation loops below take.
+                                    // coinCost is unchanged: the checked add
+                                    // throws before it assigns.
+                                    lineCoin = 0L;
+                                }
+                            }
+
+                            if (lineCoin > 0L)
+                            {
+                                resolvedLineHasUnvaluedCost |= solved.HasUnvaluedCost;
+                                (itemCostRaw ?? (itemCostRaw = NewItemCostRaw()))
+                                    .Add((cost.Id, cost.Count, solved.RealCoin, false, solved.ComparisonExtra));
+                            }
+                            else
+                            {
+                                // A barter line: an untradeable token (654 of
+                                // the 1,032 item ids used as costs in
+                                // ref/vendor_offers.json have no TP price at
+                                // all, nearly all AccountBound) that nothing
+                                // could cost - no acquisition subtree, a cut
+                                // recursion, or no priceable route under it.
+                                // Its units are the cost, so nothing is folded
+                                // into coinCost - it is valued for COMPARISON
+                                // only, exactly like a non-coin currency line,
+                                // and leaves the offer fallback-tier when it
+                                // has no valuation. Discarding the whole offer
+                                // here instead would report "no vendor route"
+                                // for an item that is genuinely purchasable,
+                                // just not with gold.
+                                barterLineCount++;
+                                (itemCostRaw ?? (itemCostRaw = NewItemCostRaw()))
+                                    .Add((cost.Id, cost.Count, 0L, false, 0L));
+                            }
                         }
                     }
                     else
@@ -347,7 +410,7 @@ namespace TaimisToolbench.Services
                 // a pure-coin offer. totalBarterUnits feeds the fallback
                 // tie-break only.
                 long valuationCopper = 0;
-                bool allValued = true;
+                bool allValued = !resolvedLineHasUnvaluedCost;
                 long totalBarterUnits = 0;
 
                 // Scale itemCostRaw by the same unitsNeeded factor
@@ -381,14 +444,33 @@ namespace TaimisToolbench.Services
                         {
                             ItemId = ic.ItemId,
                             Quantity = (int)scaledQty,
-                            GoldValue = ic.UnitPrice > 0
-                                ? (long)ic.Count * unitsNeeded * ic.UnitPrice
+                            GoldValue = ic.UnitCoin > 0
+                                ? (long)ic.Count * unitsNeeded * ic.UnitCoin
                                 : (long?)null,
                             PriceSideFellBack = ic.PriceSideFellBack,
                         });
 
-                        if (ic.UnitPrice > 0)
+                        if (ic.UnitCoin > 0)
                         {
+                            // A resolved line can carry a decision-only
+                            // remainder (a valued wallet currency somewhere
+                            // under it). It rides in valuationCopper with
+                            // every other decision-only figure, so it can
+                            // move a comparison and can never reach the coin
+                            // total - the separation the whole two-price
+                            // model rests on.
+                            if (ic.ComparisonExtraPerUnit > 0L && allValued)
+                            {
+                                try
+                                {
+                                    valuationCopper = checked(valuationCopper + (scaledQty * ic.ComparisonExtraPerUnit));
+                                }
+                                catch (OverflowException)
+                                {
+                                    allValued = false;
+                                }
+                            }
+
                             continue;
                         }
 
@@ -586,14 +668,19 @@ namespace TaimisToolbench.Services
         /// caller has established there is exactly one; -1 otherwise, which
         /// the tie-break reads as "no like-for-like comparison".
         /// </summary>
+        private static List<(int ItemId, int Count, long UnitCoin, bool PriceSideFellBack, long ComparisonExtraPerUnit)> NewItemCostRaw()
+        {
+            return new List<(int, int, long, bool, long)>();
+        }
+
         private static int BarterLineId(
-            List<(int ItemId, int Count, int UnitPrice, bool PriceSideFellBack)> itemCostRaw)
+            List<(int ItemId, int Count, long UnitCoin, bool PriceSideFellBack, long ComparisonExtraPerUnit)> itemCostRaw)
         {
             if (itemCostRaw != null)
             {
                 foreach (var ic in itemCostRaw)
                 {
-                    if (ic.UnitPrice == 0)
+                    if (ic.UnitCoin == 0)
                     {
                         return ic.ItemId;
                     }

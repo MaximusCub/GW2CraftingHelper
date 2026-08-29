@@ -240,6 +240,70 @@ namespace TaimisToolbench.Services
         /// Fields hold the locals Solve() previously threaded into
         /// Evaluate(), already normalized where Solve() normalizes them.
         /// </summary>
+        /// <summary>
+        /// Everything one Solve() call needs to price vendor cost lines by
+        /// solving them: the prebuilt quantity-1 subtrees, a memo keyed by
+        /// item id, the sibling <see cref="EvaluateContext"/> those subtrees
+        /// are evaluated into, and the three guards that make the recursion
+        /// provably terminate.
+        /// <para>
+        /// The subtrees are evaluated into their OWN memo, never the plan
+        /// tree's: every entry of that memo becomes a public SolverDecision,
+        /// and a subtree node is not a node of the plan.
+        /// </para>
+        /// <para>
+        /// Termination, and why the work is linear. Every id is written to
+        /// <see cref="Memo"/> the first time it is asked for - a resolved
+        /// value, or Unresolved when the attempt was cut - so no id is ever
+        /// evaluated twice and the total number of subtree evaluations is at
+        /// most <see cref="Subtrees"/>.Count. <see cref="Budget"/> is set to
+        /// exactly that number, so it is a redundant check rather than a
+        /// behavioural cap. <see cref="Visiting"/> holds the item ids
+        /// currently being resolved and refuses re-entry, which is what cuts
+        /// a cost-line cycle - the shipped corpus has them, 86094 and 91232
+        /// among others - instead of following it forever;
+        /// <see cref="MaxDepth"/> bounds a long acyclic chain the same way.
+        /// </para>
+        /// <para>
+        /// A cut answers Unresolved rather than a partial figure, and that
+        /// answer is memoized. Both halves matter. A partial figure looks
+        /// like money and could win a comparison it should lose, whereas
+        /// Unresolved leaves the line a barter line - the pre-expansion
+        /// treatment, which no route can win on. Memoizing it is what keeps
+        /// a cycle from re-resolving its members combinatorially. The
+        /// precision given up is real (an id cut once stays uncosted for the
+        /// rest of the solve) and is given up in the safe direction.
+        /// </para>
+        /// </summary>
+        private sealed class CostLineResolutionState
+        {
+            public CostLineResolutionState(
+                IReadOnlyDictionary<int, RecipeNode> subtrees, int maxDepth, int budget)
+            {
+                Subtrees = subtrees;
+                MaxDepth = maxDepth;
+                Budget = budget;
+            }
+
+            public IReadOnlyDictionary<int, RecipeNode> Subtrees { get; }
+
+            public Dictionary<int, CostLineUnitValue> Memo { get; } =
+                new Dictionary<int, CostLineUnitValue>();
+
+            public HashSet<int> Visiting { get; } = new HashSet<int>();
+
+            public int MaxDepth { get; }
+
+            public int Budget { get; set; }
+
+            /// <summary>
+            /// Set once, immediately after construction: the context the
+            /// subtrees evaluate into, whose own CostLines points back here so
+            /// a cost line under a cost line resolves the same way.
+            /// </summary>
+            public EvaluateContext Context { get; set; }
+        }
+
         private sealed class EvaluateContext
         {
             public IReadOnlyDictionary<int, ItemPrice> Prices { get; }
@@ -282,6 +346,14 @@ namespace TaimisToolbench.Services
             /// disables the check.
             /// </summary>
             public Dictionary<RecipeNode, int> OwnedQuantityUsedByNode { get; }
+
+            /// <summary>
+            /// Cost-line resolution state, shared by reference with the
+            /// sibling context that evaluates the subtrees themselves.
+            /// Null when the caller supplied no subtrees, which is exactly
+            /// the pre-expansion behaviour.
+            /// </summary>
+            public CostLineResolutionState CostLines { get; set; }
 
             public EvaluateContext(
                 IReadOnlyDictionary<int, ItemPrice> prices,
@@ -419,7 +491,13 @@ namespace TaimisToolbench.Services
             // Reference-keyed owned-material usage from the same
             // InventoryReducer.Reduce call that produced `tree`. Null
             // disables the RawQuantitiesReducedByOwnedStock check.
-            Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null)
+            Dictionary<RecipeNode, int> ownedQuantityUsedByNode = null,
+            // Quantity-1 acquisition subtrees for the Item cost lines of
+            // this solve's vendor offers, so a line with no Trading Post
+            // price is COSTED rather than counted as free. Null restores
+            // the pre-expansion behaviour exactly (every such line stays a
+            // barter line). See VendorCostLineSubtrees.
+            VendorCostLineSubtrees vendorCostSubtrees = null)
         {
             var valuation = currencyValuation ?? CurrencyValuation.None;
             var tiers = homesteadTiers ?? HomesteadEfficiencyTiers.Default;
@@ -456,6 +534,44 @@ namespace TaimisToolbench.Services
                 homesteadTiers: tiers,
                 bestRatingByDiscipline: bestRatingByDiscipline,
                 ownedQuantityUsedByNode: ownedQuantityUsedByNode);
+
+            // The subtrees evaluate into their own memo and their own
+            // NodeId space, and see none of the plan tree's NodeId-keyed or
+            // reference-keyed inputs (overrides, the force-buy sets, the
+            // diagnostics dictionaries, the owned-usage map): every one of
+            // those is keyed to a node of the PLAN, and applying it to a
+            // subtree node that merely shares an id would silently answer a
+            // different question. IgnoredItemIds is the exception, and
+            // deliberately carried: it is keyed by ITEM id and means "the
+            // player already has this", which is as true under a cost line
+            // as anywhere else.
+            if (vendorCostSubtrees != null)
+            {
+                var costLines = new CostLineResolutionState(
+                    vendorCostSubtrees.ByItemId,
+                    VendorCostLineSubtrees.DefaultMaxResolutionDepth,
+                    vendorCostSubtrees.Count);
+
+                costLines.Context = new EvaluateContext(
+                    prices: prices,
+                    vendorOffers: vendorOffers,
+                    memo: new Dictionary<int, Decision>(),
+                    priceBasis: priceBasis,
+                    overrides: null,
+                    currencyValuation: valuation,
+                    forceBuyOnlyNodeIds: null,
+                    competencyIndependentForceBuyNodeIds: null,
+                    costDiagnostics: null,
+                    rawCraftCostDiagnostics: null,
+                    ignoredItemIds: ignoredItemIds,
+                    homesteadTiers: tiers,
+                    bestRatingByDiscipline: bestRatingByDiscipline,
+                    ownedQuantityUsedByNode: null);
+
+                costLines.Context.CostLines = costLines;
+                evaluateContext.CostLines = costLines;
+            }
+
             Evaluate(tree, evaluateContext);
 
             // Pass 2: collect steps and currency costs following pass-1 decisions
@@ -794,7 +910,8 @@ namespace TaimisToolbench.Services
             // non-coin lines are always reported on the plan - valuation
             // affects comparison, never the displayed cost.
             var vendorEvaluation = _vendorBatchSolver.EvaluateVendorOffers(
-                node, ctx.Prices, ctx.VendorOffers, ctx.PriceBasis, ctx.CurrencyValuation, ctx.HomesteadTiers);
+                node, ctx.Prices, ctx.VendorOffers, ctx.PriceBasis, ctx.CurrencyValuation, ctx.HomesteadTiers,
+                ctx.CostLines == null ? (Func<int, CostLineUnitValue>)null : id => ResolveCostLineUnitValue(id, ctx));
 
             var candidates = SelectBestRecipes(node, ctx);
             var bestComparable = candidates.BestComparable;
@@ -1142,6 +1259,89 @@ namespace TaimisToolbench.Services
             }
 
             return Commit(AcquisitionSource.UnknownSource, null, null, 0, null);
+        }
+
+        /// <summary>
+        /// What one unit of vendor cost-line item <paramref name="itemId"/>
+        /// costs to acquire, by running the SAME <see cref="Evaluate"/> over
+        /// that item's own quantity-1 subtree. This is the whole point of the
+        /// expansion: a cost line and a recipe ingredient are costed by one
+        /// code path, so the craft route and the vendor route that mirrors it
+        /// are genuinely comparable instead of one of them being free.
+        /// <para>
+        /// Returns <see cref="CostLineUnitValue.Unresolved"/> - the
+        /// pre-expansion behaviour, a barter line worth no coin - when there
+        /// is no subtree, when the recursion is cut, or when the subtree has
+        /// no priceable route of its own.
+        /// </para>
+        /// </summary>
+        private CostLineUnitValue ResolveCostLineUnitValue(int itemId, EvaluateContext ctx)
+        {
+            var state = ctx.CostLines;
+            if (state == null)
+            {
+                return CostLineUnitValue.Unresolved;
+            }
+
+            if (state.Memo.TryGetValue(itemId, out var cached))
+            {
+                return cached;
+            }
+
+            if (!state.Subtrees.TryGetValue(itemId, out var subtree) || subtree == null)
+            {
+                return CostLineUnitValue.Unresolved;
+            }
+
+            // Three independent bounds, any one of which alone terminates the
+            // recursion; see CostLineResolutionState. A cut is memoized like
+            // any other answer, which is what makes the total work linear.
+            if (state.Visiting.Count >= state.MaxDepth || state.Budget <= 0 || !state.Visiting.Add(itemId))
+            {
+                state.Memo[itemId] = CostLineUnitValue.Unresolved;
+                return CostLineUnitValue.Unresolved;
+            }
+
+            CostLineUnitValue value;
+            try
+            {
+                state.Budget--;
+                Evaluate(subtree, state.Context);
+
+                if (!state.Context.Memo.TryGetValue(subtree.NodeId, out var decision) ||
+                    !decision.TotalCost.HasValue ||
+                    decision.TotalCost.Value <= 0L)
+                {
+                    // No priceable route at all, or one whose whole cost is
+                    // unpriceable and therefore summed to zero: honestly
+                    // unresolved rather than a fabricated free acquisition.
+                    value = CostLineUnitValue.Unresolved;
+                }
+                else
+                {
+                    long realCoin = decision.TotalCost.Value;
+
+                    // ComparisonValue can only be read as "real coin plus a
+                    // decision-only remainder" on a COMPARABLE decision; a
+                    // fallback-tier one sets both to the same real figure and
+                    // has no remainder to carry.
+                    long comparisonExtra = decision.ComparisonValue.HasValue && !decision.HasUnvaluedCurrency
+                        ? decision.ComparisonValue.Value - realCoin
+                        : 0L;
+
+                    value = new CostLineUnitValue(
+                        realCoin,
+                        comparisonExtra > 0L ? comparisonExtra : 0L,
+                        decision.HasUnvaluedCurrency || HasBarterItemCost(decision));
+                }
+            }
+            finally
+            {
+                state.Visiting.Remove(itemId);
+            }
+
+            state.Memo[itemId] = value;
+            return value;
         }
 
         /// <summary>

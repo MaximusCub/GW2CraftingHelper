@@ -176,6 +176,7 @@
     <Compile Include="Models\TimegatedItem.cs" />
     <Compile Include="Services\PlanSolver.cs" />
     <Compile Include="Services\VendorBatchSolver.cs" />
+    <Compile Include="Services\VendorCostLineSubtrees.cs" />
     <Compile Include="Services\StatusUpdateGuard.cs" />
     <Compile Include="Services\PhaseOrdinalGuard.cs" />
     <Compile Include="Services\PlanStripStatusBoard.cs" />
@@ -213,6 +214,7 @@
     <Compile Include="Services\ItemRowTooltipComposer.cs" />
     <Compile Include="Services\ItemTooltipIdentity.cs" />
     <Compile Include="Services\ExcessCraftOutputCalculator.cs" />
+    <Compile Include="Services\CostLineUnitValue.cs" />
     <Compile Include="Services\CostLineValuation.cs" />
     <Compile Include="Services\SeasonalOfferFilter.cs" />
     <Compile Include="Services\RecipeSheetSavingsCalculator.cs" />
