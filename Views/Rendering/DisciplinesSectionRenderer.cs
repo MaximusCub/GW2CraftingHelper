@@ -35,19 +35,19 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// The per-character-availability column gets a real header, which needs
-        /// ONE column X for the whole section - 8 + the widest discipline name
-        /// actually in this section's rows + charGap - passed into
-        /// CreateDisciplineRow instead of letting each row measure its own
-        /// nameLabel. Every row's charX is &lt;= that fixed X by construction (it
-        /// IS the max), so this can never make a charLabel overlap its own
-        /// nameLabel. The "Characters" header is only added when at least one
-        /// row actually has availability text to show under it.
+        /// Column geometry comes from DisciplinesColumnMath, so the header
+        /// row, every data row and all of their resize closures anchor the
+        /// table identically. The character run needs ONE column X for the
+        /// whole section - a per-row X could never line up with a single
+        /// header label - and that X clears the widest discipline name in
+        /// the section by construction, so it can never make a charLabel
+        /// overlap its own nameLabel. The "Characters" header is only added
+        /// when at least one row has availability text under it.
         /// <para>
-        /// The Level column is pinned to the panel edge
-        /// (PlanRelayoutMath.PinnedRightEdge) and the Characters column is the
-        /// one that flexes into whatever the Discipline column and the Level
-        /// band leave it.
+        /// Each header centres over the INK its own cells cover rather than
+        /// over the band around it (Services/JustifiedColumnTracks);
+        /// Discipline is the exception every table makes for its leftmost
+        /// flexing column, whose header stays on the rule its names keep.
         /// </para>
         /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
@@ -58,73 +58,58 @@ namespace TaimisToolbench.Views.Rendering
             // Body, not Caption: character names were the one text in this
             // row that was both smaller AND greyer than its neighbours, and
             // a name a user reads letter by letter is the worst thing to
-            // shrink. The grey stays - one channel of de-emphasis, not two.
+            // shrink.
             var charFont = UiFonts.Body;
-            // Header labels are part of their own columns' widths: at the
-            // ColumnHeader tier a header is routinely wider than the data
-            // under it, and a column narrower than its own header lets the
-            // neighbouring column run under that header.
-            int maxNameWidth = MeasureWidth(HeaderBands.Font, DisciplineHeaderText);
-            int maxCharWidth = 0;
-            int maxLevelWidth = 0;
+            int maxNameInk = 0;
+            int maxCharInk = 0;
+            int maxLevelInk = 0;
             bool anyCharacterText = false;
             for (int i = 0; i < section.Rows.Count; i++)
             {
-                int nameWidth = MeasureWidth(font, section.Rows[i].Label);
-                if (nameWidth > maxNameWidth)
-                {
-                    maxNameWidth = nameWidth;
-                }
-
-                int levelWidth = MeasureWidth(font, section.Rows[i].Sublabel);
-                if (levelWidth > maxLevelWidth)
-                {
-                    maxLevelWidth = levelWidth;
-                }
-
+                maxNameInk = Max(maxNameInk, MeasureWidth(font, section.Rows[i].Label));
+                maxLevelInk = Max(maxLevelInk, MeasureWidth(font, section.Rows[i].Sublabel));
                 if (!string.IsNullOrEmpty(section.Rows[i].CharacterAvailabilityText))
                 {
-                    if (!anyCharacterText)
-                    {
-                        // The column's own header is part of its extent:
-                        // it starts at the same charX and can be wider than
-                        // a short availability string.
-                        anyCharacterText = true;
-                        maxCharWidth = MeasureWidth(HeaderBands.Font, CharactersHeaderText);
-                    }
-
-                    int charWidth = MeasureWidth(charFont, section.Rows[i].CharacterAvailabilityText);
-                    if (charWidth > maxCharWidth)
-                    {
-                        maxCharWidth = charWidth;
-                    }
+                    anyCharacterText = true;
+                    maxCharInk = Max(
+                        maxCharInk, MeasureWidth(charFont, section.Rows[i].CharacterAvailabilityText));
                 }
             }
 
-            int charX = 8 + maxNameWidth + CharGap;
+            // Header labels are part of their own columns' BAND widths: at
+            // the ColumnHeader tier a header is routinely wider than the
+            // data under it, and a column narrower than its own header lets
+            // the neighbouring column run under that header. The ink widths
+            // above stay unfloored - they are what each header centres over.
+            int charHeaderWidth = MeasureWidth(HeaderBands.Font, CharactersHeaderText);
+            int levelHeaderWidth = MeasureWidth(HeaderBands.Font, LevelHeaderText);
+            int disciplineColumnWidth = Max(
+                maxNameInk, MeasureWidth(HeaderBands.Font, DisciplineHeaderText));
+            int charColumnWidth = anyCharacterText ? Max(maxCharInk, charHeaderWidth) : 0;
 
             // The Level band is reserved even when no row carries a level:
-            // its header still right-aligns onto the pinned edge, and the
-            // Characters column's ellipsis budget has to stop short of it.
-            int levelHeaderWidth = MeasureWidth(HeaderBands.Font, LevelHeaderText);
-            int levelColumnWidth = maxLevelWidth > levelHeaderWidth ? maxLevelWidth : levelHeaderWidth;
+            // its header still sits on the pinned edge, and the Characters
+            // column's ellipsis budget has to stop short of it.
+            int levelColumnWidth = Max(maxLevelInk, levelHeaderWidth);
 
-            // Both data headers centre over the band their own cells
-            // occupy rather than sharing an edge with them - the module's
-            // centred column law, see Services/JustifiedColumnTracks. The
-            // Discipline column is the flexing one and keeps its left rule.
-            Func<int, int> levelLabelX = w => JustifiedColumnTracks.CenteredInBand(
-                PlanRelayoutMath.PinnedRightEdge(w) - levelColumnWidth,
-                levelColumnWidth,
-                levelHeaderWidth);
+            Func<int, DisciplinesColumnMath.ColumnEdges> edgesFor = w =>
+                DisciplinesColumnMath.ComputeEdges(
+                    w, disciplineColumnWidth, charColumnWidth, levelColumnWidth);
+
+            Func<int, int> levelLabelX = w => JustifiedColumnTracks.CenteredOverContentRightAligned(
+                edgesFor(w).LevelRightEdge, levelColumnWidth, maxLevelInk, levelHeaderWidth);
 
             if (anyCharacterText)
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     contentFlow, panelWidth, DisciplineHeaderText, 8, LevelHeaderText, _sink,
-                    CharactersHeaderText,
-                    JustifiedColumnTracks.CenteredInBand(
-                        charX, maxCharWidth, MeasureWidth(HeaderBands.Font, CharactersHeaderText)),
+                    middleLabel: CharactersHeaderText,
+                    middleXForWidth: w =>
+                    {
+                        var e = edgesFor(w);
+                        return JustifiedColumnTracks.CenteredOverContent(
+                            e.CharX, e.CharBandWidth, e.CharX, maxCharInk, charHeaderWidth);
+                    },
                     rightLabelXForWidth: levelLabelX);
             }
             else
@@ -137,14 +122,15 @@ namespace TaimisToolbench.Views.Rendering
             for (int i = 0; i < section.Rows.Count; i++)
             {
                 CreateDisciplineRow(
-                    section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1,
-                    charX, levelColumnWidth);
+                    section.Rows[i], contentFlow, panelWidth, i == section.Rows.Count - 1, edgesFor);
             }
         }
 
-        // Shared between Render() (header column X) and
-        // CreateDisciplineRow so both always agree on the same gap.
-        private const int CharGap = 12;
+        private static int Max(int a, int b)
+        {
+            return a > b ? a : b;
+        }
+
         private const string LevelHeaderText = "Level";
         private const string CharactersHeaderText = "Characters";
         private const string DisciplineHeaderText = "Discipline";
@@ -155,67 +141,57 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         // The character-availability label sits between the discipline
-        // name and the Level column. charX is passed in by Render() as
-        // one fixed column X for the whole section (8 + the widest
-        // discipline name present + CharGap) - a per-row X could never
-        // line up with a single header label - which Render()'s own doc
-        // comment covers in
-        // full. Guaranteed >= 8 + nameLabel.Width + CharGap for every row
-        // in this call (charX's max-of-all-rows construction), so charLabel
-        // can never overlap nameLabel here.
+        // name and the Level column, on the one column X Render() derived
+        // for the whole section - see its doc comment. That X clears the
+        // widest discipline name in the section, so charLabel can never
+        // overlap nameLabel here.
         private void CreateDisciplineRow(
             PlanRowViewModel row, FlowPanel parent, int panelWidth, bool isLast,
-            int charX, int levelColumnWidth)
+            Func<int, DisciplinesColumnMath.ColumnEdges> edgesFor)
         {
             const int rowHeight = PlanContentHeightMath.DisciplineRowHeight;
             var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
             var font = UiFonts.Body;
+            var edges = edgesFor(panelWidth);
 
             LabelHelpers.WithDescenderClearance(
                 new Label()
                 {
                     Text = row.Label ?? "", Font = font,
                     AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(8, 7), Parent = rowPanel,
+                    Location = new Point(DisciplinesColumnMath.NameX, 7), Parent = rowPanel,
                 });
-            int levelRightEdge = PlanRelayoutMath.PinnedRightEdge(panelWidth);
-            var levelLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Sublabel, font, Color.White, levelRightEdge, 7);
+            var levelLabel = LabelHelpers.CreateRightAlignedLabel(
+                rowPanel, row.Sublabel, font, Color.White, edges.LevelRightEdge, 7);
 
             // "Anna (500), Bob (400/450)" - secondary text sitting
             // between the discipline name and the right-aligned Level
             // column, ellipsized to whatever room is left (same
             // EllipsizeToWidth + tooltip-on-truncate convention as
             // UsedMaterialsSectionRenderer.CreateUsedMaterialRow's name
-            // column). charX is fixed at build time (the section's set of
-            // discipline names never changes on resize, so the column X
-            // Render() derived from them does not either) - only the
-            // AVAILABLE width changes as levelLabel's position shifts with
-            // panelWidth, so only a re-ellipsis (text truncation), never a
-            // reposition, is needed on resize. Entirely skipped when
+            // column). Both its x and its budget move with the panel now
+            // that the columns distribute, so it repositions as well as
+            // re-ellipsizes. Entirely skipped when
             // row.CharacterAvailabilityText is null (the snapshot never
             // captured this data - see that field's own doc comment): no
             // label, no tooltip, no claim either way.
             var charFont = UiFonts.Body;
-            var charColor = new Color(170, 170, 170);
             string fullCharText = row.CharacterAvailabilityText;
             Label charLabel = null;
             if (!string.IsNullOrEmpty(fullCharText))
             {
-                // levelColumnWidth, not this row's own level text: Level
-                // is a reserved band right-aligned on the pinned edge, so
-                // the character run's budget stops at the band's left edge.
-                int charMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
-                    levelRightEdge, levelColumnWidth, CharGap, charX);
-                string charDisplayText = LabelHelpers.EllipsizeToWidth(charFont, fullCharText, charMaxWidth);
-                // The reported site: "Anna (500), Bobby (400/450)" - the one
-                // label in this row carrying character names, which are the
-                // only text here a user picks the letters of.
+                string charDisplayText = LabelHelpers.EllipsizeToWidth(
+                    charFont, fullCharText, edges.CharBandWidth);
+                // White, like every other content cell in the module's
+                // tables: these are character names, the only text in this
+                // row a user picks the letters out of, and the row already
+                // reads as secondary without dimming them.
                 charLabel = LabelHelpers.WithDescenderClearance(
                     new Label()
                     {
-                        Text = charDisplayText, Font = charFont, TextColor = charColor,
+                        Text = charDisplayText, Font = charFont, TextColor = Color.White,
                         AutoSizeWidth = true, AutoSizeHeight = true,
-                        Location = new Point(charX, 9), Parent = rowPanel,
+                        Location = new Point(edges.CharX, 9), Parent = rowPanel,
                     });
                 if (charLabel.Text != fullCharText)
                 {
@@ -243,19 +219,21 @@ namespace TaimisToolbench.Views.Rendering
                 rowPanel, panelWidth, rowHeight, isLast, 1, _sink,
                 w =>
                 {
+                    var e = edgesFor(w);
                     levelLabel.Location = new Point(
-                        PlanRelayoutMath.RightAlignedX(
-                            PlanRelayoutMath.PinnedRightEdge(w), levelLabel.Width),
-                        7);
+                        PlanRelayoutMath.RightAlignedX(e.LevelRightEdge, levelLabel.Width), 7);
+                    if (charLabel != null)
+                    {
+                        charLabel.Location = new Point(e.CharX, 9);
+                    }
                 });
 
             if (charLabel != null)
             {
                 _sink.AddReellipsis(w =>
                 {
-                    int newMaxWidth = PlanRelayoutMath.NameMaxWidthBeforeColumn(
-                        PlanRelayoutMath.PinnedRightEdge(w), levelColumnWidth, CharGap, charX);
-                    string newDisplayText = LabelHelpers.EllipsizeToWidth(charFont, fullCharText, newMaxWidth);
+                    string newDisplayText = LabelHelpers.EllipsizeToWidth(
+                        charFont, fullCharText, edgesFor(w).CharBandWidth);
                     if (charLabel.Text != newDisplayText)
                     {
                         charLabel.Text = newDisplayText;
