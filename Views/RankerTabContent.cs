@@ -282,10 +282,12 @@ namespace TaimisToolbench.Views
                 RebuildRows();
 
                 // A tab switch during a run rebuilds the chrome from scratch,
-                // so the in-flight state has to be restamped onto it. The
-                // button keeps its fixed "Refresh" label - progress text
-                // belongs to the status band (field bug: status-length text
-                // on the 132px button spilled past its edges).
+                // so the in-flight state has to be restamped onto it - which
+                // includes the button's "Analyzing..." label, since the
+                // rebuild constructs it at rest. Its plate holds either word
+                // and never carries the progress text, which belongs to the
+                // status band (field bug: status-length text on the 132px
+                // button spilled past its edges).
                 if (_isRefreshing)
                 {
                     _spinner.Visible = true;
@@ -674,15 +676,29 @@ namespace TaimisToolbench.Views
             TooltipFacility.ApplyPlain(_currenciesCheckbox, CurrenciesTooltip);
             _currenciesCheckbox.CheckedChanged += (_, e) => OnShowCurrenciesChanged(e.Checked);
 
+            // Size is assigned ONCE, here. The label swaps between the two
+            // words below and the plate must not move with it, which holds
+            // because FeedbackButton.RecalculateLayout only re-seats the
+            // text and icon inside the bounds it is given - it never writes
+            // Size the way an autosizing LabelBase would.
             _refreshButton = new FeedbackButton
             {
-                Text = "Refresh",
-                Size = new Point(RankerRowLayout.RefreshButtonWidth, UiMetrics.ButtonHeight),
+                Text = AnalyzeButtonText,
+                Size = new Point(RankerRowLayout.AnalyzeButtonWidth, UiMetrics.ButtonHeight),
                 Location = new Point(0, 6),
                 Parent = _toolbarPanel,
             };
             _refreshButton.Click += (_, __) => OnRefreshClicked();
         }
+
+        /// <summary>What the button says at rest.</summary>
+        private const string AnalyzeButtonText = "Analyze";
+
+        /// <summary>
+        /// What it says while a run is in flight. The width both are drawn
+        /// on is RankerRowLayout.AnalyzeButtonWidth, derived from THIS one.
+        /// </summary>
+        private const string AnalyzeRunningButtonText = "Analyzing...";
 
         private const string CategoriesToggleText = "Show Categories";
         private const string CurrenciesToggleText = "Show Currencies";
@@ -784,7 +800,7 @@ namespace TaimisToolbench.Views
             var toolbar = RankerRowLayout.Toolbar(
                 barWidth, InlineSpinnerLayout.SnapshotStatusSize, InlineSpinnerLayout.LabelGap,
                 ToggleFootprint(_categoriesCheckbox), ToggleFootprint(_currenciesCheckbox));
-            _refreshButton.Location = new Point(toolbar.RefreshX, _refreshButton.Location.Y);
+            _refreshButton.Location = new Point(toolbar.AnalyzeX, _refreshButton.Location.Y);
             _categoriesCheckbox.Location = new Point(
                 toolbar.FirstToggleX + CheckboxArtOverhang, _categoriesCheckbox.Location.Y);
             _currenciesCheckbox.Location = new Point(
@@ -1079,7 +1095,7 @@ namespace TaimisToolbench.Views
 
             _refreshButton.Enabled = !_isRefreshing && Entries.Count > 0;
             TooltipFacility.ApplyPlain(_refreshButton, Entries.Count > 0
-                ? "Recalculate every row. Each item is solved twice, so the first refresh of a session can take a while."
+                ? "Recalculate every row. Each item is solved twice, so the first analysis of a session can take a while."
                 : "Add an item to your list first.");
 
             UpdateColumnHeaderTooltips();
@@ -1137,7 +1153,7 @@ namespace TaimisToolbench.Views
 
             if (hadResults)
             {
-                SetStatus("Your account snapshot changed - press Refresh to recalculate.", isError: false);
+                SetStatus("Your account snapshot changed - press Analyze to recalculate.", isError: false);
             }
         }
 
@@ -1174,7 +1190,7 @@ namespace TaimisToolbench.Views
             "",
             "Every row scores five separate barriers - materials, account currencies, time-gated daily crafts, crafting disciplines and recipe unlocks - and combines only the ones that item actually has into one Ready percentage you can rank by.",
             "",
-            "Search above to add your first item, then press Refresh.",
+            "Search above to add your first item, then press Analyze.",
         };
 
         private void BuildEmptyState(int barWidth)
@@ -1424,7 +1440,7 @@ namespace TaimisToolbench.Views
             if (metrics == null)
             {
                 row.RemainingDash = CreateUnknownCell(
-                    row.Panel, 0, MainLineTextY, "Not yet calculated - press Refresh.");
+                    row.Panel, 0, MainLineTextY, "Not yet calculated - press Analyze.");
             }
             else if (metrics.RemainingCoinCost <= 0)
             {
@@ -1592,7 +1608,7 @@ namespace TaimisToolbench.Views
             if (metrics == null)
             {
                 row.ReadyLabel = CreateUnknownCell(
-                    row.Panel, 0, MainLineTextY, "Not yet calculated - press Refresh.");
+                    row.Panel, 0, MainLineTextY, "Not yet calculated - press Analyze.");
                 return;
             }
 
@@ -1689,7 +1705,7 @@ namespace TaimisToolbench.Views
         private static string StatusPlaceholderTooltip(RankerRowMetrics metrics)
         {
             return metrics == null
-                ? "Not yet calculated - press Refresh."
+                ? "Not yet calculated - press Analyze."
                 : "Your account snapshot has not loaded, so what you can afford is not known yet.";
         }
 
@@ -2310,7 +2326,7 @@ namespace TaimisToolbench.Views
         {
             if (metrics == null)
             {
-                return "Not yet calculated - press Refresh.";
+                return "Not yet calculated - press Analyze.";
             }
 
             if (metrics.Kind != RankerReadinessKind.Measured)
@@ -2341,7 +2357,7 @@ namespace TaimisToolbench.Views
         {
             if (metrics == null)
             {
-                return "Not yet calculated - press Refresh.";
+                return "Not yet calculated - press Analyze.";
             }
 
             if (metrics.DaysRemaining <= 0)
@@ -2434,7 +2450,7 @@ namespace TaimisToolbench.Views
             _results.InvalidateCascadeFrom(Entries, invalidatedFrom);
             Persist();
             RebuildRows();
-            SetStatus("Order changed - press Refresh to recalculate the rows below it.", isError: false);
+            SetStatus("Order changed - press Analyze to recalculate the rows below it.", isError: false);
         }
 
         private void RemoveRow(int index)
@@ -2714,10 +2730,10 @@ namespace TaimisToolbench.Views
                 return;
             }
 
-            string text = $"Refreshing {position} of {total} - {name}";
+            string text = $"Analyzing {position} of {total} - {name}";
             if (!_firstRefreshDone)
             {
-                text += ". The first refresh of a session downloads recipe data and can take a while.";
+                text += ". The first analysis of a session downloads recipe data and can take a while.";
             }
 
             SetStatus(text, isError: false);
@@ -2809,7 +2825,7 @@ namespace TaimisToolbench.Views
             }
             else if (cancelled)
             {
-                SetStatus("Refresh cancelled - " + StatusText.Count(updated, "item") + " updated", isError: false);
+                SetStatus("Analysis cancelled - " + StatusText.Count(updated, "item") + " updated", isError: false);
             }
             else
             {
@@ -2836,6 +2852,14 @@ namespace TaimisToolbench.Views
 
             UpdateModeRadios();
             _refreshButton.Enabled = enabled && Entries.Count > 0;
+
+            // Off the FIELD, not off the parameter: every caller sets
+            // _isRefreshing first, and the label has to survive a rebuild
+            // that re-enters here with a run still going.
+            _refreshButton.Text = _isRefreshing
+                ? AnalyzeRunningButtonText
+                : AnalyzeButtonText;
+
             foreach (var row in _rows)
             {
                 bool reorder = enabled && Mode == RankerMode.Cascade;
@@ -2879,11 +2903,11 @@ namespace TaimisToolbench.Views
 
             if (!_lastRefreshLocal.HasValue)
             {
-                ApplyStatusText("Not yet calculated - press Refresh.", isError: false);
+                ApplyStatusText("Not yet calculated - press Analyze.", isError: false);
                 return;
             }
 
-            string text = StatusText.Stamp("Refreshed", _lastRefreshLocal.Value);
+            string text = StatusText.Stamp("Analyzed", _lastRefreshLocal.Value);
             var snapshot = _getSnapshot();
             if (snapshot != null)
             {

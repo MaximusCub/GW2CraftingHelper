@@ -312,8 +312,8 @@ namespace TaimisToolbench.Tests.Services
             // Status text, its trailing spinner and the gap after it all end
             // before the button starts.
             Assert.True(slots.StatusX + slots.StatusWidth + SpinnerGap + SpinnerSize + SpinnerGap
-                <= slots.RefreshX);
-            Assert.Equal(barWidth, slots.RefreshX + RankerRowLayout.RefreshButtonWidth);
+                <= slots.AnalyzeX);
+            Assert.Equal(barWidth, slots.AnalyzeX + RankerRowLayout.AnalyzeButtonWidth);
             Assert.Equal(RankerRowLayout.Inset, slots.StatusX);
             Assert.True(slots.StatusWidth > 0);
         }
@@ -326,7 +326,7 @@ namespace TaimisToolbench.Tests.Services
             // against ToolbarSlots.StatusWidth; proven here with the same
             // Blish-free arithmetic and a synthetic 8px-per-char measure.
             var slots = RankerRowLayout.Toolbar(barWidth, SpinnerSize, SpinnerGap);
-            string progress = "Refreshing 17 of 25 - The Legendary Item With An Extremely " +
+            string progress = "Analyzing 17 of 25 - The Legendary Item With An Extremely " +
                 "Long Name That Keeps Going. The first refresh of a session downloads " +
                 "recipe data and can take a while, and this string is longer than any band.";
             System.Func<string, int> measure = s => 8 * (s ?? "").Length;
@@ -335,7 +335,7 @@ namespace TaimisToolbench.Tests.Services
 
             Assert.True(measure(shown) <= slots.StatusWidth);
             Assert.True(slots.StatusX + measure(shown) + SpinnerGap + SpinnerSize
-                <= slots.RefreshX);
+                <= slots.AnalyzeX);
         }
 
         [Theory]
@@ -346,7 +346,7 @@ namespace TaimisToolbench.Tests.Services
         {
             var slots = RankerRowLayout.Toolbar(barWidth, SpinnerSize, SpinnerGap);
 
-            Assert.True(slots.RefreshX >= 0);
+            Assert.True(slots.AnalyzeX >= 0);
             Assert.True(slots.StatusWidth >= 0);
         }
 
@@ -367,8 +367,8 @@ namespace TaimisToolbench.Tests.Services
             Assert.True(slots.StatusX + slots.StatusWidth + SpinnerGap + SpinnerSize + SpinnerGap
                 <= slots.FirstToggleX);
             Assert.True(slots.FirstToggleX + FirstToggleWidth <= slots.SecondToggleX);
-            Assert.True(slots.SecondToggleX + SecondToggleWidth <= slots.RefreshX);
-            Assert.Equal(barWidth, slots.RefreshX + RankerRowLayout.RefreshButtonWidth);
+            Assert.True(slots.SecondToggleX + SecondToggleWidth <= slots.AnalyzeX);
+            Assert.Equal(barWidth, slots.AnalyzeX + RankerRowLayout.AnalyzeButtonWidth);
             Assert.True(slots.StatusWidth > 0);
         }
 
@@ -381,8 +381,8 @@ namespace TaimisToolbench.Tests.Services
             var both = RankerRowLayout.Toolbar(
                 1200, SpinnerSize, SpinnerGap, FirstToggleWidth, SecondToggleWidth);
 
-            Assert.Equal(none.RefreshX, none.FirstToggleX);
-            Assert.Equal(none.RefreshX, none.SecondToggleX);
+            Assert.Equal(none.AnalyzeX, none.FirstToggleX);
+            Assert.Equal(none.AnalyzeX, none.SecondToggleX);
             Assert.Equal(
                 none.StatusWidth - FirstToggleWidth - SecondToggleWidth
                     - 2 * RankerRowLayout.CellGap,

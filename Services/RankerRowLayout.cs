@@ -548,13 +548,23 @@ namespace TaimisToolbench.Services
             return new SubLineBlock(gateY, currencyY, noteY, y);
         }
 
-        /// <summary>Fits the fixed "Refresh" label with clearance; never fed status text.</summary>
-        public const int RefreshButtonWidth = 132;
+        /// <summary>
+        /// The Analyze button's plate. It carries TWO labels - "Analyze" at
+        /// rest and "Analyzing..." while a run is in flight - and must not
+        /// resize between them, so this fits the WIDER one with room to
+        /// spare. Interpolated from the module's hand-fitted button widths
+        /// (Buy All 70 at 7 characters, Clear Overrides 124 at 15): ~6.75px
+        /// per character plus ~23px of plate, so the 12-character label
+        /// wants ~104 and this leaves ~14px of padding either side of it.
+        /// Never fed status text - see <see cref="Toolbar"/> for the run's
+        /// progress line, which belongs to the status band.
+        /// </summary>
+        public const int AnalyzeButtonWidth = 132;
 
         public readonly struct ToolbarSlots
         {
-            /// <summary>Left edge of the right-anchored Refresh button.</summary>
-            public readonly int RefreshX;
+            /// <summary>Left edge of the right-anchored Analyze button.</summary>
+            public readonly int AnalyzeX;
 
             /// <summary>Left edge of the first display toggle, seated left of the second.</summary>
             public readonly int FirstToggleX;
@@ -572,9 +582,9 @@ namespace TaimisToolbench.Services
             public readonly int StatusWidth;
 
             public ToolbarSlots(
-                int refreshX, int firstToggleX, int secondToggleX, int statusX, int statusWidth)
+                int analyzeX, int firstToggleX, int secondToggleX, int statusX, int statusWidth)
             {
-                RefreshX = refreshX;
+                AnalyzeX = analyzeX;
                 FirstToggleX = firstToggleX;
                 SecondToggleX = secondToggleX;
                 StatusX = statusX;
@@ -584,9 +594,9 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// The toolbar row: one full-width status band on the left, the
-        /// Refresh button pinned right, the two display toggles between them
+        /// Analyze button pinned right, the two display toggles between them
         /// in reading order, the inline spinner after the status text.
-        /// The refresh-progress text renders in the status band and ONLY
+        /// The run-progress text renders in the status band and ONLY
         /// there - the field test showed status-length text stamped onto
         /// the fixed-width button spilling past its edges.
         /// <para>
@@ -598,16 +608,16 @@ namespace TaimisToolbench.Services
             int barWidth, int spinnerSize, int labelGap,
             int firstToggleWidth = 0, int secondToggleWidth = 0)
         {
-            int refreshX = Math.Max(0, barWidth - RefreshButtonWidth);
+            int analyzeX = Math.Max(0, barWidth - AnalyzeButtonWidth);
             int secondX = secondToggleWidth <= 0
-                ? refreshX
-                : Math.Max(Inset, refreshX - CellGap - secondToggleWidth);
+                ? analyzeX
+                : Math.Max(Inset, analyzeX - CellGap - secondToggleWidth);
             int firstX = firstToggleWidth <= 0
                 ? secondX
                 : Math.Max(Inset, secondX - CellGap - firstToggleWidth);
             int statusRight = firstX - spinnerSize - 2 * labelGap;
             return new ToolbarSlots(
-                refreshX, firstX, secondX, Inset, Math.Max(0, statusRight - Inset));
+                analyzeX, firstX, secondX, Inset, Math.Max(0, statusRight - Inset));
         }
 
         public readonly struct ModeStripSlots
