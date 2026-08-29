@@ -811,6 +811,27 @@ offers cost the same single non-coin line, kind included; ties across
 different lines keep the first-listed offer, because ranking across them
 has no exchange rate and their unit counts must never be compared.
 
+That coin part is a **partial** accounting of the offer, and how partial
+depends on which kind of line was left unvalued. An unvalued wallet
+currency has no coin equivalent by invariant - the module refuses to
+invent an exchange rate - and every competing route omits one the same
+way, so ranking on the coin part is the only rule available. An unvalued
+**barter** line is different: it is an item acquisition, exactly the thing
+this solver exists to cost, and its omission is missing data rather than a
+deliberate refusal. `PlanSolver.Evaluate`'s terminal fallback branch
+therefore refuses to let an offer carrying a barter line win its
+comparison against a craft route, whose real cost accounts for every
+priceable component in its subtree. The offer stays reachable -
+`CanBuyVendor`, the VENDOR pill and a manual override are all unaffected -
+it simply cannot win on a price that omits most of itself. See section 8's
+barter-offer rule and `docs/KNOWN-ISSUES.md` item 44.
+
+An offer whose comparable-tier comparison value **overflows** demotes to
+the fallback tier rather than being dropped from both: its coin part is
+still real, and discarding it reported "no vendor route" for a route that
+exists, purely because a user-supplied valuation was absurd. That is the
+same treatment the per-line valuation accumulation beside it already gave.
+
 A `DailyCap`/`WeeklyCap`/`SeasonalCap` never excludes an offer or affects
 its tier - gw2efficiency only ever surfaces a cap as a post-solve notice,
 never re-routing the tree - so both tiers carry the raw caps through for
@@ -916,7 +937,13 @@ inventing a new one. The load-bearing rules:
   is paid partly in barter is flagged `VendorHasBarterItemCost` on both
   `PlanStep` and `CraftingTreeNode`: it is the twin of a non-empty
   `VendorCurrencyCosts`, and every consumer that reads a coin figure as
-  the whole cost must check both.
+  the whole cost must check both. **A barter line is never worth zero.**
+  An offer carrying one is never ranked on its coin part against a craft
+  route in the terminal fallback branch - that part omits the barter line
+  entirely, so it is a partial accounting being compared with a complete
+  one, and the offer would win on a price missing most of itself. It stays
+  offered and manually selectable; it just cannot win that comparison.
+  Section 7.1 has the currency/barter asymmetry this rests on.
 - **Craft/vendor comparability parity:** a recipe with an unvalued
   Currency-type ingredient is fallback-tier - never comparable with a real
   TP/vendor coin price in `PickCheapest` - exactly like a vendor offer

@@ -167,7 +167,7 @@ Services/PlanHistoryStore.cs                                                    
 Services/PlanPhaseEvent.cs                                                               73
 Services/PlanRelayoutMath.cs                                                            402
 Services/PlanResultBuilder.cs                                                           375
-Services/PlanSolver.cs                                                                 2050
+Services/PlanSolver.cs                                                                 2076
 Services/PlanStore.cs                                                                   219
 Services/PlanStoreHelpers.cs                                                            374
 Services/PlanStripStatusBoard.cs                                                        307
@@ -450,7 +450,7 @@ tests/TaimisToolbench.Tests/Services/PlanSolverBarterItemValuationTests.cs      
 tests/TaimisToolbench.Tests/Services/PlanSolverCapNoticeSuppressionTests.cs           202
 tests/TaimisToolbench.Tests/Services/PlanSolverCoreDecisionTests.cs                   656
 tests/TaimisToolbench.Tests/Services/PlanSolverCraftCompetencyTests.cs                585
-tests/TaimisToolbench.Tests/Services/PlanSolverCraftVendorComparabilityTests.cs       555
+tests/TaimisToolbench.Tests/Services/PlanSolverCraftVendorComparabilityTests.cs       557
 tests/TaimisToolbench.Tests/Services/PlanSolverCurrencyValuationTests.cs              456
 tests/TaimisToolbench.Tests/Services/PlanSolverForceBuyOnlyTests.cs                   166
 tests/TaimisToolbench.Tests/Services/PlanSolverGoldenTests.cs                         289
@@ -462,6 +462,7 @@ tests/TaimisToolbench.Tests/Services/PlanSolverPillSubduingTests.cs             
 tests/TaimisToolbench.Tests/Services/PlanSolverPriceBasisAndOverrideTests.cs          424
 tests/TaimisToolbench.Tests/Services/PlanSolverQuantityZeroGuardTests.cs               76
 tests/TaimisToolbench.Tests/Services/PlanSolverRecipeSelectionTieBreakTests.cs        267
+tests/TaimisToolbench.Tests/Services/PlanSolverUnpricedBarterOfferTests.cs            362
 tests/TaimisToolbench.Tests/Services/PlanSolverVendorBatchingTests.cs                 805
 tests/TaimisToolbench.Tests/Services/PlanSolverVendorCapTests.cs                      455
 tests/TaimisToolbench.Tests/Services/PlanSolverVendorOfferTests.cs                    614

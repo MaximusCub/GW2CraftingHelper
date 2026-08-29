@@ -677,6 +677,24 @@ fallback cannot break more finely than its existing coin-tie rule. Full
 records: `dev/archive/known-issues/2026-08-15-craft-vendor-comparability-parity-fix.md`,
 `...-adversarial.md`, `...-external.md`.
 
+**Follow-up (FIXED): a barter line is not worth zero.** That fix's fourth
+finding accepted, as a documented limitation, that the terminal fallback
+ranked a vendor offer's coin part against a craft route's real cost. Field
+use showed why that is not survivable once the unvalued line is an *item*
+rather than a wallet currency: Obsidian Heavy Breastplate (101521) was
+recommended as a 2g95s10c vendor purchase, that being the price of the
+10 Globs of Ectoplasm on Lyhr's offer, which also charges four
+account-bound Gifts that folded into no coin at all. The coin part is a
+partial accounting; the craft cost it was beating is a complete one. An
+offer carrying a barter line can no longer win that comparison, and the
+mirror-image case - an offer silently dropped from both tiers when its
+comparison value overflowed - now demotes to fallback instead. The
+currency-only ranking is unchanged, and so is the residual above: pricing
+the barter line properly is unreachable here (the vendor cost-line graph
+in `ref/vendor_offers.json` is cyclic, and 727 of its 1,032 distinct cost
+item ids have no seed recipe at all). Coverage:
+`tests/TaimisToolbench.Tests/Services/PlanSolverUnpricedBarterOfferTests.cs`.
+
 ### 45. W3B: generation progress + rich logging
 
 The plan-strip status board and the phase-by-phase progress reporting a
