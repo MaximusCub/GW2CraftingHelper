@@ -1057,3 +1057,70 @@ silently depends on that invariant holding.
 
 **Full history:** KNOWN-ISSUES item 25;
 [`docs/research/m37-r2-batch-economics.md`](research/m37-r2-batch-economics.md).
+
+### S2.2 Crafting Ranker: cascade, ramp, weights, cache
+
+**`RankerPriorityCascade` - what the ledger tracks.** "What a plan takes
+from you" is several different things, and the ledger keeps them apart:
+
+- materials, from `CraftingPlanResult.UsedMaterials` - the solver's own
+  post-solve consumption record, which already reflects every buy-vs-craft
+  decision, including decisions caused by what was owned;
+- currencies and coin, netted by the cascade itself, because the solver
+  never consults the wallet (see `AccountCurrencyIndex`);
+- daily-cooldown crafting actions, which are capped per **account**, so two
+  items needing the same gated ingredient queue rather than run in
+  parallel.
+
+**`RankerReadinessRamp` - why the ramp is deep rather than pastel.** A
+naive red-to-green ramp peaks at a bright yellow around the midpoint, and
+white on bright yellow is illegible. WCAG's 4.5:1 floor for white
+(`#FFFFFF`) means every colour on the ramp has to keep its relative
+luminance at or under `1.05 / 4.5 - 0.05 = 0.1833`, which is a deep,
+saturated ramp and is why the three anchors are dark for their hues.
+
+Interpolation is in OKLCh, not in sRGB. An sRGB lerp between two saturated
+hues cuts through the interior of the colour solid and desaturates on the
+way - red to green goes through brown - because sRGB's axes are not
+perceptual. OKLab (Bjorn Ottosson, 2020) is a perceptual space whose polar
+form OKLCh separates lightness, chroma and hue, so walking the hue angle
+keeps chroma up all the way across and the intermediate colours stay orange
+and olive rather than mud. The 25% sample is `(159, 76, 0)` - a real orange
+- which is the measurement that says the space is doing its job.
+
+**`RankerReadinessRamp.Track` - the second contrast obligation.** The track
+constant was first chosen against white alone. At `Rgb(38, 36, 34)` it
+scored 1.05:1 against the panel behind it, while the panel's own texture
+varies by 1.076:1 - so the track was literally less distinguishable from
+the surface than the surface is from itself. Measured in game at 3440x1440.
+Darker is the only direction that serves both obligations, and the current
+value sits at 1.32:1 against the panel with pure black as the 1.42:1
+ceiling.
+
+**`RankerReadinessWeights` - the per-gate argument.** The weights are not
+derived from each gate's magnitude; deriving them that way sounds
+principled and is the exchange-rate trap in disguise. They are judgement
+calls about substitutability, which is a property the game itself decides:
+
+- A daily reset cannot be bought at any price. It is the only barrier with
+  no substitute, so it takes the largest share.
+- Coin is the bulk of the work and the one gate measured exactly, by the
+  real solver at real prices. Equal claim on precision grounds; no better
+  claim than time on difficulty grounds.
+- Currencies are a real barrier measured only as within-currency ratios, so
+  each point carries less information than a coin point. Weighted below
+  materials for that reason, not because currencies matter less.
+- A discipline is a hard wall - you cannot craft at all without it - but a
+  short one next to a legendary's materials bill, and usually either
+  satisfied already or cheap to satisfy. Non-zero because it is real; small
+  because it is short.
+- A recipe unlock sits on the same substitutability rung as a discipline: a
+  hard wall, but most recipes are purchasable sheets or cheap unlocks, so it
+  takes the disciplines weight rather than inventing a new tier. First call,
+  reviewable like the others.
+
+**`RankerResultCache` - why two sets.** The two comparison modes answer
+different questions about the same rows, and a row's answer under one says
+nothing about its answer under the other. Keeping only the last mode's set
+made every toggle a full recompute, including a toggle straight back to
+numbers the session had already paid for (owner ruling, 2026-08-27).

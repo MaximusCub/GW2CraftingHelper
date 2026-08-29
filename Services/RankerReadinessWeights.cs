@@ -9,33 +9,17 @@ namespace TaimisToolbench.Services
     /// formula so they can be argued with.
     ///
     /// They are NOT derived from each gate's magnitude. Deriving them that way
-    /// sounds principled and is the exchange-rate trap in disguise: to weight
-    /// days against coin by magnitude you must first decide what a day is
-    /// worth in gold, and neither the GW2 API nor this repo will supply that
-    /// number. They are judgement calls about SUBSTITUTABILITY instead, which
-    /// is a property the game itself decides:
-    ///
-    ///  - A daily reset cannot be bought at any price. It is the only barrier
-    ///    with no substitute, so it takes the largest share.
-    ///  - Coin is the bulk of the work and the one gate measured exactly, by
-    ///    the real solver at real prices. Equal claim on precision grounds; no
-    ///    better claim than time on difficulty grounds.
-    ///  - Currencies are a real barrier measured only as within-currency
-    ///    ratios, so each point carries less information than a coin point.
-    ///    Weighted below materials for that reason, not because currencies
-    ///    matter less.
-    ///  - A discipline is a hard wall - you cannot craft at all without it -
-    ///    but a short one next to a legendary's materials bill, and usually
-    ///    either satisfied already or cheap to satisfy. Non-zero because it is
-    ///    real; small because it is short.
-    ///  - A recipe unlock sits on the same substitutability rung as a
-    ///    discipline: a hard wall, but most recipes are purchasable sheets
-    ///    or cheap unlocks, so it takes the disciplines weight rather than
-    ///    inventing a new tier. First call, reviewable like the others.
+    /// needs an exchange rate between a day and a pile of gold first, and
+    /// neither the GW2 API nor this repo will supply that number. They are
+    /// judgement calls about SUBSTITUTABILITY instead, which is a property the
+    /// game itself decides.
     ///
     /// Deliberately not a user setting: a user who retunes the weights cannot
     /// compare their own numbers with anyone else's, and the model's
     /// legibility is the feature.
+    ///
+    /// The argument for each gate's own share: docs/ARCHITECTURE.md,
+    /// "Services Q-Z: relocated design narrative".
     /// </summary>
     public static class RankerReadinessWeights
     {

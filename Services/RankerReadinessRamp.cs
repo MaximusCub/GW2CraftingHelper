@@ -3,40 +3,23 @@ using System;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// The continuous red -> amber -> green ramp the Crafting Ranker paints
-    /// its readiness bars with, and the contrast arithmetic that decides
-    /// what the ramp is allowed to be.
+    /// The continuous red -> amber -> green ramp the Crafting Ranker paints its
+    /// readiness bars with, and the contrast arithmetic that decides what the
+    /// ramp is allowed to be.
     ///
-    /// <para>
-    /// WHITE TEXT SITS ON THIS FILL, which is the whole constraint. A naive
-    /// red-to-green ramp peaks at a bright yellow around the midpoint, and
-    /// white on bright yellow is illegible; WCAG's 4.5:1 floor for white
-    /// (#FFFFFF) means every colour on the ramp has to keep its relative
-    /// luminance at or under 1.05 / 4.5 - 0.05 = 0.1833. That is a deep,
-    /// saturated ramp, not a pastel one, and it is why the three anchors
-    /// below are dark for their hues. <see cref="ContrastWithWhite"/> and
-    /// the tests over it are what stop a later "let's brighten it" from
-    /// silently crossing the floor.
-    /// </para>
+    /// WHITE TEXT SITS ON THIS FILL, which is the whole constraint: WCAG's 4.5:1
+    /// floor for #FFFFFF caps every colour on the ramp at a relative luminance of
+    /// 1.05 / 4.5 - 0.05 = 0.1833. That is why the three anchors are dark for
+    /// their hues, and <see cref="ContrastWithWhite"/> plus the tests over it are
+    /// what stop a later "let's brighten it" silently crossing the floor.
+    /// Interpolation is in OKLCh, not sRGB, so the intermediate colours stay
+    /// orange and olive rather than mud.
     ///
-    /// <para>
-    /// INTERPOLATION IS IN OKLCh, not in sRGB. An sRGB lerp between two
-    /// saturated hues cuts through the interior of the colour solid and
-    /// desaturates on the way - red to green goes through brown - because
-    /// sRGB's axes are not perceptual. OKLab (Bjorn Ottosson, 2020) is a
-    /// perceptual space whose polar form OKLCh separates lightness, chroma
-    /// and hue, so walking the hue angle keeps chroma up all the way across
-    /// and the intermediate colours stay orange and olive rather than mud.
-    /// The 25% sample is (159, 76, 0) - a real orange - which is the
-    /// measurement that says the space is doing its job.
-    /// </para>
-    ///
-    /// <para>
-    /// Blish-free on purpose: the module's colour type is XNA's, which is a
-    /// graphics dependency, so the arithmetic lives here over plain bytes
-    /// and <see cref="Views.Rendering.RankerReadinessColors"/> is the one
-    /// place that turns a sample into a Color.
-    /// </para>
+    /// Blish-free on purpose: the module's colour type is XNA's, so the
+    /// arithmetic lives here over plain bytes and
+    /// <see cref="Views.Rendering.RankerReadinessColors"/> is the one place that
+    /// turns a sample into a Color. Derivation: docs/ARCHITECTURE.md,
+    /// "Services Q-Z: relocated design narrative".
     /// </summary>
     internal static class RankerReadinessRamp
     {
@@ -72,24 +55,21 @@ namespace TaimisToolbench.Services
         public static readonly Rgb Full = new Rgb(42, 124, 48);
 
         /// <summary>
-        /// The unfilled part of a bar, which carries TWO contrast
-        /// obligations, not one. Against white, because a low fill leaves
-        /// the centred percentage sitting over the track rather than over
-        /// the ramp: 19.42:1. Against the PANEL BEHIND IT, because a track
-        /// nobody can see is not a bar - it is a floating coloured block
-        /// with no scale, and the percentage beside it reads as detached.
+        /// The unfilled part of a bar, which carries TWO contrast obligations,
+        /// not one. Against white, because a low fill leaves the centred
+        /// percentage sitting over the track rather than over the ramp: 19.42:1.
+        /// Against the PANEL BEHIND IT, because a track nobody can see is not a
+        /// bar - it is a floating coloured block with no scale, and the
+        /// percentage beside it reads as detached.
         /// <para>
-        /// The second obligation is the one this constant was first chosen
-        /// without: at Rgb(38, 36, 34) the track scored 1.05:1 against the
-        /// panel while the panel's own texture varies by 1.076:1, so it was
-        /// literally less distinguishable from the surface than the surface
-        /// is from itself. Measured in game at 3440x1440.
+        /// Darker is the only direction that serves both: reaching 3:1 against
+        /// the panel needs roughly Rgb(110), which drops white-text contrast to
+        /// ~3.5:1, under <see cref="WhiteTextContrastFloor"/>. Pure black is the
+        /// ceiling at 1.42:1; this sits at 1.32:1.
         /// </para>
         /// <para>
-        /// Darker is the only direction that serves both: reaching 3:1
-        /// against the panel needs roughly Rgb(110), which drops white-text
-        /// contrast to ~3.5:1, under <see cref="WhiteTextContrastFloor"/>.
-        /// Pure black is the ceiling at 1.42:1; this sits at 1.32:1.
+        /// How the second obligation was found, and the measurement behind it:
+        /// docs/ARCHITECTURE.md, "Services Q-Z: relocated design narrative".
         /// </para>
         /// </summary>
         public static readonly Rgb Track = new Rgb(14, 13, 12);

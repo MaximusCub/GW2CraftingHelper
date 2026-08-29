@@ -14,18 +14,9 @@ namespace TaimisToolbench.Services
     /// n+1. Nothing is re-solved: an earlier slot's plan is decided without
     /// reference to any later one, which is what the user's ordering means.
     ///
-    /// The ledger tracks four kinds of claim, because "what a plan takes from
-    /// you" is four different things:
-    ///  - materials, from CraftingPlanResult.UsedMaterials (the solver's own
-    ///    post-solve consumption record, which already reflects every
-    ///    buy-vs-craft decision, including decisions caused by what was owned)
-    ///  - currencies and coin, netted by this class, because the solver never
-    ///    consults the wallet (see AccountCurrencyIndex)
-    ///  - daily-cooldown crafting actions, which are capped per ACCOUNT, so
-    ///    two items needing the same gated ingredient queue rather than run
-    ///    in parallel
-    ///
-    /// Blish-free by construction.
+    /// Blish-free by construction. What the ledger tracks, and why "what a
+    /// plan takes from you" is several different things: docs/ARCHITECTURE.md,
+    /// "Services Q-Z: relocated design narrative".
     /// </summary>
     internal sealed class RankerPriorityCascade
     {

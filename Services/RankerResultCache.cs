@@ -4,45 +4,24 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// The Crafting Ranker's two answer sets - one per comparison mode -
-    /// and the rules for when each stops being true.
+    /// The Crafting Ranker's two answer sets - one per comparison mode - and
+    /// the rules for when each stops being true.
     ///
-    /// <para>
-    /// WHY TWO. The two modes answer different questions about the same
-    /// rows, and a row's answer under one says nothing about its answer
-    /// under the other. Keeping only the last mode's set made every toggle
-    /// a full recompute, including a toggle straight back to numbers the
-    /// session had already paid for (owner ruling, 2026-08-27).
-    /// </para>
-    ///
-    /// <para>
-    /// INVALIDATION, once, here:
-    /// </para>
+    /// INVALIDATION, stated once, here:
     /// <list type="bullet">
-    /// <item><description>CASCADE is order-dependent. A row is measured
-    /// after every row above it has claimed materials, currencies, coin and
-    /// daily crafts, so ANY change at priority index i - a reorder, an
-    /// insert, a removal, a quantity edit - invalidates i and everything
-    /// below it. Rows above are untouched: the cascade never reads
-    /// downward.</description></item>
-    /// <item><description>INDEPENDENT is order-free. Every row is measured
-    /// against the whole account, ignoring the others, so reordering
-    /// invalidates nothing at all and adding or removing a row invalidates
-    /// only that row. A quantity edit invalidates the row it edits, in both
-    /// sets.</description></item>
-    /// <item><description>A NEW ACCOUNT SNAPSHOT invalidates both sets
-    /// whole: every number in either was measured against the holdings the
-    /// snapshot replaced.</description></item>
-    /// <item><description>A REFRESH of a mode recomputes that mode's set
-    /// and leaves the other alone.</description></item>
+    /// <item><description>CASCADE is order-dependent: any change at priority
+    /// index i (reorder, insert, removal, quantity edit) invalidates i and
+    /// everything below it, never anything above it.</description></item>
+    /// <item><description>INDEPENDENT is order-free: reordering invalidates
+    /// nothing at all, adding or removing a row invalidates only that row,
+    /// and a quantity edit invalidates the row it edits in both sets.
+    /// </description></item>
+    /// <item><description>A NEW ACCOUNT SNAPSHOT invalidates both sets whole;
+    /// a REFRESH of one mode leaves the other alone.</description></item>
     /// </list>
-    ///
-    /// <para>
     /// BOUND: at most RankerWatchlistLimits.MaxEntries rows in each of two
-    /// sets. Nothing here grows with time, only with the list the user can
-    /// see, and a removed row is dropped from both sets rather than left to
-    /// accumulate.
-    /// </para>
+    /// sets, so nothing here grows with time. Why two sets exist:
+    /// docs/ARCHITECTURE.md, "Services Q-Z: relocated design narrative".
     /// </summary>
     internal sealed class RankerResultCache
     {
