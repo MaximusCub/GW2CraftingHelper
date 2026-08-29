@@ -473,7 +473,7 @@ tests/TaimisToolbench.Tests/Services/PlanSolverUnpricedBarterOfferTests.cs      
 tests/TaimisToolbench.Tests/Services/PlanSolverVendorBatchingTests.cs                 805
 tests/TaimisToolbench.Tests/Services/PlanSolverVendorCapTests.cs                      455
 tests/TaimisToolbench.Tests/Services/PlanSolverVendorOfferTests.cs                    614
-tests/TaimisToolbench.Tests/Services/PlanStoreTests.cs                               2438
+tests/TaimisToolbench.Tests/Services/PlanStoreTests.cs                               2439
 tests/TaimisToolbench.Tests/Services/PlanStripStatusBoardTests.cs                     406
 tests/TaimisToolbench.Tests/Services/PlanStripTickDecisionTests.cs                    166
 tests/TaimisToolbench.Tests/Services/PlanTableSorterTests.cs                          446

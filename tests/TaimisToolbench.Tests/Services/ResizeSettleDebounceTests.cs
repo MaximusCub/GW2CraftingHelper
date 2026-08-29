@@ -275,7 +275,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(ResizeSettleDebounce.DefaultSettleMs, debounce.SettleMs);
         }
 
-        [Fact]
+        [Fact(Timeout = 30000)]
         public async Task TheProductionWiringRunsTheCallbackWithNoSeamsSupplied()
         {
             // The one test on the real DateTime.UtcNow and the real
@@ -290,11 +290,10 @@ namespace TaimisToolbench.Tests.Services
 
             debounce.Schedule();
 
-            Task finished = await Task.WhenAny(ran.Task, Task.Delay(30000));
-            Assert.Same(ran.Task, finished);
+            await ran.Task;
         }
 
-        [Fact]
+        [Fact(Timeout = 30000)]
         public async Task TheSettleWindowDoesNotDependOnTheAmbientSynchronizationContext()
         {
             // The callback reaches the UI thread through the marshal, so the
@@ -323,8 +322,7 @@ namespace TaimisToolbench.Tests.Services
                 SynchronizationContext.SetSynchronizationContext(original);
             }
 
-            Task finished = await Task.WhenAny(ran.Task, Task.Delay(30000));
-            Assert.Same(ran.Task, finished);
+            await ran.Task;
             Assert.Equal(0, dead.Posts);
         }
 
