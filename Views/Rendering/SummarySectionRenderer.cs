@@ -847,7 +847,17 @@ namespace TaimisToolbench.Views.Rendering
                 IconControls.CreateItemIcon(
                     rowPanel, row.IconUrl, ItemIconFrame.NotAnItem(),
                     SummarySectionLayoutMath.CurrencyIconX, iconY,
-                    ItemIconTier.CurrencyListRow, ItemIconTooltip.Naming(row.Label));
+                    ItemIconTier.CurrencyListRow,
+                    // A CurrencyCost row is a wallet currency by
+                    // construction (PlanViewModelBuilder.
+                    // BuildCurrencyTableRows reads Plan.CurrencyCosts), and
+                    // CurrencyOwnedQuantity is already the raw unclamped
+                    // wallet holding the game's tooltip states.
+                    ItemIconTooltip.ForCurrency(
+                        row.Label,
+                        () => CurrencyTooltipFacts.For(
+                            row.Label, row.IconUrl, row.CurrencyDescription,
+                            row.CurrencyOwnedQuantity)));
             }
 
             const int nameX = SummarySectionLayoutMath.CurrencyNameX;
@@ -866,9 +876,9 @@ namespace TaimisToolbench.Views.Rendering
                 Parent = rowPanel,
             });
 
-            // No tooltip on the name or the row: the currency's icon names
-            // it (ItemIconTooltip.Naming), and that is the one control on
-            // the row that answers for it.
+            // No tooltip on the name or the row: the currency's icon
+            // answers for it, and that is the one control on the row that
+            // does.
             var numberColor = new Color(220, 220, 220);
             var requiredLabel = LabelHelpers.CreateRightAlignedLabel(rowPanel, row.Quantity.ToString(), font, numberColor, edges.RequiredRightEdge, SummarySectionLayoutMath.CurrencyRowTextY);
             string haveText = row.CurrencyOwnedQuantity.HasValue ? row.CurrencyOwnedQuantity.Value.ToString() : "-";

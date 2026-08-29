@@ -69,6 +69,14 @@ namespace TaimisToolbench.Views.Rendering
         /// supplies the transparency, so scaling it again would land the
         /// box near 0.66 coverage and fail audit H6's no-legible-bleed
         /// requirement. Measurement wins.
+        /// <para>
+        /// THE BOX IS MEANT TO BE SEE-THROUGH. The game's own tooltip is
+        /// semi-transparent (the art's alpha channel, mean ~0.80) and so is
+        /// this one; scene showing through it in a side-by-side against an
+        /// in-game capture is the MATCH, not the defect. Repeatedly
+        /// mis-diagnosed as lost opacity - do not raise the coverage to
+        /// "fix" it.
+        /// </para>
         /// </summary>
         private const float CanvasArtOpacity = 0.98f;
 
@@ -123,9 +131,9 @@ namespace TaimisToolbench.Views.Rendering
         /// The inline effect icon beside a consumable's effect block:
         /// ~26px square with the text column starting ~31px in, both
         /// measured on live3 soul-pastries (icon columns 21-47, text at 51
-        /// with the content edge at 21) and candy-corn (2026-08-26). Kept
-        /// at the game's absolute size: the tooltip's 14pt face is within
-        /// 1.4% of the game's text scale.
+        /// with the content edge at 21) and candy-corn (2026-08-26). The
+        /// game's absolute pixel sizes, not multiples of the line height:
+        /// they do not move when the text face does.
         /// </summary>
         private const int EffectIconSize = 26;
 
@@ -343,13 +351,12 @@ namespace TaimisToolbench.Views.Rendering
 
         private void BuildContent(TooltipContent content)
         {
-            // Caption (Menomonia 14), NOT the module's Body 16: the game's
-            // tooltip text measures within 1.4% of Menomonia 14 and the
-            // owner's 2026-08-26 field ruling - made against real in-game
-            // tooltips - is to match the game rather than keep the
-            // module-wide +2pt readability bump here (fidelity-audit
-            // section 2, F9 resolved).
-            var font = UiFonts.Caption;
+            // Body (Menomonia 16), the module's reading size.
+            // TooltipLayoutMath.ItemTooltipMaxContentWidth is derived by
+            // measuring the game's own wrap decisions THROUGH this face,
+            // so the two move together: change one without re-deriving the
+            // other and the box stops breaking lines where the game does.
+            var font = UiFonts.Body;
             int lineHeight = font.LineHeight;
             int coinIconSize = CoinIconSizeFor(lineHeight);
 

@@ -107,9 +107,50 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// A subject with no item identity to compose from - a currency, a
-        /// coin denomination. Its name in plain prose, which is all there
-        /// is to say about it.
+        /// THE standard wallet-currency hover: the game's own currency
+        /// tooltip - icon+name, the wallet balance, the currency's prose,
+        /// the type line (<see cref="CurrencyTooltipComposer"/>).
+        /// <paramref name="getFacts"/> is read at hover time, so a
+        /// /v2/currencies reply that lands after the row was built still
+        /// reaches the box.
+        /// <para>
+        /// The KIND is the caller's to choose and it must come from the id
+        /// space the caller drew the icon from, never from the name:
+        /// Gaeting Crystal is item 86094 AND wallet currencies 39 and 77,
+        /// one in-game good in two id spaces, so a name lookup cannot tell
+        /// which tooltip it is owed. A good the module lists among its
+        /// currencies but which is really an ITEM - Crystalline Ore 46682
+        /// - takes <see cref="ForItem(ItemTooltipIdentity, Func{ItemStatBlock})"/>
+        /// instead. Views/SettingsTabContent's <c>IsBarterItem</c> is the
+        /// discriminator that already carries this distinction.
+        /// </para>
+        /// </summary>
+        internal static ItemIconTooltip ForCurrency(
+            string name, Func<CurrencyTooltipFacts> getFacts)
+        {
+            if (getFacts == null)
+            {
+                throw new ArgumentNullException(nameof(getFacts));
+            }
+
+            return new ItemIconTooltip(
+                () => CurrencyTooltipComposer.BuildContent(getFacts()), name);
+        }
+
+        /// <summary>
+        /// A subject that is neither an item nor a wallet currency and so
+        /// has no tooltip of its own to compose - its name in plain prose,
+        /// which is all there is to say about it.
+        /// <para>
+        /// RETIRING. It was the one seam through which an item or a
+        /// currency could reach the screen as a bare name, and that is what
+        /// every currency hover in the module used to be. Items take
+        /// <see cref="ForItem(ItemTooltipIdentity, Func{ItemStatBlock})"/>
+        /// and currencies take <see cref="ForCurrency"/>; the tests
+        /// workflow's "Every item icon names its tier and what it shows on
+        /// hover" step holds the remaining callers to a named list and
+        /// fails the build on a new one.
+        /// </para>
         /// </summary>
         internal static ItemIconTooltip Naming(string subject)
         {

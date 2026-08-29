@@ -34,6 +34,22 @@
 > the owner's field ruling retired the Menomonia-16 divergence - the
 > tooltip renders at 14 with `MaxContentWidth` 350. The line-order map
 > and desktop-gate steps 3/6/15 below describe the superseded shapes.
+>
+> **Superseded further - 2026-08-28, branch `wave1-tooltips`.** The
+> owner's field ruling that retired the Menomonia-16 divergence is itself
+> retired: a side-by-side against the game's own tooltip reads the 14pt
+> box a size too small, and the surface now draws at `UiFonts.Body`
+> (Menomonia 16). `ItemTooltipMaxContentWidth` is not a transferable
+> number - it is the midpoint of the bracket the game's own break
+> decisions leave when the corpus is measured THROUGH the face the
+> surface draws in - so it was re-derived against menomonia-16-regular
+> and moved 332 -> 376, reproducing the same wraps. Every statement below
+> about a 14pt face or a 350/332 cap is superseded; the line order,
+> colours, canvas and blank rules are not.
+>
+> Also settled here, because it has been mis-diagnosed more than once:
+> the game's own tooltip is SEMI-TRANSPARENT and so is this one. Scene
+> showing through the box in a side-by-side is the match, not a defect.
 
 ## Tooltip authenticity (tooltip-authenticity)
 

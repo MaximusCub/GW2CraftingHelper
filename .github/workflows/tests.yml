@@ -557,17 +557,22 @@ jobs:
                   i += 1
               return None
 
-          def last_argument(args):
+          def split_arguments(args):
               # Top-level split: a nested call's own commas are not ours.
-              depth, start = 0, 0
+              parts, depth, start = [], 0, 0
               for i, ch in enumerate(args):
                   if ch in '([':
                       depth += 1
                   elif ch in ')]':
                       depth -= 1
                   elif ch == ',' and depth == 0:
+                      parts.append(args[start:i].strip())
                       start = i + 1
-              return args[start:].strip()
+              parts.append(args[start:].strip())
+              return parts
+
+          def last_argument(args):
+              return split_arguments(args)[-1]
 
           bad, silent, unused = [], [], []
           seen = set()
@@ -598,6 +603,68 @@ jobs:
               if path not in files:
                   silent.append(f'{path}: forward-listed but not in the tree ({why})')
 
+          # The bare-name hatch, and who may still reach it. Naming() yields
+          # a name-only hover with no icon, no wallet balance, no prose - it
+          # is what every currency in the module used to show, and the owner's
+          # rule is that there is no way to display an item or a currency
+          # wrong. An ITEM takes ForItem/Composed and a WALLET CURRENCY takes
+          # ForCurrency; the kind must come from the id space the call site
+          # drew the icon from, never from the name (Gaeting Crystal is item
+          # 86094 AND currencies 39/77 - one good, two id spaces).
+          #
+          # Each entry below is a call site still awaiting conversion and the
+          # branch that owns the file. Removing an entry is the act of the
+          # commit that converts it; adding one needs a reason in the message,
+          # and "the subject is a currency" is not one.
+          NAMING_PENDING = {
+              'Views/SettingsTabContent.cs':
+                  'the settings branch owns this file - its CurrencyRow.IsBarterItem'
+                  ' already picks the id space, so the two icon calls in'
+                  ' EnsureCurrencyRowIcon take ForItem and ForCurrency respectively',
+              'Views/RankerTabContent.cs':
+                  'the Ranker branch owns this file - its currency shortfall chips'
+                  ' take ForCurrency',
+          }
+          naming = []
+          for f in files:
+              text = open(f, encoding='utf-8').read()
+              for m in re.finditer(re.escape('ItemIconTooltip.Naming('), text):
+                  line = text.count('\n', 0, m.start()) + 1
+                  if f not in NAMING_PENDING:
+                      naming.append(f'{f}:{line}')
+          for path, why in sorted(NAMING_PENDING.items()):
+              if path not in files:
+                  naming.append(f'{path}: listed as pending but not in the tree ({why})')
+
+          # A hard-coded null stat source on ForItem composes a header-only
+          # hover: an icon and a name, and nothing the game's own item
+          # tooltip says. Every other call site passes a CONDITIONAL null -
+          # "no stat block for THIS id, on this surface" - which is a
+          # different statement and stays allowed. Same rules as
+          # NAMING_PENDING: an entry is removed by the commit that converts
+          # its call.
+          STATLESS_PENDING = {
+              'Views/PlanHistoryTabContent.cs':
+                  'the Plan History branch owns this file - a one-item entry\'s row'
+                  ' header IS that item and is owed its stat block; a multi-item'
+                  ' entry keeps the null, because one item\'s stats are not the'
+                  ' request\'s',
+          }
+          statless = []
+          for f in files:
+              text = open(f, encoding='utf-8').read()
+              for m in re.finditer(re.escape('ItemIconTooltip.ForItem('), text):
+                  args = arguments(text, m.end() - 1)
+                  if args is None:
+                      continue
+                  parts = split_arguments(args)
+                  line = text.count('\n', 0, m.start()) + 1
+                  if len(parts) > 1 and parts[1] == 'null' and f not in STATLESS_PENDING:
+                      statless.append(f'{f}:{line}')
+          for path, why in sorted(STATLESS_PENDING.items()):
+              if path not in files:
+                  statless.append(f'{path}: listed as pending but not in the tree ({why})')
+
           # The stamping seams, pinned by name and by parameter type. A new
           # one, or one widened to Control/Label, is how the whole-row
           # stamping would come back.
@@ -626,9 +693,23 @@ jobs:
               print('These item icons are built without a named ItemIconTooltip:')
               print('\n'.join(sorted(silent)))
               print('Pass one from Views/Rendering/ItemIconTooltip.cs: ForItem/Composed for')
-              print('the standard item hover, Naming for a currency, or None(ItemIconSilence.X)')
+              print('an item, ForCurrency for a wallet currency, or None(ItemIconSilence.X)')
               print('to say out loud that this icon shows nothing and why.')
-          if bad or silent:
+          if naming:
+              print('These icons show a bare name where the entity has a tooltip of')
+              print('its own:')
+              print('\n'.join(sorted(naming)))
+              print('ItemIconTooltip.Naming is retiring. An item takes ForItem/Composed,')
+              print('a wallet currency takes ForCurrency - and which one is decided by the')
+              print('id space the call site drew the icon from, never by the name.')
+          if statless:
+              print('These item hovers are composed with no stat source at all, so they')
+              print('can only ever be an icon and a name:')
+              print('\n'.join(sorted(statless)))
+              print('Pass the surface\'s own session stat lookup. A null that depends on')
+              print('the row (no id, no accessor on this surface) is a conditional and is')
+              print('not what this asks about.')
+          if bad or silent or naming or statless:
               sys.exit(1)
           if unused:
               print('NOTE: these files no longer call a pre-tier overload - drop them')

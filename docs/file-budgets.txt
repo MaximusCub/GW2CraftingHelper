@@ -37,7 +37,7 @@ Models/CraftingPlanResult.cs                                                    
 Models/CraftingTreeNode.cs                                                              235
 Models/CurrencyCost.cs                                                                    9
 Models/CurrencyDecisionDefaults.cs                                                      114
-Models/CurrencyMetadata.cs                                                               16
+Models/CurrencyMetadata.cs                                                               24
 Models/CurrencyValuation.cs                                                             321
 Models/DailyCooldownItem.cs                                                              38
 Models/ExcessCraftOutput.cs                                                              43
@@ -49,7 +49,7 @@ Models/ItemPrice.cs                                                             
 Models/ItemStatBlock.cs                                                                 131
 Models/MaterialSourceAllocation.cs                                                        9
 Models/OwnMaterialsMode.cs                                                               43
-Models/PersistedPlan.cs                                                                 169
+Models/PersistedPlan.cs                                                                 173
 Models/PersistedPlanLoad.cs                                                              49
 Models/PillSourceCostBreakdown.cs                                                        76
 Models/PlanHistoryEntry.cs                                                              146
@@ -80,7 +80,7 @@ Models/UsedMaterial.cs                                                          
 Models/VendorItemCostLine.cs                                                             42
 Models/VendorOffer.cs                                                                    57
 Models/VendorOfferDataset.cs                                                             15
-Module.cs                                                                               2856
+Module.cs                                                                               2860
 Properties/AssemblyInfo.cs                                                               12
 Services/AboutLayoutMath.cs                                                             163
 Services/AccountCurrencyIndex.cs                                                         44
@@ -98,8 +98,10 @@ Services/CraftCompetencyEvaluator.cs                                            
 Services/CraftableItemSearchProvider.cs                                                 127
 Services/CraftingPlanPipeline.cs                                                       1406
 Services/CraftingTreeBuilder.cs                                                         626
-Services/CurrencyDisplayResolver.cs                                                     216
-Services/CurrencyMetadataService.cs                                                     141
+Services/CurrencyDisplayResolver.cs                                                     236
+Services/CurrencyMetadataService.cs                                                     159
+Services/CurrencyTooltipComposer.cs                                                      92
+Services/CurrencyTooltipFacts.cs                                                         80
 Services/CurrencyValuationSerializer.cs                                                 221
 Services/DailyCooldownItemService.cs                                                     77
 Services/DecisionPillPlanner.cs                                                         431
@@ -272,7 +274,7 @@ Views/ItemInputRowStrip.cs                                                      
 Views/ItemRowState.cs                                                                    31
 Views/LogTabContent.cs                                                                 1436
 Views/MainThreadMarshal.cs                                                              141
-Views/MainView.cs                                                                       2743
+Views/MainView.cs                                                                       2766
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
 Views/PlanHistoryTabContent.cs                                                          1402
@@ -300,7 +302,7 @@ Views/Rendering/PressFeedback.cs                                                
 Views/Rendering/RankerReadinessColors.cs                                                 99
 Views/Rendering/RarityColors.cs                                                         147
 Views/Rendering/RecipesSectionRenderer.cs                                               323
-Views/Rendering/RichTooltipSurface.cs                                                   600
+Views/Rendering/RichTooltipSurface.cs                                                   607
 Views/Rendering/RowRelayoutHelpers.cs                                                    72
 Views/Rendering/ShoppingBadgeColors.cs                                                   72
 Views/Rendering/ShoppingListSectionRenderer.cs                                          453
@@ -378,8 +380,9 @@ tests/TaimisToolbench.Tests/Services/CraftingPlanPipelineProgressLoggingTests.cs
 tests/TaimisToolbench.Tests/Services/CraftingPlanPipelineTests.cs                     372
 tests/TaimisToolbench.Tests/Services/CraftingPlanPipelineVendorCostComponentTests.cs  538
 tests/TaimisToolbench.Tests/Services/CraftingTreeBuilderTests.cs                     2311
-tests/TaimisToolbench.Tests/Services/CurrencyDisplayResolverTests.cs                  416
-tests/TaimisToolbench.Tests/Services/CurrencyMetadataServiceTests.cs                  358
+tests/TaimisToolbench.Tests/Services/CurrencyDisplayResolverTests.cs                  459
+tests/TaimisToolbench.Tests/Services/CurrencyMetadataServiceTests.cs                  409
+tests/TaimisToolbench.Tests/Services/CurrencyTooltipComposerTests.cs                  169
 tests/TaimisToolbench.Tests/Services/CurrencyValuationSerializerTests.cs              274
 tests/TaimisToolbench.Tests/Services/DailyCooldownItemServiceTests.cs                 209
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerSubduingTests.cs              187

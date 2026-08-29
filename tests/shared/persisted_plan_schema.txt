@@ -91,6 +91,7 @@ CraftingTreeNode.VendorHasBarterItemCost:Boolean
 CurrencyCost.Amount:Int64
 CurrencyCost.CurrencyId:Int32
 CurrencyMetadata.CurrencyId:Int32
+CurrencyMetadata.Description:String
 CurrencyMetadata.IconUrl:String
 CurrencyMetadata.Name:String
 CurrencyValuation.ClearedCurrencyIds:IReadOnlyCollection`1<Int32>

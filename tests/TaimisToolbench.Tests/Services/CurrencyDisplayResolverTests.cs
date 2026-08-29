@@ -56,6 +56,55 @@ namespace TaimisToolbench.Tests.Services
             Assert.DoesNotContain("99999", name);
         }
 
+        // --- ResolveDescription ---
+        [Fact]
+        public void ResolveDescription_MetadataPresent_ReturnsTheApisOwnProse()
+        {
+            var metadata = new Dictionary<int, CurrencyMetadata>
+            {
+                [23] = new CurrencyMetadata
+                {
+                    CurrencyId = 23,
+                    Name = "Spirit Shards",
+                    Description = "Gained after reaching level 80.",
+                },
+            };
+
+            Assert.Equal(
+                "Gained after reaching level 80.",
+                CurrencyDisplayResolver.ResolveDescription(23, metadata));
+        }
+
+        [Fact]
+        public void ResolveDescription_NoMetadata_ReturnsNullRatherThanInventingProse()
+        {
+            // Unlike ResolveName there is no offline table to fall back to,
+            // and a sentence the module wrote itself would be invented data.
+            Assert.Null(CurrencyDisplayResolver.ResolveDescription(23, null));
+
+            var metadata = new Dictionary<int, CurrencyMetadata>
+            {
+                [2] = new CurrencyMetadata { CurrencyId = 2, Name = "Karma", Description = "k" },
+            };
+            Assert.Null(CurrencyDisplayResolver.ResolveDescription(23, metadata));
+        }
+
+        [Fact]
+        public void ResolveDescription_EmptyDescription_ReadsAsAbsent()
+        {
+            // An older saved plan carries CurrencyMetadata with no
+            // Description at all; Newtonsoft leaves it null, and a reply
+            // that carried none parses to "". Both mean the same thing.
+            var metadata = new Dictionary<int, CurrencyMetadata>
+            {
+                [23] = new CurrencyMetadata { CurrencyId = 23, Name = "Spirit Shards", Description = "" },
+                [24] = new CurrencyMetadata { CurrencyId = 24, Name = "Relics" },
+            };
+
+            Assert.Null(CurrencyDisplayResolver.ResolveDescription(23, metadata));
+            Assert.Null(CurrencyDisplayResolver.ResolveDescription(24, metadata));
+        }
+
         // --- ResolveIconUrl ---
         [Fact]
         public void ResolveIconUrl_MetadataPresent_ReturnsIcon()

@@ -208,9 +208,9 @@ namespace TaimisToolbench.Tests.Services
 
         // --- The item tooltip's live-derived wrap cap ---
 
-        // Menomonia 14 exactly as the tooltip surface gets it: glyph
-        // metrics read out of the shipped
-        // Content/fonts/menomonia/menomonia-14-regular.xnb for the
+        // Menomonia 16 exactly as the tooltip surface gets it (UiFonts.Body,
+        // RichTooltipSurface.BuildContent): glyph metrics read out of the
+        // shipped Content/fonts/menomonia/menomonia-16-regular.xnb for the
         // characters the A/B strings use, plus Blish's global
         // LetterSpacing = -1. Measured the way MonoGame.Extended's
         // BitmapFont.MeasureString does - the pen advances by
@@ -218,48 +218,48 @@ namespace TaimisToolbench.Tests.Services
         // glyph ink - so a wrap asserted here is the wrap the module
         // renders. Every listed glyph has ink, so no zero-width guard is
         // needed.
-        private const string Menomonia14Chars = " .:AFMTabcdefghilmnorstuwy";
+        private const string Menomonia16Chars = " .:AFMTabcdefghilmnorstuwy";
 
-        private static readonly int[] Menomonia14Advance = new[]
+        private static readonly int[] Menomonia16Advance = new[]
         {
-            6, 3, 3, 9, 8, 13, 10, 8, 8, 8, 8, 8, 6,
-            8, 8, 4, 4, 13, 8, 8, 5, 7, 6, 8, 13, 8,
+            7, 4, 3, 10, 9, 15, 11, 9, 9, 9, 9, 9, 6,
+            9, 9, 4, 4, 14, 9, 9, 6, 8, 6, 9, 14, 9,
         };
 
-        private static readonly int[] Menomonia14XOffset = new[]
+        private static readonly int[] Menomonia16XOffset = new[]
         {
             -2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-            -1, -1, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+            -1, -1, 0, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1,
         };
 
-        private static readonly int[] Menomonia14Ink = new[]
+        private static readonly int[] Menomonia16Ink = new[]
         {
-            5, 5, 5, 11, 10, 15, 12, 10, 10, 10, 10, 10, 8,
-            10, 10, 5, 6, 14, 10, 10, 7, 9, 8, 10, 15, 10,
+            5, 5, 5, 12, 11, 16, 13, 11, 11, 11, 11, 11, 8,
+            11, 11, 5, 5, 16, 11, 11, 8, 10, 8, 11, 16, 11,
         };
 
         private const int BlishLetterSpacing = -1;
 
-        private static int MeasureMenomonia14(string text)
+        private static int MeasureMenomonia16(string text)
         {
             int pen = 0;
             int width = 0;
             foreach (char c in text ?? string.Empty)
             {
-                int i = Menomonia14Chars.IndexOf(c);
+                int i = Menomonia16Chars.IndexOf(c);
                 if (i < 0)
                 {
                     throw new ArgumentException(
                         "No metric captured for '" + c + "'.", nameof(text));
                 }
 
-                int right = pen + Menomonia14XOffset[i] + Menomonia14Ink[i];
+                int right = pen + Menomonia16XOffset[i] + Menomonia16Ink[i];
                 if (right > width)
                 {
                     width = right;
                 }
 
-                pen += Menomonia14Advance[i] + BlishLetterSpacing;
+                pen += Menomonia16Advance[i] + BlishLetterSpacing;
             }
 
             return width;
@@ -272,26 +272,26 @@ namespace TaimisToolbench.Tests.Services
             // both sides: at least the width of the line the game KEPT
             // whole, below that line plus the word it PUSHED down. Through
             // this face the corpus reads (kept / pushed): Gift of Twilight
-            // 282/338, eyes-of-kormir 313/366 and 315/352,
-            // heart-of-destroyer 293/362 and 326/387, plus Gift of
-            // Twilight's unwrapped 317. Intersection [326, 338).
-            Assert.InRange(TooltipLayoutMath.ItemTooltipMaxContentWidth, 326, 337);
+            // 320/381, eyes-of-kormir 354/415 and 357/400,
+            // heart-of-destroyer 330/408 and 372/442, plus Gift of
+            // Twilight's unwrapped 359. Intersection [372, 381).
+            Assert.InRange(TooltipLayoutMath.ItemTooltipMaxContentWidth, 372, 380);
 
             // The metric arrays are indexed by position in the character
             // string; a length drift would measure silently wrong rather
             // than throw.
-            Assert.Equal(Menomonia14Chars.Length, Menomonia14Advance.Length);
-            Assert.Equal(Menomonia14Chars.Length, Menomonia14XOffset.Length);
-            Assert.Equal(Menomonia14Chars.Length, Menomonia14Ink.Length);
+            Assert.Equal(Menomonia16Chars.Length, Menomonia16Advance.Length);
+            Assert.Equal(Menomonia16Chars.Length, Menomonia16XOffset.Length);
+            Assert.Equal(Menomonia16Chars.Length, Menomonia16Ink.Length);
 
             // The two numbers the A/B turns on, so a font or metric change
             // that moved them could not silently keep the cap valid.
             Assert.Equal(
-                282, MeasureMenomonia14("A gift used to create the legendary greatsword"));
+                320, MeasureMenomonia16("A gift used to create the legendary greatsword"));
             Assert.Equal(
-                338, MeasureMenomonia14("A gift used to create the legendary greatsword Twilight."));
+                381, MeasureMenomonia16("A gift used to create the legendary greatsword Twilight."));
             Assert.Equal(
-                317, MeasureMenomonia14("Made by combining these items in the Mystic Forge:"));
+                359, MeasureMenomonia16("Made by combining these items in the Mystic Forge:"));
         }
 
         [Fact]
@@ -299,9 +299,9 @@ namespace TaimisToolbench.Tests.Services
         {
             // The 2026-08-27 owner A/B: item 19648 hovered in the module
             // and in the live game. The game wrapped its description after
-            // "greatsword" and kept the Mystic Forge line whole; at the
-            // former 350 the module fitted the whole description on one
-            // line, which is the discrepancy the capture pair showed.
+            // "greatsword" and kept the Mystic Forge line whole - the two
+            // break decisions the cap is derived to reproduce, asserted
+            // here through the face the surface actually draws in.
             var content = TooltipContent.FromText(
                 "A gift used to create the legendary greatsword Twilight.\n" +
                 "Made by combining these items in the Mystic Forge:");
@@ -310,8 +310,8 @@ namespace TaimisToolbench.Tests.Services
                 content,
                 TooltipLayoutMath.MaxContentWidth(
                     1920, 10, TooltipLayoutMath.ItemTooltipMaxContentWidth),
-                18,
-                MeasureMenomonia14,
+                20,
+                MeasureMenomonia16,
                 _ => 0);
 
             Assert.Equal(
@@ -325,7 +325,7 @@ namespace TaimisToolbench.Tests.Services
 
             // Shrink-wrap to the widest laid-out line, not to the cap -
             // the sizing rule the live corpus confirms.
-            Assert.Equal(317, layout.Width);
+            Assert.Equal(359, layout.Width);
         }
 
         // --- Placement (the four-edge clamp) ---
