@@ -73,33 +73,23 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Builds each requested item's own tree via the exact same
-        /// BuildTreeAsync path
-        /// a single-item request uses, then - for 2+ items - wraps them
-        /// under a synthetic root RecipeNode the same way gw2e's frontend
-        /// does for its own Calculator (docs/gw2e-parity-spec.md):
-        /// a reserved-id, never-rendered
-        /// "recipe" whose Ingredients are the N real item trees, each
-        /// already carrying its own requested amount as its own Quantity
-        /// (set by BuildTreeAsync itself, exactly like an ordinary recipe
-        /// ingredient's quantity). Feeding this wrapper through the
-        /// unmodified PlanSolver/InventoryReducer/CraftingTreeBuilder
-        /// pipeline is what gives merged shopping-list/steps/currency
-        /// totals "for free" via the existing per-item-id aggregation
-        /// (PlanSolver.Collect's AggregateStep) - no multi-item-specific
-        /// solver logic exists or is needed.
+        /// BuildTreeAsync path a single-item request uses, then - for 2+ items -
+        /// wraps them under a synthetic root RecipeNode: a reserved-id,
+        /// never-rendered "recipe" whose Ingredients are the N real item trees,
+        /// each already carrying its own requested amount as its own Quantity.
         ///
-        /// A single-entry request returns that item's own tree UNCHANGED -
-        /// no wrapper at all - echoing gw2e's own `if (r.length === 1)
-        /// return r[0]` short-circuit, so a caller feeding a single-entry
-        /// list into this method gets byte-identical output to calling
-        /// BuildTreeAsync directly.
+        /// A single-entry request returns that item's own tree UNCHANGED - no
+        /// wrapper at all - so a caller feeding a single-entry list into this
+        /// method gets byte-identical output to calling BuildTreeAsync directly.
         ///
-        /// Items are built sequentially (not concurrently): the persistent
-        /// search/recipe caches (see PreWarmCacheAsync) already make any
-        /// overlap between requested items' subtrees cheap on repeat calls,
-        /// and sequential building avoids adding concurrency surface to a
-        /// data structure not designed to be mutated from multiple item
-        /// builds in parallel.
+        /// Items are built sequentially, not concurrently: the persistent
+        /// search/recipe caches (see PreWarmCacheAsync) already make any overlap
+        /// between requested items' subtrees cheap on repeat calls, and
+        /// sequential building adds no concurrency surface to a structure not
+        /// designed for parallel mutation.
+        ///
+        /// Why a wrapper gives merged totals for free, and the gw2efficiency
+        /// behaviour it echoes: docs/ARCHITECTURE.md, S2.6.
         /// </summary>
         public async Task<RecipeNode> BuildMultiItemTreeAsync(
             IReadOnlyList<PlanRequestItem> items, CancellationToken ct)

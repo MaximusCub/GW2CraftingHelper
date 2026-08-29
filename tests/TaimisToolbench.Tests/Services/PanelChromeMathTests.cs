@@ -4,13 +4,12 @@ using Xunit;
 namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
-    /// The arithmetic every tab's hosted container is sized by. What these
-    /// pin is one property: the size of the content a titled, bordered panel
-    /// can hold comes from that panel's real chrome, never from the
-    /// panel-sized default a not-yet-laid-out Blish panel reports. The
-    /// difference between the two IS the first-paint truncation - a viewport
-    /// sized from the wrong one keeps a stale height, and the bottom of the
-    /// plan is not drawn until a resize corrects it (KNOWN-ISSUES #65).
+    /// The arithmetic every tab's hosted container is sized by. What these pin
+    /// is one property: the content size a titled, bordered panel can hold
+    /// comes from that panel's real chrome, never from the panel-sized default
+    /// a not-yet-laid-out Blish panel reports. That difference IS the
+    /// first-paint truncation - a viewport sized from the wrong one keeps a
+    /// stale height until a resize corrects it (KNOWN-ISSUES #65).
     ///
     /// The vendor constants below are Blish_HUD.Controls.Panel's own public
     /// values, restated here as literals because the test project is
@@ -19,19 +18,9 @@ namespace TaimisToolbench.Tests.Services
     ///
     /// The second half of the file walks the same chain end to end, from the
     /// window height down to the panel a tab renders into, at window sizes
-    /// from the module's floor to a 4K-tall client. What it pins is the
-    /// bottom of that chain: the viewport used to stop 74px above the window
-    /// while its top sat flush under the title bar, because the content
-    /// region Module.cs hands Blish was authored window-region-relative and
-    /// Blish reads it as absolute texture coordinates (KNOWN-ISSUES #66).
-    ///
-    /// The TOP of the chain has one term the vendor no longer supplies: the
-    /// module does not set Panel.Title, so Blish reserves no 36px header and
-    /// the tab's name is drawn on the module's own taller band inside the
-    /// content region. The sweep walks the chain as the adapter really
-    /// builds it - untitled panel, band subtracted - and the budgets below
-    /// are literals so that shrinking the band back cannot quietly move the
-    /// assertions with it.
+    /// from the module's floor to a 4K-tall client, with the budgets written
+    /// as literals. Both ends of that chain and what moved them:
+    /// docs/ARCHITECTURE.md section 4 (KNOWN-ISSUES #66).
     /// </summary>
     public class PanelChromeMathTests
     {

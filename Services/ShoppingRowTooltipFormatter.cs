@@ -4,24 +4,19 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// Builds the shopping-row tooltip's per-currency HAVE/NEED line(s)
-    /// (shoplist-have-format) from an already-resolved
-    /// CurrencyAmountViewModel list - the same list
-    /// ShoppingListSectionRenderer.CreateShoppingRow renders in the Total
-    /// cell (row.CurrencyCosts). Pure, Blish-free string shaping (mirrors
-    /// RequestLabelFormatter's own doc comment) so the exact wording is
-    /// directly unit-testable without a live BasicTooltipText - and,
-    /// critically, so both CreateShoppingRow's initial tooltip build and
-    /// its AddReellipsis rebuild call the identical code path: the two
-    /// must never diverge - a diverging rebuild silently drops every
+    /// Builds the shopping-row tooltip's per-currency HAVE/NEED line(s) from an
+    /// already-resolved CurrencyAmountViewModel list - the same list
+    /// ShoppingListSectionRenderer.CreateShoppingRow renders in the Total cell
+    /// (row.CurrencyCosts). Pure, Blish-free string shaping so both
+    /// CreateShoppingRow's initial tooltip build and its AddReellipsis rebuild
+    /// call the identical code path: a diverging rebuild silently drops every
     /// currency line on the first resize/settle.
     ///
     /// cc.Amount is this ROW's own currency total (one PlanStep's
-    /// VendorCurrencyCosts - see PlanViewModelBuilder.
-    /// BuildShoppingListSection), never the whole plan's requirement for
-    /// that currency id (that figure is PlanViewModel.CurrencyPlanTotals,
-    /// which this renderer is never handed) - so the wording below never
-    /// claims "plan requires"; it states only what
+    /// VendorCurrencyCosts - see PlanViewModelBuilder.BuildShoppingListSection),
+    /// never the whole plan's requirement for that currency id (that figure is
+    /// PlanViewModel.CurrencyPlanTotals, which this renderer is never handed),
+    /// so the wording below never claims "plan requires"; it states only what
     /// this row's own numbers actually mean.
     /// </summary>
     internal static class ShoppingRowTooltipFormatter
@@ -60,43 +55,22 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// One line per currency cost with a resolved wallet holding
-        /// (cc.OwnedQuantity.HasValue); a currency with no wallet data at
-        /// all (OwnedQuantity null) or a non-positive Amount (nothing
-        /// meaningful to report - guards a future zero/negative-Amount
-        /// caller from rendering a content-free "HAVE 0/0" line) is
-        /// silently skipped. Never returns null - an empty list for
-        /// "nothing to say" lets callers AddRange without a null check.
+        /// (cc.OwnedQuantity.HasValue); a currency with no wallet data at all,
+        /// or a non-positive Amount, is silently skipped. Never returns null -
+        /// an empty list for "nothing to say" lets callers AddRange without a
+        /// null check.
         ///
-        /// Shortfall rows (wallet holding &lt; Amount) render
-        /// "HAVE owned/Amount THIS ROW, NEED shortfall". In this branch the
-        /// OwnedQuantity clamp is inert (raw &lt; Amount), so OwnedQuantity
-        /// already IS the real unclamped holding - nothing more to add.
+        /// Shortfall rows (holding &lt; Amount) render "HAVE owned/Amount THIS
+        /// ROW, NEED shortfall"; in that branch the OwnedQuantity clamp is
+        /// inert, so OwnedQuantity already IS the real unclamped holding.
+        /// Covered rows (holding &gt;= Amount) render "HAVE Amount/Amount THIS
+        /// ROW", plus a "(wallet N)" aside only when the real unclamped
+        /// RawOwnedQuantity exceeds Amount - the clamp hides that surplus, so
+        /// the aside is the only place it survives.
         ///
-        /// Covered rows (wallet holding &gt;= Amount) render
-        /// "HAVE Amount/Amount THIS ROW", plus a "(wallet N)" aside only
-        /// when the real unclamped holding (RawOwnedQuantity) exceeds
-        /// Amount - the clamp on OwnedQuantity hides that surplus, so the
-        /// aside is the only place it survives.
-        ///
-        /// The "THIS ROW" suffix on both halves is deliberate (shoplist-
-        /// have-format SCOPE COLLISION): both numbers
-        /// are this ROW's own total (cc.Amount, one PlanStep's own
-        /// VendorCurrencyCosts - see the class doc comment), never the
-        /// whole plan's requirement for that currency id. Without a scope
-        /// marker, two shopping rows drawing on the SAME wallet currency
-        /// (e.g. Karma split across two vendor rows) can each independently
-        /// read as "fully covered" and double-count the one wallet balance
-        /// - the same misreading class DecisionPillPlanner's PLAN-scope
-        /// "HAVE {have}/{planTotal} TOTAL" pill (AppendCurrencyOwnershipPill)
-        /// exists to avoid, via its own explicit "TOTAL" suffix. "THIS ROW"
-        /// is this method's row-scope mirror of that same convention - the
-        /// vocabulary must never look plan-scope when it isn't. The "(wallet
-        /// N)" aside is worded the same way for the same reason: "wallet" is
-        /// the one term this codebase now uses for a raw account-wide
-        /// holding figure, matching the Summary column-header table's
-        /// "Have" column and the tree's "HAVE x/y TOTAL" pill - a THIS
-        /// ROW/wallet line can never be mistaken for the plan-scope facts
-        /// those two show.
+        /// The "THIS ROW" and "wallet" wording is load-bearing and must not be
+        /// softened; why, and the plan-scope pill it mirrors:
+        /// docs/ARCHITECTURE.md, "Services Q-Z: relocated design narrative".
         /// </summary>
         public static IReadOnlyList<string> BuildCurrencyLines(IReadOnlyList<CurrencyAmountViewModel> currencyCosts)
         {

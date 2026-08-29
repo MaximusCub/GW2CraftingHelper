@@ -192,34 +192,24 @@ namespace TaimisToolbench.Tests.Services
         }
 
         /// <summary>
-        /// Item 1's BASELINE decision is Craft
-        /// (a cheap 1x item-2 recipe undercuts the vendor offer below), so
-        /// the winning offer's item cost component (id 42, "Glob of
-        /// Ectoplasm") is never scanned by the decisions-only
-        /// AddVendorItemComponentIds overload - only
-        /// AddAllVendorOfferItemComponentIds (scanning every vendorOffers
-        /// entry, not just the winning decision) can widen metadata AND
-        /// (which this test now also covers)
-        /// BuildOwnedVendorItemComponentAmounts' ownership scan for it. A
-        /// manual per-node override forcing item 1 to BuyFromVendor via
-        /// ResolveWithOverrides - an ordinary, commonly-used interaction -
-        /// then surfaces that item's component leaf; without the metadata
-        /// fix it would render "Unknown Item"/null icon forever, and
-        /// without the ownership fix it would show correct name/icon but
-        /// NO have pill forever, even with the item sitting in the account
-        /// (ResolveWithOverrides never re-fetches EITHER - see its own doc
-        /// comment).
+        /// Item 1's BASELINE decision is Craft (a cheap 1x item-2 recipe
+        /// undercuts the vendor offer below), so the winning offer's item cost
+        /// component (id 42) is never scanned by the decisions-only
+        /// AddVendorItemComponentIds overload - only the every-offer overload
+        /// AddAllVendorOfferItemComponentIds can widen metadata AND
+        /// BuildOwnedVendorItemComponentAmounts' ownership scan for it.
+        /// A manual per-node override forcing item 1 to BuyFromVendor via
+        /// ResolveWithOverrides then surfaces that leaf: without the metadata
+        /// fix it renders "Unknown Item"/null icon forever; without the
+        /// ownership fix it shows a correct name and icon but NO have pill
+        /// forever, even with the item owned (ResolveWithOverrides re-fetches
+        /// neither - see its own doc comment).
         ///
-        /// Regression: the offer's non-coin Currency
-        /// cost line (id 23) is the exact currency-side sibling of the
-        /// item-side gap above - BuildOwnedCurrencyAmounts used to scope
-        /// its ownership scan strictly to the baseline plan's aggregated
-        /// CurrencyCosts, so a currency component surfaced only by this
-        /// same override would get correct name/icon but NO have pill
-        /// either, permanently, even with a full wallet. The wallet entry
-        /// for currency 23 below proves BuildOwnedCurrencyAmounts's own
-        /// AddAllVendorOfferCurrencyComponentIds widening now covers it the
-        /// same way the item side already did.
+        /// The offer's non-coin Currency line (id 23) is the exact
+        /// currency-side sibling: BuildOwnedCurrencyAmounts used to scope its
+        /// ownership scan to the baseline plan's aggregated CurrencyCosts, so
+        /// a currency surfaced only by this override had the same permanent
+        /// missing-pill gap - the wallet entry below proves it is closed.
         /// </summary>
         [Fact]
         public async Task MixedVendorOffer_NotBaselineWinner_ResolveWithOverrides_StillResolvesRealItemMetadataAndOwnership()

@@ -11,31 +11,24 @@ using Xunit;
 namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
-    /// Whole-result goldens for the solver's economic decisions, captured
-    /// by running the real pipeline over a corpus that spans the axes
+    /// Whole-result goldens for the solver's economic decisions, captured by
+    /// running the real pipeline over a corpus that spans the axes
     /// PlanSolver.Evaluate branches on: vendor-priced leaves, own-materials
     /// off/free/valued, both PriceBasis values, the force-buy pre-pass,
     /// currency valuation, multi-item roots, and a deep nested tree.
     ///
-    /// <para>
-    /// Each golden holds the ENTIRE CraftingPlanResult (see
-    /// PlanResultDump): the acquisition source chosen for every node, unit
-    /// and total costs, craft step ordering, required recipes and
-    /// disciplines, the shopping list, and every advisory list. Captured
-    /// against the solver BEFORE Evaluate was decomposed, so a byte-
-    /// identical sweep afterwards is proof the extraction moved no
-    /// arithmetic - the same standard WP-11/WP-15 held VendorBatchSolver
-    /// to.
-    /// </para>
+    /// Each golden holds the ENTIRE CraftingPlanResult (see PlanResultDump): the
+    /// acquisition source for every node, unit and total costs, craft step order,
+    /// required recipes and disciplines, the shopping list, and every advisory
+    /// list. Captured against the solver BEFORE Evaluate was decomposed, so a
+    /// byte-identical sweep afterwards proves the extraction moved no arithmetic.
     ///
-    /// <para>
-    /// A difference here is never a reason to re-baseline. Investigate the
-    /// difference; the golden is the record of what the solver decided.
-    /// To regenerate deliberately (a real, reviewed behaviour change), set
-    /// TTB_REGEN_PLAN_GOLDENS=1 and run this class - it rewrites the
-    /// files in tests/TaimisToolbench.Tests/Goldens/plan-solver/ and
-    /// fails, so the rewrite can never pass unnoticed in CI.
-    /// </para>
+    /// A difference here is never a reason to re-baseline: investigate it, since
+    /// the golden is the record of what the solver decided. To regenerate
+    /// deliberately (a real, reviewed behaviour change), set
+    /// TTB_REGEN_PLAN_GOLDENS=1 and run this class - it rewrites the files in
+    /// tests/TaimisToolbench.Tests/Goldens/plan-solver/ and fails, so the
+    /// rewrite can never pass unnoticed in CI.
     /// </summary>
     public class PlanSolverGoldenTests
     {

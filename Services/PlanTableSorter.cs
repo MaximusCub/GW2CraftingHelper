@@ -115,40 +115,21 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// Ordering for the Shopping List's Each/Total cells, which are not
         /// one scale but three kinds of cell: a coin price, a price paid in
-        /// some non-coin currency (spirit shards, karma), and a genuinely
-        /// unpriceable row that renders a dash. A copper amount and a
-        /// spirit-shard amount are not comparable - the module's pricing
-        /// rules forbid inventing an exchange rate between them - so the
-        /// column sorts in three blocks: coin rows (including mixed
-        /// coin+currency rows, keyed on their copper part, which is the one
-        /// magnitude every coin row shares), then currency-only rows, then
-        /// unpriceable rows.
-        /// <para>
-        /// The block order is deliberately direction-INVARIANT while the
-        /// order WITHIN a block flips. Reversing the blocks would express
-        /// nothing - "5 spirit shards" is neither more nor less than "3
-        /// gold" in either direction - and it would float the dash rows to
-        /// the top, where they are pure noise. Descending therefore means
-        /// "most expensive coin row first, still followed by the currency
-        /// rows, still followed by the dashes".
-        /// </para>
-        /// <para>
-        /// Currency-only rows sort by currency name first (ordinal,
-        /// case-insensitive) so every karma row lands beside every other
-        /// karma row, then by amount within that currency - the only
-        /// numeric comparison in that block that is actually meaningful.
-        /// A row carrying more than one currency is keyed on its
-        /// ordinally-first currency name (and that entry's amount), which
-        /// is stable regardless of the order the resolver emitted them in;
-        /// no attempt is made to add amounts across currencies.
-        /// </para>
+        /// some non-coin currency, and a genuinely unpriceable row that
+        /// renders a dash. A copper amount and a spirit-shard amount are not
+        /// comparable - the module's pricing rules forbid inventing an
+        /// exchange rate - so the column sorts in three blocks: coin rows
+        /// (including mixed coin+currency rows, keyed on their copper part),
+        /// then currency-only rows, then unpriceable rows. The block order is
+        /// direction-INVARIANT while the order WITHIN a block flips, so
+        /// descending means "most expensive coin row first, still followed by
+        /// the currency rows, still followed by the dashes".
         /// <para>
         /// The numeric key inside a currency is
         /// <see cref="CurrencyAmountViewModel.UnitRate"/> when the resolver
-        /// set one, NOT Amount: a per-unit amount whose rate does not
-        /// divide evenly carries Amount 0 and shows its rate as bundle
-        /// text ("912 for 92"), so keying on Amount would sort every such
-        /// row as free and tie them all with each other.
+        /// set one, NOT Amount: a per-unit amount whose rate does not divide
+        /// evenly carries Amount 0, so keying on Amount would sort every such
+        /// row as free. Derivation: docs/ARCHITECTURE.md section S1.8.
         /// </para>
         /// </summary>
         private static int CompareValue(

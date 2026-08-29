@@ -701,31 +701,24 @@ namespace VendorOfferUpdater
         }
 
         /// <summary>
-        /// Merges a scoped, freshly-queried batch of offers into an
-        /// existing full baseline, replacing ONLY the merchants the
-        /// scoped query covered - every other merchant's offers pass
-        /// through untouched. A merchant appearing in
-        /// <paramref name="fresh"/> has every baseline offer removed
-        /// first, then every fresh offer added - never a partial union
-        /// that could leave stale rows alongside new ones.
+        /// Merges a scoped, freshly-queried batch into an existing full
+        /// baseline, replacing ONLY the merchants the scoped query covered: a
+        /// merchant present in <paramref name="fresh"/> has every baseline
+        /// offer removed first and every fresh offer added, never a partial
+        /// union; every other merchant passes through untouched.
         ///
         /// <paramref name="merchantsWithSkippedRows"/> (merchants with at
         /// least one GameId&lt;=0 row this pass, built before the GameId
-        /// filter runs) opts a merchant OUT of wholesale replacement:
-        /// replacing on the strength of a known-incomplete fresh set has
-        /// silently deleted shipped offers before. Its baseline offers
-        /// are instead unioned with the fresh ones, deduplicated by
-        /// OfferId with fresh preferred - but a losing row's
-        /// SeasonalFestival tag is carried onto an untagged winner - plus
-        /// a content-key pass (ComputeContentKey) for rows predating a
-        /// hash-format change. Possibly-stale baseline rows surviving an
-        /// extra run is visible and fixable; silent deletion is not.
+        /// filter runs) opts a merchant OUT of that replacement: its baseline
+        /// offers are unioned with the fresh ones, deduplicated by OfferId
+        /// with fresh preferred - a losing row's SeasonalFestival tag is
+        /// carried onto an untagged winner - plus a content-key pass
+        /// (ComputeContentKey) for rows predating a hash-format change. Why
+        /// replacing there is unsafe: docs/ARCHITECTURE.md section T.4.
         ///
-        /// NOTE (non-purity): this method mutates rows it does not own -
-        /// it assigns onto SeasonalFestival/OfferId of instances in the
-        /// caller's own <paramref name="fresh"/>/<paramref name="baseline"/>
-        /// lists rather than cloning, so a caller keeping its own
-        /// reference will observe the mutation.
+        /// NOTE (non-purity): assigns onto SeasonalFestival/OfferId of rows in
+        /// the caller's own <paramref name="fresh"/>/<paramref name="baseline"/>
+        /// lists rather than cloning, so a caller's own reference sees it.
         /// </summary>
         // internal for testability (VendorOfferUpdater.Tests)
         internal static BaselineMergeResult MergeIntoBaseline(
@@ -1151,72 +1144,24 @@ namespace VendorOfferUpdater
         }
 
         /// <summary>
-        /// Festival-vendor auto-tagging follow-up: fetches
-        /// each distinct wiki vendor PAGE's raw wikitext (via
-        /// WikiSmwClient.FetchWikitextAsync) and extracts its
-        /// {{Temporary|...}} template's seasonal/event value
-        /// (TemporaryTemplateParser), so ConvertToOffer can resolve every
-        /// vendor's offers to a festival tag - not just the three
-        /// Candy Corn Vendor (Weekly) rows this module previously
-        /// hand-tagged.
+        /// Festival-vendor auto-tagging: fetches each distinct wiki vendor
+        /// PAGE's raw wikitext (WikiSmwClient.FetchWikitextAsync) and extracts
+        /// its {{Temporary|...}} template's seasonal/event value
+        /// (TemporaryTemplateParser), so ConvertToOffer can tag that vendor's
+        /// offers. Opt-in via --tag-seasonal-festivals: no SMW property
+        /// carries that template, so the pass costs one extra HTTP request per
+        /// distinct vendor page.
         ///
-        /// Deliberately opt-in (--tag-seasonal-festivals), not part of
-        /// every default run: unlike every other field on WikiVendorResult
-        /// (which come from the SMW "ask" printouts already fetched by
-        /// QueryVendorItemsAsync/ResolveItemGameIdsAsync), there is no
-        /// Semantic MediaWiki property for a page's {{Temporary}} template
-        /// - unioning a distinct-PageName wikitext-parse request into
-        /// every full refresh would add one HTTP request per distinct
-        /// vendor page (thousands, for a from-scratch scrape) on top of
-        /// the existing two-pass budget, silently changing the cost/time
-        /// profile of the default `./tools/refresh-vendor-data.sh` workflow.
-        /// A developer who wants full coverage passes the flag explicitly.
+        /// Results are cached by real wiki page title (PageName up to the
+        /// first '#', since PageName is a "Sells item" SUBOBJECT key), with ""
+        /// meaning "checked, no tag", in a gitignored dev-local JSON file.
         ///
-        /// Results are cached by real wiki page title (raw wiki value, or
-        /// "" for "checked - no seasonal/event tag") in a small JSON file
-        /// next to the other dev-local caches (gitignored, like
-        /// wiki_vendor_cache.json/item_id_cache.json) so a repeat run
-        /// never re-fetches a page it has already checked.
-        /// <paramref name="maxSeasonalPages"/> is a self-healing per-run
-        /// budget (only a genuinely invalid budget &lt;= 0
-        /// still throws SafetyLimitException, same pattern WikiSmwClient's
-        /// own query safety limits use) on how many NEW pages a single run
-        /// will fetch, so an accidental full-dataset run with the flag set
-        /// does not silently attempt thousands of live requests in one go.
-        /// When there are more uncached pages than the budget allows, this
-        /// method fetches only up to the budget, saves the cache as usual,
-        /// and logs how many pages remain - it does NOT throw. The next
-        /// run's own toFetch list is smaller (this run's fetches are now
-        /// cached), so repeated runs converge on full coverage instead of
-        /// every run past the first throwing on the same unmet budget.
-        ///
-        /// WikiVendorResult.PageName is the SMW subject key of the vendor's
-        /// "Sells item" SUBOBJECT, not the vendor's own wiki page title -
-        /// confirmed live (api.php?action=ask against
-        /// "[[Has vendor::Candy Corn Vendor (Weekly)]]"): every row's
-        /// subject is "Candy Corn Vendor (Weekly)#vendor1",
-        /// "...#vendor2", etc. (one subobject per sold item). The real,
-        /// fetchable page title is everything before the first '#' - see
-        /// StripSubobjectSuffix. Caching (and fetching) by the STRIPPED
-        /// title, not the raw subobject key, is also what keeps this pass
-        /// cheap: one wikitext fetch per distinct VENDOR, not per sold item.
-        ///
-        /// <paramref name="queryScopedResults"/>
-        /// (null for --resolve-item-currencies-only, which has no --query
-        /// and processes the whole cache by design) scopes which pages
-        /// count toward the <paramref name="maxSeasonalPages"/> fetch
-        /// budget to the ones THIS RUN's --query actually returned.
-        /// <paramref name="wikiResults"/> at the caller's call site is the
-        /// FULL merged wiki_vendor_cache.json (Program.cs Step 2's
-        /// MergeWikiCache union), not just this run's query - scoping the
-        /// fetch budget to it meant a narrow --query on a real dev-machine
-        /// cache (thousands of distinct vendor pages) computed thousands
-        /// of "uncached" pages, exceeded --max-seasonal-pages, and threw
-        /// SafetyLimitException BEFORE Steps 4-6 ever wrote output,
-        /// discarding the scoped run's already-completed live work. The
-        /// cache-apply loop below still runs over the full
-        /// <paramref name="wikiResults"/>, since applying an
-        /// already-cached tag is a cheap dictionary lookup, not a fetch.
+        /// <paramref name="maxSeasonalPages"/> caps how many NEW pages one run
+        /// fetches: over budget it fetches up to the cap, saves the cache and
+        /// logs the remainder rather than throwing; only a budget &lt;= 0
+        /// throws. <paramref name="queryScopedResults"/> scopes that budget to
+        /// the pages THIS run's --query returned, not the full merged cache.
+        /// Why each of those holds: docs/ARCHITECTURE.md section T.5.
         /// </summary>
         // internal for testability (VendorOfferUpdater.Tests)
         internal static async Task ResolveSeasonalFestivalValuesAsync(

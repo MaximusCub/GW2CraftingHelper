@@ -9,35 +9,20 @@ namespace VendorOfferUpdater
 {
     /// <summary>
     /// Answers the one question a reviewer of a `data(vendor):` commit cannot
-    /// otherwise answer: what actually changed. `git diff` on
-    /// ref/vendor_offers.json reports "1 insertion(+), 1 deletion(-)" on a
-    /// 14.8MB single line, which is the entire dataset replaced as one
-    /// indivisible hunk.
+    /// otherwise answer: what actually changed. It re-pairs added and removed
+    /// rows by (merchant, output item), which the offerId hash does not
+    /// preserve but a human reads instantly, and reports them as repricings
+    /// with the old and new cost side by side; only rows with no counterpart
+    /// are reported as genuine additions or removals.
     /// <para>
-    /// The naive answer - list the offerIds that appeared and disappeared - is
-    /// almost as useless, because offerId is a SHA-256 over the offer's whole
-    /// content. Change one price and the row does not "change": it vanishes and
-    /// a different hash appears. So a raw added/removed pair list turns every
-    /// repricing into two unrelated-looking hex strings.
-    /// </para>
-    /// <para>
-    /// This re-pairs those by (merchant, output item), which the hash does not
-    /// preserve but a human reads instantly, and reports them as repricings with
-    /// the old and new cost side by side. Only rows with no counterpart are
-    /// reported as genuine additions or removals. SeasonalFestival is the one
-    /// field outside the hash, so a change to it keeps the offerId and is
-    /// reported separately as a retag. A row whose id is shared but whose
-    /// content is not - a hand-edit, or a row predating a hash-format change -
-    /// is reported as a repricing rather than trusted on its id alone.
-    /// </para>
-    /// <para>
-    /// The converse also holds and matters more, because a VendorOfferHasher
-    /// hash-format change does it to every row at once: a row whose content is
-    /// unchanged but whose id is not has not been repriced, and is counted as
-    /// rehashed rather than listed. Without that, one such migration reported
-    /// 48,750 of 53,544 rows as repriced, each printing an identical before and
-    /// after, and cross-paired rows differing only in OutputCount into price
-    /// moves that never happened.
+    /// SeasonalFestival is the one field outside the hash, so a change to it
+    /// keeps the offerId and is reported separately as a retag. A row whose id
+    /// is shared but whose content is not - a hand-edit, or a row predating a
+    /// hash-format change - is reported as a repricing rather than trusted on
+    /// its id alone. The converse, a row whose content is unchanged but whose
+    /// id is not, is counted as rehashed rather than listed: a
+    /// VendorOfferHasher format change does that to every row at once. Why no
+    /// cheaper answer works: docs/ARCHITECTURE.md section T.3.
     /// </para>
     /// </summary>
     internal static class VendorOfferDiff

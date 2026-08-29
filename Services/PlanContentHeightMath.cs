@@ -7,27 +7,22 @@ namespace TaimisToolbench.Services
     /// <summary>
     /// Pure content-height arithmetic (Blish-free, unit-testable) for the
     /// plan view's collapsible section bodies and recipe-tree child
-    /// containers. These containers used to rely on
-    /// Blish's FlowPanel HeightSizingMode.AutoSize, which only converges
-    /// one nested level per real engine frame (Container.DoUpdate sizes a
-    /// container from its children's CURRENT bounds before recursing into
-    /// those children's own Update for that same frame) - the root cause of
-    /// KNOWN-ISSUES #12/#14's multi-frame flash/stutter window. Every row
-    /// height in the plan view is a fixed constant, so the
-    /// total height of any section body or tree subtree is knowable
+    /// containers. Every row height in the plan view is a fixed constant, so
+    /// the total height of any section body or tree subtree is knowable
     /// synchronously from row counts/types and expansion state alone, with
     /// no need to wait for Blish layout to converge.
-    /// Every row height is still a fixed constant after the Plan Notes
-    /// section learned to wrap: a wrapped note renders one
-    /// FallbackTextRowHeight row per LINE, so only the row COUNT became
+    /// <para>
+    /// Still true after Plan Notes learned to wrap: a wrapped note renders
+    /// one FallbackTextRowHeight row per LINE, so only the row COUNT became
     /// width-dependent, which is why Notes is sized by
-    /// NotesSectionLayoutMath/its renderer rather than by SectionBodyHeight
-    /// below (the same split Summary already has).
+    /// NotesSectionLayoutMath and its renderer rather than by
+    /// SectionBodyHeight below - the same split Summary already has.
+    /// </para>
+    /// <para>
     /// CraftingPlanView uses these SAME constants both to size the
-    /// AutoSize-replacement containers explicitly and to size the
-    /// individual row Panels it creates, so the two paths cannot drift
-    /// apart - mirrors ShoppingColumnMath's "one source of truth" shape.
-    /// <para>See docs/ARCHITECTURE.md section 4.</para>
+    /// AutoSize-replacement containers and to size the individual row Panels
+    /// it creates, so the two cannot drift. See docs/ARCHITECTURE.md section 4.2.
+    /// </para>
     /// </summary>
     internal static class PlanContentHeightMath
     {
@@ -205,24 +200,17 @@ namespace TaimisToolbench.Services
         /// The ONE distance between a formula tile's caption line box and
         /// the top of the amount run under it, in BOTH Total Cost bands
         /// (the cost band's boxed tiles and the profit band's plain ones).
-        /// <para>
-        /// It used to be a residual rather than a constant: both bands
-        /// BOTTOM-anchored their amount inside a fixed row height, so the
-        /// space under the caption was whatever the height arithmetic left
-        /// over - 1px on the profit band, which the field report called
-        /// cramped ("'Sell Value' and the gold line are a little cramped").
-        /// Anchoring the amount UNDER the caption instead makes the gap
-        /// this number at every band, and the two bands cannot drift apart.
-        /// </para>
+        /// Anchoring the amount UNDER the caption, rather than bottom-
+        /// anchoring it inside a fixed row height, is what makes the gap
+        /// this number at every band, so the two bands cannot drift apart.
         /// <para>
         /// 8, from the caption tier's own metrics rather than by eye: a
         /// label and the value it names read as one group only while the
         /// space between them stays under about one cap height
         /// (ColumnHeaderInk.CapHeight is 17), and reads as touching much
         /// below half of it. 8 is the 4pt-scale step at half that cap
-        /// height. Against ColumnHeaderInk's lowest ink - 26, one past its
-        /// own 25px line box - it leaves 7px of clear air under the
-        /// caption's descenders.
+        /// height, and leaves 7px of clear air under the caption's
+        /// descenders. Derivation: docs/ARCHITECTURE.md section 4.2.
         /// </para>
         /// </summary>
         public const int CostTileLabelToValueGap = 8;
@@ -444,31 +432,22 @@ namespace TaimisToolbench.Services
         public const int MultiRootDividerHeight = 12;
 
         /// <summary>
-        /// Total height of
-        /// the Recipe Tree section's single shared content FlowPanel when
-        /// it holds N top-level trees stacked (gw2e's own "N independent
-        /// top-level recipe trees" render, its synthetic wrapper node never
-        /// surfacing - docs/gw2e-parity-spec.md) rather
-        /// than one. Each requested item's own root node already IS its own
-        /// full icon/name/quantity/pill/cost row (CraftingTreeNode, same
-        /// shape TreeNodeHeight already sizes for a single-item plan) - so
-        /// this is simply that same per-root arithmetic summed across every
-        /// root, plus one MultiRootDividerHeight gap between each pair of
-        /// consecutive roots (never before the first or after the last). A
-        /// one-element roots list (the single-item case) has no divider at
-        /// all, so a single-item plan differs from
-        /// TreeNodeHeight(roots[0], 0, false, ...) by exactly the column
-        /// header below.
+        /// Total height of the Recipe Tree section's single shared content
+        /// FlowPanel when it holds N top-level trees stacked rather than
+        /// one: the same per-root arithmetic TreeNodeHeight does, summed
+        /// across every root, plus one MultiRootDividerHeight gap between
+        /// each pair of consecutive roots - never before the first or after
+        /// the last, so a one-element list has no divider at all.
         /// <para>
-        /// One ColumnHeaderRowHeight column header
-        /// (TreeSectionController.CreateTreeSection builds it into the
-        /// same FlowPanel, above every root) precedes the roots whenever
-        /// there is a tree at all - the tree's right-hand columns are
-        /// unlabelled otherwise, unlike every other column-header table
-        /// in the plan.
+        /// One ColumnHeaderRowHeight column header precedes the roots
+        /// whenever there is a tree at all
+        /// (TreeSectionController.CreateTreeSection builds it into the same
+        /// FlowPanel), so a single-item plan differs from
+        /// TreeNodeHeight(roots[0], 0, false, ...) by exactly that header.
         /// An empty/absent roots list renders no tree and therefore no
         /// header either, and still measures 0.
         /// </para>
+        /// <para>Derivation: docs/ARCHITECTURE.md section 4.2.</para>
         /// </summary>
         public static int MultiRootTreeFlowHeight(
             IReadOnlyList<CraftingTreeNode> roots, IReadOnlyDictionary<int, bool> expansionOverrides)

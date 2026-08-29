@@ -2,19 +2,13 @@ namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Geometry for the Snapshot tab's header block (Blish-free,
-    /// unit-testable), where the source-filter checkboxes share the search
-    /// row instead of owning a full-width row of their own: the header used
-    /// five sparse rows to say what four can, and the widest of them - the
-    /// search row - was empty for everything right of the content-type
-    /// dropdown.
+    /// unit-testable), where the source-filter checkboxes share the search row
+    /// instead of owning a full-width row of their own.
     /// <para>
     /// They share it only while the whole run fits beside the search box in
-    /// ONE row. Sharing halves the width the run has to flow into, so a
-    /// roster that used to fit inside the 4-row cap can wrap past it and
-    /// hide filters behind a scrollbar - paying a third of the filter set
-    /// for 38px of header. Past one row the run falls back to its own
-    /// full-width row below the search box, which is exactly the layout it
-    /// had before it moved up.
+    /// ONE row. Past one row the run falls back to its own full-width row
+    /// below the search box, which is exactly the layout it had before it
+    /// moved up.
     /// </para>
     /// <para>
     /// The checkbox flow itself is unchanged
@@ -22,7 +16,8 @@ namespace TaimisToolbench.Services
     /// still scrolls past the cap); it is handed the placement's width here
     /// and positioned at its start offset by the panel that holds it.
     /// </para>
-    /// <para>See docs/ARCHITECTURE.md section 4.</para>
+    /// <para>See docs/ARCHITECTURE.md section 4, and "Services Q-Z: relocated
+    /// design narrative" for what the one-row limit buys and costs.</para>
     /// </summary>
     internal static class SnapshotHeaderLayout
     {

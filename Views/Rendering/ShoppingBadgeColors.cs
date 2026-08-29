@@ -6,25 +6,18 @@ namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// Chrome for the Shopping List's source badges, now that they are an
-    /// aligned column rather than a tag glued to the name.
-    ///
-    /// <para>
-    /// Every badge used to render in <see cref="PillKind.Locked"/>'s
-    /// recessed grey, so the column said WHICH source only to a reader who
-    /// stopped to read four capital letters on every row. Two hues fix
-    /// that without spending the accent budget: the majority rows stay
-    /// neutral (accents mean nothing if the common case has one), and only
-    /// the two classes that are actually a different KIND of action get a
-    /// colour.
-    /// </para>
-    ///
+    /// aligned column rather than a tag glued to the name. Two hues: the
+    /// majority rows stay neutral (accents mean nothing if the common case
+    /// has one), and only the two classes that are actually a different KIND
+    /// of action get a colour.
     /// <para>
     /// Deliberately NOT an arm of <see cref="PillColors"/>. That switch is
     /// the recipe tree's decision vocabulary - green means selected, blue
     /// owned, amber ignore-active - and none of those meanings is "go to a
-    /// vendor". Reusing one would dilute a vocabulary the tree depends on;
-    /// these are non-interactive chrome that shares only the pill's shape.
+    /// vendor". These are non-interactive chrome that shares only the pill's
+    /// shape.
     /// </para>
+    /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </summary>
     internal static class ShoppingBadgeColors
     {

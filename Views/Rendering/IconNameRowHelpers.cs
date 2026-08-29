@@ -74,24 +74,20 @@ namespace TaimisToolbench.Views.Rendering
         /// <summary>
         /// Builds the rarity-framed icon and the ellipsized, rarity-colored,
         /// drop-shadowed name label immediately to its right, at a named
-        /// <see cref="ItemIconTier"/>. rightEdge/qtyWidth/nameGap are
-        /// threaded straight into
-        /// PlanRelayoutMath.NameMaxWidthBeforeColumn exactly as each
-        /// pre-extraction caller computed them inline (untouched - this
-        /// helper does not change that arithmetic, only where it is
-        /// called from).
+        /// <see cref="ItemIconTier"/>. rightEdge/qtyWidth/nameGap are threaded
+        /// straight into PlanRelayoutMath.NameMaxWidthBeforeColumn.
         /// <para>
-        /// One <paramref name="resolvedRarity"/> feeds BOTH the frame and
-        /// the name colour, so the two cannot disagree. It is what
-        /// <c>ItemRarityResolution.Resolve</c> returned; null is a
-        /// legitimately unknown rarity and renders neutral in both places.
+        /// One <paramref name="resolvedRarity"/> feeds BOTH the frame and the
+        /// name colour, so the two cannot disagree. It is what
+        /// <c>ItemRarityResolution.Resolve</c> returned; null is a legitimately
+        /// unknown rarity and renders neutral in both places.
         /// </para>
         /// <para>
-        /// <paramref name="tooltip"/> is stamped on the icon tree and
-        /// NOWHERE else - not on the name label this helper builds beside
-        /// it, and not on the row. See
-        /// <see cref="ItemIconTooltip.StampOnIconTree"/> for why.
+        /// <paramref name="tooltip"/> is stamped on the icon tree and NOWHERE
+        /// else - not on the name label this helper builds beside it, and not on
+        /// the row. See <see cref="ItemIconTooltip.StampOnIconTree"/> for why.
         /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         internal static IconNameHandle CreateIconAndEllipsizedName(
             Panel rowPanel, string iconUrl, string resolvedRarity, int iconX, int iconY,

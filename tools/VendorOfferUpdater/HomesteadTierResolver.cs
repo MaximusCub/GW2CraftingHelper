@@ -4,26 +4,16 @@ namespace VendorOfferUpdater
 {
     /// <summary>
     /// Resolves a wiki-scraped vendor row's Homestead Refinement efficiency
-    /// tier from its merchant name and raw "Has
-    /// requirement" SMW property text. Kept separate from ConvertToOffer so
-    /// this pure resolution logic is covered by direct unit tests without a
-    /// Gw2ApiHelper/HttpClient fixture.
+    /// tier from its merchant name and raw "Has requirement" SMW property
+    /// text. A row participates in tier gating only when its merchant name
+    /// contains the literal substring "Homestead Refinement"; the tier is
+    /// then read off the requirement text, which is empty for tier 0 and
+    /// carries exactly one "one [[Homestead Upgrade: ...]]" or "two
+    /// [[Homestead Upgrade: ...]]" value for tiers 1 and 2 respectively.
     ///
-    /// Mirrors gw2efficiency's own cheapestTree.ts matching shape (docs/
-    /// docs/research/m37-r1-homestead.md Section 1.2): a row only participates
-    /// in tier gating when its merchant name contains the literal substring
-    /// "Homestead Refinement" (gw2e: tree.merchant.name.includes('Homestead
-    /// Refinement')) - matching all three station pages ("...-Farm",
-    /// "...-Lumber Mill", "...-Metal Forge") the same way a plain
-    /// `.includes()` substring test would.
-    ///
-    /// Confirmed live (direct SMW ask probe against Homestead
-    /// Refinement-Metal Forge, ): a tier-0 row's "Has requirement"
-    /// printout returns an empty array; a tier-1/tier-2 row returns exactly
-    /// one _txt value, "one [[Homestead Upgrade: ...]]" or "two [[Homestead
-    /// Upgrade: ...]]" respectively - the wiki's {{vendor table row}}
-    /// template parameter is literally `requirement=one [[...]]` /
-    /// `requirement=two [[...]]`.
+    /// The gw2efficiency parity shape, the live SMW probe those readings
+    /// come from, and why this is a separate class are in
+    /// docs/ARCHITECTURE.md section T.1.
     /// </summary>
     public static class HomesteadTierResolver
     {

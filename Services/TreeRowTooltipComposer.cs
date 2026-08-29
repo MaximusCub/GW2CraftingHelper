@@ -5,26 +5,24 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// Builds a Recipe Tree row's extra tooltip lines (unit-price line(s),
-    /// the TP price-side-fallback caveat, the Unknown/
-    /// GuildUpgrade acquisition hint, the receipt/what-if caption, and the
-    /// "Right-click: Open wiki page" affordance line), for
-    /// <c>TreeSectionController.RenderTreeNode</c>. Pure,
+    /// Builds a Recipe Tree row's extra tooltip lines (unit-price line(s), the
+    /// TP price-side-fallback caveat, the Unknown/GuildUpgrade acquisition
+    /// hint, the receipt/what-if caption, and the "Right-click: Open wiki page"
+    /// affordance line), for <c>TreeSectionController.RenderTreeNode</c>. Pure,
     /// Blish-free string shaping so this row-tooltip logic is directly
     /// unit-testable without a live <c>Panel</c>/<c>BasicTooltipText</c>,
-    /// matching this repo's established pattern for tree-rendering text
-    /// (DecisionPillPlanner, ValueDetailTooltipBuilder,
-    /// ShoppingRowTooltipFormatter, ...).
+    /// matching this repo's pattern for tree-rendering text
+    /// (DecisionPillPlanner, ValueDetailTooltipBuilder, ShoppingRowTooltipFormatter).
     ///
     /// Deliberately excludes the wiki-link RIGHT-CLICK WIRING itself
     /// (<c>rowPanel.RightMouseButtonPressed</c>/<c>MouseLeft</c>/
-    /// <c>RightMouseButtonReleased</c>) - that is Blish-bound event wiring
-    /// and stays in <c>TreeSectionController.RenderTreeNode</c>, gated by
-    /// the identical <see cref="WikiLinkBuilder.HasWikiPage"/> predicate
-    /// this class also calls to decide whether to append the tooltip line.
-    /// Calling that cheap pure predicate twice per row (once here, once in
-    /// the caller) is intentional - it keeps this class free of any Blish
-    /// dependency rather than threading a bool back out for one call site.
+    /// <c>RightMouseButtonReleased</c>) - that is Blish-bound event wiring and
+    /// stays in <c>TreeSectionController.RenderTreeNode</c>, gated by the
+    /// identical <see cref="WikiLinkBuilder.HasWikiPage"/> predicate this class
+    /// also calls to decide whether to append the tooltip line. Calling that
+    /// cheap pure predicate twice per row is intentional: it keeps this class
+    /// free of any Blish dependency rather than threading a bool back out for
+    /// one call site.
     /// </summary>
     internal static class TreeRowTooltipComposer
     {
@@ -84,25 +82,21 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// A row's extra tooltip lines as content. Returns fresh,
-        /// never-null content (empty when nothing applies) so the caller can
-        /// hand it straight to <c>UpdateTreeRowTooltip</c> and capture the
-        /// SAME instance in its settle re-ellipsis closure, matching
-        /// <c>RenderTreeNode</c>'s own "computed once, reused verbatim"
-        /// comment on <c>extraTooltipLines</c> - only the "is the name
+        /// A row's extra tooltip lines as content. Returns fresh, never-null
+        /// content (empty when nothing applies) so the caller can hand it
+        /// straight to <c>UpdateTreeRowTooltip</c> and capture the SAME
+        /// instance in its settle re-ellipsis closure - only the "is the name
         /// actually truncated" line is reconsidered on resize, never this
         /// content.
         /// <para>
-        /// The unit-price line keeps its gold figure as a coin span so the
-        /// rich tooltip surface can draw it with real coin icons instead of
-        /// spelling it "1g 23s 45c".
+        /// The unit-price line keeps its gold figure as a coin span so the rich
+        /// tooltip surface can draw it with real coin icons instead of spelling
+        /// it "1g 23s 45c".
         /// </para>
         /// <para>
-        /// Returned UNWRAPPED - including the vendor price-side caveats,
-        /// which run to 83 characters. The surface measures and wraps
-        /// against a real font at a real pixel width. (There was once a
-        /// second entry point returning pre-wrapped strings; nothing called
-        /// it and it is gone.)
+        /// Returned UNWRAPPED - including the vendor price-side caveats, which
+        /// run to 83 characters. The surface measures and wraps against a real
+        /// font at a real pixel width.
         /// </para>
         /// </summary>
         public static TooltipContent BuildExtraTooltipContent(

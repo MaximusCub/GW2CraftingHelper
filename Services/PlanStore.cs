@@ -6,60 +6,24 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// Loads/saves the generated Crafting Plan tab's content so it
-    /// survives a module
-    /// close/reopen. Mirrors SnapshotStore's shape (single-file JSON,
-    /// atomic .tmp+Replace write) with one deliberate divergence: an
-    /// unreadable file is NOT silently swallowed to null the
-    /// way SnapshotStore's Deserialize is - it is logged before falling
-    /// back to null (see PlanStoreHelpers.DeserializePersistedPlan's own
-    /// doc comment). A missing file is still silent - "fresh start" with no
-    /// plan is the ordinary first-run case, not a failure.
+    /// Loads/saves the generated Crafting Plan tab's content so it survives
+    /// a module close/reopen. Single-file JSON, atomic .tmp+Replace write,
+    /// gzip container - LoadLatest sniffs the first two bytes for the gzip
+    /// magic number (0x1F 0x8B), so a plain-JSON plan.json written before
+    /// the container changed still loads.
     /// <para>
-    /// Two unreadable-file verdicts, two severities, because merging them
-    /// once cost a full forensic investigation (2026-08-23): a corrupt or
-    /// otherwise unparseable file goes to onError (Warn, same as every I/O
-    /// failure below), while a file written at an older SHIPPED schema
-    /// version - expected, benign, and repaired by the next Generate - goes
-    /// to onInfo (Info). Any caller wiring one and not the other silently
-    /// drops half the story.
+    /// Contract a caller can violate: a MISSING file is silent (a fresh
+    /// start with no plan is the ordinary first-run case). An UNREADABLE
+    /// one never is, and its two verdicts carry two severities - a corrupt
+    /// or unparseable file goes to onError at Warn, a file written at an
+    /// older SHIPPED schema version to onInfo at Info. A caller wiring one
+    /// and not the other silently drops half the story. Both verdicts cost
+    /// the RESULT and keep the REQUEST, so LoadLatest returns a
+    /// PersistedPlanLoad rather than a plan; null means only "nothing to
+    /// restore". Save takes an internal lock because it has two genuinely
+    /// independent callers - see the field's own comment.
     /// </para>
-    /// <para>
-    /// Both verdicts now cost the RESULT and keep the REQUEST, so
-    /// LoadLatest hands back a PersistedPlanLoad rather than a plan: a
-    /// schema bump reseeds the tab's items and settings and asks for one
-    /// Generate, instead of discarding the user's plan. Null still means
-    /// "nothing to restore" and covers the two cases that leave nothing
-    /// worth showing - no file, and a document whose request layer holds
-    /// no items either. See docs/ARCHITECTURE.md section 12.
-    /// </para>
-    /// <para>
-    /// Unlike SnapshotStore/StatusStore (whose callers are already
-    /// serialized by a higher-level in-flight guard - see Module's own
-    /// _refreshInProgress), Save has two genuinely independent call sites
-    /// (a Generate's own post-await persist, and a pill-click override
-    /// re-solve's fire-and-forget background persist - see Module.cs's
-    /// PersistAfterGenerateAsync/PersistResolvedPlanInBackground) that can
-    /// race each other (a decision pill on an OLD plan stays clickable
-    /// while a NEW Generate is in flight). Save takes an internal lock so
-    /// two overlapping writers can never both be mid-write to the same
-    /// .tmp path at once - see the field's own comment.
-    /// </para>
-    /// <para>
-    /// The on-disk container is gzip (a large plan's compact JSON runs
-    /// ~700 KB, and this file is rewritten on every override-resolve
-    /// pill click, not just once per Generate). The plan.json name is
-    /// kept as-is (no .gz rename) - LoadLatest sniffs the first two
-    /// bytes for the gzip magic number (0x1F 0x8B) so an existing
-    /// plain-JSON plan.json from before this change (PR #107) still
-    /// loads. Save always writes gzip going forward. The payload schema
-    /// (SchemaVersion, PlanStructuralValidator's gate) is completely
-    /// unchanged - only the container encoding differs, so every
-    /// existing tolerance guarantee (truncated/corrupt data, one Warn,
-    /// return null, never partial) is preserved by construction: both
-    /// decompression and JSON parsing happen inside LoadLatest's single
-    /// try/catch below.
-    /// </para>
+    /// <para>Derivation: docs/ARCHITECTURE.md section 12.</para>
     /// </summary>
     internal class PlanStore
     {

@@ -8,46 +8,23 @@ namespace TaimisToolbench.Views
 {
     /// <summary>
     /// The input-eating layer that makes <see cref="ModalDialog"/> actually
-    /// modal. Before it, a confirm was only visually on top: with the Clear
-    /// Cache confirm open, a click on the Crafting Plan tab's "+" add-row
-    /// button behind it still registered.
-    ///
+    /// modal, over the module window only - other modules' windows and the
+    /// game stay live. Paints nothing: it is a hit-test, not a scrim.
     /// <para>
-    /// <b>Why a control at all.</b> Measured in BlishHUD 1.3.0:
-    /// Container.TriggerMouseInput walks its children
-    /// <c>OrderByDescending(ZIndex).ThenByDescending(index in _children)</c>,
-    /// and the first child whose AbsoluteBounds contain the cursor and whose
-    /// own TriggerMouseInput returns non-null wins - and BREAKS the loop, so
-    /// no lower sibling is reached. Control.TriggerMouseInput returns
-    /// <c>this</c> whenever CapturesInput() has the Mouse (or MouseWheel)
-    /// flag. A bare control between the blocked window and the dialog is
-    /// therefore all it takes; the one flag that would NOT block is
-    /// CaptureType.Filter, which the loop deliberately steps past.
+    /// Measured in BlishHUD 1.3.0: Container.TriggerMouseInput walks its
+    /// children <c>OrderByDescending(ZIndex).ThenByDescending(index in
+    /// _children)</c> and BREAKS on the first whose bounds contain the
+    /// cursor and whose own TriggerMouseInput returns non-null, which it
+    /// does whenever CapturesInput() has the Mouse (or MouseWheel) flag -
+    /// but NOT with CaptureType.Filter, which that loop steps past.
     /// </para>
-    ///
     /// <para>
-    /// <b>Why it covers the module window, not the screen.</b> A capturing
-    /// control also stops the GAME from seeing the click. A screen-wide
-    /// blocker would mean a confirm left open swallows every click in Guild
-    /// Wars 2, which is not a trade a HUD overlay should make for a
-    /// two-button confirm. The finding is about the surface the dialog
-    /// belongs to, so that is exactly what is blocked: other modules'
-    /// windows and the game stay live.
+    /// A window's effective ZIndex is not a compile-time constant, so the
+    /// backdrop tracks <c>dialog.ZIndex - 1</c> every visible frame and is
+    /// built lazily on the first Show(), which puts it after the window it
+    /// blocks in the sibling-index tiebreak above.
     /// </para>
-    ///
-    /// <para>
-    /// <b>Z-order.</b> A window's effective ZIndex is
-    /// <c>5 + Screen.WINDOW_BASEZINDEX + its rank among windows ordered by
-    /// (TopMost, LastInteraction)</c>, so it is not a compile-time constant
-    /// and a TopMost dialog can land exactly one above a non-TopMost module
-    /// window. The backdrop tracks <c>dialog.ZIndex - 1</c> every frame it
-    /// is visible. On the tie that arithmetic can produce with the blocked
-    /// window, the sibling-index tiebreak above decides - which is why the
-    /// backdrop is constructed lazily on the first Show(), after every
-    /// window exists, so it is always the later child.
-    /// </para>
-    ///
-    /// <para>Paints nothing: it is a hit-test, not a scrim.</para>
+    /// Derivations: docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </summary>
     internal sealed class ModalBackdrop : Control
     {

@@ -10,74 +10,21 @@ namespace TaimisToolbench.Views.Rendering
     /// The module's button. A <see cref="StandardButton"/> that answers a
     /// press, takes a font, takes a text colour, tints its icon and centres
     /// an icon-only label honestly - four things Blish's button cannot be
-    /// talked into from the outside.
-    /// <para>
-    /// Measured from the vendored Blish HUD 1.3.0 binary (ilspycmd) - what
-    /// StandardButton does and does not already do:
-    /// </para>
-    /// <list type="bullet">
-    /// <item>Hover: <c>OnMouseEntered</c>/<c>OnMouseLeft</c> tween
-    /// AnimationState 0 &lt;-&gt; 8 over 0.25s, stepping through the
-    /// "common/button-states" atlas. That works, and is left alone - the
-    /// paint below walks the same atlas with the same public
-    /// AnimationState.</item>
-    /// <item>Press: nothing. There is no OnLeftMouseButtonPressed override
-    /// and no pressed frame in the atlas walk - the button looks identical
-    /// held down as hovered.</item>
-    /// <item>Sound: <c>OnClick</c> calls
-    /// <c>PlaySoundEffectByName("audio\\button-click")</c>, but
-    /// ContentService's audio reader is already rooted at ref.dat's "audio"
-    /// folder, so the lookup becomes audio/audio/button-click.wav, fails the
-    /// FileExists check, and returns silently. StandardButton is mute in
-    /// 1.3.0; Checkbox and GlowButton, which pass the unprefixed
-    /// "button-click", are not.</item>
-    /// </list>
-    /// <para>
-    /// So the press-and-sound gap is supplied by <see cref="PressFeedback"/>.
-    /// If a later Blish release fixes the double-prefixed path, this button
-    /// will play the sound twice on a completed click and the PlayClick call
-    /// in PressFeedback.Wire is what to drop.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>Why the paint is overridden rather than the control replaced.</b>
-    /// The three limits below all live in <c>StandardButton.Paint</c> and
-    /// <c>RecalculateLayout</c>, both virtual; everything ABOVE them -
-    /// the hover tween, the click event and its Enabled gate, the tooltip
-    /// plumbing every one of this module's buttons relies on, focus, opacity
-    /// and the whole Container/Control lifecycle - is inherited free and is
-    /// the part that would have to be rebuilt, and kept rebuilt, if this
-    /// derived from <c>Control</c> instead. The button art is Blish's own
-    /// (<c>common/button-states</c> and <c>button-border</c>, both reachable
-    /// through the public <c>GameService.Content.GetTexture</c>), so painting
-    /// it ourselves costs two texture handles and no fidelity. Overriding two
-    /// methods buys all four fixes; subclassing Control would buy them at the
-    /// price of every behaviour that already works.
-    /// </para>
-    /// <list type="number">
-    /// <item><b>No Font.</b> StandardButton draws in DefaultFont14 and
-    /// exposes no way to change it, so a button could not sit on this
-    /// module's type ramp and could not carry a glyph from the shipped
-    /// glyph font (ref/glyphs.fnt) at all.</item>
-    /// <item><b>Text colour is forced.</b> <c>Paint</c> assigns
-    /// <c>_textColor</c> on EVERY frame, so a colour written from outside is
-    /// overwritten before it is ever drawn.</item>
-    /// <item><b>Icon is blitted untinted</b>, onto button art whose face
-    /// samples about (200,193,175). Blish's own white affordance textures -
-    /// 733269/733270, the matched X pair - are therefore invisible on a
-    /// button, which is the measured reason Plan History reached for a
-    /// Checkbox instead of a button wearing an icon.</item>
-    /// <item><b>An icon-only button's icon is off centre by construction.</b>
-    /// With no text, StandardButton seats it at
-    /// <c>Width / 2 + 8 - iconWidth - 4</c> - the +8 is a text gap being paid
-    /// for when there is no text - so it sits 4px right of centre at every
-    /// width.</item>
-    /// </list>
-    /// <para>
+    /// talked into from the outside, all four living in StandardButton.Paint
+    /// and RecalculateLayout, both virtual and both overridden here.
     /// Defaults reproduce StandardButton's own rendering exactly, so this is
     /// a drop-in: a call site that sets none of the new properties draws
     /// pixel for pixel what it drew before.
+    /// <para>
+    /// StandardButton is MUTE in 1.3.0 - its OnClick asks ContentService for
+    /// "audio\\button-click" against a reader already rooted at ref.dat's
+    /// "audio" folder, so the lookup fails its FileExists check silently.
+    /// The sound is supplied by <see cref="PressFeedback"/> instead; if a
+    /// later Blish release fixes that double-prefixed path this button will
+    /// play it twice, and the PlayClick call in PressFeedback.Wire is what
+    /// to drop.
     /// </para>
+    /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </summary>
     internal class FeedbackButton : StandardButton
     {

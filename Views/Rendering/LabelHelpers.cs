@@ -15,64 +15,24 @@ namespace TaimisToolbench.Views.Rendering
         private static readonly Color RowDividerColor = new Color(100, 100, 100);
 
         /// <summary>
-        /// 2px divider at the bottom edge of a row panel - the shared "list
-        /// row" chrome used by every table-style section except the tree
-        /// (which uses indent guidelines instead, per gw2e's own convention).
-        /// Was 1px, bottom-anchored via rowHeight - 1. Blish applies
-        /// its UI-scale (e.g. the "Normal" GW2 UI size's 0.897) as a real
-        /// GPU scale matrix, not an integer-pixel-snapped one, so a 1px-tall
-        /// quad rasterizes to 0.897 physical pixels - guaranteed physical
-        /// coverage is floor(0.897) = 0, i.e. it can disappear entirely
-        /// depending on scroll-offset sub-pixel alignment (KNOWN-ISSUES
-        /// #23). At 2px, floor(2 * 0.897) = floor(1.794) = 1 guarantees at
-        /// least one covered physical scanline for the divider's OWN
-        /// quad-vs-scissor math analyzed in isolation.
-        ///
-        /// M36b: that isolated argument is
-        /// necessary but not sufficient. rowPanel is itself a Container, and
-        /// every Container.Paint() performs a SECOND, independent
-        /// floor/ceil round trip - it unscales the physical scissor it was
-        /// just given back to logical space (ScaleBy(1/UIScaleMultiplier))
-        /// before re-intersecting and re-scaling it for its own children
-        /// (Container.cs:377-381, Control.cs:1176-1177 in the decompiled
-        /// Blish HUD binary). That round trip can shrink the clip rectangle
-        /// propagated to the divider by exactly 1 logical pixel, but
-        /// provably only at the row's BOTTOM edge (the reconstructed START
-        /// never exceeds the true start - floor(floor(Y*s)/s) &lt;= Y for any
-        /// positive scale s). Whether that 1px shrink actually deletes the
-        /// divider depends on rowHeight: simulation across every rowHeight
-        /// in this file and all four GW2 UI Size scale factors (0.81 /
-        /// 0.897 / 1.0 / 1.103) showed the pre-tier-2 44px rows
-        /// (CraftStepRowHeight of the day) and 32px rows (the
-        /// DisciplineRowHeight of the day) vanish completely (0 physical
-        /// scanlines) at ~10.2% of scroll phases at the default scale,
-        /// while the pre-tier-2 36px rows were immune at every tested
-        /// scale.
-        ///
-        /// Fix: bottomClearance - an extra logical pixel of gap between the
-        /// divider and rowHeight, i.e. Location.Y = rowHeight - 2 -
-        /// bottomClearance. This moves the divider's own interval entirely
-        /// inside the worst-case-shrunk clip window, which simulation
-        /// confirms is immune (0/5000 vanishes) for every (rowHeight, scale)
-        /// pair tested - proven, not just observed clean at one scale.
-        ///
-        /// Tier-2 re-run (owner icon ruling): the plan tab's icon-led rows
-        /// grew to 45px (Used Materials / Shopping / Required Recipes -
-        /// flush tier-2 frame + divider) and 52px (Crafting Steps), and
-        /// the simulation - re-derived from the decompiled ScaleBy
-        /// floor/ceil semantics and validated by reproducing the numbers
-        /// above - shows BOTH new heights are in the vulnerable class at
-        /// clearance 0 (45: 18.0% of phases at 0.81 / 7.0% at 0.897; 52:
-        /// 10.3% at 0.897) and immune at clearance 1 at all four scales.
-        /// Every icon-led row therefore passes
-        /// PlanContentHeightMath.IconRowDividerClearance (1), and the
-        /// flush fit survives because the tier-2 heights absorb the
-        /// clearance pixel in their own derivation (42 + 2 + 1 = 45 puts
-        /// the divider at 42..44, exactly under the 0..42 icon frame).
-        /// The proof is now executable - RowDividerScissorSimulationTests
-        /// sweeps every shipped (rowHeight, clearance) pair at all four
-        /// scales and fails on any vanish - so a future height change
-        /// re-runs it by construction.
+        /// 2px divider at the bottom edge of a row panel - the shared "list row"
+        /// chrome used by every table-style section except the tree (which uses
+        /// indent guidelines instead, per gw2e's own convention).
+        /// <para>
+        /// Both constants are derived, not chosen. 2px, not 1px: Blish applies
+        /// its UI scale (the "Normal" GW2 UI size is 0.897) as a real GPU scale
+        /// matrix, so a 1px quad rasterizes to floor(0.897) = 0 guaranteed
+        /// physical pixels and can vanish (KNOWN-ISSUES #23). bottomClearance
+        /// adds a logical pixel - Location.Y = rowHeight - 2 - bottomClearance -
+        /// putting the divider inside the worst-case shrunk clip window.
+        /// </para>
+        /// <para>
+        /// Which heights need clearance is not a judgement call:
+        /// RowDividerScissorSimulationTests sweeps every shipped (rowHeight,
+        /// clearance) pair at all four GW2 UI scales and fails on any vanish.
+        /// Icon-led rows pass PlanContentHeightMath.IconRowDividerClearance (1).
+        /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         internal static Panel CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight, int bottomClearance)
         {
@@ -112,18 +72,15 @@ namespace TaimisToolbench.Views.Rendering
         /// right-aligns against a label's width moves. Single-line labels
         /// only - a later Text assignment of the same one-line shape keeps
         /// this height, which is the point.
-        ///
-        /// VerticalAlignment is pinned to Top, and that is what makes the
-        /// extra height safe to apply to some labels in a row and not
-        /// others. Blish_HUD.Controls.Label.VerticalAlignment is a public
-        /// settable property whose default this module does not control; if
-        /// it were Middle, growing a box by 2 would push its glyphs down by
-        /// 1 while an unswept sibling on the same row stayed put, and a
-        /// ragged baseline inside one sentence ("Craft 12x " + item name)
-        /// is worse than the clip this fixes. Top makes the two pixels land
-        /// entirely BELOW the glyphs, so a swept label renders at exactly
-        /// the y it rendered at before - the change is additive clearance,
-        /// never motion.
+        /// <para>
+        /// VerticalAlignment is pinned to Top, and that is what makes the extra
+        /// height safe to apply to some labels in a row and not others: the two
+        /// pixels land entirely BELOW the glyphs, so a swept label renders at
+        /// exactly the y it rendered at before - additive clearance, never
+        /// motion.
+        /// </para>
+        /// Why Top and not Blish's default: docs/ARCHITECTURE.md, "Views:
+        /// relocated design narrative".
         /// </summary>
         internal static Label WithDescenderClearance(Label label)
         {

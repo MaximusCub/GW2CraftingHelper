@@ -14,18 +14,16 @@ namespace TaimisToolbench.Views.Rendering
     /// and the toolbar publication seam.
     ///
     /// One named interface rather than a list of constructor delegates:
-    /// the callbacks are semantically one collaborator, and two of them
-    /// used to share the type <c>Action&lt;PlanViewModel&gt;</c> with
-    /// opposite meanings (render vs. assign-field), so transposing them
-    /// compiled. Named members make that swap unexpressible and give a new
-    /// tree feature one place to grow instead of four.
+    /// two of them used to share the type <c>Action&lt;PlanViewModel&gt;</c>
+    /// with opposite meanings (render vs. assign-field), so transposing them
+    /// compiled. Named members make that swap unexpressible.
     ///
-    /// Implemented explicitly by CraftingPlanView, which already implements
-    /// <see cref="ISectionRelayoutSink"/> the same way, so nothing here
-    /// widens that class's public surface. The header member returns a
-    /// ValueTuple because CraftingPlanView's own SectionHeaderHandle is a
-    /// private nested type.
-    /// <para>See docs/ARCHITECTURE.md section 5.</para>
+    /// Implemented explicitly by CraftingPlanView, so nothing here widens
+    /// that class's public surface. The header member returns a ValueTuple
+    /// because CraftingPlanView's own SectionHeaderHandle is a private
+    /// nested type.
+    /// <para>See docs/ARCHITECTURE.md section 5 and "Views: relocated design
+    /// narrative".</para>
     /// </summary>
     internal interface ITreePlanHost
     {

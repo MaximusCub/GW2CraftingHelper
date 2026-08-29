@@ -2195,14 +2195,9 @@ namespace TaimisToolbench.Views
         /// <para>
         /// Nothing is drawn while the row's metadata is unresolved: that is
         /// "not fetched yet", not "this has no icon", and IconControls'
-        /// empty-slot placeholder states the second. Once the currency list
-        /// has resolved, every currency row gets an icon control - a
-        /// currency the list carries with no icon URL of its own then gets
-        /// that placeholder, which is the state it really is in. A barter
-        /// item is held to the id it resolved rather than to the fetch
-        /// having happened, because the item fetch answers per id: an id
-        /// absent from the reply is one nobody has an icon for yet, not one
-        /// the API says has none.
+        /// empty-slot placeholder states the second. Once the currency list has
+        /// resolved, every currency row gets an icon control. A barter item is
+        /// held to the id it resolved rather than to the fetch having happened.
         /// </para>
         /// <para>
         /// The band is reserved by the cell's geometry
@@ -2210,6 +2205,8 @@ namespace TaimisToolbench.Views
         /// not one is drawn), so an icon arriving mid-session moves no other
         /// control. Built at most once per row per Build cycle.
         /// </para>
+        /// Why the two readiness tests differ: docs/ARCHITECTURE.md, "Views:
+        /// relocated design narrative".
         /// </summary>
         private void EnsureCurrencyRowIcon(CurrencyRow row)
         {

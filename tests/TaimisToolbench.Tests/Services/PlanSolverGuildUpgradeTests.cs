@@ -8,26 +8,24 @@ using static TaimisToolbench.Tests.Helpers.VendorOfferBuilders;
 namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
-    /// guildupgrade-ingredients fix (KNOWN-ISSUES #54): the versioned
-    /// GW2 API returns ingredient {type:"GuildUpgrade", id:&lt;upgradeId&gt;,
-    /// count:N} on Guild Decoration recipes (e.g. recipe 12002 -> item
-    /// 80471, guild upgrade id 829, ref/recipes_seed.json). Before this fix,
-    /// PlanSolver.Evaluate's ingredient loop only special-cased
-    /// IngredientType == "Currency", so a GuildUpgrade ingredient fell
-    /// through and was evaluated exactly like a normal item node. The TP
-    /// item-pricing route was never actually reachable in production
-    /// (CraftingPlanPipeline.CollectItemIds only ever collects "Item"-typed
-    /// ids, so the TP price table can never carry a GuildUpgrade id there);
-    /// the route that WAS reachable is VendorBatchSolver.EvaluateVendorOffers,
-    /// which keys vendorOffers by the raw ingredient id with no "Item"-type
-    /// gate at all. These tests exercise the real PlanSolver.Solve() entry
-    /// point (not a contract mirror) and prove a GuildUpgrade ingredient is
-    /// NEVER priced as an item, a vendor offer, or a currency, even when a
-    /// coincidentally-matching TP price, vendor offer, or CurrencyValuation
-    /// entry exists for the exact same numeric id - GuildUpgrade ids and
-    /// wallet currency ids are simply distinct id spaces with no defined
-    /// relationship to each other, so any of these collisions is possible
-    /// in principle even though none is present in the current seed.
+    /// KNOWN-ISSUES #54: the versioned GW2 API returns ingredient
+    /// {type:"GuildUpgrade", id:&lt;upgradeId&gt;, count:N} on Guild Decoration
+    /// recipes (e.g. recipe 12002 -> item 80471, guild upgrade id 829,
+    /// ref/recipes_seed.json). Before the fix, PlanSolver.Evaluate's ingredient
+    /// loop only special-cased IngredientType == "Currency", so a GuildUpgrade
+    /// ingredient fell through and was evaluated exactly like a normal item
+    /// node. The TP item-pricing route was never reachable in production
+    /// (CraftingPlanPipeline.CollectItemIds only collects "Item"-typed ids, so
+    /// the TP price table can never carry a GuildUpgrade id there); the route
+    /// that WAS reachable is VendorBatchSolver.EvaluateVendorOffers, which keys
+    /// vendorOffers by the raw ingredient id with no "Item"-type gate at all.
+    ///
+    /// These tests exercise the real PlanSolver.Solve() entry point and prove a
+    /// GuildUpgrade ingredient is NEVER priced as an item, a vendor offer or a
+    /// currency, even when a coincidentally-matching TP price, vendor offer or
+    /// CurrencyValuation entry exists for the exact same numeric id: GuildUpgrade
+    /// ids and wallet currency ids are distinct id spaces, so any of those
+    /// collisions is possible in principle though none is in the current seed.
     /// </summary>
     public class PlanSolverGuildUpgradeTests
     {

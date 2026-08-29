@@ -12,54 +12,22 @@ namespace TaimisToolbench.Services
     internal static class WindowSizing
     {
         /// <summary>
-        /// Narrowest window the recipe tree stays readable in. Measured for
-        /// the deepest REALISTIC chain rather than the deepest chain that
-        /// exists: the legendary trinkets Transcendence and Conflux, both
-        /// exactly depth 14, whose widest row at every font size is the
-        /// dust-promotion blow-up "429750x Pile of Glittering Dust".
-        /// <para>
-        /// Chain, all terms measured at Menomonia 16 against the installed
-        /// XNBs (docs/research/minimum-window-width.md section 9, which
-        /// reproduces the method and every anchor figure of that report's
-        /// own 1478-era derivation):
-        /// <code>
-        ///  629  widestNameEnd  = nameX(14) 394 + "429750x " 69 + name 166
-        ///  +24  the designed name-to-pill gutter at the deepest row
-        /// +256  TreePillColumnWidth
-        /// +335  cost column: 181 worst-digit six-digit-gold coin run
-        ///                    + 154 widest two-currency vendor run
-        ///   +8  TableRightMargin
-        /// ---- 1252  tab panel
-        /// +126  WindowToTabPanelChrome
-        /// ==== 1378
-        /// </code>
-        /// </para>
-        /// <para>
-        /// 1378, not the 1232 the like-for-like depth-14 arithmetic gives
-        /// on its own: 1232 accepts that a row combining a forced-craft
-        /// dust chain with a vendor currency run ellipsizes, and the
-        /// maintainer declined that trade - "we are designing for a minimum
-        /// resolution of 1920x1080, so cramming down to a smaller min-size
-        /// that will result in cramped renders seems bad". The +154 rider
-        /// is what buys "a two-currency vendor run always fits at the
-        /// floor". Pinned by DeepestRealisticRowAtTheWindowMinimum in
-        /// PlanRelayoutMathTests.
-        /// </para>
-        /// <para>
-        /// Down from 1478, which fitted the depth-23 "+24 Agony Infusion"
-        /// chain untruncated. That chain now ellipsizes from depth 20 -
-        /// six levels past the deepest realistic plan, and exactly the
-        /// idiom of record everywhere else in the view (ellipsis, full name
-        /// on the tooltip).
-        /// </para>
-        /// <para>
-        /// The other contributor to this floor is the controls row, which
-        /// is subsumed: its widest arrangement is the "Value Own Materials"
-        /// checkbox at x=350 (its label measures 145px at Blish's own
-        /// Font14, plus the box) clearing the right-anchored 120px Generate
-        /// Plan button and <see cref="WindowToTabPanelChrome"/>'s trailing
-        /// padding - under 700px all told, half of what the tree needs.
-        /// </para>
+        /// Narrowest window the recipe tree stays readable in, in pixels.
+        /// Measured for the deepest REALISTIC chain rather than the deepest
+        /// chain that exists: the legendary trinkets Transcendence and Conflux,
+        /// both exactly depth 14, whose widest row at every font size is the
+        /// dust-promotion blow-up "429750x Pile of Glittering Dust". Every term
+        /// is measured at Menomonia 16 against the installed XNBs.
+        ///
+        /// Pinned by DeepestRealisticRowAtTheWindowMinimum in
+        /// PlanRelayoutMathTests. Re-derive it from
+        /// docs/research/minimum-window-width.md section 9 - which reproduces
+        /// the method and every anchor figure - whenever the tree's column
+        /// widths, the type ramp or the window chrome move.
+        ///
+        /// The term-by-term chain, why it is 1378 rather than the 1232 the
+        /// like-for-like arithmetic gives, why it came down from 1478, and why
+        /// the controls row is subsumed: docs/ARCHITECTURE.md, S2.9.
         /// </summary>
         public const int MinWindowWidth = 1378;
 

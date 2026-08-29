@@ -4,23 +4,17 @@ namespace TaimisToolbench.Models
 {
     /// <summary>
     /// An item's tooltip-ready facts: already-resolved attribute lines,
-    /// already-decided binding wording, the description as the API wrote
-    /// it. The API soup (infix_upgrade, stat_choices, attribute_adjustment)
-    /// stops at <see cref="Services.ItemStatBlockFactory"/>.
-    ///
+    /// already-decided binding wording, the description as the API wrote it.
+    /// The API soup (infix_upgrade, stat_choices, attribute_adjustment) stops
+    /// at <see cref="Services.ItemStatBlockFactory"/>.
     /// <para>
     /// DELIBERATELY NOT A MEMBER OF <see cref="ItemMetadata"/>, and
-    /// deliberately unreachable from <see cref="PersistedPlan"/>.
-    /// PersistedPlan.Result is a <see cref="CraftingPlanResult"/> holding
-    /// the ItemMetadata dictionary, and PersistedPlanSchemaMemberSetTests
-    /// guards that whole reachable graph against
-    /// PersistedPlan.CurrentSchemaVersion; hanging stats off ItemMetadata
-    /// would force a schema bump, which
-    /// PlanStoreHelpers.DeserializePersistedPlan answers by discarding
-    /// every existing user's saved plan. Stat blocks are therefore a
-    /// session-scoped side channel held by ItemMetadataService alone - a
-    /// restored plan simply has none until something re-fetches (see
-    /// KNOWN-ISSUES #40).
+    /// deliberately unreachable from <see cref="PersistedPlan"/>: hanging
+    /// stats off ItemMetadata would put them inside the graph
+    /// PersistedPlanSchemaMemberSetTests guards, forcing a schema bump. Stat
+    /// blocks are a session-scoped side channel held by ItemMetadataService
+    /// alone, so a restored plan simply has none until something re-fetches
+    /// (KNOWN-ISSUES #40). See docs/ARCHITECTURE.md section S1.4.
     /// </para>
     /// </summary>
     internal sealed class ItemStatBlock

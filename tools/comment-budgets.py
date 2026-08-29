@@ -14,19 +14,19 @@ import os
 import subprocess
 import sys
 
-# CLAUDE.md: "Keep contiguous comment blocks to roughly 12 lines".
+# CLAUDE.md: "roughly 12 lines of inline // prose".
 INLINE_MAX = 12
 
-# Looser, because an XML block is API documentation with a fixed tag overhead
-# (<summary>, <param>, <returns>, <remarks>) rather than narration, and
-# because CLAUDE.md asks for a rule to be stated once canonically - which
-# puts the length in a class doc by design. Calibrated against what real
-# work produces: over the four PRs merged 2026-08-28 the inline rule fired
-# on nothing, while >30 fired on both new contract types (ItemIconTooltip
-# at 31 lines, RankerReadinessRamp at 36) - one of them by a single line.
-# 40 clears that observed ceiling and still catches every essay: of 2,113
-# XML runs, >30 is 51 blocks, >40 is 24, and the longest are 73 and 72.
-XML_MAX = 40
+# Looser than the inline rule, because the same prose costs more lines here:
+# an XML block spends them on <summary>, <para>, <list> and <param> structure
+# that a // block does not have to write. Not much looser. Measured over the
+# 2,257 XML runs in the tree: median 7 lines, mean 8.9, p90 19, p99 40. The
+# previous 40 sat at the 99th percentile, so it constrained 1% of blocks and
+# an author who learned the limit from a CI failure learned the wrong number
+# - CLAUDE.md has said 12 the whole time. 20 sits just above p90, leaving
+# ~92% of existing blocks compliant and putting the gate where a block has
+# to earn its length.
+XML_MAX = 20
 
 HEADER = """\
 # Per-file counts of over-length comment blocks - a ratchet, not a target.

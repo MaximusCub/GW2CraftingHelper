@@ -3,27 +3,23 @@ using System.Collections.Generic;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// The Recipe Tree toolbar row's RIGHT-anchored button cluster, and the
-    /// x the left cluster (the state chips) has to stop short of.
-    ///
+    /// The Recipe Tree toolbar row's RIGHT-anchored button cluster, and the x
+    /// the left cluster (the state chips) has to stop short of.
     /// <para>
     /// The row has two clusters that share one width. The chips negotiate
     /// through <see cref="TreeChipStripLayout.Fit"/>; the number they
     /// negotiate AGAINST is this cluster's total width, which is why the
     /// buttons' widths and gaps live here rather than as literals in the
-    /// view's placement calls. A width that can only be read off a
-    /// PlaceRight argument is a width no test can assert the boundary
-    /// cases against without re-typing it, and a re-typed width is one a
-    /// later rename silently invalidates.
+    /// view's placement calls. See docs/ARCHITECTURE.md, "Services Q-Z:
+    /// relocated design narrative".
     /// </para>
-    ///
     /// <para>
-    /// Invariant: <see cref="RightButtons"/> is exactly the set of buttons
-    /// the row places, in the right-to-left order it places them.
+    /// Invariant: <see cref="RightButtons"/> is exactly the set of buttons the
+    /// row places, in the right-to-left order it places them.
     /// <see cref="ChipLimitX"/> is only correct while that holds. The view
-    /// clamps its chip limit to the buttons it actually placed as well, so
-    /// a slot missing from this list costs the chips room rather than
-    /// putting them on top of a live click target.
+    /// clamps its chip limit to the buttons it actually placed as well, so a
+    /// slot missing from this list costs the chips room rather than putting
+    /// them on top of a live click target.
     /// </para>
     /// </summary>
     internal static class TreeToolbarRowLayout

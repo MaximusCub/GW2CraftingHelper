@@ -77,26 +77,22 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Resolves a full non-coin currency cost (CostLine list, already
-        /// scaled to the caller's quantity - e.g. PlanStep/SolverDecision's
-        /// VendorCurrencyCosts, or a CraftingTreeNode's) into display-ready
-        /// amounts. Null/empty input yields null (never an empty-but-
-        /// non-null list), so callers can use a simple null/Count==0 check
-        /// for "does this row/node have a currency cost at all".
-        ///
-        /// ownedCurrencyAmounts (gw2e's ownedCurrencies split -
-        /// optional, cosmetic only) sets each line's OwnedQuantity to
-        /// min(line.Count, wallet amount) when the wallet holds any of that
-        /// currency; null (not 0) when the caller has no wallet data at all
-        /// or omits it, or the currency simply isn't in the wallet snapshot.
-        /// The same pass also sets RawOwnedQuantity to the real, UNCLAMPED
-        /// wallet amount under the identical null-vs-set conditions
-        /// (shoplist-have-format) - see CurrencyAmountViewModel.
-        /// RawOwnedQuantity's own doc comment for why the clamped and raw
-        /// figures both need to survive to callers.
-        ///
-        /// Callers resolving a per-unit "Each" amount should not pass this
-        /// (ownership is a total-quantity concept - see ResolveUnitAmounts,
-        /// which never accepts it).
+        /// scaled to the caller's quantity) into display-ready amounts.
+        /// Null/empty input yields null - never an empty-but-non-null list -
+        /// so callers can use a null/Count==0 check for "does this row have a
+        /// currency cost at all".
+        /// <para>
+        /// ownedCurrencyAmounts (optional, cosmetic only) sets each line's
+        /// OwnedQuantity to min(line.Count, wallet amount) when the wallet
+        /// holds any of that currency, and null - not 0 - when the caller has
+        /// no wallet data or the currency is absent from the snapshot. The
+        /// same pass sets RawOwnedQuantity to the real, UNCLAMPED wallet
+        /// amount under the identical conditions; see that property's own doc
+        /// comment for why both figures must survive to callers.
+        /// Callers resolving a per-unit "Each" amount must not pass it -
+        /// ownership is a total-quantity concept, and ResolveUnitAmounts
+        /// never accepts it.
+        /// </para>
         /// </summary>
         public static List<CurrencyAmountViewModel> ResolveAmounts(
             IReadOnlyList<CostLine> costLines,
@@ -134,32 +130,24 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Per-unit ("Each") counterpart of ResolveAmounts for a vendor-
-        /// priced currency cost - the WINNING OFFER's true per-unit rate
-        /// (its own per-batch cost line divided by its own OutputCount), not
-        /// a truncated average over the row's aggregated total/Quantity
-        ///. The previous total/quantity truncating-average
-        /// approach could show a misleading "1" for a merged row whose real
-        /// purchases were e.g. 3-for-3 plus 1-for-1 batches; this resolves
-        /// the actual offer rate instead.
-        ///
-        /// perBatchCostLines/outputCount come from PlanStep.
-        /// VendorOfferCurrencyCostLinesPerBatch/VendorOfferOutputCount,
-        /// which are only populated when every tree occurrence merged into
-        /// that step used the identical winning offer (see
-        /// VendorBatchSolver.FinalizeVendorBatches) - null/0 otherwise (mixed
-        /// offers, or a non-vendor row), in which case this returns null
-        /// rather than reviving the old misleading average: gw2efficiency
-        /// itself never shows a per-unit currency price at all (docs/
-        /// docs/gw2e-parity-spec.md Section 4.3/directive 5), so omitting the
-        /// Each cell is the closer parity choice than guessing.
-        ///
-        /// When a line's per-batch count does not divide evenly by
-        /// outputCount, the true rate is not a whole number; rather than
-        /// round (inventing data the spec doesn't ask for), the amount
-        /// carries a literal "N for M" bundle label instead (see
+        /// Per-unit ("Each") counterpart of ResolveAmounts for a
+        /// vendor-priced currency cost: the WINNING OFFER's true per-unit
+        /// rate - its own per-batch cost line divided by its own OutputCount
+        /// - never a truncated average over the row's aggregated total.
+        /// <para>
+        /// perBatchCostLines/outputCount come from
+        /// PlanStep.VendorOfferCurrencyCostLinesPerBatch/
+        /// VendorOfferOutputCount, populated only when every tree occurrence
+        /// merged into that step used the identical winning offer
+        /// (VendorBatchSolver.FinalizeVendorBatches). Null/0 otherwise, in
+        /// which case this returns null rather than guessing: gw2efficiency
+        /// never shows a per-unit currency price at all. When a line's
+        /// per-batch count does not divide evenly by outputCount the true
+        /// rate is not a whole number, so rather than round, the amount
+        /// carries a literal "N for M" bundle label (see
         /// CurrencyAmountViewModel.BundleLabel) for the caller to render as
-        /// text.
+        /// text. Derivation: docs/ARCHITECTURE.md section S1.7.
+        /// </para>
         /// </summary>
         public static List<CurrencyAmountViewModel> ResolveUnitAmounts(
             int outputCount,
@@ -172,24 +160,20 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// Approximates a per-unit ("Each") currency amount for a single
         /// recipe-tree row (TreeSectionController's "Unit price:" tooltip
-        /// line, field-test finding B) from a node's own already-scaled-to-
-        /// Quantity VendorCurrencyCosts. Unlike ResolveUnitAmounts, this is
-        /// NOT the winning offer's true per-batch rate: CraftingTreeNode
-        /// carries no per-offer batch data (OutputCount/
-        /// CurrencyCostLinesPerBatch only exist on PlanStep, threaded there
-        /// by VendorBatchSolver.FinalizeVendorBatches for the MERGED
-        /// shopping list - a later, separate pass a single tree node's
-        /// SolverDecision never goes through), so this divides the node's
-        /// own total by its own Quantity instead. The two happen to agree
-        /// whenever this offer's purchase batches divided evenly into this
-        /// node's Quantity (the common case); when they do not (the total
-        /// already includes rounding up to a whole purchase - see
-        /// VendorBatchSolver.EvaluateVendorOffers' unitsNeeded), this falls
-        /// back to the same "N for M" bundle text as ResolveUnitAmounts
-        /// rather than dividing into a misleading fractional number - see
-        /// that method's own doc comment for why a truncated average is
-        /// avoided in the first place. Display-layer-only: no solver change
-        /// needed to plumb the true batch rate down to this node.
+        /// line) from a node's own already-scaled-to-Quantity
+        /// VendorCurrencyCosts. Unlike ResolveUnitAmounts this is NOT the
+        /// winning offer's true per-batch rate: CraftingTreeNode carries no
+        /// per-offer batch data, so this divides the node's own total by its
+        /// own Quantity.
+        /// <para>
+        /// The two agree whenever the offer's purchase batches divided evenly
+        /// into the node's Quantity (the common case). When they do not, this
+        /// falls back to the same "N for M" bundle text as ResolveUnitAmounts
+        /// rather than dividing into a misleading fractional number.
+        /// Display-layer only: no solver change is needed to plumb the true
+        /// batch rate down to this node.
+        /// Derivation: docs/ARCHITECTURE.md section S1.7.
+        /// </para>
         /// </summary>
         public static List<CurrencyAmountViewModel> ResolveTreeNodeUnitAmounts(
             IReadOnlyList<CostLine> totalCostLines,

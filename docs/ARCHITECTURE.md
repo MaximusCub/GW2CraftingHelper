@@ -161,6 +161,35 @@ comment instead claims `Children` itself would have been corrupted is
 asserting something the decompiled source disproves - its own defect
 (KNOWN-ISSUES #36).
 
+### Tab changes have no pre-change hook: the unsaved-Settings prompt
+
+`Module.cs`'s `PromptForUnsavedSettings` asks whether to keep or drop unsaved
+Settings edits only after the user has already left the tab, because Blish
+1.3.0 has nowhere to put the question earlier. Measured from the vendored
+binary: `TabbedWindow2.SelectedTab`'s setter assigns the backing field via
+`SetProperty` and only then calls `OnTabChanged`, which itself calls
+`ShowView` (tearing down the old view) BEFORE raising the public `TabChanged`
+event. There is no pre-change event, nothing the handler can set to veto, and
+the one virtual member in the chain already runs after the assignment - so by
+the time any module code is reached the tab has changed and cannot be changed
+back without triggering a second switch. KNOWN-ISSUES #51 records the
+alternatives that were measured and rejected.
+
+The prompt still has the user's text to save because of the detach-not-dispose
+behaviour above: `ClearChildren` unparents the outgoing view's controls
+without disposing them, so the Settings `TextBox`es still hold what was typed
+and Save persists exactly what was on screen.
+
+Only the tab path is hooked. The window's own `Hidden` event deliberately is
+not: measured in the vendored 1.3.0 binary, every `WindowBase2` subscribes to
+`Gw2Mumble.PlayerCharacter.IsInCombatChanged` and
+`Gw2Instance.IsInGameChanged`, both of which call `Hide()` when the user has
+Blish's "hide windows in combat" or "hide during loading" overlay options on,
+so entering combat with an edited field would pop a modal over gameplay.
+Closing the window leaves the edits in the live `TextBox`es exactly as it
+always has: nothing tears the view down, so reopening the window shows the
+typed text again.
+
 ### The logging-channel rule for these guards
 
 Every one of these primitives ends in a catch that swallows rather than
@@ -256,6 +285,22 @@ notch arithmetic, while `MouseWheelScrollLines` is read live: 120 is Win32's
 for that same constant and is not user-configurable, unlike
 `MouseWheelScrollLines`, which is.
 
+**The second Windows defect, `MouseWheelScrollLines = -1`:** Windows' "one
+screen at a time" mouse-wheel setting (Control Panel / Settings mouse wheel
+option) reports `SystemInformation.MouseWheelScrollLines` as `-1`, not a
+usable line count. Blish's own `Scrollbar.HandleWheelScroll` has the
+identical defect - its `Math.Sign(...) * -30 * MouseWheelScrollLines`
+scrolls the *wrong direction* for every wheel event, wrapped or not, under
+that setting - and this module cannot fix Blish's arithmetic.
+`WheelDeltaSanitizer.SanitizeScrollLines` substitutes Windows' documented
+out-of-box default of 3 lines whenever the raw value is not a usable
+positive count (covering `-1` and any other non-positive or unexpected
+value defensively), which at least keeps *this module's* correction
+pointing the right way. It deliberately does not try to reproduce Blish's
+own step size under that setting, since Blish's step is itself wrong there:
+direction-correctness is chosen over an unreachable exact-step match for
+this one OS setting value.
+
 **Where:** `Services/WheelDeltaSanitizer.cs` (pure, Blish-free,
 unit-tested); consumed by `CraftingPlanView.ApplyWheelWrapCorrection`.
 
@@ -289,6 +334,14 @@ contest safe rather than janky:
   event, rather than requiring the content height to have stopped
   changing first - so a user scrolling during a live restore is never
   contested.
+
+**Why the correction is computed in pixel space:**
+`Services/ScrollMath.ApplyPixelDelta` converts a scrollbar ratio to pixels,
+applies the delta, and converts back, rather than working in ratio space
+directly. Blish's own `Scrollbar.HandleWheelScroll`/`ScrollAnimated` operate
+in pixel space (a fixed per-notch pixel step added to the current pixel
+offset), so a correction expressed in ratios would not compose the same way
+across a changing scrollable range.
 
 **Where:** `Views/CraftingPlanView.cs`, region "Scroll preserve/restore/verify"
 (`PreserveScrollAcross`, `StartScrollVerify`, the `PanelScrollbarField`
@@ -384,7 +437,63 @@ exempt and is still read directly: `WindowBase2.OnResized` assigns it from
 the new size synchronously, before raising `Resized`, so it is never a
 layout pass behind.
 
-**Full history:** KNOWN-ISSUES items 12, 14, 19, 65.
+### 4.2 What the height constants absorbed
+
+**The convergence the arithmetic replaced.** These containers used to rely
+on Blish's `FlowPanel` `HeightSizingMode.AutoSize`, which converges only
+one nested level per real engine frame: `Container.DoUpdate` sizes a
+container from its children's *current* bounds before recursing into those
+children's own `Update` for that same frame. That is the root cause of
+KNOWN-ISSUES #12/#14's multi-frame flash/stutter window. Because every row
+height in the plan view is a fixed constant, the whole tree of heights is
+knowable synchronously instead, and `CraftingPlanView` uses the same
+constants for the AutoSize-replacement containers and for the individual
+row `Panel`s - the "one source of truth" shape `ShoppingColumnMath`
+already has.
+
+**`CostTileLabelToValueGap` used to be a residual.** Both Total Cost bands
+bottom-anchored their amount inside a fixed row height, so the space under
+the caption was whatever the height arithmetic happened to leave over - 1px
+on the profit band, which the field report called cramped ("'Sell Value'
+and the gold line are a little cramped"). Anchoring the amount *under* the
+caption instead makes that gap one named constant at every band, and the
+two bands can no longer drift apart. Its value, 8, is derived from the
+caption tier's own metrics rather than chosen by eye; the derivation is in
+the constant's own doc comment, because the number is the thing a caller
+has to get right.
+
+**`MultiRootTreeFlowHeight` and the multi-root render.** gw2efficiency
+renders N independent top-level recipe trees, its synthetic wrapper node
+never surfacing (`docs/gw2e-parity-spec.md`), and this module matches that.
+Each requested item's own root node already *is* a full
+icon/name/quantity/pill/cost row - the same `CraftingTreeNode` shape
+`TreeNodeHeight` sizes for a single-item plan - so the multi-root height is
+that same per-root arithmetic summed across every root, plus one divider
+per adjacent pair. The one column header sits above every root rather than
+per root: the tree's right-hand columns would otherwise be unlabelled,
+unlike every other column-header table in the plan.
+
+**`PanelChromeMath` belongs to this section too**, and its "why" is the
+last part of 4.1 above: a panel's `ContentRegion` cannot be read back after
+a resize that happened inside a layout pass, so the arithmetic is mirrored
+Blish-free instead. The class's own doc comment states the hazard and
+points here rather than restating the mechanism.
+
+**The viewport's bottom, and the band at its top.** The chain from the
+window's height down to the panel a tab renders into has two ends that moved
+independently. At the bottom, the viewport used to stop 74px above the window
+while its top sat flush under the title bar: the content region `Module.cs`
+hands Blish was authored window-region-relative, and Blish reads it as
+absolute texture coordinates (KNOWN-ISSUES #66). At the top, the module sets
+no `Panel.Title`, so Blish reserves no 36px header and the tab's name is drawn
+on the module's own taller band inside the content region instead - which is
+the chain `ViewAdapter` really builds, and the one
+`tests/TaimisToolbench.Tests/Services/PanelChromeMathTests.cs` sweeps, at
+window sizes from the module's floor to a 4K-tall client. Its budgets are
+written as literals so that shrinking the band back cannot quietly move the
+assertions with it.
+
+**Full history:** KNOWN-ISSUES items 12, 14, 19, 65, 66.
 
 ---
 
@@ -554,6 +663,92 @@ which is what closes the race regardless of drain order.
 
 **Full history:** KNOWN-ISSUES item 20.3 (M34-B1 #4).
 
+### 6.1 Out-of-order phase events: `PhaseOrdinalGuard`
+
+`Services/PhaseOrdinalGuard.cs` mirrors `StatusUpdateGuard`'s shape and
+spirit - a pure, Blish-free function `CraftingPlanView` calls at the
+moment each event actually drains - for a second race the guard above
+cannot see.
+
+`Progress<T>` with no `SynchronizationContext` installed (section 1: this
+module has none) posts every `Report` through an independent
+`ThreadPool.QueueUserWorkItem`, so two phase events reported milliseconds
+apart - a warm recipe/price cache, a small plan - can be executed out of
+order by different worker threads before either reaches the main-thread
+queue. `StatusUpdateGuard` alone cannot catch that: both events belong to
+the SAME generation, so its `myGen` check passes for both, and the
+later-draining older event can overwrite a newer phase's text.
+
+The fix rests on `PlanPhase`'s declaration order being the pipeline's
+actual emission order, so its int ordinal is a reliable monotonic sequence
+per generation. That order is `BuildingTree` -> `FetchingPrices` ->
+`SolvingDecisions` -> `FetchingItemDetails` -> `CheckingLearnedRecipes` ->
+`BuildingDisplay`, and `CraftingPlanPipeline`'s `phaseTracker.Start` call
+sites fire strictly in it on both the single-item and multi-item paths.
+An event whose ordinal is not strictly greater than the last one applied
+is therefore stale and dropped, regardless of drain order.
+
+### 6.2 The pull-based status board
+
+`Services/PlanStripStatusBoard.cs` holds the Crafting Plan tab's status
+state at module level rather than in the view (KNOWN-ISSUES #45, "tab
+switch strip freeze / lost completion status").
+
+`CraftingPlanView`'s status-strip fields and its `_statusLabel` control
+are rebuilt every time the tab's `Build()` runs, so a completion callback
+that writes directly to a control can target a since-discarded label or be
+skipped by a view-liveness check - and nothing about the next `Build()`
+cycle would know a finished generation's status text ever existed to
+restore. The board inverts that. Every write only ever updates pure state,
+so it can never be skipped by a liveness check and never race a rebuild;
+the strip is a pull consumer, reading the board every tick while armed and
+reading a fresh `Snapshot()` on every rebuild.
+
+It is constructed once by `Module` and passed into `CraftingPlanView`'s
+constructor, so the state outlives any single view build cycle - the
+module-level-state ownership pattern used for exactly this class of bug.
+
+Threading: writers run on whichever thread they naturally land on - the
+main thread for `Begin` (`TriggerGenerate`, before any await), a
+ThreadPool thread for `UpdatePhase` (the pipeline's
+`IProgress<PlanPhaseEvent>` callback) and for `Finish` (the pipeline's
+success/cancel/failure continuation). None of them marshal onto the main
+thread first, because nothing here touches a Blish HUD control. Only the
+pull side - the spinner ticker's `FrameTicker.DoUpdate` step, and `Build()`
+itself - runs on the main thread, and it is the only place a Blish control
+is ever touched from this board's data.
+
+`Finish` is rejected through the same `StatusUpdateGuard` `UpdatePhase`
+uses rather than a raw sequence-only check, which would otherwise accept a
+second `Finish()` for the same generation - silently overwriting the
+first-recorded wording - and would accept a `Finish(0, ...)` on a virgin,
+never-`Begin()`'d board. That last case is unreachable today only because
+the caller's `myGen` is always `++_generateSequence` and therefore never
+0, which is not an invariant this class should rely on its caller to hold.
+
+`SeedRestored` is the one write that deliberately bypasses both guards: it
+is the board's own one-time initial seed at module load, at sequence 0,
+which the view's `++_generateSequence` convention can never produce. Its
+own `_sequence == 0 && !_inFlight` check is enforcement, not decoration.
+`Module.LoadAsync`'s restore drain can lag well behind the module's
+`Update()` loop starting to tick - `LoadAsync` awaits a full
+account-snapshot network refresh after arming the restore flag but before
+returning, and Blish HUD does not call a module's `Update()` until
+`LoadAsync`'s Task completes - so a user can open the window and click
+Generate while `LoadAsync` is still in flight, and have that generation's
+`Begin(1)`/`UpdatePhase(1, ...)`/`Finish(1, ...)` all land *before* the
+seed finally runs. Unconditionally stomping `_sequence` back to 0 in that
+window would silently reject every subsequent write for that in-flight
+generation and freeze its spinner on the next tick
+(`PlanStripTickDecision.Decide` sees Sequence 0 != myGen 1 and stops) -
+exactly the lost-completion-status bug the board exists to prevent. The
+`_sequence == 0` half alone would suffice, since `Begin` only ever moves
+`_sequence` away from 0 and never back; the `_inFlight` half is kept as a
+self-documenting belt-and-braces guard rather than relying on that.
+
+`ClearRestoredSeed` undoes a seed whose downstream render then failed, and
+carries the same guard for the same reason.
+
 ---
 
 ## 7. Merged-ceil vendor batching
@@ -587,6 +782,88 @@ as pure code motion. A change to the arithmetic itself is permitted when
 it carries characterization tests of current behavior, the standard
 adversarial review pipeline, and an explicit improved/regressed-nothing
 statement, per the high-evidence-zone policy.
+
+### 7.1 Offer tiering, in full
+
+`EvaluateVendorOffers` splits offers on their non-coin cost lines, and two
+kinds of line obey one rule: a non-coin wallet currency line, and a
+*barter* line - an `Item` cost line whose item has no Trading Post price,
+which is what an account-bound vendor token is. An `Item` line that does
+have a TP price is money, not a barter line: it folds into the offer's
+real coin cost and never consults a valuation.
+
+An offer is **comparable** (competes with TP/craft coin costs in
+`PickCheapest`) when it has no non-coin lines at all, or every one of them
+has a valuation. Its comparison value is then coin part +
+`sum(count * copperPerUnit)` over those valued lines, reported via
+`VendorOfferEvaluation.BestComparableValue`. The winning comparable
+offer's real coin part and (if any) currency lines are reported
+separately, via `BestComparableCoinCost` and `BestComparableCurrencyCosts`;
+the valuation affects comparison only, never the amounts committed to the
+plan. A barter line's own scaled quantity rides on
+`BestComparableItemCosts` with a null `GoldValue`, for the same reason.
+
+An offer with at least one non-coin line that has **no** valuation
+(including when it is mixed with other, valued lines) is incomparable with
+coin costs and is reported only as a **fallback**, ranked by lowest coin
+part. A fallback coin-part tie is broken by unit count only when both
+offers cost the same single non-coin line, kind included; ties across
+different lines keep the first-listed offer, because ranking across them
+has no exchange rate and their unit counts must never be compared.
+
+A `DailyCap`/`WeeklyCap`/`SeasonalCap` never excludes an offer or affects
+its tier - gw2efficiency only ever surfaces a cap as a post-solve notice,
+never re-routing the tree - so both tiers carry the raw caps through for
+`FinalizeVendorBatches` to check once against aggregate demand.
+
+### 7.2 Why the ceil is merged, and why a conflict is not
+
+The sum of independently-ceil'd per-occurrence costs overstates the true
+cost whenever an item is needed via 2+ occurrences and bought via a bulk
+offer, so `FinalizeVendorBatches` re-derives the cost from the aggregate
+quantity and ceils once. It only does so when every occurrence resolved to
+the identical winning offer: re-deriving one "true" cost across genuinely
+different offers has no principled answer, so a `Conflict` step keeps
+`AggregateStep`'s sum of real per-occurrence purchases - a deliberately
+conservative fallback.
+
+### 7.3 Allocating a corrected total back to occurrences
+
+Without `AllocateVendorNodeCosts`, `CraftingTreeNode.SubtreeCost` (via the
+public `Decisions` dict) kept showing the stale, per-occurrence-overcounted
+sum after `FinalizeVendorBatches` had corrected only the merged
+`PlanStep`/`currencyMap` view.
+
+It touches only the stepKeys that method actually corrected -
+`step.VendorOfferOutputCount > 0`, which is only ever set inside its
+single-winning-offer branch and is 0 for the conflict/mixed-offer case.
+Where occurrences disagreed on the winning offer, each occurrence's own
+memo `TotalCost` is already individually correct (a genuinely different
+real purchase), so redistributing a uniform rate across them would replace
+correct values with a wrong blended one - the same reasoning
+`FinalizeVendorBatches` itself applies to `step.TotalCost`.
+
+The allocation is largest-remainder (Hamilton) apportionment, proportional
+to each occurrence's own `Quantity` share of the step's total demand:
+`floor(step.TotalCost * quantity / totalQuantity)` per occurrence, then the
+leftover copper(s) - `step.TotalCost` minus the sum of floors, always fewer
+than `occurrences.Count` - go one each to the occurrences with the largest
+fractional remainder (numerator mod `totalQuantity`), ties broken by
+first-seen (DFS) order for determinism. The allocated shares always sum to
+precisely `step.TotalCost` (no drift, no invented precision) and any two
+occurrences of equal quantity diverge by at most 1 copper. The multiply
+widens to `decimal` so this holds unconditionally - no `long` overflow is
+possible for any `step.TotalCost`/`Quantity` pair. A "last occurrence
+absorbs the remainder" shape is not acceptable here: it dumps the entire
+batch-overrun cost, unbounded for equal-quantity occurrences, onto
+whichever occurrence lands last in DFS order.
+
+A component leaf's raw `VendorItemCosts`/`VendorCurrencyCosts` are captured
+pre-merge, per occurrence, and are *not* re-derived here - they can
+disagree with the corrected share whenever a step merges 2+ occurrences.
+The caller reads this method's outputs afterward to mark which decisions
+must suppress component-leaf display, in
+`FlagUnreliableVendorComponentCosts`.
 
 **Full history:** KNOWN-ISSUES items 20.1, 20.2, 28, 33.
 
@@ -666,6 +943,179 @@ there is a finding to investigate, never a file to re-baseline.
 **Full history:** KNOWN-ISSUES items 20, 21, 24, 25, 26 (the M33-M37
 parity waves); `docs/gw2e-parity-spec.md` for the researched gw2efficiency
 behavior itself.
+
+### 8.1 Achievement-bit ingredient dedup
+
+`Services/AchievementBitDedupPrePass.cs` echoes gw2efficiency's own
+two-part mechanism (`initialTreeChecks` plus `calculateTreeQuantity`'s
+`achievement_bit` check -
+[`docs/research/m37-r3-achievement-dedup.md`](research/m37-r3-achievement-dedup.md)
+sections 1.1/1.2) for a small handful of real recipes: the WvW "Infinite
+[siege weapon] Blueprint" achievement rewards, whose ingredients name a
+specific achievement *bit* - a one-time reward item that must never be
+counted twice just because it also happens to be needed directly
+elsewhere in the same plan. The rule itself is ported 1:1 from the
+ground-truth gw2e unit test quoted in that report (section 1.4) and is
+stated in the class's own doc comment.
+
+**Zeroing clears `Recipes`, not just `Quantity`.** Unlike gw2e's nested
+tree - which stores a small per-edge ratio and resolves every absolute
+quantity in one downstream pass - this module bakes each `RecipeNode`'s
+absolute `Quantity` once, at tree-build time
+(`RecipeService.BuildNodeAsync`, report sections 3.3/4.2). Zeroing a
+duplicate occurrence here therefore also clears that occurrence's own
+`Recipes`, mirroring `InventoryReducer.ReduceNodeSourced`'s identical
+"`Quantity <= 0` -> `Recipes.Clear()`" treatment of a genuinely
+fully-owned node, so `PlanSolver.Evaluate` has no craft path left to
+consider and the ordinary zero-quantity Buy/Have collapse takes over
+cleanly. Without clearing `Recipes`, a duplicate occurrence with no
+TP/vendor price but a real craft recipe could still resolve to Craft -
+using its own, un-deduped children's costs - purely because nothing
+cheaper competed, re-introducing exactly the double count this pass
+exists to remove. That is a deliberate departure from literally "zeroing
+hits `Quantity` only".
+
+**It runs once and never again.** The pass fires right after the tree is
+built, before inventory reduction and before Solve
+(`CraftingPlanPipeline`), and never again for that tree's lifetime - not
+even across local override/Ignore re-solves, which reuse the same tree
+object. gw2e's own equivalent interactive-update path (`updateTree.ts`)
+does not re-run its classification pass and can let a "shared with a
+normal occurrence" dedup silently un-zero itself after a manual pill click
+(report section 1.5, an upstream fragility). Running once and never again
+avoids that class of bug entirely, which is strictly safer than upstream
+rather than a parity gap.
+
+**Both walks descend only the primary option.** `CollectItemIdsForDedup`
+and `ZeroDuplicateBitOccurrences` each follow `node.Recipes[0]` only,
+mirroring `InventoryReducer.ReduceNodeSourced`'s precedent for the
+identical ambiguity: `PlanSolver` has not run at pre-pass time, so which
+of a node's alternate `RecipeOption`s will actually be chosen is
+unknowable here, and gw2efficiency's own nested tree never has this
+ambiguity at all (recipe-nesting resolves exactly one recipe per node
+before pricing). Walking every option - the pre-fix behaviour - could
+classify an achievement-bit occurrence living only in an option
+`PlanSolver` never chooses as "seen", corrupting the zeroing decision for
+a sibling option's occurrence of the same id that *is* on the solved path.
+On the zeroing side the stake is higher still: zeroing an occurrence in a
+never-chosen option would silently discard that option's true cost from
+`Evaluate`'s comparison (which sums each option's own ingredient costs
+independently), making an objectively worse option look artificially
+cheap enough to be picked over the honest primary one.
+
+Descending stops at a zeroed occurrence. Everything below one is dead
+weight the ordinary zero-quantity path already hides, and - per the
+verified 7-recipe/28-ingredient dataset this pass targets - never itself
+contains a further achievement-bit id needing independent zeroing.
+
+The pass is pure, Blish-free and does no I/O; it mutates the passed-in
+tree in place, the same seam `OwnedMaterialsForceBuyPrePass` occupies
+conceptually, though this one needs no `NodeId`s and no throwaway solve.
+
+### 8.2 Owned materials: decision-guided reduction
+
+`Models/OwnMaterialsMode` picks how the plan values materials the player
+already owns. An owned unit is always consumed first, at zero acquisition
+cost, in either mode - the enum never makes an owned unit *cost*
+anything. What `Valued` adds is three things: a zero-owned decision pass
+before the real solve (reusing the force-buy pre-pass baseline) that
+excludes a node from crafting when buying it outright costs less than 85%
+of what its own components would cost to buy fresh, gw2e's
+`getCheaperToBuyItemIds`; a decision-*guided* rather than merely gated
+reduction; and a deduction of owned materials' trading-post sell
+opportunity cost from `CraftingProfit`, computed from the decision-guided
+`UsedMaterials` list. `Free` falls back to the legacy
+primary-recipe-option heuristic unchanged. All of it is inert unless an
+account snapshot actually drove reduction.
+
+**What "decision-guided" buys.** In `InventoryReducer.ReduceNodeSourced`,
+when the guide contains a node's `NodeId`, only the recipe option whose
+`Source == Craft && RecipeId` matches may let its descendants consume the
+pool; every sibling option is left at full zero-owned cost. If the node's
+zero-owned decision was anything other than Craft, no option consumes the
+pool for its descendants - an un-crafted branch never demands its own
+ingredients, mirroring `PlanSolver.Evaluate`'s own `ignoredItemIds`/
+`Quantity == 0` handling. Since discounting only ever lowers a cost, and
+only along the path the zero-owned pass already declared the winner,
+owned ingredient stock further down the tree can never pull the real
+post-reduction `Solve()` toward a *different* recipe option than the
+guide chose for that node.
+
+Without a guide, the legacy heuristic is true only along the single
+chosen-recipe-candidate chain: the root, then recursively each node's
+primary option. Which option the solver will actually choose is unknowable
+at reduction time, and walking every option while letting each drain the
+shared pool would let an option the solver never picks steal owned stock
+from a branch that *is* chosen. Once an option's descendants are excluded
+they stay excluded for the whole subtree below, however deep - the branch
+is hypothetical, or provably not the winning path, from there down.
+
+Every option's `CraftsNeeded`/ingredient `Quantity` is still rescaled
+regardless of `consumeFromPool`. That arithmetic reflects the node's own
+already-decided, pool-independent `Quantity` and is required for
+`PlanSolver`'s cost comparison across recipe options to stay internally
+consistent, since every ingredient of every recipe is always evaluated -
+even one the solver ultimately does not choose.
+
+**The residual (KNOWN-ISSUES #20, not guarded or tested).** None of this
+guarantees the guide's own Craft-vs-Buy decision for a node still holds
+after reduction. The guide is computed on the unreduced tree, but a node's
+own `Quantity` can still shrink from owned stock of its own item id - and
+because craft cost is non-linear in quantity (`ComputeCraftsNeeded`'s
+ceiling division, `VendorBatchSolver`'s per-batch math), shrinking it can
+raise the effective per-unit cost enough to flip the real solve's decision
+away from what the guide assumed, after that node's ingredients were
+already discounted into `UsedMaterials` against a Craft assumption. It
+takes a node with owned stock of itself plus owned stock of its own
+ingredients, and a recipe or vendor batch whose output count exceeds 1.
+
+`OwnedMaterialsForceBuyPrePass`'s competency-blind second evaluation
+carries a residual of the same shape. "Competency-blind" applies only at
+the node's own recipe choice; ingredient costs stay the normal
+competency-resolved figures, which can only inflate the raw craft cost and
+therefore only *add* nodes to `CompetencyIndependentForceBuyNodeIds`,
+never drop them. The risk left is a parent whose untrained recipe would
+survive a true blind evaluation being pulled in by an inflated child
+contribution, falsely excluding a real training opportunity at the parent
+- the child's own opportunity is still reported at the child's node.
+
+### 8.3 Decision-only valuations: currencies and barter items
+
+Two curated tables answer "what is this non-coin cost worth, for
+comparison purposes only": `Models/CurrencyDecisionDefaults.cs` for wallet
+currencies and `Models/BarterItemDecisionDefaults.cs` for untradeable
+barter items. They are separate tables because a GW2 item id and a GW2
+currency id are different id spaces that collide numerically - currency 39
+and item 39 are unrelated things - so a single int-keyed map would answer
+the wrong question for one of them. `Models/CurrencyValuation.cs` holds
+the user's own overrides and clears over the top of both.
+
+The currency table is adapted from gw2efficiency's
+`CURRENCY_DECISION_PRICES` (`@gw2efficiency/recipe-calculation`,
+`src/static/currencyDecisionPrices.ts`, MIT, Copyright (c) 2016
+queicherius / David Reess). Shipping it as defaults is an explicit,
+one-time waiver of the repo's "do not invent data" rule for that table
+only: every value is sourced and attributed to the upstream MIT package
+rather than invented, and the permission notice the licence requires is
+reproduced verbatim in the source file itself. Research notes live in
+[`docs/research/gw2e-currency-decision-prices.md`](research/gw2e-currency-decision-prices.md).
+
+The barter table has no upstream to adapt - gw2efficiency values wallet
+currencies only - so each entry is derived here under a single stated
+rule, recorded per entry in the file: the cheapest repeatable vendor
+exchange in `ref/vendor_offers.json` whose entire cost is coin or a
+currency that already carries a `CurrencyDecisionDefaults` value, divided
+by that offer's output count.
+
+That rule is deliberately conservative in one direction. It can only ever
+name a route we can see, so it is an *upper* bound on what the item really
+costs to obtain, and an over-valued barter token makes its offer look
+dearer than it is: such a token can lose a comparison it should have won,
+but can never win one it should have lost. An item whose cheapest visible
+route bottoms out in another untradeable item, an RNG chest, or a
+time-gated daily craft is absent on purpose. Absent is a supported state,
+not an unfinished one - the offer still reaches the user, as an honestly
+unranked fallback (section 8's barter-offer rule).
 
 ---
 
@@ -817,9 +1267,11 @@ expensive way, in a live desktop session:
 
 The metrics come from parsing the installed
 `Content/fonts/menomonia/menomonia-{size}-{style}.xnb` files directly -
-uncompressed MonoGame XNB containers holding one BitmapFont asset - and
-they reproduce, glyph for glyph, the figures published in
-[`docs/research/minimum-window-width.md`](research/minimum-window-width.md).
+uncompressed MonoGame XNB containers holding one `BitmapFontReader` asset
+(lineHeight, then nine int32 per glyph region). Widths follow
+MonoGame.Extended's own `MeasureString` rule, which is what a Blish `Label`'s
+autosize calls. The parse reproduces, glyph for glyph, the figures published
+in [`docs/research/minimum-window-width.md`](research/minimum-window-width.md).
 The atlas covers 8-36 regular and 8-24 plus 36 bold, reached via
 `ContentService.GetFont`, not only the five Blish defaults.
 
@@ -916,3 +1368,1879 @@ case), `Views/CraftingPlanView.cs` (`ApplyRestoredRequest`, the
 request-only restore), `Models/PlanHistoryEntry.cs` and
 `Services/PlanHistoryStore.cs` (the index's readable range and the
 additive-only row graph behind it).
+
+---
+
+## V. Views: relocated design narrative
+
+The `Views/` tree carries a lot of hard-won reasoning: decompiled Blish HUD
+1.3.0 behaviour, pixel simulations, bug post-mortems, and the arguments
+behind choices that look arbitrary from the outside. That reasoning is
+worth keeping, but a forty-line XML doc comment stops being read. This
+section is where the derivations live. Each member's own doc comment keeps
+the part a caller can violate - the invariant, the measured constant, the
+Blish quirk you need to know to use it - and points here for the rest.
+
+The subsections below are ordered by file, top-level `Views/` first, then
+`Views/Rendering/`.
+
+### V.1 `AboutTabContent`: rebuilt per visit, and the SemVer reflection
+
+The About tab is the same shape as `LogTabContent`: one
+`FlowPanel(CanScroll)`, a `Build(Container)` that populates it once, and no
+relayout registry. Nothing on it is interactive beyond plain
+selectable/copyable text, so there is no state worth keeping "sticky"
+across a tab revisit and the rebuild-per-visit cost buys correctness for
+free. `MainView` carries the cross-cutting note on that rebuild policy.
+
+The manifest read cannot fail under normal operation: `ModuleParameters.Manifest`
+is the exact object Blish HUD itself already parsed and validated in order
+to load this module at all. The hand-parse of the packaged `manifest.json`
+exists for the cases where it somehow does anyway - a null `Manifest`, an
+unexpectedly blank `Name`, or any exception - and mirrors the
+try/catch-with-graceful-fallback shape `Module.Initialize()` already uses
+four times for seed files.
+
+`Manifest.Version` and a dependency's `VersionRange` are typed
+`SemVer.Version` / `SemVer.Range`, from the external "SemVer" NuGet package
+Blish HUD embeds via Costura at runtime. This project has no compile-time
+reference to it, so a direct property access does not compile. Reflection
+(`ToString()` only) avoids adding a package reference for a two-field,
+display-only read.
+
+### V.2 `ApiAccessDialog`: why not a generalized `ModalDialog`
+
+It follows the same `StandardWindow` construction technique as
+`ModalDialog` - a 1x1 pixel background stretched to the window's own size,
+`TopMost`, a stable `Id`, `Show()`/`Hide()` semantics - but is a separate
+class rather than a generalization of it. `ModalDialog`'s shape is one
+short sentence, a fixed "Confirm" title, and a caller-named confirm button
+beside a fixed Cancel; this dialog is a multi-line numbered checklist under
+a different title with a Retry/Close pair. `ModalDialog`'s message `Label`
+is also not wrapped at all, which is fine for its own short sentence and
+wrong for full-sentence checklist items.
+
+It deliberately skips `ModalDialog`'s settings-backed drag position
+persistence. This is a rare error-path dialog, not a workflow a user
+repeatedly opens and repositions, so it simply centers on every `Show()`
+and needs no new `ModuleSettings` entries.
+
+The failure it explains is real and was reported: at character select,
+Blish has not yet resolved the game's Mumble identity, every account data
+source call fails with an invalid or missing API key, and the Snapshot
+tab's Refresh Now used to show only the unhelpful "Refresh Failed -
+{time}".
+
+### V.3 `FocusRelease`: how Blish's focus slot gets orphaned
+
+`TextInputBase.Focused`'s setter assigns
+`GameService.Input.Keyboard.FocusedControl = this` on every change, a
+change to `false` included. Blish itself soft-unfocuses in two places: the
+click-away handler (`Focused = _mouseOver && _enabled`) and
+`DisposeControl`. The second runs after `Control.Dispose` has already
+cleared `Parent`, so a box disposed while focused leaves that one global
+slot holding an orphan whose `GetAncestors()` is empty - which
+`KeyboardHandler`'s ancestor-visibility sweep can therefore never heal.
+
+A slot naming one box while another still holds focus is what the user
+feels. Escape is consumed clearing the slot instead of the box, and
+re-clicking the live box cannot repair it, because the setter's
+change-detection skips the assignment when `_focused` is already true. That
+is why the release has to go through `UnsetFocus()` and why it retries.
+
+### V.4 `ItemInputRowStrip`: why it is not under `Views/Rendering/`
+
+Its controls are `AutocompleteTextBox`, `SuggestionPanel` and
+`FocusRelease`, all of which are `Views` types. Putting the strip under
+`Views/Rendering/` would make that folder reference `Views` and reverse the
+one-way dependency section 5 above states.
+
+### V.5 `LogTabContent`: the three-column row split, and the follow poll
+
+`LogRow` splits each entry into four controls (panel plus three labels)
+where the previous shape used three, and pays one more `EllipsizeToWidth`
+per row per refit. Both are bounded by the ring cap (2000) and by what the
+filter admits, the refit loop is `SuspendLayout`-wrapped, and on a resize
+the ellipsize half runs once per drag rather than once per drag event.
+
+One divergence is accepted rather than fixed: timestamps do not align
+pixel-for-pixel between an `[INFO]` row and a `[DEBUG]` one, because the
+level word and the stamp share the Time label. Fixing it costs a fifth
+control per row on the module's heaviest render path. The Tag and Message
+columns - the two a reader actually scans - do align.
+
+`PollForUpdates` is the "plus a poll" half of the refresh design in
+[`dev/proposals/d2-log-system.md`](../dev/proposals/d2-log-system.md)
+section 4.3, layered on top of the `TabChanged`-driven `Refresh`. That
+design is also what calls for the append-only incremental update rather
+than a full-rebuild `Refresh()` on every version bump.
+
+### V.6 `MainView`: Clear Cache, Refresh Now, status, and the result repack
+
+Interposing a confirm dialog in front of Clear Cache opens a window in
+which a refresh can start, which the old single-click version could not:
+Refresh Now disables Clear Cache for its whole duration, but not the
+reverse. Both buttons are therefore disabled for the dialog's lifetime, and
+because `Build()` recreates them on every tab visit - which would re-enable
+them mid-dialog - the confirm also bumps `_clearGeneration`.
+
+`RefreshNowAsync` is a method rather than an inline lambda because the
+`ApiAccessDialog`'s Retry button invokes it too. Both entry points are
+Blish UI event handlers (a `Click`, or the dialog's own `Click`-driven
+Retry callback), so both always start on the main thread - the same
+argument `CraftingPlanView.TriggerGenerate` makes about its own
+confirm-modal callback.
+
+`ApplyStatusDisplay`'s parentheses around the elapsed time are the method's
+own, and they are what keep the age from reading as part of the timestamp
+beside it ("Updated - Aug 15, 2026 3:41 PM (2m ago)"). The `_statusLabel`
+now lives in its own full-width `_statusPanel` row beneath the header
+rather than in the header's shared, button-crowded run, which is why the
+composed text is not truncated: a full-width row is far less likely to run
+out of space, and truncating a status message is worse than letting a rare
+long one reach the edge.
+
+`RefitResultRows` keeps the scroll position across a repack that KEEPS the
+column count - the grid panel's width moves, its height does not. A repack
+that CHANGES the column count writes a new grid-panel height, and Blish's
+`Scrollbar` zeroes the scroll position a frame after any content-height
+change (measured: KNOWN-ISSUES #55, "The grid panel holds its unfiltered
+height"), so the list snaps to top. That is not defended against: this tab
+has no scroll-restore machinery - `CraftingPlanView.PreserveScrollAcross`
+is the module's only one - and a column-count change re-flows every row
+anyway, so there is no old position left to hold.
+
+### V.7 `ModalBackdrop`: what it is for, and what it must not block
+
+Before it existed, a confirm was only visually on top: with the Clear Cache
+confirm open, a click on the Crafting Plan tab's "+" add-row button behind
+it still registered.
+
+It covers the module window rather than the screen because a capturing
+control also stops the GAME from seeing the click. A screen-wide blocker
+would mean a confirm left open swallows every click in Guild Wars 2, which
+is not a trade a HUD overlay should make for a two-button confirm. The
+finding is about the surface the dialog belongs to, so that is exactly what
+is blocked.
+
+The Z-order arithmetic behind the lazy construction: a window's effective
+`ZIndex` is `5 + Screen.WINDOW_BASEZINDEX + its rank among windows ordered
+by (TopMost, LastInteraction)`, so it is not a compile-time constant and a
+`TopMost` dialog can land exactly one above a non-`TopMost` module window.
+On the tie that arithmetic can produce with the blocked window, the
+sibling-index tiebreak in `Container.TriggerMouseInput` decides - which is
+why the backdrop is constructed on the first `Show()`, after every window
+exists, so it is always the later child.
+
+### V.8 `SettingsTabContent.EnsureCurrencyRowIcon`: two different readiness tests
+
+A currency row is held to the currency LIST having resolved; a barter item
+row is held to the ITEM ID it resolved. The asymmetry is deliberate,
+because the two fetches answer different questions. Once the currency list
+has resolved, every currency row gets an icon control, and a currency the
+list carries with no icon URL of its own gets `IconControls`' empty-slot
+placeholder - which is the state it really is in. The item fetch answers
+per id, so an id absent from the reply is one nobody has an icon for yet,
+not one the API says has none; holding a barter row to "the fetch happened"
+would draw the placeholder over the first case.
+
+### V.9 `CraftingPlanView.ApplyRestoredPlan` and `RollBackFailedPlanRender`
+
+`ApplyRestoredPlan` mirrors `TriggerGenerate`'s success-path shape: it adopts
+the restored `result` as the override loop's baseline, restores the user's
+prior decision-pill overrides, reseeds the request inputs (rows, checkboxes,
+price basis) that produced the plan, resets section expansion, rebuilds the
+view model, and seeds the status board with the staleness banner text.
+`RestoreOverrides` is not optional there - see V.17 for what a restored
+session loses without it.
+
+Two narrow try/catches guard the restore. `PlanStoreHelpers`' tolerance gate
+is only structural, so a degraded `plan.json` can still throw inside the view
+model build or inside `RenderPlan` - the builder copies the tree by
+reference, so a null child is only dereferenced when `RenderPlan` walks it.
+`RollBackFailedPlanRender` is shared with `Build()`'s guarded tail so a
+poisoned view model can never be committed on either path.
+
+Each thing the rollback restores is on the list for its own reason:
+
+- The tree controller's override/ignore/expansion baseline
+  (`ResetForNewPlan(null)`) and its per-render tree state, because the
+  restored result was adopted as `_lastResult` before the render was
+  attempted.
+- `_lastDebugLog` / `_currentPlan` / `_planGeneratedAt`, because a committed
+  view model that cannot render would re-throw out of `Build()`'s tail on
+  every later tab visit.
+- `_contentPanel`'s children, because a mid-build exception can leave a
+  partially-built plan parented in a live panel; `ResetContentPanelToEmpty`
+  sweeps it.
+- The status board's seeded staleness banner and its painted label text -
+  both skipped when `ClearRestoredSeed` reports a real Generate has raced
+  in, so a superseding generation's status is never clobbered.
+
+The catch is `catch (Exception)` on purpose: the rollback is the load-bearing
+part, and narrowing it would trade a vanished plan for a crash on every later
+tab visit.
+
+### V.10 `ApplyWheelWrapCorrection`: why cancel-then-direct-write
+
+Verified against the decompiled vendored Glide: `TweenerImpl.Tween` registers
+a new tween in the by-target dictionary synchronously, before returning - so
+by the time this handler runs, the wrong duration-0 tween is already
+registered and `TargetCancel` finds it immediately. `Tween.Cancel` nulls the
+`"ScrollDistance"` lerper slot synchronously, so even an `Update()` that runs
+before removal skips the write: the wrong step never lands, rather than being
+canceled one frame late.
+
+That is why the shape is cancel-then-direct-write rather than a counter-tween
+or a deferred correction, either of which would add a wrong frame this
+mechanism does not have. (`Scrollbar` itself never calls `TargetCancel`;
+rapid `ScrollAnimated` calls overwrite each other via `Tween`'s default
+overwrite parameter, an internal-only path.)
+
+Section 2 above covers the vendored `WheelDelta` defect this corrects.
+
+### V.11 `PlaceTreeToolbarRow`: the collapsed row, and publishing the cluster
+
+The strip's arithmetic collapses the toolbar row entirely when it is hidden,
+which puts its Y exactly on the status row. A full-height panel left there
+would sit over the top few pixels of the scrollable content area, so a hidden
+row is given zero height as well as `Visible = false` and cannot intercept
+anything even if Blish's hit-testing ever stopped honouring `Visible`.
+
+Publishing where the button cluster starts matters because the two clusters
+share one row and only this method knows its width. A left cluster laid out
+without that number is a left cluster laid out over the buttons - which is
+exactly what the chips did before `TreeChipStripLayout.Fit` existed.
+
+### V.12 `PreserveScrollAcrossResize`: why the reset lands a frame late
+
+Confirmed by decompiling the vendor assembly
+(`packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe`,
+`Blish_HUD.Controls.Scrollbar` and `Panel`):
+
+`Scrollbar.RecalculateLayout` caches
+`_scrollbarPercent = ContentRegion.Height / containerLowestContent` and zeroes
+`ScrollDistance` (and, via `UpdateAssocContainer`, `VerticalScrollOffset`)
+whenever that ratio differs from the previously cached value.
+`RecalculateLayout` runs from two places:
+
+1. Synchronously, nested inside `Panel`'s own `"Height"` `PropertyChanged`
+   handler - `UpdatePanelScrollbarOnOwnPropertyChanged` sets
+   `_panelScrollbar.Height`, itself a `Control.Height` write that
+   invalidates/recalculates the scrollbar. But .NET's `PropertyChanged` event
+   fires BEFORE `Control.Size`'s own
+   `OnPropertyChanged("Height", invalidateLayout: true)` call to
+   `Invalidate()`, so this nested call runs before `Panel`'s own
+   `RecalculateLayout` has refreshed `ContentRegion` for the new size, reads
+   the STALE (pre-resize) `ContentRegion.Height`, and sees no change.
+2. Once every real engine frame, unconditionally, from `Scrollbar.DoUpdate`'s
+   own `Invalidate()` call. By the time THAT runs, `ContentRegion.Height` has
+   already been refreshed - the panel's own `RecalculateLayout` ran
+   synchronously earlier in the same `Height`-setter chain - so it now sees a
+   genuine change and resets.
+
+Net effect: the reset lands on a later real frame, typically the next one,
+not synchronously inside the tick's `Size` write. This is the same
+delayed-reset window `ApplySavedScrollSynchronously`'s class doc describes
+for rebuilds, and the reason `StartScrollVerify` exists there.
+
+A per-tick verify window is deliberately not used: it would spawn (or
+cancel-and-replace) a `FrameTicker` on every single drag frame, and the
+per-tick synchronous write already keeps each tick visually correct without
+one. The bounded window is armed once, at drag settle.
+
+### V.13 `ReplayRelayout` and `ResizeSettleStep`: the drag-frame budget
+
+`SuspendLayout`/`ResumeLayout` around the replay is about comparison cost.
+For a long shopping list or a deep tree, replaying dozens of per-row closures
+in a single tick without it would trigger that many redundant full sibling
+reflows in the same frame (the `O(rows^2)` risk raised as m2 risk 2). The
+coalesced reflow is a no-op for vertical position anyway, because these
+writes only ever touch `Width`/`X` - row heights stay fixed, and
+`SingleTopToBottom` flow positions children from cumulative `Height`.
+
+The perf caveat on `ReplayRelayout` is real and stated inline: this shape
+replaced a ONE-TIME dispose+rebuild 150ms after the drag settled with a full
+replay of `_relayoutActions` on EVERY real drag frame. That is a genuine
+change in perf character, not just a different trigger, and the mitigation
+above is reasoned rather than measured - no live drag-resize check on a
+large, fully-expanded plan (deep tree plus long shopping list) has been
+performed against a running Blish instance.
+
+`ResizeSettleStep` defers only the MEASURE half, and only because
+`MeasureString` is comparatively expensive to run on every tick across a long
+list or deep tree. The visible cost of deferring it is small: truncated text
+stays unchanged mid-drag and is corrected once the drag settles.
+
+### V.14 `TriggerGenerate`: why the resolution await lives in the wrapper
+
+The await could have gone inside `GenerateFromResolvedRows`, and that is the
+version this replaced. It cannot: `IItemSearchProvider` may complete
+asynchronously, Blish's host installs no `SynchronizationContext` (section 1
+above), and everything after such an await would therefore run on a
+ThreadPool thread - while the generate body touches controls from its first
+line. Keeping the await in a thin wrapper puts exactly one marshal hop
+between the resolution and a body that has no async seams of its own.
+
+### V.15 `SetGenerateInputsEnabled`: the run it was added for
+
+The Generate button used to be the only control disabled for the length of a
+run, which left "Use Own Materials" clickable while a plan was still
+generating - and its confirm callback starts another generation. Two runs
+then shared one `ItemMetadataService`, which is a data race, and
+`_generateSequence` does not help: it makes the last result win, it does not
+stop the redundant work. `ItemMetadataService` is now internally locked
+(`_cacheLock`), so this is no longer a crash guard; it is the single-flight
+rule that stops the redundant run from starting at all.
+
+### V.16 `SpinnerTick`, `CreateSectionHeader`, `CreateRequiredRecipesSection`
+
+`PlanStripTickAction.RenderFinalAndStop` is what makes "the board reports
+finished, so render final status and stop" true without any separate
+completion-callback write into this control ever being needed. The tick reads
+the board; nothing writes back into the tick.
+
+`CreateSectionHeader`'s `suppressToggle`/`suppressPress` pair has exactly one
+remaining user: Required Recipes' "Hide Unlocked" checkbox, the only
+interactive control left in any section header now that the Recipe Tree's
+five buttons moved to the non-scrolling strip (see `TreeToolbarCommands`).
+
+Toggling that checkbox re-renders through `RenderPlan(_currentPlan)` - the
+same full rebuild path a pill click's local re-solve and a fresh Generate
+both already use - rather than inventing a second, parallel relayout
+mechanism for one section.
+
+### V.17 `DisciplinesSectionRenderer`: one column X for the whole section
+
+A per-row X, varying with each discipline name's width, could never line up
+with a single header position - which is why the character-availability
+column had none. Computing one column X for the whole section fixes that
+without touching `rowHeight`, `PlanContentHeightMath` or `PlanRelayoutMath`:
+`NameMaxWidthBeforeColumn`'s existing 20px floor still clamps the ellipsis
+width on narrow panels exactly as it did before.
+
+The "Characters" header is added only when at least one row actually has
+availability text under it. In practice a section is never both null and
+non-null (see `BuildCharacterAvailabilityText`'s own doc comment), but the
+check walks all rows rather than assuming that.
+
+### V.18 `FeedbackButton`: what `StandardButton` measurably does not do
+
+Measured from the vendored Blish HUD 1.3.0 binary with `ilspycmd`:
+
+- **Hover works and is left alone.** `OnMouseEntered`/`OnMouseLeft` tween
+  `AnimationState` 0 to 8 over 0.25s, stepping through the
+  `common/button-states` atlas. The override paints from the same atlas via
+  the same public `AnimationState`.
+- **Press does nothing.** There is no `OnLeftMouseButtonPressed` override and
+  no pressed frame in the atlas walk, so the button looks identical held down
+  as hovered.
+- **Sound is silently dead.** `OnClick` calls
+  `PlaySoundEffectByName("audio\\button-click")`, but `ContentService`'s audio
+  reader is already rooted at `ref.dat`'s `audio` folder, so the lookup
+  becomes `audio/audio/button-click.wav`, fails the `FileExists` check, and
+  returns silently. `Checkbox` and `GlowButton`, which pass the unprefixed
+  `"button-click"`, are audible.
+
+The press and sound gap is supplied by `PressFeedback`. If a later Blish
+release fixes the double-prefixed path, this button will play the sound twice
+on a completed click and the `PlayClick` call in `PressFeedback.Wire` is what
+to drop.
+
+**Why the paint is overridden rather than the control replaced.** The four
+limits all live in `StandardButton.Paint` and `RecalculateLayout`, both
+virtual. Everything ABOVE them - the hover tween, the click event and its
+`Enabled` gate, the tooltip plumbing every one of this module's buttons
+relies on, focus, opacity, and the whole `Container`/`Control` lifecycle - is
+inherited free, and is the part that would have to be rebuilt, and kept
+rebuilt, by deriving from `Control` instead. The button art is Blish's own
+(`common/button-states` and `button-border`, both reachable through the
+public `GameService.Content.GetTexture`), so painting it costs two texture
+handles and no fidelity.
+
+The four limits in full:
+
+1. **No `Font`.** `StandardButton` draws in `DefaultFont14` and exposes no way
+   to change it, so a button could not sit on this module's type ramp and
+   could not carry a glyph from the shipped glyph font (`ref/glyphs.fnt`) at
+   all.
+2. **Text colour is forced.** `Paint` assigns `_textColor` on EVERY frame, so
+   a colour written from outside is overwritten before it is ever drawn.
+3. **Icon is blitted untinted**, onto button art whose face samples about
+   (200,193,175). Blish's own white affordance textures - 733269/733270, the
+   matched X pair - are therefore invisible on a button, which is the measured
+   reason Plan History reached for a `Checkbox` instead of a button wearing an
+   icon.
+4. **An icon-only button's icon is off centre by construction.** With no text,
+   `StandardButton` seats it at `Width / 2 + 8 - iconWidth - 4` - the `+8` is a
+   text gap being paid for when there is no text - so it sits 4px right of
+   centre at every width.
+
+### V.19 `GlyphFont.Merged`: why one font rather than two labels
+
+The sort indicator is part of the header's own `Label.Text`, which is what
+lets every right-aligned header keep tracking its column: the relayout
+closures right-align off a width that already includes the indicator. A
+separate glyph `Label` beside the title would have meant re-deriving nine call
+sites' worth of column arithmetic. One merged font means every existing
+`MeasureString` keeps measuring the whole string correctly and no call site
+learns anything new - which is worth the handful of extra texture switches per
+frame the split texture pages cost.
+
+### V.20 `HeaderBands`: why a band, and why a factory
+
+Four of the plan tab's five original headers already drew a band, so unifying
+the other way would have rewritten the majority to match the minority. Every
+table row in this module also carries a 2px divider and, in most tables, an
+icon, so an unbanded header in a lighter grey reads as a faint first data row
+rather than as a header.
+
+The factory shape is a response to a measured failure. `HeaderBands`'
+predecessor exposed the band colour as a constant and let eight call sites
+each build their own `Panel` from it; seven of the eight did, and only one
+went through a shared renderer - the same opt-in-helper failure the module
+already paid for on icon sizes.
+
+### V.21 `HoverChainResync`: the clicks it does and does not fix
+
+Every click in the plan view that rebuilds what it was clicked on hits the
+frozen hover chain: a decision pill re-solves and rebuilds its own row, a sort
+header re-renders the table it labels, a caret rebuilds the subtree under it.
+The replacement control lands under a stationary cursor with
+`MouseOver == false` and no `MouseEntered` fired, so the pill the user is
+pointing at reads as un-hovered until they jiggle the mouse - and this
+module's own `AnyPillHovered` guard, which asks the same question, answers
+wrongly in the meantime.
+
+A LOST click is a different, also-measured mechanism, and this section is the
+one place it is stated. `MouseHandler` buffers exactly ONE pending mouse event
+(`_mouseEvent`, overwritten by the hook thread and consumed once per
+`Update`), and `Control.OnLeftMouseButtonReleased` only raises `Click` when
+that same control INSTANCE was primed by its own press. A frame long enough to
+contain both halves of the next click drops the press, so the release finds
+nothing primed. The answer to that is to make the rebuild frame short, which
+is `TreeSectionController.TryRefreshInPlace`'s job - not this type's.
+
+### V.22 The `Views/Rendering` seams
+
+Shared row-construction helpers with several callers (`TextRowRenderer`,
+`ColumnHeaderRowRenderer`, `RowRelayoutHelpers`, `IconNameRowHelpers`) take
+`ISectionRelayoutSink` as a method parameter rather than as a
+constructor-injected field, because none of them is itself a section renderer
+and none of them has a per-render lifetime to hang a field on.
+
+`ITreePlanHost` is one named interface rather than a list of constructor
+delegates because the callbacks are semantically one collaborator, and because
+a named member is the only thing that makes a particular swap unexpressible:
+two of them used to share the type `Action<PlanViewModel>` with opposite
+meanings (render vs. assign-field), so transposing them compiled. It also
+gives a new tree feature one place to grow instead of four. `CraftingPlanView`
+implements it explicitly, the same way it implements `ISectionRelayoutSink`,
+so nothing there widens that class's public surface.
+
+### V.23 The icon contract: `IconControls`, `ItemIconTooltip`, `IconNameRowHelpers`
+
+All three halves of `CreateItemIcon`'s no-defaults rule exist because all
+three were opt-in before and all three silently drifted: eleven call sites
+each chose their own pixel size, a call site with no rarity to hand looked
+identical to one that had looked and found none, and an icon with no hover
+looked identical to one that had decided against showing one.
+
+`ItemIconTooltip` is the same treatment `ItemIconFrame` gives the frame colour
+and `ItemIconTier` gives the size. A trailing default could be omitted, and
+omission looked exactly like a deliberate decision not to show one - which is
+how the Plan History tab shipped with item icons that answered nothing at all.
+A factory name is what a diff shows.
+
+There is deliberately no eager or plain-text twin of
+`ApplyRichDeferredToIconTree`, because either would be a way to give an icon a
+hover without saying so at the call site.
+
+`IconNameRowHelpers.CreateIconAndEllipsizedName` threads
+`rightEdge`/`qtyWidth`/`nameGap` into `PlanRelayoutMath.NameMaxWidthBeforeColumn`
+exactly as each pre-extraction caller computed them inline; the helper changed
+where that arithmetic is called from, not the arithmetic.
+
+### V.24 `InlineSpinner`: the decompiled `LoadingSpinner`
+
+Measured from the vendored Blish HUD 1.3.0 binary
+(`packages/BlishHUD.1.3.0/lib/net472/"Blish HUD.exe"`, decompiled with
+`ilspycmd`): `Blish_HUD.Controls.LoadingSpinner` is a plain public `Control`
+with a parameterless constructor whose only body is `Size = 64x64`, and whose
+`Paint` hands its own bounds straight to
+`LoadingSpinnerUtil.DrawLoadingSpinner`. That helper draws one 64x64 source
+frame of the `spinner-atlas` texture (4096x64 in `ref.dat`, i.e. 64 frames)
+into whatever destination bounds it is given, so the control scales to any
+size. The frame index is
+`GameService.Overlay.CurrentGameTime.TotalGameTime.TotalSeconds * 21.333 % 64`
+- global game time, not per-control state, so the animation costs no ticker
+and starts mid-cycle rather than at frame 0.
+
+### V.25 `ItemStatWarmer`: the gap it closes
+
+Warming is what closes the gap between "this row knows its name, icon and
+rarity" and "this row shows the same tooltip the game does". Without it a tab
+handed only the pure-read cache accessor shows the identity-only fallback for
+every item no earlier plan happened to touch.
+
+### V.26 `LabelHelpers`: the row-divider scissor derivation, and `WithDescenderClearance`
+
+The 1px-to-2px change came first. Blish applies its UI scale (for example the
+"Normal" GW2 UI size's 0.897) as a real GPU scale matrix, not an
+integer-pixel-snapped one, so a 1px-tall quad rasterizes to 0.897 physical
+pixels - guaranteed physical coverage `floor(0.897) = 0`, i.e. it can
+disappear entirely depending on scroll-offset sub-pixel alignment
+(KNOWN-ISSUES #23). At 2px, `floor(2 * 0.897) = 1` guarantees at least one
+covered physical scanline for the divider's OWN quad-vs-scissor math analyzed
+in isolation.
+
+That isolated argument turned out to be necessary but not sufficient. The row
+panel is itself a `Container`, and every `Container.Paint()` performs a SECOND,
+independent floor/ceil round trip: it unscales the physical scissor it was just
+given back to logical space (`ScaleBy(1/UIScaleMultiplier)`) before
+re-intersecting and re-scaling it for its own children (`Container.cs:377-381`,
+`Control.cs:1176-1177` in the decompiled Blish HUD binary). That round trip can
+shrink the clip rectangle propagated to the divider by exactly 1 logical pixel,
+but provably only at the row's BOTTOM edge - the reconstructed START never
+exceeds the true start, since `floor(floor(Y*s)/s) <= Y` for any positive scale
+`s`.
+
+Whether that 1px shrink actually deletes the divider depends on `rowHeight`.
+Simulation across every `rowHeight` then in the file and all four GW2 UI Size
+scale factors (0.81 / 0.897 / 1.0 / 1.103) showed the pre-tier-2 44px rows
+(`CraftStepRowHeight` of the day) and 32px rows (`DisciplineRowHeight` of the
+day) vanish completely - 0 physical scanlines - at about 10.2% of scroll phases
+at the default scale, while the pre-tier-2 36px rows were immune at every
+tested scale.
+
+The fix is `bottomClearance`: an extra logical pixel of gap between the divider
+and `rowHeight`, so `Location.Y = rowHeight - 2 - bottomClearance`. That moves
+the divider's own interval entirely inside the worst-case-shrunk clip window,
+which simulation confirms is immune (0/5000 vanishes) for every
+(`rowHeight`, scale) pair tested - proven, not merely observed clean at one
+scale.
+
+The tier-2 re-run, after the owner icon ruling grew the plan tab's icon-led
+rows to 45px (Used Materials / Shopping / Required Recipes: flush tier-2 frame
+plus divider) and 52px (Crafting Steps): the simulation, re-derived from the
+decompiled `ScaleBy` floor/ceil semantics and validated by reproducing the
+numbers above, shows BOTH new heights are in the vulnerable class at clearance
+0 (45px: 18.0% of phases at 0.81, 7.0% at 0.897; 52px: 10.3% at 0.897) and
+immune at clearance 1 at all four scales. The flush fit survives because the
+tier-2 heights absorb the clearance pixel in their own derivation:
+`42 + 2 + 1 = 45` puts the divider at 42..44, exactly under the 0..42 icon
+frame. The proof is executable - `RowDividerScissorSimulationTests` sweeps
+every shipped (`rowHeight`, `clearance`) pair at all four scales and fails on
+any vanish - so a future height change re-runs it by construction.
+
+That proof is a transcription of the decompiled 1.3.0 paint pipeline rather
+than an invention, and each step names its source: `RectangleExtension.ScaleBy`
+floors X/Y and ceils W/H after a float32 multiply; `Control.Draw` sets the
+physical scissor to `Intersect(logicalScissor, bounds).ScaleBy(uiScale)`;
+`Container.Paint` unscales that physical scissor back to logical space with
+`ScaleBy(1/uiScale)` before re-intersecting and re-scaling it for each child
+(the second, independent round trip named above); and the GPU rasterizes a
+physical scanline of the divider quad only when the scanline's center lies
+inside the quad's scaled interval. A divider "vanishes" at a scroll phase when
+no rasterized scanline survives the scissor.
+
+The model earns its authority over the shipped geometry by first reproducing
+the measured past: the vulnerable 44px and 32px rows at the 0.897 "Normal"
+scale and the then-30px section header at the 0.81 "Small" scale (the scale of
+that session's live pixel scans), at the same ~10.2% vanish rates published
+above, and the immune 36px rows. A model that cannot reproduce the
+live-verified past has no authority over the present.
+
+`WithDescenderClearance` pins `VerticalAlignment` to `Top` for a related
+reason. `Blish_HUD.Controls.Label.VerticalAlignment` is a public settable
+property whose default this module does not control; if it were `Middle`,
+growing a box by 2 would push its glyphs down by 1 while an unswept sibling on
+the same row stayed put, and a ragged baseline inside one sentence ("Craft 12x
+" plus an item name) is worse than the clip the sweep fixes.
+
+### V.27 `PlanHeaderRenderer`: the three things that used to compete
+
+The header block was CENTRED while everything under it was left-aligned, so
+the plan had no single left edge. It carried a right-aligned "Generated: ..."
+panel duplicating - to the minute - the timestamp the fixed status strip 70px
+above already shows, so an opened plan said the same thing twice. And its
+title shared `DefaultFont18` with every collapsible section header, leaving
+the page with no typographic top level at all.
+
+So: the in-scroll timestamp is gone (the strip keeps it, and it never scrolls
+away), the title is left-aligned at `DefaultFont32`, and `CreateSectionHeader`
+drops to `DefaultFont16`. The "Crafting Plan for " prefix went with the
+timestamp - the tab is already titled "Crafting Plan" and the strip already
+says "Plan generated", so the prefix cost half the title's width to repeat
+what two other elements say.
+
+### V.28 `PressFeedback`: why `Opacity` and not the site's own colour
+
+A helper that wrote to the same properties the sites' own hover vocabularies
+use - `BackgroundColor` for a decision pill, `TextColor` for a sortable
+header, a different translucent wash for a tree row and for a section header -
+would have to capture and restore a resting value that the site's own
+`MouseLeft` handler is also writing, making correctness depend on which
+handler was subscribed first. `Opacity` is touched by nothing else on any of
+these controls.
+
+`AbsoluteOpacity()` walking the parent chain is also what makes the dim
+legible on a target whose own background is transparent: dimming the panel
+dims its label and icon children with it.
+
+### V.29 `RichTooltipSurface`: the measured canvas
+
+The 0.98 multiplier is Blish's own on the "tooltip" texture (decompiled 1.3.0)
+and independently the live client's: fitting
+`composite = s*artAlpha*artRGB + (1 - s*artAlpha)*scene` to two clean interior
+patches of `live2/k-2` puts `s` at 0.98 and 1.00, residual std about 1
+quantisation level (fidelity-audit, 8.4 closure). Those same patches correlate
+with the texture at `r = 0.983` at the predicted alignment, which is what
+settles that the background is textured rather than flat.
+
+The audit's F5 note suggested 0.82. That number belonged to the flat FILL,
+whose constant carries its own coverage; the texture's alpha channel (mean
+about 0.80) already supplies the transparency, so scaling it again would land
+the box near 0.66 coverage and fail audit H6's no-legible-bleed requirement.
+Measurement wins.
+
+### V.30 `ShoppingBadgeColors`: why only two hues
+
+Every badge used to render in `PillKind.Locked`'s recessed grey, so the column
+said WHICH source only to a reader who stopped to read four capital letters on
+every row. Two hues fix that without spending the accent budget. Reusing an arm
+of `PillColors` would have diluted a vocabulary the tree depends on - green
+means selected, blue owned, amber ignore-active, and none of those means "go to
+a vendor".
+
+### V.31 `SummarySectionRenderer.CreateFormulaBand`
+
+`PlanViewModelBuilder` groups `CostFormulaTile` and `ProfitFormulaTile`
+separately and `Render` re-groups by that same `RowType`, so two bands render
+as two stacked tile rows rather than one: the cost band at
+`SummarySectionLayoutMath.CostBandHeight`, the profit band at
+`PlanContentHeightMath.CostTileRowHeight`.
+
+A lone tile centred on a full-width band reads as a stray caption floating in
+whitespace, and it is the only tile in the section that aligns with nothing
+else in it - the currency table's icon column, the footnote and every section
+title all start at the left. So a collapsed one-tile band is left-aligned at
+the section's own content gutter, keeps the same band height as the three-tile
+case, and simply starts where everything else in the section starts.
+
+Every tile's amount renders at the SAME font; the result tile is picked out by
+`highlightResult` instead, with a tinted, semi-transparent box around its
+caption, note and amount. A promoted `DefaultFont32` was tried and broke the
+band's visual balance. The box is a real `Panel` and the result tile's controls
+are its CHILDREN, so the fill is painted behind them by the container's own
+paint order - no z-index games - and a resize moves one control instead of
+re-centring three runs. Amounts hang one
+`PlanContentHeightMath.CostTileLabelToValueGap` under the measured caption
+line, in every band, so the distance between a caption and the number it names
+is that constant rather than whatever a fixed row height happened to leave
+over.
+
+`currencyNoteText`, when non-null, draws a small disclosure line under the
+RESULT tile's AMOUNT: the plan has costs the coin figure does not include. It
+hangs below the run rather than sitting between caption and run, so it cannot
+push the other tiles' amounts down - they share one `amountY`.
+
+The `-` and `=` operators between tiles are small dim `Label`s centered on each
+boundary, with no tooltip so they never steal hover; without them, same-shaped
+tiles have no visible relationship. They are never drawn for a collapsed
+one-tile band. Only the FINAL boundary's symbol is conditional: there is only
+ever one non-final boundary (`tileCount == 3`), and the left two tiles' own
+subtraction is never in question - only whether the final result tile's
+displayed value is the true right-hand side, which it is not in the profit
+band's loss case.
+
+### V.32 `TooltipFacility`: one surface, and where content lives
+
+Measured, KNOWN-ISSUES #41: `Control.Dispose` does not dispose the control's
+`Tooltip`, and the `Tooltip` is not the control's child, so nothing in Blish
+ever tears one down. A per-control instance on controls this module rebuilds on
+every render would therefore leak one container plus its child tree per row per
+render - hence exactly one rich surface for the whole module, repointed on
+hover.
+
+Content is held in a `ConditionalWeakTable<TKey,TValue>` keyed by the control,
+so the facility never holds a control alive and a disposed row's content is
+collected with it.
+
+`ApplyPlain` routes through `TooltipTextFormat`, the wrap seam this facility
+inherits from the tier-1 tooltip work. `ApplyRich` exists for anything a string
+tooltip could only spell out as "1g 23s 45c", and for every item hover.
+
+### V.33 `TreeSectionController`: heights, in-place refresh, and the pill column
+
+`RefreshTreeContainerHeights` replaced `InvalidateUpToContentPanel`, which only
+repositioned siblings and relied on Blish's `AutoSize` convergence - one nested
+level per real frame - to eventually grow or shrink ancestor containers to
+match. That convergence window was the direct cause of KNOWN-ISSUES #12/#14's
+multi-frame windows.
+
+`TryRefreshInPlace` exists because of the mechanism stated in V.21 above:
+`MouseHandler` holds exactly one pending mouse event and
+`Control.OnLeftMouseButtonReleased` raises `Click` only when that same control
+INSTANCE was primed by its own press, so a frame long enough to contain both
+halves of the next click loses the press. A decision pill's click used to
+re-solve and rebuild every control in the plan, which is what turned into the
+reported "rapid IGNORE toggling drops clicks". Ignoring a LEAF material - the
+common case, and the one the field report is about - passes the gate.
+
+The pill column's budget is exceeded because `DecisionPillPlanner.AppendOwnershipPills`
+unconditionally adds an "IGNORE" pill, plus "USING N OWNED" when applicable, to
+every ordinary node, on top of its 1-3 source pills. The row cannot grow to
+absorb them: `TreeRowHeight` is a fixed per-row height shared by every
+layout/scroll-height calculation in that file, so there is no wrap and no
+second line. Before `ComputePillFit`, trailing pills were simply dropped with
+nothing on the row to say they had existed - which is what the "+N" pill now
+says.
+
+That "+N" pill is deliberately not wired to a popup offering the hidden
+options. The hidden pills are almost always the trailing annotation and the
+IGNORE toggle, and a real affordance means a new popup or menu surface, with
+its own dismiss, focus and scroll behaviour, hanging off a case that tightened
+padding already resolves most of the time. The tooltip states the fact; the
+desktop gate decides whether the fact needs an affordance.
+
+### V.34 `TreeToolbarCommands`: why the buttons left the section header
+
+The Recipe Tree's action buttons used to sit in the tree's own section header,
+inside the scroll flow - so on a long plan, the moment Collapse All became
+useful was the moment it had scrolled off screen. The buttons moved out to the
+non-scrolling strip; the override/ignore state they act on could not follow,
+which is what this seam carries.
+
+The would-change predicates exist because a dialog that protects nothing
+teaches people to click through dialogs, and a click that changes nothing has
+to say so rather than silently re-solving.
+
+### V.35 `UiFonts`: the ramp and its Blish-facing edges
+
+The ramp is two reading sizes (`Caption` 14, `Body` 16) and three emphatic
+tiers above them (`ColumnHeader`, `SectionTitle`, `Display`), with weight doing
+as much of the work as size. Blish surfaces five sizes as `DefaultFontNN`
+properties; every other size in the installed Menomonia inventory (8-36, bold
+at 8-24 and 36) loads through `ContentService.GetFont`.
+
+Blish's own `Label` default is `DefaultFont14`, so a `Label` this module builds
+without an explicit `Font` renders one step below `Body`. Every label site
+therefore sets one. The three excluded control types stay at that default for
+their own reasons: `Checkbox` exposes no `Font` property at all, and `TextBox`
+and `Dropdown` have internal padding Blish authors against `DefaultFont14`
+while holding typed values rather than module prose.
+
+`FeedbackButton` used to be a fourth exclusion, because `StandardButton`
+exposes no `Font` either. It now declares `Caption` explicitly, so the button's
+size is a decision this ramp made rather than a Blish default it happened to
+match.
+
+### V.36 `UiMetrics.ButtonHeight`: how 28 was picked
+
+Three heights were in use across the tabs: 30 on the Snapshot tab's Clear Cache
+and Refresh Now, 28 on the Log tab's three buttons, Settings' Save and the
+plan's Generate Plan, and 24 on the plan's five Recipe Tree actions and its
+per-row +/- pair. 28 wins on button count, and it is the height of the one
+input row a button already shares - the plan's item row, whose
+`AutocompleteTextBox` and quantity `TextBox` are both 28, beside its +/- pair.
+
+It is not the module's input height, and the constant should not be read as
+having settled that question. `TextBox`es are 26 at nine of their eleven sites
+(Settings' six, the Snapshot and Log search boxes, About's), and the two
+`Dropdown`s outside the plan tab are 30, so the Log toolbar's run is three
+input heights wide before any button is placed.
+### 12.1 Two verdicts, two severities
+
+`PlanStore` mirrors `SnapshotStore`'s shape - single-file JSON, atomic
+`.tmp`+`Replace` write - with one deliberate divergence: an unreadable
+file is not silently swallowed to null the way `SnapshotStore`'s
+`Deserialize` is. It is logged first. A missing file stays silent, because
+"fresh start with no plan" is the ordinary first-run case rather than a
+failure.
+
+The two unreadable-file verdicts carry two different severities because
+merging them once cost a full forensic investigation (2026-08-23). A
+corrupt or otherwise unparseable file goes to `onError` at Warn, the same
+as every I/O failure; a file written at an older *shipped* schema version
+- expected, benign, and repaired by the next Generate - goes to `onInfo`
+at Info. Any caller wiring one and not the other silently drops half the
+story.
+
+`PlanStoreHelpers.DeserializePersistedPlan` is what makes that split
+possible: unlike `SnapshotHelpers`' silent-null precedent it does not
+swallow a parse or schema failure itself, but lets the exception
+propagate to `PlanStore.LoadLatest`'s single `try`/`catch`, which owns
+both callbacks. Its formatting is compact rather than indented, for the
+reason `SerializePersistedPlan`'s own doc comment gives.
+
+### 12.2 The gzip container
+
+The on-disk container is gzip: a large plan's compact JSON runs ~700 KB,
+and this file is rewritten on every override-resolve pill click, not just
+once per Generate. The `plan.json` name is kept as-is with no `.gz`
+rename - `LoadLatest` sniffs the first two bytes for the gzip magic number
+(`0x1F 0x8B`), so an existing plain-JSON `plan.json` from before this
+change (PR #107) still loads, and `Save` always writes gzip going forward.
+The payload schema is completely unchanged; only the container encoding
+differs, so every existing tolerance guarantee (truncated or corrupt data,
+one Warn, return null, never partial) is preserved by construction -
+decompression and JSON parsing both happen inside that same single
+`try`/`catch`.
+
+`PlanStore.Save` takes an internal lock, unlike `SnapshotStore`/
+`StatusStore` whose callers are already serialized by a higher-level
+in-flight guard (`Module`'s `_refreshInProgress`). It has two genuinely
+independent call sites - a Generate's own post-await persist, and a
+pill-click override re-solve's fire-and-forget background persist (see
+`Module.cs`'s `PersistAfterGenerateAsync`/`PersistResolvedPlanInBackground`)
+- which can race, because a decision pill on an old plan stays clickable
+while a new Generate is in flight. The lock is what stops two overlapping
+writers being mid-write to the same `.tmp` path at once.
+
+`PlanHistoryStore` serializes indented, following `RankerStore`/
+`SnapshotHelpers` rather than `PlanStoreHelpers`' compact choice: the
+index is single-digit KB and rewritten once per Generate, not per pill
+click, so the compact decision's rationale does not apply to it.
+
+### 12.3 What the structural validator guarantees
+
+`Services/PlanStructuralValidator.cs` walks the entire object graph a
+deserialized `PersistedPlan` carries, at the deserialization boundary,
+before the file is accepted at all. Every check it makes exists because
+some production path dereferences that exact field with no null guard, on
+an assumption that holds for every solver-*built* `CraftingPlanResult`/
+`PlanSolveContext` - those are only ever constructed by `PlanSolver`/
+`PlanResultBuilder`/`CraftingTreeBuilder`. A restored plan is the one path
+that bypasses the solver and hands the same types straight from disk into
+that trusted code, so the invariants are re-established once, centrally,
+instead of at each call site.
+
+Centrally, because several of those sites sit outside any `try`/`catch`:
+Expand All and the per-node toggle call `RenderTreeNode` straight from a
+click handler, on nodes a guarded initial render never visited because
+they were collapsed, and Craft All/Buy All walk the whole tree through
+`BuildPresetOverrides` before `ApplyOverridesAndResolve`'s catch is
+reached.
+
+### 12.4 What the shape hash last moved for
+
+`PersistedPlan.SchemaShapeHash` last moved for the currency tooltip work,
+which is purely additive: one string, `CurrencyMetadata.Description`,
+absent from an older file and left null by Newtonsoft, which drops the
+tooltip's paragraph and nothing else. A plan written before it still
+deserializes and `CurrentSchemaVersion` stays at 3. A bump now costs a
+re-solve rather than the plan, but it still costs one.
+
+It does cost bytes. The persisted `CurrencyMetadata` is the whole
+`/v2/currencies` reply, so every saved plan grows by the descriptions of
+all 79 currencies - measured 2026-08-28 at 8.5 KB raw, ~2.5 KB gzipped,
+per plan blob.
+
+---
+
+## S1. Services A-P: relocated design narrative
+
+Derivations, histories and investigations moved out of over-length XML doc
+comments under `Services/` (A-P) and `Models/`. Each subsection is cited by
+the comment it came from; the comment keeps the invariant a caller can
+violate, and this is where the "how we got here" lives.
+
+### S1.1 The logging system: one ring, one file sink, two locks
+
+`Services/ModuleLog.cs` is an ordinary instantiable class rather than a
+static one so tests can construct isolated instances (`new ModuleLog()`)
+with deterministic, non-shared state regardless of xUnit's default
+cross-class parallelism. Production call sites use the single app-wide
+`Shared` instance instead of threading a `ModuleLog` dependency through
+every constructor - deliberately the "static-or-singleton" shape
+`dev/proposals/d2-log-system.md` section 4.1 describes, resolved as a
+singleton-by-default instantiable type specifically so it stays testable.
+It is Blish-free for the same reason `ModuleLogEntry` is, and the Log tab
+reads the ring on its own `Version` poll rather than through a push
+callback - the same producer/consumer separation `Module.cs` already uses
+for its own dirty-flag fields.
+
+**Why two locks, and why `Write` never touches disk.** `_gate` guards the
+in-memory ring and `Version` - fast, pure in-memory work, taken by every
+`Write` and by `Snapshot()`. `_fileGate` guards the attached file sink -
+slow, real disk IO. `Write` hands its entry to a single-consumer background
+flush queue rather than performing IO itself, so neither lock, and
+therefore neither the Log tab's per-frame `Version` poll nor any other
+caller's ring access, can ever block behind file IO regardless of which
+thread called `Write` or how large the file has grown. That was a real
+live hazard before the split: the `[scrolldiag]` Debug channel calls
+`Write` on the main thread from inside `CraftingPlanView`'s
+frame-timing-sensitive scroll-verify loop, so any synchronous disk IO
+inside `Write` - never mind an occasional full-file read+rewrite trim -
+would stall that exact frame. `Write` checks `_store` as a volatile field
+read for the same reason: taking `_fileGate` to find out whether a sink
+exists would reintroduce the stall against a different lock.
+
+`SeedFromStore` is the one path that holds both locks, always `_fileGate`
+then `_gate`. It holds `_fileGate` for the whole read+seed, serializing
+against the background flush loop and against `PruneOlderThan` so the read
+can never race a concurrent file write or rewrite, and nests `_gate` only
+around the ring-append portion, serializing against a concurrent `Write`'s
+own ring append from a background continuation during startup (the build-ID
+fetch's `Task.Run`) - without which a brand-new entry could land in the ring
+chronologically *before* the seeded history. Every other path holds one lock
+at a time, so nothing can complete the opposite ordering and deadlock. It
+resolves d2 section 7's Open Question 2 as yes: pre-session history is
+visible on first tab-open, not just "since this launch".
+
+`DeleteFileAndReset` (d2 section 7, Open Question 4) starts with a brief,
+bounded spin-wait drain of the pending flush queue so entries queued before
+the call land in the file before it is deleted rather than resurrecting it
+afterwards. Best-effort: an entry still in flight past the budget - a hung
+disk - can land in the recreated file, which is a stale line in the new log
+rather than a correctness hazard, and in practice the queue is empty at the
+moment a user clicks the button, so the common cost is zero. Clearing only
+the view floor would let `SeedFromStore` resurrect every entry next session;
+deleting only the file would leave this session's ring intact - hence both
+halves.
+
+`Services/ModuleLogStore.cs` writes JSONL rather than one big JSON array
+(the `SnapshotStore`/`StatusStore`/`VendorOfferStore` shape) because a log
+is fundamentally append-heavy: a crash mid-append to JSONL loses at most the
+last, tolerated-as-partial line, whereas a crash mid-write to one big array
+can corrupt the entire file. Rotation is split into two independently
+callable, independently testable operations rather than d2's single combined
+`RotateIfNeeded(maxBytes, maxAgeDays)`, matching how they actually fire at
+different cadences. Every public method has its own internal try/catch and
+calls its own `onError` rather than propagating, which is why
+`ModuleLog.Configure`'s `onStoreError` parameter is defence-in-depth rather
+than the error path a caller should expect to see fire.
+
+### S1.2 Shared layout laws
+
+`Services/GridLayout.cs` states the column-grid law once. It was stated
+three times before the class existed - `SnapshotItemGridLayout`,
+`SettingsCurrencyGridLayout` and `ColumnBoardLayout` each carried their own
+`ComputeColumnCount` and `ComputeColumnWidth` with character-identical
+bodies - and the copies had already drifted apart once and been re-synced by
+copying again, leaving a note that pointed a reader at a sibling's prose
+rather than at shared code. Grid geometry meant to agree now agrees by
+construction.
+
+`Services/JustifiedColumnTracks.cs` was written for the currency table,
+whose packed stack left ~1000px of nothing between a currency's name and its
+first number with no anchor for the eye between them. The Plan History table
+had the same shape and the same complaint, so the arithmetic lives in one
+place rather than two: a second copy is how two tables that are supposed to
+read alike drift apart. Right-aligning a header and its cells to a shared
+edge also lines them up, but only at that edge - a short header over wide
+cells then reads as belonging to the column on its right, which is why the
+tracks centre instead. `Services/PlanHistoryRowLayout.cs` is that law applied
+to one row.
+
+`Services/LogGutterLayout.cs` replaced one worst-case prefix *template* -
+the widest level word, a widest-digit stamp, and a fourteen-`w` tag
+allowance, measured once and applied to every row at every width whatever
+the rows actually contained. The template existed for a real reason,
+recorded on `LogTabContent.FullPrefixWidth`: the incremental append path
+sees only the new entries, so a width derived from what it can see would
+drift from what a full rebuild produced. That is answered rather than
+reverted - the view holds the widest rendered tag as a monotonic high-water
+mark per render generation, so both paths agree by construction while the
+band still tracks the content.
+
+### S1.3 Icon tiers: measured from the game
+
+`Services/ItemIconTiers.cs` and `Services/CurrencyIconTiers.cs` hold two
+sizes each, matched to the game's own two inventory and two wallet tiers
+(owner rulings, 2026-08-26 and 2026-08-27). Both are Blish-free so the
+layout math that reserves room for an icon and the view that draws it read
+the same number.
+
+**Item tiers**, measured from the staged references against in-game tooltip
+text (~14px, the same class as `UiFonts.Body`, so game pixels at default UI
+scale read 1:1 as module logical pixels): `bag-icon-size-reference.png`
+shows a main bag grid at ~59-60px slot pitch with ~54-56px of slot art;
+`bag-sidebar-icon-size-reference.png` shows the bag side bar at ~44px pitch
+with ~39-40px of art - a sidebar-to-slot art ratio of ~0.72.
+
+**Currency tiers**, measured from `gate-ranker/currency-wallet-list-reference.png`
+and `gate-ranker/currency-summary-bar-reference.png`. Calibration follows
+the tooltip fidelity audit's method - a capture counts as native only once
+one of its metrics is shown to match a known native one - but lands a far
+tighter anchor than that audit's text pitch can. The live gold-coin currency
+texture (asset 156904) is 32x32, and template-matching it against the wallet
+list row is pixel-exact at scale 1.000: mean squared error 2.0 over the
+texture's opaque pixels, against 887 and 1176 one pixel either side. A
+capture cannot match an unresampled source that closely unless it is native
+1:1, so game pixels read 1:1 as module logical pixels - the same conclusion
+the item tiers reached, independently corroborated by the bag sidebar
+measuring the same 44px pitch in this capture as in its own reference.
+
+**Where the icon sits**, measured at both currency tiers: the box is centred
+on the number's *ink* rather than sitting on the baseline - list tier, icon
+box y178..209 (centre 193.5) against the "841" glyph ink y188..198 (centre
+193.0); bar tier, box y114..129 against ink y115..126, within a pixel at
+half the size. That is the rule the renderers spell as
+`iconYOffset = (textHeight - iconSize) / 2`, recorded here so it need not be
+re-derived from a screenshot.
+
+### S1.4 Item tooltips: what the API says and what the game shows
+
+`Services/ItemStatBlockFactory.cs` is where every "what does an absent field
+mean" decision is made, so the composer downstream only renders facts.
+Stat-*selectable* items (non-empty `stat_choices`) record only how many
+combinations exist: computing numbers for one nominated combination is
+possible - see `Services/ItemStatMath.cs` - but *which* one is an open
+judgment call (KNOWN-ISSUES #40, Q4), and it is the only thing in this
+feature that would need a `/v2/itemstats` request.
+
+**Bindings.** `ResolveBindings`' independence rule and its bare-versus-"on
+Use" wording come from captures: relic-livingcity 104938 (2026-08-26) shows
+"Account Bound" and "Soulbound on Use" stacked on one item (AccountBound +
+SoulBindOnUse), which is what rules out a most-specific ladder. Within a
+dimension the stronger flag wins - live3 almonds 12337 and fury-scorched
+86967 both carry AccountBound *and* AccountBindOnUse and render one account
+line. Five captures carry a bind-on-acquire flag and read bare: Gift of
+Twilight 19648 (the 2026-08-27 owner A/B, the same item hovered in the
+module and in the game), heart-of-destroyer 67017 and holographic-wings
+79157 - all AccountBound + AccountBindOnUse, all bare "Account Bound" -
+relic-livingcity 104938, and red-festival-lantern 68638 (SoulbindOnAcquire +
+SoulBindOnUse, bare "Soulbound"). The "on Acquire" wording appears on
+exactly two captures, almonds 12337 and fury-scorched 86967, and both are
+*material storage* hovers, where the copy shown is not bound to anyone yet.
+Which copy the player is looking at is instance state `/v2/items` cannot
+carry, so the majority-and-A/B wording wins.
+
+**Attribute arithmetic.** `ItemStatMath`'s formula is measured on
+Berserker's (itemstats 161, .35/.25/.25) against Zojja's
+Warfists/Pauldrons (adjustment 134.442 -> 47/34/34), Visor (179.256 ->
+63/45/45), Tassets (268.884 -> 94/67/67) and Breastplate (403.326 ->
+141/101/101). `ItemStatMathTests` asserts against those published answers
+rather than against the method's own arithmetic.
+
+**The consumable block.** `ItemStatTooltipComposer.AppendConsumableEffect`'s
+colours are measured on live3 soul-pastries / candy-corn / omnomberry
+(2026-08-26): all three saturate at (170,170,170) for every line of the
+block, superseding F7's white-first-line split, whose allspice/steak
+evidence was JPEG-era. The effect lines' own `+`/`%` prefixes come from the
+API text and are not normalised - omnomberry carries "30% Magic Find" beside
+"+10% Experience from Kills".
+
+**Descriptions.** `Services/ItemDescriptionSanitizer.cs` keeps the API's
+colour spans as roles rather than discarding them because the game colours
+only the marked runs and leaves unmarked text white, which is the only way
+"A gift bag!" can be told apart from the quoted flavour that follows it
+inside one description string (KNOWN-ISSUES #42, gap G7). Unknown angle-
+bracket content is passed through rather than stripped: a blanket
+tag-stripper would silently delete real item text the day the API uses a
+bracket for something that is not markup.
+
+`Models/ItemStatBlock` stays off `ItemMetadata` because `PersistedPlan.Result`
+is a `CraftingPlanResult` holding the `ItemMetadata` dictionary, and
+`PersistedPlanSchemaMemberSetTests` guards that whole reachable graph against
+`PersistedPlan.CurrentSchemaVersion` - so hanging stats there would force a
+schema bump (section 12).
+
+### S1.5 The two decision vocabularies
+
+`Models/AcquisitionSource` is the solver's vocabulary and
+`Models/CraftingDecision` the display layer's. They diverge because the
+solver never needs an owned/ignored state - that is display-only,
+`CraftingDecision.Have` - while the tree builder never needs a distinct
+currency-leaf source. The single bridge is
+`Services/CraftingTreeBuilder.MapSource`.
+
+Per-member mapping:
+
+| `AcquisitionSource` | `CraftingDecision` |
+| --- | --- |
+| `Craft` | `Craft` |
+| `BuyFromTp` | `BuyFromTp` |
+| `BuyFromVendor` | `BuyFromVendor` |
+| `Currency` | `Currency` in principle only - see below |
+| `UnknownSource` | `Unknown` |
+| (none) | `Have`, `GuildUpgrade`, `UnrecognizedIngredient` - set directly |
+
+`AcquisitionSource.Currency` exists because `PlanStep.Source` shares the
+enum for aggregation bookkeeping, but `CraftingTreeBuilder` never routes a
+currency leaf through `MapSource` at all: it sets `CraftingDecision.Currency`
+directly as soon as it sees a non-`"Item"` ingredient type, before any
+decision lookup. `UnknownSource` -> `Unknown` is a genuinely reachable
+production path - gw2efficiency's "Not sold or crafted": no recipe, no TP
+price, no vendor offer - and it is the only case that legitimately offers
+the pill layer's interactive IGNORE toggle, because the user may already
+have the item in hand with no way for the module to know.
+
+`GuildUpgrade` is set directly for a Guild Decoration recipe's
+claimed-upgrade requirement and is deliberately separate from `Currency`: a
+guild upgrade id and a wallet currency id are distinct id spaces with no
+defined relationship, so resolving one as if it were the other on the
+strength of a numeric match would risk silently showing the wrong name or
+price on any collision. Full guild-decoration crafting support - resolving
+the upgrade's real name, verifying ownership - is out of scope
+(KNOWN-ISSUES #54). `UnrecognizedIngredient` covers an ingredient type that
+is none of `"Item"`, `"Currency"` or `"GuildUpgrade"`, and is distinct from
+`Unknown` because a shared value once gave that leaf the interactive IGNORE
+toggle, keyed on a raw non-item id that could silently zero an unrelated
+`"Item"` node sharing the same numeric id. Its own value routes it to the
+single-locked-pill short-circuit instead.
+
+`GuildUpgrade` and `UnrecognizedIngredient` are appended last, after every
+pre-existing member, in the order they were introduced - the reason the
+enum's own doc comment states as a rule.
+
+### S1.6 Tree rows: vendor cost leaves and the pill column
+
+`CraftingTreeBuilder.BuildVendorCostComponentLeaves` synthesizes leaves only
+for a mixed-kind winning offer, plus the one pure-barter case. A pure-coin
+or pure-TP-item offer shows its whole cost in the parent's own coin cell,
+and a pure-currency one in that cell's currency segments
+(`TreeCostColumnMath.ShowsCurrencySegments`), but a barter quantity has
+neither. Currency leaves, and item leaves for an untradeable barter item,
+carry blank cost cells by design; only a TP-valued item leaf must visibly
+sum, which is what keeps "parent total = sum of the parts a leaf can show"
+true while a raw coin component stays folded into `SubtreeCost`.
+
+`Services/DecisionPillPlanner.cs`'s pill count *is* the affordance: 2-3
+pills means a real choice, exactly one means the source is locked. The
+`default` arm of its source switch is a non-crashing safety net for a future
+regression, not a real code path.
+
+`Services/PlanRelayoutMath.cs` fits those pills into the row.
+`ComputeVisiblePillCount` is the primitive: at least one pill is always
+drawn even when it alone overruns, because a completely empty pill column
+reads worse than one slightly-overflowing pill, and every pill after the
+first is dropped strictly once it would not entirely fit - a node's pills
+only ever grow wider left-to-right, so once one is cut every later one would
+be too. `ComputePillFit` is the policy, escalating normal padding ->
+tightened padding -> tightened padding with a trailing "+N": squeezing is
+cheaper than hiding a real option, and announcing the remainder is cheaper
+than dropping it silently. The "+N" pill's own width depends on N, which
+depends on how many pills its width displaced, so the last step iterates to
+a fixed point; N is non-decreasing across iterations and bounded by the pill
+count, so it settles immediately in practice (only a digit-count change
+moves it at all). The loop is capped anyway, and `HiddenCount` is derived
+from the final `VisibleCount` either way, so an unconverged width is a few
+pixels wrong and never a wrong count.
+
+### S1.7 Per-unit currency amounts
+
+`CurrencyDisplayResolver.ResolveUnitAmounts` resolves the winning offer's
+own per-batch rate rather than a truncated `total / quantity` average. The
+average could show a misleading "1" for a merged row whose real purchases
+were, say, a 3-for-3 batch plus a 1-for-1 batch. When the offer data is not
+available - mixed offers merged into one step, or a non-vendor row - it
+returns null rather than reviving that average: gw2efficiency itself never
+shows a per-unit currency price at all (`docs/gw2e-parity-spec.md` section
+4.3, directive 5), so omitting the Each cell is the closer parity choice
+than guessing. When a line's per-batch count does not divide evenly, the
+true rate is not a whole number, and rather than round - inventing data the
+spec does not ask for - the amount carries a literal "N for M" bundle label.
+
+`ResolveTreeNodeUnitAmounts` answers the same question for a single tree row
+(`TreeSectionController`'s "Unit price:" tooltip line, field-test finding B),
+where the true batch rate is simply not present: `OutputCount` and
+`CurrencyCostLinesPerBatch` exist only on `PlanStep`, threaded there by
+`VendorBatchSolver.FinalizeVendorBatches` for the merged shopping list - a
+later, separate pass a single tree node's `SolverDecision` never goes
+through. Dividing the node's own total by its own `Quantity` agrees with the
+true rate whenever the offer's batches divided evenly into that quantity,
+and falls back to the same bundle text when they did not (the total already
+includes rounding up to a whole purchase - `EvaluateVendorOffers`'
+`unitsNeeded`). It is a display-layer fix: no solver change was needed.
+
+### S1.8 Shopping List sort order
+
+`PlanTableSorter.CompareValue` sorts in three blocks because the column
+holds three kinds of cell, not one scale. Reversing the *blocks* would
+express nothing - "5 spirit shards" is neither more nor less than "3 gold"
+in either direction - and it would float the dash rows to the top, where
+they are pure noise, so the block order is direction-invariant while the
+order within a block flips.
+
+Currency-only rows sort by currency name first (ordinal, case-insensitive)
+so every karma row lands beside every other karma row, then by amount within
+that currency - the only numeric comparison in that block that is actually
+meaningful. A row carrying more than one currency is keyed on its
+ordinally-first currency name and that entry's amount, which is stable
+regardless of the order the resolver emitted them in; no attempt is made to
+add amounts across currencies. The numeric key is `UnitRate` rather than
+`Amount` because a per-unit amount whose rate does not divide evenly carries
+`Amount` 0 and shows its rate as bundle text ("912 for 92"), so keying on
+`Amount` would sort every such row as free and tie them all with each other.
+
+### S1.9 Session caches and timing diagnostics
+
+`Services/CachingAccountRecipeClient.cs` is a decorator rather than a field
+inside `Gw2AccountRecipeClient` because that class holds a Blish
+`Gw2ApiManager`, and tests in this repo are Blish-free, so caching logic
+living there could never be exercised by a test. Its staleness has two
+downstream consumers, both annotations rather than solver inputs: the
+"already known" flag on required recipes
+(`PlanResultBuilder`'s `RecipeRequirement.IsMissing`), and the gate on
+`RecipeSheetSavingsCalculator`, which emits a note advising the purchase of
+a recipe sheet the account does not own, carrying a `SavingsPerUnit` coin
+figure. So a recipe learned in-game inside the TTL window not only still
+reads as missing - the plan may keep recommending, priced, the sheet that
+taught it until the window passes.
+
+`Services/Diagnostics/PlanPhaseTimingSummary.cs` buckets the raw per-step
+`timingLog` lines `PlanTimingAnalyzer` already parses (Build recipe
+tree/trees, Collect item IDs, Fetch TP prices, Query vendor offers,
+Inventory reduction, Solve, Fetch item metadata, Fetch currency metadata,
+Fetch learned recipes, Build result) into the coarser phases
+`PlanPhaseEvent` exposes to the live UI, rather than
+`PlanTimingAnalyzer.Summarize`'s per-raw-step percentage breakdown. It reads
+straight from a full `CraftingPlanResult.DebugLog` - raw timing lines, then
+`PlanTimingAnalyzer.SummaryHeaderLine`, then `PlanResultBuilder`'s own
+reduction/decision lines - rather than needing the pipeline to plumb its
+local `timingLog` list out to the wrapper that calls this.
+
+The `wallClockMs` parameter exists because the sum of the raw per-step lines
+necessarily omits every un-instrumented gap between them - task scheduling,
+awaits resuming, GC - so it is always less than or equal to the wrapper's
+own wall-clock `Stopwatch`, and for a real ~19s generation the two can
+differ by seconds rather than milliseconds. The single number a field tester
+actually experiences ("it took 19 seconds") is the wall-clock figure, so
+when it is supplied it becomes the "total" with the phase sum appended
+alongside as "(phases Nms)" for comparison; when absent - every existing
+test, any future non-UI caller - the "total" stays the phase sum exactly as
+before.
+## S2. Services Q-Z: relocated design narrative
+
+Design narrative moved out of doc comments in `Services/` (files whose
+names begin Q-Z) under CLAUDE.md's comment rule: the invariant a caller can
+violate stays at the member, the derivation that explains it lives here.
+Each subsection names the class and member it came from, so a reader who
+arrives from the citation lands on the same argument the comment used to
+carry.
+
+### S2.1 Sell-side economics for a batch
+
+**`SellSideEconomics.ApplyBatchSellSideEconomics`.** The batch rollup is
+gw2efficiency parity work (KNOWN-ISSUES #25), and it diverges from gw2e's
+own multi-item rollup - the `o()` function in the live app bundle, see
+[`docs/research/m37-r2-batch-economics.md`](research/m37-r2-batch-economics.md)
+sections 1.2 and 4.1 - in three deliberate ways:
+
+1. **No craft-vs-buy filter.** Any requested root with a live TP sell
+   price contributes its own `SellableQuantity`/`NetSaleValue`/
+   `CraftingProfit` regardless of whether the solver bought or crafted it.
+   This matches the module's already-shipped single-item
+   `ApplySellSideEconomics` semantics, which has never filtered by
+   craft-vs-buy - a flip/arbitrage number is still meaningful - and the
+   research report's explicit recommendation (4.1.1) *not* to adopt gw2e's
+   `craft === true` filter. Pinned by
+   `MultiItemPlanTests.GenerateStructuredAsync_MultiItem_OneRootBoughtButTradable_IncludedInSum`.
+2. **A crafted root with no live TP sell price contributes nothing** -
+   excluded entirely, its revenue and its own craft cost dropping out
+   together - rather than gw2e's silent "-cost" drag for an untradable
+   crafted root.
+3. **A single profit basis** (instant-sell/buy-order, via `SellInstant`),
+   matching the single-item row. gw2e always shows a second
+   sell-listing-basis figure this module has never surfaced.
+
+**Why `MaterialOpportunityCost` is a single batch-wide sum.** `Reduce`
+still runs on the entire wrapper tree before `Solve` ever picks buy vs
+craft per root (see `GenerateStructuredMultiAsync`'s step ordering), so the
+figure is one sum over the merged `UsedMaterials` list and is not scoped
+down to the roots that end up contributing to the sellable totals. What
+makes that safe is that `UsedMaterials` is itself decision-aware:
+`InventoryReducer.Reduce`'s `zeroOwnedDecisions` guide, fed by a throwaway
+zero-owned `Solve()` on the same unreduced tree, means a root the solver
+decides to buy no longer has its never-crafted subtree's owned ingredient
+stock recorded as "used" at all, so there is nothing left to deduct from
+`CraftingProfit` for that root. The single-item path was updated to the
+same guided reduction, so both behave identically. Pinned by
+`MultiItemPlanTests.GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostNullForBoughtRootOwnedIngredient`.
+
+**`SellSideEconomics.PerItemEconomics`.** `itemId` is passed explicitly
+rather than read from `itemRoot.Id`. Both call sites already guarantee
+`itemRoot.Id == itemId` by construction (`RecipeService.BuildTreeAsync` and
+`BuildMultiItemTreeAsync`), but keeping it explicit means the struct never
+silently depends on that invariant holding.
+
+**Full history:** KNOWN-ISSUES item 25;
+[`docs/research/m37-r2-batch-economics.md`](research/m37-r2-batch-economics.md).
+
+### S2.2 Crafting Ranker: cascade, ramp, weights, cache
+
+**`RankerPriorityCascade` - what the ledger tracks.** "What a plan takes
+from you" is several different things, and the ledger keeps them apart:
+
+- materials, from `CraftingPlanResult.UsedMaterials` - the solver's own
+  post-solve consumption record, which already reflects every buy-vs-craft
+  decision, including decisions caused by what was owned;
+- currencies and coin, netted by the cascade itself, because the solver
+  never consults the wallet (see `AccountCurrencyIndex`);
+- daily-cooldown crafting actions, which are capped per **account**, so two
+  items needing the same gated ingredient queue rather than run in
+  parallel.
+
+**`RankerReadinessRamp` - why the ramp is deep rather than pastel.** A
+naive red-to-green ramp peaks at a bright yellow around the midpoint, and
+white on bright yellow is illegible. WCAG's 4.5:1 floor for white
+(`#FFFFFF`) means every colour on the ramp has to keep its relative
+luminance at or under `1.05 / 4.5 - 0.05 = 0.1833`, which is a deep,
+saturated ramp and is why the three anchors are dark for their hues.
+
+Interpolation is in OKLCh, not in sRGB. An sRGB lerp between two saturated
+hues cuts through the interior of the colour solid and desaturates on the
+way - red to green goes through brown - because sRGB's axes are not
+perceptual. OKLab (Bjorn Ottosson, 2020) is a perceptual space whose polar
+form OKLCh separates lightness, chroma and hue, so walking the hue angle
+keeps chroma up all the way across and the intermediate colours stay orange
+and olive rather than mud. The 25% sample is `(159, 76, 0)`, a real orange,
+which is the measurement that says the space is doing its job.
+
+**`RankerReadinessRamp.Track` - the second contrast obligation.** The track
+constant was first chosen against white alone. At `Rgb(38, 36, 34)` it
+scored 1.05:1 against the panel behind it, while the panel's own texture
+varies by 1.076:1 - so the track was literally less distinguishable from
+the surface than the surface is from itself. Measured in game at 3440x1440.
+Darker is the only direction that serves both obligations, and the current
+value sits at 1.32:1 against the panel with pure black as the 1.42:1
+ceiling.
+
+**`RankerReadinessWeights` - the per-gate argument.** The weights are not
+derived from each gate's magnitude; deriving them that way sounds
+principled and is the exchange-rate trap in disguise. They are judgement
+calls about substitutability, which is a property the game itself decides:
+
+- A daily reset cannot be bought at any price. It is the only barrier with
+  no substitute, so it takes the largest share.
+- Coin is the bulk of the work and the one gate measured exactly, by the
+  real solver at real prices. Equal claim on precision grounds; no better
+  claim than time on difficulty grounds.
+- Currencies are a real barrier measured only as within-currency ratios, so
+  each point carries less information than a coin point. Weighted below
+  materials for that reason, not because currencies matter less.
+- A discipline is a hard wall - you cannot craft at all without it - but a
+  short one next to a legendary's materials bill, and usually either
+  satisfied already or cheap to satisfy. Non-zero because it is real; small
+  because it is short.
+- A recipe unlock sits on the same substitutability rung as a discipline: a
+  hard wall, but most recipes are purchasable sheets or cheap unlocks, so it
+  takes the disciplines weight rather than inventing a new tier. First call,
+  reviewable like the others.
+
+**`RankerResultCache` - why two sets.** The two comparison modes answer
+different questions about the same rows, and a row's answer under one says
+nothing about its answer under the other. Keeping only the last mode's set
+made every toggle a full recompute, including a toggle straight back to
+numbers the session had already paid for (owner ruling, 2026-08-27).
+
+### S2.3 Column and section geometry (Q-Z)
+
+**`RecipesColumnMath` - why discipline is a column.** The discipline used to
+be a second `Caption` line *under* the recipe name, which forced the
+section to carry two row heights and put a name and its discipline on
+different reading lines. As a column, every recipe row is one line at
+`PlanContentHeightMath.RecipeRowHeight`.
+
+**`ShoppingColumnMath` - why the bands are distributed.** Distributing the
+bands over equal tracks rather than packing them against the panel's right
+edge is what stops a short item name being stranded far left with the
+middle of the row empty. Each header centres over its band rather than
+sharing an edge with it; `JustifiedColumnTracks` carries the argument for
+why a shared edge is not enough.
+
+**`SnapshotHeaderLayout` - what the shared row buys and costs.** The header
+used five sparse rows to say what four can, and the widest of them - the
+search row - was empty for everything right of the content-type dropdown.
+Sharing that row halves the width the source-filter run has to flow into,
+so a roster that used to fit inside the 4-row cap can wrap past it and hide
+filters behind a scrollbar: a third of the filter set for 38px of header.
+That is why the sharing is conditional on the whole run fitting in one row,
+and why the fallback is exactly the full-width row the flow had before.
+
+**`SummarySectionLayoutMath` - why it is its own class.** Its role is the
+same kind of thing `Services/PlanContentHeightMath.cs` and
+`Services/PlanRelayoutMath.cs` already do for every other section, and it
+is deliberately kept out of both: they are shared infrastructure several
+other sections' row builders depend on, and they are high-evidence zones
+(see [`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md#policy-high-evidence-zones)) -
+off-limits for the broader fold-back this class's existence sidesteps.
+KNOWN-ISSUES #46 carries the original rationale.
+
+**`TreeChipStripLayout` - what the slot held before, and why zero hides.**
+The slot the state chips occupy used to hold a grey "Recipe Tree:" caption:
+small *and* grey, labelling five buttons whose own verbs and tooltips
+already said what they act on. Real information replaces a caption that
+named nothing. A chip is hidden entirely at zero rather than shown reading
+zero because a standing "Overrides: 0" spends attention on the absence of a
+thing, and a permanently-disabled clear button beside it invites "why is
+this disabled?".
+
+**`TreeToolbarRowLayout` - why the button widths live in the class.** A
+width that can only be read off a `PlaceRight` argument is a width no test
+can assert the boundary cases against without re-typing it, and a re-typed
+width is one a later rename silently invalidates.
+
+**`TreeCostColumnMath` - what the column looked like before.** It used to
+right-align one ragged run per row: a gold/silver/copper row and a currency
+row both ended at the same x but shared no interior alignment, so no two
+coin icons in the whole tree lined up vertically. Scanning the whole tree
+once per render pass costs one walk of an already-materialised tree and
+buys a column that never shifts under the user; the node count the section
+header shows rides on the same walk for the same stability reason.
+
+**`UiSpacing` - the coincidences on record.** 8px also ships as
+`LogToolbarLayout.Gap` and `LogRowLayout.RightPad`, and 20px as both
+`SettingsFormLayout.SectionGap` (vertical, between section blocks) and
+`TreeToolbarRowLayout.GroupGap` (horizontal, between button groups). Those
+are coincidences, they stay where they are, and coupling them would make a
+deliberate change to one silently move the others.
+
+### S2.4 Tooltip text: wrap seams and scope vocabulary
+
+**`ShoppingRowTooltipFormatter.BuildCurrencyLines` - why "THIS ROW" and
+"wallet" are load-bearing.** Both numbers on a shopping-row currency line
+are that *row's* own total (`cc.Amount`, one `PlanStep`'s
+`VendorCurrencyCosts`), never the whole plan's requirement for that
+currency id. Without a scope marker, two shopping rows drawing on the same
+wallet currency - Karma split across two vendor rows, say - can each
+independently read as "fully covered" and double-count the one wallet
+balance. That is the same misreading class `DecisionPillPlanner`'s
+plan-scope `HAVE {have}/{planTotal} TOTAL` pill
+(`AppendCurrencyOwnershipPill`) exists to avoid, via its own explicit
+"TOTAL" suffix; "THIS ROW" is the row-scope mirror of that convention, and
+the vocabulary must never look plan-scope when it is not. The "(wallet N)"
+aside is worded the same way for the same reason: "wallet" is the one term
+this codebase uses for a raw account-wide holding figure, matching the
+Summary column-header table's "Have" column and the tree's
+`HAVE x/y TOTAL` pill.
+
+**`TooltipLayoutMath.ItemTooltipMaxContentWidth` - the corpus.** The cap is
+derived from the game's own break decisions rather than from a game-pixel
+cap converted by a scale factor, because a mean font ratio hides a real
+per-string spread (0.99x to 1.03x at Menomonia 14): `LetterSpacing = -1`
+tightens tracking on a face whose glyph boxes are already wider than the
+game's, so how a given string lands depends on its letter count as much as
+its length. Each live capture that wraps a paragraph pins the cap twice -
+it must be at least the width of the line the game *kept whole*, and below
+that line plus the word the game *pushed down*. Measured through this face,
+in this constant's units:
+
+- Gift of Twilight 19648: 320 kept / 381 with "Twilight." pushed down; its
+  "Made by combining these items in the Mystic Forge:" line, 359, stays
+  whole.
+- eyes-of-kormir 83103: 354 kept / 415 with "because"; 357 kept / 400 with
+  "under".
+- heart-of-destroyer 67017: 330 kept / 408 with "Bloodstone"; 372 kept /
+  442 with "Destroyer".
+- fury-scorched 86967: 406 kept / 430 with "for" - the one outlier.
+
+Every constraint but fury's intersects at [372, 381); 376 is its midpoint,
+so no decision sits within 4px of flipping. Fury's kept line would need a
+cap of 406+, which would un-wrap Gift of Twilight *and* eyes' second line,
+so it loses 1 constraint to 5.
+
+**`TooltipTextFormat.LineBudgetChars` - why 71, not the shipped 75.** Every
+prose string of 55 characters or more that this module builds (73 of them,
+swept out of `Services/` and `Views/`) was measured against the installed
+Menomonia 14 XNB with MonoGame.Extended's own advance / `XOffset+Width`
+rule - the same parse behind
+[`docs/research/minimum-window-width.md`](research/minimum-window-width.md).
+They average 7.03px per character, so 500px is 71 characters, not the 76 the
+original 6.5px/char estimate assumed. Per-string the spread is
+6.7 to 7.5px/char, so prose at the wide end still crosses 500px inside a
+71-character line; Blish's own space wrap takes those, which costs a break
+it would have made anyway and never loses text. The one case only this seam
+handles - a single token wider than the cap, which Blish's wrapper will not
+split - is hard-cut by `TextWrapMath` before the budget matters.
+
+The budget is a **character** count, not pixels, because a tooltip string
+is composed in `Services/`, far from any font; the alternative - threading a
+measured `Func<string, int>` down from `Views/Rendering/` - would put a
+Blish dependency on the very seam the class exists to keep Blish-free.
+
+**`TreeRowTooltipComposer.BuildExtraTooltipContent`.** The returned content
+is computed once and reused verbatim by `RenderTreeNode`'s
+`extraTooltipLines`. There was once a second entry point returning
+pre-wrapped strings; nothing called it and it is gone.
+
+**`ValueDetailTooltipBuilder`.** The hover template is duplicated verbatim
+from gw2efficiency's own crafting-pill hover, and the class is kept
+Blish-free - unlike `TreeSectionController`, which only calls it and assigns
+the result to `BasicTooltipText` - so the text-building logic is directly
+unit-testable, matching this repo's established pattern for tree-rendering
+logic (`DecisionPillPlanner`, `CoinSegmentMath`, and the rest). The
+divergence it surfaces can be an unpriceable descendant's own divergence
+rolled up recursively; see `DecisionValue`'s own doc comment.
+
+### S2.5 Account-snapshot concurrency and search
+
+**`SnapshotCommitGate` - what `SnapshotEpochGuard` alone left open.** The
+original KNOWN-ISSUES #31/31a-F1 fix captured `myEpoch` before a snapshot
+fetch's await and re-checked it afterwards against a bare
+`volatile int _snapshotEpoch`, with the field commit that follows (write
+`_currentSnapshot`/`_pendingSnapshot`/`_snapshotDirty`, save to disk) as
+several more unguarded instructions after that check. `Module.ClearCache`
+bumps the same epoch and nulls those same fields with no synchronization of
+its own. The check and the commit were never atomic with respect to
+`ClearCache` - just narrowed from "the whole fetch" down to "the few
+instructions between the check and the last field write" - so a Clear Cache
+landing in that gap could still resurrect a just-cleared snapshot, or leave
+the three fields in a combination that never legitimately occurs. The gate
+closes the gap for real by putting the bump and the re-check under one lock.
+
+**`SnapshotRefreshSlot` - what the check-then-set gate cost.** Three threads
+reach `Module`'s two refresh entry points - `LoadAsync` on a ThreadPool
+task, `Update()` on the main thread, and `OnSubtokenUpdated` on a thread the
+module does not control - and both entry points used to gate on a
+check-then-set over a `volatile bool`. Volatile makes a write *visible*; it
+does not make check-then-set *atomic*, so two entrants could both get past
+it. Each would then run the same three-statement sequence (cancel the live
+source, dispose it, assign a fresh one) and each could dispose the source
+the other had just published, after which the loser's own
+`_refreshCts.Token` read threw `ObjectDisposedException` - or
+`NullReferenceException`, if a Clear Cache click nulled the field in the
+same window. `Module`'s generic catch reported that as "refresh failed" and
+armed a 60-second retry backoff for a call that never reached the network.
+
+**`SnapshotSearchResultBuilder.ShortQueryCharacterHint` - why the hint
+exists.** The `MinCharacterSearchLength` hold-back is deliberate but
+invisible: a one-letter query that a character's name does contain looks
+like a plain no-results, so the user reads the tab as broken rather than as
+waiting for a second letter.
+
+**`SnapshotSearchResultBuilder.BuildItemRows` - inputs and cost.**
+`itemsById` is the already-deduped itemId -> representative-entry map (see
+`BuildRepresentativeIndex`); the method never re-scans the raw per-source
+entry list itself, so it stays cheap to call on every keystroke as long as
+the caller builds the map once per snapshot rather than once per call.
+Character matching costs a full source walk for every item whose name does
+not match, where a name-only search could skip straight past it; that is
+bounded above by the empty-search rebuild, which already walks every source
+of every item. The match is against character names only - storage-location
+labels stay unmatched (Feature 1 Open Question 2, resolved in favour of
+source-label matching). A row surfaced by a character match reports the
+account-wide total rather than the matched character's share, so the total
+keeps meaning the same thing on every row in the list.
+
+### S2.6 Receipt captions and the multi-item tree wrapper
+
+**`ReceiptCaptionHelper` - where the stacked shape comes from.** The stack
+this helper detects is produced by one branch of
+`CraftingTreeBuilder.BuildNode`: `componentLeaves != null &&
+wantsReferenceBranch`. That branch synthesizes the cost-component leaves,
+appends the reference branch's own recipe ingredients after them, and sets
+`node.IsReferenceBranch` - which is why "IsReferenceBranch and the first
+child is a cost component" identifies the case from the node alone, with no
+new model field. The helper is Blish-free by design so it can be exercised
+by a real test over plain `CraftingTreeNode` objects, independently of the
+`Views/Rendering` pass that consumes it. The caution about never touching
+`Children` is not stylistic: row heights flow through
+`PlanContentHeightMath`'s tree arm, which counts exactly
+`node.Children.Count` rows per level, so a caption rendered as an extra
+row - rather than as an extra tooltip line on an existing child's row -
+would desync a height the view assigns synchronously.
+
+**`RecipeService.BuildMultiItemTreeAsync` - why a synthetic wrapper.** For
+2+ items the per-item trees are wrapped under a synthetic root `RecipeNode`
+the same way gw2efficiency's frontend does for its own Calculator (see
+[`docs/gw2e-parity-spec.md`](gw2e-parity-spec.md)): a reserved-id,
+never-rendered "recipe" whose `Ingredients` are the N real item trees, each
+already carrying its own requested amount as its own `Quantity` (set by
+`BuildTreeAsync` itself, exactly like an ordinary recipe ingredient's
+quantity). Feeding that wrapper through the unmodified
+`PlanSolver`/`InventoryReducer`/`CraftingTreeBuilder` pipeline is what gives
+merged shopping-list, steps and currency totals for free, via the existing
+per-item-id aggregation in `PlanSolver.Collect`'s `AggregateStep`: no
+multi-item-specific solver logic exists, or is needed. The single-entry
+short-circuit echoes gw2e's own `if (r.length === 1) return r[0]`.
+
+### S2.7 Recipe-tree row identity
+
+**`TreeRowIdentity` - why a shared `NodeId` is not enough.**
+`RecipeNodeIds` gives a real recipe node a stable pre-order id, so there the
+id does fix the item for the row's life. A vendor cost-component leaf's id
+is `CraftingTreeBuilder.SyntheticComponentNodeId(parentNodeId,
+componentIndex)` - the leaf's *position* in the chosen offer's cost lines -
+while its name, icon and rarity come from that line's own `ItemId`. A
+re-solve that picks a different offer of the same shape (`{item, currency}`
+becoming `{other item, currency}`) keeps every id and every structural fact
+and changes only which items the lines name, so an identity-blind refresh
+would repaint one item's quantity, cost cell and tooltip under another
+item's name and icon.
+
+### S2.8 The re-solve status line
+
+**`StatusText.ForOverrideResolve` - why the count left the line.** The line
+used to carry the standing override count - "Decisions updated (3
+override(s))" - which is a different kind of fact. How many decisions you
+have overridden is the plan's *state*, true until you change it; this line
+says what just happened and is replaced by the next thing that does. The two
+are not connected, and a line that mixed them made the count vanish the
+moment anything else happened. The count lives in the top strip's Overrides
+chip now, where it persists and can be acted on.
+
+### S2.9 Window placement and the measured width floor
+
+**`WindowPlacement` - why the arithmetic is split out.** It is split out of
+`Views/ResizableTabbedWindow` on the same terms as `WindowSizing` and
+`PanelChromeMath`: the arithmetic is the part that has to be pinned, and a
+Blish control cannot be constructed in a Blish-free test.
+
+**What Blish's own clamp does and does not do.** `WindowBase2.Show` reads
+the persisted position and applies `Clamp(x, 0, SpriteScreen.Width - 64)`
+per axis (BlishHUD 1.3.0, decompiled). Nothing on that path consults the
+window's size, so a position saved against a wide client leaves an arbitrary
+amount of the window's right-hand side - cost column, Generate button,
+resize grip - past the edge of a narrower one, with no way to drag it back.
+A restored *size* gets no clamp at all on that same path, which is what
+`ClampExtent` exists for.
+
+**`WindowSizing.MinWindowWidth` - the term-by-term chain.** Measured at
+Menomonia 16 against the installed XNBs
+([`docs/research/minimum-window-width.md`](research/minimum-window-width.md)
+section 9 reproduces the method and every anchor figure of that report's own
+1478-era derivation):
+
+```
+ 629  widestNameEnd  = nameX(14) 394 + "429750x " 69 + name 166
+ +24  the designed name-to-pill gutter at the deepest row
++256  TreePillColumnWidth
++335  cost column: 181 worst-digit six-digit-gold coin run
+                   + 154 widest two-currency vendor run
+  +8  TableRightMargin
+---- 1252  tab panel
++126  WindowToTabPanelChrome
+==== 1378
+```
+
+1378, not the 1232 the like-for-like depth-14 arithmetic gives on its own:
+1232 accepts that a row combining a forced-craft dust chain with a vendor
+currency run ellipsizes, and the maintainer declined that trade - "we are
+designing for a minimum resolution of 1920x1080, so cramming down to a
+smaller min-size that will result in cramped renders seems bad". The +154
+rider is what buys "a two-currency vendor run always fits at the floor".
+
+Down from 1478, which fitted the depth-23 "+24 Agony Infusion" chain
+untruncated. That chain now ellipsizes from depth 20 - six levels past the
+deepest realistic plan, and exactly the idiom of record everywhere else in
+the view (ellipsis, full name on the tooltip).
+
+The other contributor to this floor is the controls row, which is subsumed:
+its widest arrangement is the "Value Own Materials" checkbox at x=350 (its
+label measures 145px at Blish's own Font14, plus the box) clearing the
+right-anchored 120px Generate Plan button and `WindowToTabPanelChrome`'s
+trailing padding - under 700px all told, half of what the tree needs.
+
+### S2.10 Wiki link launch
+
+**`WikiLinkLauncher` - the first external-URL launch.** This is the module's
+first launch of an external URL, a deliberate maintainer decision. The
+try/catch exists because ShellExecute can throw for reasons outside the
+module's control - `Win32Exception` for no registered URL handler, a
+locked-down environment, and so on. The `Task.Run` offload was a later
+fix-pass: `ShellExecuteEx` blocks the calling thread until the shell hands
+the URL off, and a cold browser start, DDE negotiation, or a "choose an app"
+prompt can stall that call for hundreds of milliseconds to seconds, freezing
+the whole overlay - scroll and relayout included - for as long as it runs.
+
+### S2.11 Recipe corpus refresh
+
+**`RecipeCorpusRefresher` - the case that motivates it.** Recipe 14025's
+rift-essence ingredients turned from items into wallet currencies without
+the recipe id changing (KNOWN-ISSUES #48), and `RecipeCorpusVerifier` cannot
+see such a change because it only ever fetches ids the corpus lacks. The one
+comparison the refresher does make - is the fetched row identical to the
+seed's? - exists to keep the overlay from becoming a 10 MB duplicate of the
+shipped seed for no gain.
+
+---
+
+## T. Tests and tools: relocated design narrative
+
+Derivations, histories and investigations moved out of over-length XML doc
+comments under `tools/` and `tests/`. Section 9 above describes the data
+pipeline these tools feed; this section is the level below it - the wiki
+shapes, the incidents, and the coverage gaps that explain why the offline
+tools and a handful of test fixtures are built the way they are. Each
+comment they came from keeps the part a caller can violate and points
+here for the rest.
+
+### T.1 `HomesteadTierResolver`: the parity shape and the live probe
+
+The merchant-name test matches gw2efficiency's own `cheapestTree.ts`
+matching shape (`docs/research/m37-r1-homestead.md` section 1.2): a row
+participates in tier gating only when its merchant name contains the
+literal substring "Homestead Refinement" (gw2e:
+`tree.merchant.name.includes('Homestead Refinement')`), which catches all
+three station pages ("...-Farm", "...-Lumber Mill", "...-Metal Forge") the
+same way a plain `.includes()` would.
+
+The tier encoding was confirmed live, by a direct SMW ask probe against
+Homestead Refinement-Metal Forge: a tier-0 row's "Has requirement"
+printout returns an empty array, and a tier-1 or tier-2 row returns
+exactly one `_txt` value, "one [[Homestead Upgrade: ...]]" or "two
+[[Homestead Upgrade: ...]]" respectively. That is not an inference from
+the rendered page - the wiki's `{{vendor table row}}` template parameter
+is literally `requirement=one [[...]]` / `requirement=two [[...]]`.
+
+The class is separate from `ConvertToOffer` so this pure resolution logic
+is covered by direct unit tests without a `Gw2ApiHelper`/`HttpClient`
+fixture.
+
+### T.2 `TemporaryTemplateParser`: the wikitext shapes that were observed
+
+Every shape below was read off a live page through the wiki mirror
+(`api.php?action=parse&prop=wikitext`), not inferred from the template's
+documentation.
+
+- **Template name casing varies in the wild.** Both `{{Temporary|...}}`
+  and `{{temporary|...}}` appear verbatim on real pages ("Mad King's
+  Realm" uses the lowercase form), which is why the match is
+  case-insensitive.
+- **Parameter name varies too.** The six recurring festival vendor NPC
+  pages this module cares about all use `seasonal=` - for example "Candy
+  Corn Vendor (Weekly)":
+  `{{Temporary|release=Shadow of the Mad King 2019|seasonal=Halloween}}`.
+  A minority of vendor NPC pages use `event=` for the identical purpose:
+  confirmed on "Trader" (Bazaar of the Four Winds),
+  `{{Temporary|release=Bazaar of the Four Winds|event=Festival of the
+  Four Winds}}`, and on the non-festival one-off vendors "Consortium
+  Trader (Fractal Rush)" and "Starter Equipment Vendor",
+  `{{temporary|event=Fractal Rush}}` / `{{temporary|event=Fractal
+  Incursion}}`. The parser treats both parameters identically; it is
+  `Gw2Constants.ResolveSeasonalFestivalKey`, not the parser, that decides
+  whether an extracted value is one of the six known festivals or an
+  unrecognized one-off event or release.
+- **A page can carry `{{Temporary|release=...}}` with neither parameter**
+  - a one-off, non-festival, non-`event` release vendor. That returns
+  null, the same as a page with no `{{Temporary}}` template at all.
+- **One shape has never been observed and is therefore untested:** the
+  extracted value is not normalized against wiki markup, so
+  `seasonal=[[Halloween]]` would extract the literal "[[Halloween]]".
+  `Gw2Constants.ResolveSeasonalFestivalKey` correctly leaves that
+  untagged with a warning rather than fuzzy-matching or guessing (the
+  never-guess repo invariant), but it is worth knowing about if a future
+  wiki edit introduces wikilink-wrapped parameter values.
+
+The template regex matches up to the first literal `}` via a negated
+character class rather than up to the first `}}`, so a single stray `}`
+inside a real template's parameter list would make that template
+unmatchable rather than truncate its captured body early. Not observed on
+any real page, and left unhardened for that reason.
+
+### T.3 `VendorOfferDiff`: why a raw id diff is useless
+
+`git diff` on `ref/vendor_offers.json` reports "1 insertion(+), 1
+deletion(-)" on a 14.8MB single line: the entire dataset replaced as one
+indivisible hunk. A reviewer of a `data(vendor):` commit cannot see what
+changed.
+
+The naive improvement - list the offerIds that appeared and disappeared -
+is almost as useless, because `offerId` is a SHA-256 over the offer's
+whole content. Change one price and the row does not "change": it
+vanishes and a different hash appears, so a raw added/removed pair list
+turns every repricing into two unrelated-looking hex strings.
+
+Re-pairing by (merchant, output item) is what the hash does not preserve
+but a human reads instantly. The converse case matters more, because a
+`VendorOfferHasher` hash-format change does it to every row at once: a row
+whose content is unchanged but whose id is not has not been repriced. One
+such migration reported 48,750 of 53,544 rows as repriced, each printing
+an identical before and after, and cross-paired rows differing only in
+`OutputCount` into price moves that never happened. Counting those as
+rehashed rather than listing them is what keeps the report readable.
+
+### T.4 `Program.MergeIntoBaseline`: why an incomplete batch never replaces
+
+Wholesale replacement of a merchant's rows on the strength of a fresh
+scrape is correct only when the fresh set is complete. It has silently
+deleted shipped offers before, when a pass returned rows with
+`GameId <= 0` that the GameId filter then dropped. Hence the
+`merchantsWithSkippedRows` opt-out: those merchants union instead of
+replace. A possibly-stale baseline row surviving an extra run is visible
+and fixable; a silent deletion is neither.
+
+### T.5 `Program.ResolveSeasonalFestivalValuesAsync`: opt-in, budgeted, page-keyed
+
+**Why opt-in.** Every other field on `WikiVendorResult` comes from SMW
+"ask" printouts already fetched by
+`QueryVendorItemsAsync`/`ResolveItemGameIdsAsync`. There is no Semantic
+MediaWiki property for a page's `{{Temporary}}` template, so unioning a
+distinct-page wikitext parse into every full refresh would add one HTTP
+request per distinct vendor page - thousands, for a from-scratch scrape -
+on top of the existing two-pass budget, silently changing the cost and
+time profile of the default `./tools/refresh-vendor-data.sh` workflow. A
+developer who wants full coverage passes `--tag-seasonal-festivals`
+explicitly.
+
+**Why the cache is keyed by stripped page title.**
+`WikiVendorResult.PageName` is the SMW subject key of the vendor's "Sells
+item" SUBOBJECT, not the vendor's own wiki page title - confirmed live
+(`api.php?action=ask` against `[[Has vendor::Candy Corn Vendor
+(Weekly)]]`): every row's subject is "Candy Corn Vendor (Weekly)#vendor1",
+"...#vendor2", and so on, one subobject per sold item. The fetchable page
+title is everything before the first `#` (`StripSubobjectSuffix`).
+Caching and fetching by the stripped title is also what keeps the pass
+cheap: one wikitext fetch per distinct VENDOR, not per sold item.
+
+**Why the budget is self-healing rather than fatal.** An over-budget run
+fetches up to the budget, saves the cache, and logs how many pages remain.
+The next run's `toFetch` list is smaller, so repeated runs converge on
+full coverage instead of every run past the first throwing on the same
+unmet budget.
+
+**Why the budget is scoped to this run's query.** `wikiResults` at the
+caller's call site is the FULL merged `wiki_vendor_cache.json` (Step 2's
+`MergeWikiCache` union), not just this run's query. Scoping the fetch
+budget to it meant a narrow `--query` on a real dev-machine cache
+(thousands of distinct vendor pages) computed thousands of "uncached"
+pages, exceeded `--max-seasonal-pages`, and threw `SafetyLimitException`
+BEFORE Steps 4-6 ever wrote output, discarding the scoped run's
+already-completed live work. `queryScopedResults` scopes the budget to the
+pages this run's `--query` actually returned, and is null for
+`--resolve-item-currencies-only`, which has no `--query` and processes the
+whole cache by design. The cache-apply loop still runs over the full
+`wikiResults` either way, since applying an already-cached tag is a
+dictionary lookup, not a fetch.
+
+### T.6 `WikiSmwClient.FetchWikitextAsync`: the redirect that looked like an answer
+
+`action=parse` does not resolve redirects by default, unlike `action=ask`'s
+SMW queries. Without `&redirects=1`, a vendor page whose SMW subject title
+is a redirect returned "#REDIRECT [[Target]]" as its wikitext, in which
+`TemplateRegex` then correctly found no `{{Temporary}}` template - so the
+caller cached `""` ("checked, no tag"), which looked identical to a real,
+deliberate absence and was never retried.
+
+That is also why a null return and an empty wikitext body are not
+interchangeable at the call site. `ResolveSeasonalFestivalValuesAsync`
+warns about and leaves uncached the "wikitext came back null at all" case
+(missing or renamed page, API error object), precisely because a null does
+not mean "checked, no template" the way an empty body legitimately can.
+
+### T.7 `VendorOfferHasherGoldenVectorTests`: why the fixture lives in `tests/shared/`
+
+`tests/shared/vendor_offer_hasher_vectors.json` was originally a
+CROSS-PROJECT net: the module carried its own copy of the hasher under
+`Services/`, and both suites replayed these same rows so the two copies
+could not drift. That copy had no callers anywhere in the module and has
+been deleted, leaving one implementation, so the fixture's job is now
+regression pinning over time rather than agreement between two files. It
+stays outside either project's `Helpers/` because it is still the right
+home for a hash contract that keys shipped data, and because a second
+consumer may return.
+
+### T.8 The festival tagging pass behind `SeasonalFestivalRoundTripTests`
+
+The shipped `ref/vendor_offers.json` baseline carries `seasonalFestival`
+on 57 offers across all six known festivals, not just the three
+hand-tagged Candy Corn Vendor (Weekly) ecto offers it started with.
+Dragon Bash Merchant (Weekly), Wintersday Trader (Weekly), Festival
+Rewards Vendor (Weekly), Gauntlet Ticket Vendor, New Year Vendor and
+Super Adventure Box Weekly Trader were live-tagged by a scoped
+`--tag-seasonal-festivals --merge-into` run targeting exactly those six
+merchants.
+
+Candy Corn Vendor (Weekly) was deliberately excluded from that scoped
+query. A fresh scrape of ANY merchant recomputes new OfferIds for that
+merchant (see `VendorOfferHasher`'s own doc comment on the Astral Acclaim
+hash-format migration), so touching it would have broken the test's "the
+three known offer IDs survive identically" requirement - and with it the
+evidence that a `--merge-into` run does not silently drop tags. Coverage
+is deliberately partial: thousands of non-festival vendor pages remain
+untagged, since the pass covered the known festival vendor list rather
+than a full re-scrape (KNOWN-ISSUES #63).

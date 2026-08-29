@@ -6,43 +6,23 @@ using System.Text;
 namespace TaimisToolbench.Services.Diagnostics
 {
     /// <summary>
-    /// Formats a compact, coarse-phase timing summary for the
-    /// CraftingPlanPipeline's "Info on
-    /// finish" ModuleLog line - e.g. "tree 120ms, prices 8400ms (418
-    /// items), solve 30ms, item details 9200ms, learned recipes 900ms,
-    /// display 250ms - total 19036ms (phases 18158ms)". Pure function over the SAME raw
-    /// timingLog data PlanTimingAnalyzer already parses (Build recipe
-    /// tree/trees, Collect item IDs, Fetch TP prices, Query vendor offers,
-    /// Inventory reduction, Solve, Fetch item metadata, Fetch currency
-    /// metadata, Fetch learned recipes, Build result - see
-    /// CraftingPlanPipeline's own timingLog.Add call sites), just bucketed
-    /// into the coarser phases PlanPhaseEvent exposes to the live UI,
-    /// rather than PlanTimingAnalyzer.Summarize's own per-raw-step
-    /// percentage breakdown.
+    /// Formats a compact, coarse-phase timing summary for
+    /// CraftingPlanPipeline's "Info on finish" ModuleLog line - e.g. "tree
+    /// 120ms, prices 8400ms (418 items), solve 30ms, ... - total 19036ms
+    /// (phases 18158ms)". Pure function over the same raw timingLog data
+    /// PlanTimingAnalyzer parses, bucketed into the coarser phases
+    /// PlanPhaseEvent exposes to the live UI. Reads straight from a full
+    /// CraftingPlanResult.DebugLog and stops scanning at
+    /// <see cref="PlanTimingAnalyzer.SummaryHeaderLine"/>, so it can never
+    /// mis-bucket a later, unrelated debug line.
     /// <para>
-    /// Deliberately reads straight from a full CraftingPlanResult.DebugLog
-    /// (raw timing lines, then <see cref="PlanTimingAnalyzer.SummaryHeaderLine"/>,
-    /// then PlanResultBuilder's own reduction/decision lines - see
-    /// CraftingPlanPipeline.FinishTimingLog) rather than needing the
-    /// pipeline to separately plumb its local timingLog list out to the
-    /// GenerateStructuredAsync(IReadOnlyList&lt;PlanRequestItem&gt;, ...)
-    /// wrapper that calls this - stops scanning at the marker so it can
-    /// never mis-bucket a later, unrelated debug line.
-    /// </para>
-    /// <para>
-    /// the SUM of these raw per-step lines necessarily
-    /// omits every un-instrumented gap between them (task-scheduling,
-    /// awaits resuming, GC, etc.), so it is always LESS THAN OR EQUAL TO
-    /// the wrapper's own wall-clock Stopwatch - for a real ~19s generation
-    /// the two can differ by seconds, not milliseconds. The single number
-    /// a field tester actually experiences ("it took 19 seconds") is that
-    /// wall-clock figure, not the phase sum, so an optional
-    /// <c>wallClockMs</c> parameter on <see cref="FormatCompactSummary"/>
-    /// lets the caller supply it: when present it becomes the "total",
-    /// with the phase sum appended alongside as "(phases Nms)" for
-    /// diagnostic comparison; when absent (every existing test, any
-    /// future non-UI caller) the "total" stays the phase sum exactly as
-    /// before - fully backward compatible.
+    /// The SUM of the raw per-step lines omits every un-instrumented gap
+    /// between them, so it is always LESS THAN OR EQUAL TO wall-clock - for a
+    /// real ~19s generation the two can differ by seconds, not milliseconds.
+    /// The optional wallClockMs parameter on
+    /// <see cref="FormatCompactSummary"/> lets the caller supply the figure a
+    /// field tester actually experiences; when absent the "total" stays the
+    /// phase sum. Derivation: docs/ARCHITECTURE.md section S1.9.
     /// </para>
     /// </summary>
     internal static class PlanPhaseTimingSummary

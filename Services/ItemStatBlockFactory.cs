@@ -6,11 +6,11 @@ namespace TaimisToolbench.Services
 {
     /// <summary>
     /// RawItem (+ its optional details block) -> <see cref="ItemStatBlock"/>.
-    /// Every decision about what an absent field MEANS is made here, once,
-    /// so the composer downstream only ever renders facts:
+    /// Every decision about what an absent field MEANS is made here, once, so
+    /// the composer downstream only ever renders facts:
     /// <list type="bullet">
-    /// <item><description>A null details block is the crafting-material
-    /// case (measured on 19700/19685/46683), not an error - the block still
+    /// <item><description>A null details block is the crafting-material case
+    /// (measured on 19700/19685/46683), not an error - the block still
     /// carries name, rarity, type, level, vendor value and flavour.</description></item>
     /// <item><description>A weapon's <c>defense: 0</c> is "no defense", not
     /// "0 defense": every weapon in the API reports it. Same for a 0-value
@@ -19,13 +19,9 @@ namespace TaimisToolbench.Services
     /// entirely, which is what the game itself shows for those
     /// items.</description></item>
     /// </list>
-    /// <para>
     /// Stat-SELECTABLE items (non-empty stat_choices) record only how many
-    /// combinations exist. Computing numbers for one nominated combination
-    /// is possible - see <see cref="ItemStatMath"/> - but WHICH one is an
-    /// open judgment call (KNOWN-ISSUES #40, Q4), and it is the only thing
-    /// in this feature that would need a /v2/itemstats request. Nothing is guessed here.
-    /// </para>
+    /// combinations exist; nothing is guessed here. See
+    /// docs/ARCHITECTURE.md section S1.4.
     /// </summary>
     internal static class ItemStatBlockFactory
     {
@@ -122,34 +118,19 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// The binding lines the game shows, in its order: the account
-        /// dimension, then the soul dimension. The two are INDEPENDENT,
-        /// not a most-specific ladder - live3/relic-livingcity
-        /// (2026-08-26) shows "Account Bound" and "Soulbound on Use"
-        /// stacked on one item (104938, AccountBound + SoulBindOnUse).
-        /// Within a dimension the stronger flag wins: AccountBound over
-        /// AccountBindOnUse (live3 almonds 12337 and fury-scorched 86967
-        /// both carry BOTH flags and render ONE account line), and
+        /// dimension, then the soul dimension. The two are INDEPENDENT, not a
+        /// most-specific ladder - one item can carry AccountBound and
+        /// SoulBindOnUse and show both lines stacked. Within a dimension the
+        /// stronger flag wins: AccountBound over AccountBindOnUse,
         /// SoulbindOnAcquire over SoulBindOnUse.
         /// <para>
-        /// A bind-ON-ACQUIRE flag reads BARE - "Account Bound",
-        /// "Soulbound" - because that is what the game prints on the
-        /// ordinary inventory hover the module's tooltips stand in for.
-        /// MEASURED on five captures carrying such a flag: Gift of
-        /// Twilight 19648 (the 2026-08-27 owner A/B, same item hovered in
-        /// the module and in the game), heart-of-destroyer 67017 and
-        /// holographic-wings 79157 - all AccountBound + AccountBindOnUse,
-        /// all bare "Account Bound" - relic-livingcity 104938
-        /// (AccountBound + SoulBindOnUse, "Account Bound" stacked over
-        /// "Soulbound on Use") and red-festival-lantern 68638
-        /// (SoulbindOnAcquire + SoulBindOnUse, bare "Soulbound"). The
-        /// "on Acquire" wording appears on exactly two captures - almonds
-        /// 12337 and fury-scorched 86967 - and both are MATERIAL STORAGE
-        /// hovers, where the copy shown is not bound to anyone yet. Which
-        /// copy the player is looking at is instance state /v2/items
-        /// cannot carry, so the majority-and-A/B wording wins. A
-        /// bind-on-USE flag keeps its "on Use" tail: the binding has not
-        /// happened yet for any copy, and that is what the relic capture
-        /// shows.
+        /// A bind-ON-ACQUIRE flag reads BARE - "Account Bound", "Soulbound" -
+        /// because that is what the game prints on the ordinary inventory
+        /// hover these tooltips stand in for. A bind-on-USE flag keeps its
+        /// "on Use" tail: the binding has not happened yet for any copy.
+        /// Which copy the player is looking at is instance state /v2/items
+        /// cannot carry, so the wording cannot be resolved per copy.
+        /// Measurements: docs/ARCHITECTURE.md section S1.4.
         /// </para>
         /// </summary>
         private static IReadOnlyList<string> ResolveBindings(HashSet<string> flags)

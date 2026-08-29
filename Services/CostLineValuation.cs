@@ -6,24 +6,21 @@ namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Small, self-contained coin-valuation helper shared by
-    /// RecipeSheetSavingsCalculator (recipe-sheet vendor offers) and
-    /// SeasonalVendorTipCalculator (seasonal vendor offers) - both need to
-    /// answer "what does this offer's CostLines cost in coin", and both
-    /// keep the strict "skip rather than guess" posture: a non-coin
-    /// Currency line, an unpriced/zero-priced Item line, or any
-    /// unrecognized CostLine.Type makes the WHOLE offer unpriceable rather
-    /// than silently dropping that one line - repo invariant, "avoid
-    /// invalid currency comparisons".
-    ///
-    /// Deliberately much simpler than VendorBatchSolver's own evaluation,
-    /// which now DOES route an unpriced Item line into its fallback tier
-    /// rather than discarding the offer (see
+    /// RecipeSheetSavingsCalculator and SeasonalVendorTipCalculator - both
+    /// need "what do these CostLines cost in coin", and both keep the strict
+    /// "skip rather than guess" posture: a non-coin Currency line, an
+    /// unpriced/zero-priced Item line, or any unrecognized CostLine.Type
+    /// makes the WHOLE offer unpriceable rather than silently dropping that
+    /// one line - repo invariant, "avoid invalid currency comparisons".
+    /// <para>
+    /// Deliberately simpler than VendorBatchSolver's own evaluation, which
+    /// DOES route an unpriced Item line into its fallback tier (see
     /// docs/ARCHITECTURE.md section 8). It can: it has a valuation, a
     /// comparable/fallback split and a place to report non-coin costs.
-    /// These two callers have none of those - each needs a single "is this
-    /// priceable, and for how much" answer for ONE unscaled purchase, and
-    /// nowhere to put an incomparable one - so the strict posture is right
-    /// HERE and the two must not be made to converge.
+    /// These two callers have none of those - each needs one "is this
+    /// priceable, and for how much" answer for ONE unscaled purchase - so
+    /// the strict posture is right HERE and the two must not converge.
+    /// </para>
     /// </summary>
     internal static class CostLineValuation
     {
