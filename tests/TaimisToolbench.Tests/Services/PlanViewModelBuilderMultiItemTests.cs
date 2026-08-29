@@ -84,9 +84,11 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void MultiItemRequest_TitleIsFirstItemNamePlusOthersCount()
+        public void MultiItemRequest_HeadsOnTheFirstItemAndCountsTheRestInTheSuffix()
         {
             var meta = MetaFor((1, "Gift of Exordium", "a.png"), (2, "B", "b.png"), (3, "C", "c.png"));
+            meta[1].Rarity = "Legendary";
+            meta[3].Rarity = "Exotic";
             var requested = new List<PlanRequestItem>
             {
                 new PlanRequestItem { ItemId = 1, Quantity = 1 },
@@ -101,13 +103,26 @@ namespace TaimisToolbench.Tests.Services
 
             var vm = _builder.Build(result);
 
-            Assert.Equal("Gift of Exordium and 2 others", vm.TargetItemName);
-            Assert.Null(vm.TargetIconUrl);
-            Assert.Null(vm.TargetRarity);
+            // The heading item is the FIRST requested item, icon and rarity
+            // included - it used to be a nameless placeholder with both
+            // nulled, which cost the header its art and its rarity colour.
+            Assert.Equal("Gift of Exordium", vm.TargetItemName);
+            Assert.Equal("a.png", vm.TargetIconUrl);
+            Assert.Equal("Legendary", vm.TargetRarity);
+
+            // " + ", not " and ": the suffix reads as the count of the icons
+            // stacked beside it, not as a second title.
+            Assert.Equal(" + 2 others", vm.TargetNameSuffix);
+
+            Assert.Equal(2, vm.AdditionalTargetItems.Count);
+            Assert.Equal(2, vm.AdditionalTargetItems[0].ItemId);
+            Assert.Equal("B", vm.AdditionalTargetItems[0].Name);
+            Assert.Equal("b.png", vm.AdditionalTargetItems[0].IconUrl);
+            Assert.Equal("Exotic", vm.AdditionalTargetItems[1].Rarity);
         }
 
         [Fact]
-        public void MultiItemRequest_TwoItems_TitleUsesSingularOther()
+        public void MultiItemRequest_TwoItems_SuffixUsesSingularOther()
         {
             var meta = MetaFor((1, "Gift of Exordium", "a.png"), (2, "B", "b.png"));
             var requested = new List<PlanRequestItem>
@@ -120,7 +135,45 @@ namespace TaimisToolbench.Tests.Services
 
             var vm = _builder.Build(result);
 
-            Assert.Equal("Gift of Exordium and 1 other", vm.TargetItemName);
+            Assert.Equal("Gift of Exordium", vm.TargetItemName);
+            Assert.Equal(" + 1 other", vm.TargetNameSuffix);
+            Assert.Single(vm.AdditionalTargetItems);
+        }
+
+        [Fact]
+        public void MultiItemRequest_ItemWithNoMetadata_StillStacksWithNeutralIdentity()
+        {
+            // A batch item whose /v2/items lookup never landed: the run
+            // still seats an icon for it, with the module's own "Unknown
+            // Item" name, no art and no guessed rarity.
+            var meta = MetaFor((1, "Gift of Exordium", "a.png"));
+            var requested = new List<PlanRequestItem>
+            {
+                new PlanRequestItem { ItemId = 1, Quantity = 1 },
+                new PlanRequestItem { ItemId = 77, Quantity = 1 },
+            };
+            var result = MakeResult(metadata: meta, requestedItems: requested,
+                multiItemRoots: new List<CraftingTreeNode> { RootNode(1, 1, "Gift of Exordium"), RootNode(2, 77, "?") });
+
+            var vm = _builder.Build(result);
+
+            var missing = Assert.Single(vm.AdditionalTargetItems);
+            Assert.Equal(77, missing.ItemId);
+            Assert.Equal("Unknown Item", missing.Name);
+            Assert.Null(missing.IconUrl);
+            Assert.Null(missing.Rarity);
+        }
+
+        [Fact]
+        public void SingleItemRequest_HasNoBatchSuffixOrStackedItems()
+        {
+            var meta = MetaFor((1, "Zojja's Claymore", "claymore.png"));
+            var result = MakeResult(targetItemId: 1, targetQuantity: 5, metadata: meta);
+
+            var vm = _builder.Build(result);
+
+            Assert.Null(vm.TargetNameSuffix);
+            Assert.Null(vm.AdditionalTargetItems);
         }
 
         [Fact]

@@ -169,7 +169,7 @@ namespace TaimisToolbench.Views.Rendering
         // paints ON the fill (see CreateHighlightBox), so an edge lands at
         // 1 - 0.5 * 0.86 ~= 0.57 against that 0.14 interior - the ring is
         // four times the interior's density, which is what makes it read
-        // as an edge at 1px.
+        // as an edge at the frame's hairline width.
         private static readonly Color ResultHighlightTint = new Color(214, 176, 96);
         private static readonly Color ResultHighlightFill = ResultHighlightTint * 0.14f;
         private static readonly Color ResultHighlightBorder = ResultHighlightTint * 0.5f;
@@ -526,16 +526,30 @@ namespace TaimisToolbench.Views.Rendering
 #endif
         }
 
-        /// <summary>Width of the highlight box's frame.</summary>
-        private const int HighlightBoxBorder = 1;
+        /// <summary>
+        /// Width of the highlight box's frame. TWO logical pixels, for the
+        /// reason LabelHelpers.CreateRowDivider is 2px: Blish applies the
+        /// GW2 UI scale as a real GPU scale matrix, so a 1px logical quad
+        /// rasterizes to floor(scale) = 0 guaranteed physical pixels and
+        /// vanishes or survives according to its own sub-pixel phase
+        /// (KNOWN-ISSUES #23). The band's y is a scroll offset away and the
+        /// box's x follows the panel width, so the four edges each land on
+        /// a different phase - field report: the box drew its top and
+        /// bottom and neither side. At 2, floor(2 * 0.81) = 1 covered
+        /// physical pixel at the smallest supported UI scale, on all four
+        /// edges. Content is inset by CostBandBoxPadX (14) / PadY (6), so
+        /// the wider frame still cannot reach it.
+        /// </summary>
+        private const int HighlightBoxBorder = 2;
 
         /// <summary>
         /// The result tile's highlight box, and the container its caption,
         /// disclosure line and amount are parented to. The box IS the fill
         /// panel - nothing paints beneath it, so the parchment behind the
         /// section shows through at exactly ResultHighlightFill's alpha.
-        /// The frame is four 1px edge panels drawn ON the fill (so an edge
-        /// composites to fill+border, visibly denser than the interior);
+        /// The frame is four HighlightBoxBorder-wide edge panels drawn ON
+        /// the fill (so an edge composites to fill+border, visibly denser
+        /// than the interior);
         /// deliberately NOT the LabelHelpers.CreateSmallTag idiom of a
         /// border-coloured panel with the fill inset inside it, which every
         /// other caller gets away with only because its border is opaque.

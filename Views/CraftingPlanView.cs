@@ -1077,7 +1077,11 @@ namespace TaimisToolbench.Views
                     }
                 }
 
-                string target = string.IsNullOrEmpty(plan.TargetItemName) ? "unnamed" : plan.TargetItemName;
+                // TargetNameSuffix carries a batch's " + N others"; without
+                // it this line names only the first of the requested items.
+                string target = string.IsNullOrEmpty(plan.TargetItemName)
+                    ? "unnamed"
+                    : plan.TargetItemName + (plan.TargetNameSuffix ?? "");
                 return $"target={target} x{plan.TargetQuantity}, roots={rootCount}, sections={sectionCount}, rows={rowCount}";
             }
             catch (Exception ex)

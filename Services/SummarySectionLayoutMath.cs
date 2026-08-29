@@ -299,8 +299,8 @@ namespace TaimisToolbench.Services
             // lives in the hover text rather than widening this line past
             // its tile.
             return currencyRowCount == 1
-                ? "+ 1 currency required"
-                : $"+ {currencyRowCount} currencies required";
+                ? "+ 1 Currency Required"
+                : $"+ {currencyRowCount} Currencies Required";
         }
 
         /// <summary>
