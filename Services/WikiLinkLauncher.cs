@@ -5,35 +5,23 @@ using System.Threading.Tasks;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// UI-bundle milestone, Feature A (wiki links) - this module's FIRST
-    /// external-URL launch (deliberate maintainer decision, see the
-    /// milestone spec). A thin Process.Start wrapper, deliberately kept
-    /// separate from the pure, unit-tested WikiLinkBuilder: this class is
-    /// side-effecting (spawns the user's default browser) and cannot be
-    /// exercised by a real test the way WikiLinkBuilder's URL construction
-    /// can, so it stays as small as possible and carries no logic of its
-    /// own beyond "launch, and do not let a launch failure propagate into
-    /// the caller's UI event handler".
+    /// A thin Process.Start wrapper for opening a wiki page, kept separate from
+    /// the pure, unit-tested WikiLinkBuilder: this class is side-effecting and
+    /// carries no logic beyond "launch, and do not let a launch failure
+    /// propagate into the caller's UI event handler".
     /// <para>
     /// net48/Process.Start(string) already resolves through ShellExecute
-    /// (UseShellExecute defaults to true on this target framework), so a
-    /// bare http(s) URL opens the OS's default browser directly - no
-    /// ProcessStartInfo needed. Wrapped in try/catch because ShellExecute
-    /// can throw (Win32Exception - no registered URL handler, a locked-down
-    /// environment, etc.); a wiki-link click must never crash or otherwise
-    /// disrupt the Blish HUD overlay it was clicked from.
+    /// (UseShellExecute defaults to true on this target framework), so a bare
+    /// http(s) URL opens the OS's default browser directly. Wrapped in
+    /// try/catch because ShellExecute can throw (Win32Exception); a wiki-link
+    /// click must never crash the Blish HUD overlay it was clicked from.
     /// </para>
     /// <para>
-    /// Fix-pass (UI-thread stall): both call sites are mouse-event handlers
-    /// dispatched from the game update loop, and ShellExecuteEx blocks the
-    /// calling thread until the shell hands the URL off - a cold browser
-    /// start, DDE negotiation, or a "choose an app" prompt can stall that
-    /// call for hundreds of ms to seconds, freezing the whole overlay
-    /// (scroll/relayout included) for as long as it runs. The actual
-    /// Process.Start call is therefore offloaded to a background thread via
-    /// Task.Run; the try/catch stays INSIDE the task (not wrapped around
-    /// Task.Run itself) so a launch failure is still caught and logged here
-    /// rather than becoming an unobserved task exception.
+    /// ShellExecuteEx BLOCKS the calling thread until the shell hands the URL
+    /// off, and both call sites are mouse-event handlers dispatched from the
+    /// game update loop, so the call is offloaded to Task.Run. The try/catch
+    /// stays INSIDE the task - not around Task.Run itself - so a launch failure
+    /// is still caught and logged. See docs/ARCHITECTURE.md, S2.10.
     /// </para>
     /// </summary>
     internal static class WikiLinkLauncher

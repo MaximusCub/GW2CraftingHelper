@@ -2,31 +2,22 @@ namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Left-to-right x positions for the Recipe Tree toolbar row's two
-    /// per-plan STATE chips (Blish-free, unit-testable). Each chip is a
-    /// count label with its own clear button beside it: "Overrides: 3
+    /// per-plan STATE chips (Blish-free, unit-testable). Each chip is a count
+    /// label with its own clear button beside it: "Overrides: 3
     /// [Clear Overrides]", "Ignored: 2 [Clear Ignored]".
-    ///
     /// <para>
-    /// The slot they occupy used to hold a grey "Recipe Tree:" caption -
-    /// small AND grey, labelling five buttons whose own verbs and tooltips
-    /// already said what they act on. Real information replaces a caption
-    /// that named nothing.
+    /// A chip is HIDDEN entirely at zero rather than shown reading zero. A
+    /// hidden chip contributes no width and no gap, so the surviving chip sits
+    /// exactly where a lone chip should.
     /// </para>
-    ///
-    /// <para>
-    /// A chip is HIDDEN entirely at zero rather than shown reading zero: a
-    /// standing "Overrides: 0" spends attention on the absence of a thing,
-    /// and a permanently-disabled clear button beside it invites "why is
-    /// this disabled?". A hidden chip contributes no width and no gap, so
-    /// the surviving chip sits exactly where a lone chip should.
-    /// </para>
-    ///
     /// <para>
     /// The strip is not free to be as wide as its content: the same row
     /// right-anchors five buttons. <see cref="Fit"/> is the whole of the
-    /// negotiation between them, and every caller goes through it - the
-    /// x's alone are not a placement.
+    /// negotiation between them, and every caller goes through it - the x's
+    /// alone are not a placement.
     /// </para>
+    /// <para>See docs/ARCHITECTURE.md, "Services Q-Z: relocated design
+    /// narrative", for what the slot held before and why zero hides.</para>
     /// </summary>
     internal static class TreeChipStripLayout
     {

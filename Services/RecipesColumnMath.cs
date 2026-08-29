@@ -2,16 +2,8 @@ namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Pure column-edge arithmetic (Blish-free, unit-testable) for the
-    /// Required Recipes table: Recipe (flex) | Discipline | Status.
-    ///
-    /// <para>
-    /// The discipline used to be a second Caption line UNDER the recipe
-    /// name, which forced the section to carry two row heights and put a
-    /// name and its discipline on different reading lines. It is a column
-    /// now, so every recipe row is one line at
-    /// PlanContentHeightMath.RecipeRowHeight.
-    /// </para>
-    ///
+    /// Required Recipes table: Recipe (flex) | Discipline | Status. Every
+    /// recipe row is one line at PlanContentHeightMath.RecipeRowHeight.
     /// <para>
     /// Status right-anchors to PlanRelayoutMath.PinnedRightEdge; the
     /// Discipline column's text is LEFT-ruled at
@@ -20,6 +12,9 @@ namespace TaimisToolbench.Services
     /// column - the same choice the Shopping List's Source column makes);
     /// the recipe name absorbs everything the two of them leave.
     /// </para>
+    /// <para>Why the discipline is a column rather than a second caption
+    /// line: docs/ARCHITECTURE.md, "Services Q-Z: relocated design
+    /// narrative".</para>
     /// </summary>
     internal static class RecipesColumnMath
     {

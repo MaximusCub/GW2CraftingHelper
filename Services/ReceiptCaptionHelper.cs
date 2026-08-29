@@ -3,34 +3,23 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// Pure "which child index gets which caption" logic for the UI-bundle
-    /// milestone's Feature C (receipt/what-if captions). Blish-free by
-    /// design so it can be exercised by a real test over plain
-    /// CraftingTreeNode objects, independent of the Views/Rendering render
-    /// pass that consumes it.
+    /// Pure "which child index gets which caption" logic for receipt/what-if
+    /// captions. Blish-free, so a real test can exercise it over plain nodes.
     /// <para>
     /// A vendor-selected node's Children is a STACK exactly when the
-    /// cost-component-leaf synthesis AND the "what it would cost to craft
-    /// instead" reference branch both fired for the same node
-    /// (CraftingTreeBuilder.BuildNode's componentLeaves != null &amp;&amp;
-    /// wantsReferenceBranch branch): the leading run of children are
-    /// synthesized cost-component leaves (IsCostComponent == true), the
-    /// remainder are the reference branch's own recipe ingredients
-    /// (IsCostComponent == false). node.IsReferenceBranch is set true in
-    /// that same branch, so "IsReferenceBranch AND the first child is a
-    /// cost component" is exactly the stacked case - detectable from the
-    /// node alone, with no new model field needed.
+    /// cost-component-leaf synthesis AND the "craft instead" reference branch
+    /// both fired for the same node: the leading run of children are
+    /// synthesized cost-component leaves (IsCostComponent == true), the rest are
+    /// the reference branch's own ingredients. So "IsReferenceBranch AND the
+    /// first child is a cost component" is exactly the stacked case.
     /// </para>
     /// <para>
-    /// CAUTION (per the milestone spec): tree row heights flow through
-    /// PlanContentHeightMath's tree arm, which counts exactly
-    /// node.Children.Count rows per level - a frozen file this package
-    /// does not touch. This helper never adds, removes, or reorders a
-    /// node's Children; it only says which of the EXISTING children (by
-    /// index) a caption belongs in front of, so the caller can render the
-    /// caption as an extra tooltip line on that child's own row instead of
-    /// inserting a new row the height math would not know how to count -
-    /// see TreeSectionController.RenderTreeNode's captionText parameter.
+    /// This helper never adds, removes, or reorders a node's Children - tree
+    /// row heights flow through PlanContentHeightMath's tree arm, which counts
+    /// exactly node.Children.Count rows per level. It only says which EXISTING
+    /// child a caption belongs in front of; see
+    /// TreeSectionController.RenderTreeNode's captionText parameter, and
+    /// docs/ARCHITECTURE.md, S2.6.
     /// </para>
     /// </summary>
     internal static class ReceiptCaptionHelper

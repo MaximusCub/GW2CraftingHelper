@@ -4,34 +4,24 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// Builds the "value-detail" hover
-    /// text for a Recipe Tree CRAFT/VENDOR pill whose committed decision's
-    /// DECISION-ONLY comparison value (CraftingTreeNode.DecisionValue)
-    /// diverges from its displayed real gold cost (SubtreeCost) - i.e. a
-    /// valued currency (or an unpriceable descendant's own divergence,
-    /// rolled up recursively - see DecisionValue's own doc comment)
-    /// contributed to why this decision won. Spec duplicated verbatim from
-    /// gw2efficiency's own crafting-pill hover template. Kept Blish-free
-    /// (unlike TreeSectionController, which only calls this and assigns
-    /// the result to BasicTooltipText) so the actual text-building logic is
-    /// directly unit-testable, matching this repo's established pattern for
-    /// tree-rendering logic (DecisionPillPlanner, CoinSegmentMath, ...).
+    /// Builds the "value-detail" hover text for a Recipe Tree CRAFT/VENDOR pill
+    /// whose committed decision's DECISION-ONLY comparison value
+    /// (CraftingTreeNode.DecisionValue) diverges from its displayed real gold
+    /// cost (SubtreeCost) - i.e. a valued currency contributed to why this
+    /// decision won. Blish-free, so the text-building logic is unit-testable.
     ///
-    /// DECISION-ONLY (repo invariant, restated here since this class's
-    /// whole purpose is to surface a decision-only figure): every number
-    /// this class formats is for a HOVER TOOLTIP only - it must never be
-    /// copied into a displayed total anywhere else in the app.
+    /// DECISION-ONLY (repo invariant, restated here because this class's whole
+    /// purpose is to surface a decision-only figure): every number this class
+    /// formats is for a HOVER TOOLTIP only - it must never be copied into a
+    /// displayed total anywhere else in the app.
     ///
     /// This hover can never fire for an unpriceable component, only for a
-    /// valued currency. PlanSolver.RecomputeComparisonValues
-    /// sets ComparisonValue = TotalCost for every fallback-tier decision,
-    /// and fallback tier propagates transitively up through every Craft
-    /// ancestor, so an unvalued currency or GuildUpgrade ingredient
-    /// anywhere in a chosen subtree forces delta = 0 for that node AND
-    /// every ancestor above it - TryBuildContent's delta &lt;= 0 guard then
-    /// suppresses the hover for the whole chain. Documented here, not
-    /// fixed, so a future reader treats this as a known scope limit of the
-    /// current solver rollup rather than rediscovering it as a bug.
+    /// valued currency: PlanSolver.RecomputeComparisonValues sets
+    /// ComparisonValue = TotalCost for every fallback-tier decision, and
+    /// fallback tier propagates transitively up through every Craft ancestor,
+    /// so TryBuildContent's delta &lt;= 0 guard suppresses the hover for the
+    /// whole chain. A known scope limit of the current solver rollup, not a
+    /// bug; see docs/ARCHITECTURE.md, "Services Q-Z: relocated design narrative".
     /// </summary>
     internal static class ValueDetailTooltipBuilder
     {

@@ -5,59 +5,46 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// The redesigned Summary (Total Cost) section's own pure layout
-    /// arithmetic (Blish-free, unit-testable) - total content height and
-    /// the currency table's column edges.
+    /// The Summary (Total Cost) section's own pure layout arithmetic
+    /// (Blish-free, unit-testable) - total content height and the currency
+    /// table's column edges.
     ///
-    /// Deliberately kept OUT of Services/PlanContentHeightMath.cs and
-    /// Services/PlanRelayoutMath.cs, even though this class's role is
-    /// otherwise the same kind of thing both already do for every other
-    /// section: both are shared infrastructure several other sections'
-    /// row builders depend on and are high-evidence zones (see
-    /// docs/KNOWN-ISSUES.md#policy-high-evidence-zones) - off-limits for the broader
-    /// fold-back this class's own existence sidesteps.
-    /// Views/CraftingPlanView.cs's one call site
-    /// (CreateCollapsibleSection) special-cases PlanSectionType.Summary to
-    /// call BodyHeight below instead of
-    /// PlanContentHeightMath.SectionBodyHeight, the same way every other
-    /// section type still routes through that method unchanged - see
-    /// KNOWN-ISSUES #46 for the original rationale.
+    /// Views/CraftingPlanView.cs's one call site (CreateCollapsibleSection)
+    /// special-cases PlanSectionType.Summary to call BodyHeight below instead
+    /// of PlanContentHeightMath.SectionBodyHeight; every other section type
+    /// still routes through that method unchanged.
     ///
-    /// The row-height CONSTANTS themselves are not redefined here - every
-    /// formula below reads PlanContentHeightMath's existing public
-    /// CostTileRowHeight/ColumnHeaderRowHeight/CurrencyRowHeight/
-    /// FallbackTextRowHeight constants directly, so this class can never
-    /// drift from the fixed-row-height convention every other section
-    /// already follows; only the Summary-specific COUNTING logic (how many
-    /// of each fixed-height row this section's new formula-band/currency-
-    /// table/footnote shape actually has) lives here.
+    /// The row-height CONSTANTS are not redefined here - every formula below
+    /// reads PlanContentHeightMath's existing public CostTileRowHeight/
+    /// ColumnHeaderRowHeight/CurrencyRowHeight/FallbackTextRowHeight directly,
+    /// so this class can never drift from the fixed-row-height convention.
+    /// Only the Summary-specific COUNTING logic lives here.
+    ///
+    /// Why it is a separate class: docs/ARCHITECTURE.md, "Services Q-Z:
+    /// relocated design narrative"; KNOWN-ISSUES #46 for the original
+    /// rationale.
     /// </summary>
     internal static class SummarySectionLayoutMath
     {
         /// <summary>
-        /// Total height of the redesigned Total Cost section's content
-        /// FlowPanel - CraftingPlanView.CreateCollapsibleSection assigns
-        /// this to contentFlow.Height synchronously right after
+        /// Total height of the Total Cost section's content FlowPanel.
+        /// CraftingPlanView.CreateCollapsibleSection assigns this to
+        /// contentFlow.Height synchronously right after
         /// SummarySectionRenderer.Render populates it (see
-        /// PlanContentHeightMath's own class doc comment for why this
-        /// matters), so it must stay in exact agreement with what that
-        /// renderer actually builds:
-        ///   - at most one CostBandHeight-tall row for the cost formula
-        ///     band (always present - 1 or 3 CostFormulaTile rows both
-        ///     render as ONE tile row, per the collapse rule), taller
-        ///     again when the plan carries currency costs the coin figure
-        ///     cannot speak for (see CostBandHeight);
-        ///   - at most one CostTileRowHeight-tall row for the profit
-        ///     formula band (present only when ProfitFormulaTile rows
-        ///     exist - always exactly 3 when present);
-        ///   - one CurrencyTableTopGap spacer plus one
-        ///     ColumnHeaderRowHeight header plus one CurrencyRowHeight row
-        ///     per CurrencyCost row, only when at least one exists;
-        ///   - one FallbackTextRowHeight row per MultiItemNote row;
-        ///   - one FallbackTextRowHeight row for the SummaryFootnote row
-        ///     (always exactly one in practice, but summed rather than
-        ///     assumed so a null/absent footnote degrades gracefully
-        ///     instead of desyncing height from what actually rendered).
+        /// PlanContentHeightMath's class doc for why that matters), so it must
+        /// agree exactly with what that renderer builds:
+        ///   - one CostBandHeight-tall row for the cost formula band (always
+        ///     present - 1 or 3 CostFormulaTile rows both render as ONE tile
+        ///     row, per the collapse rule), taller again when the plan carries
+        ///     currency costs the coin figure cannot speak for;
+        ///   - at most one CostTileRowHeight-tall row for the profit formula
+        ///     band, present only when ProfitFormulaTile rows exist (always 3);
+        ///   - one CurrencyTableTopGap spacer plus one ColumnHeaderRowHeight
+        ///     header plus one CurrencyRowHeight row per CurrencyCost row, only
+        ///     when at least one exists;
+        ///   - one FallbackTextRowHeight row per MultiItemNote row, and one for
+        ///     the SummaryFootnote row - summed rather than assumed so an
+        ///     absent footnote degrades gracefully instead of desyncing.
         /// </summary>
         public static int BodyHeight(IReadOnlyList<PlanRowViewModel> rows)
         {

@@ -126,29 +126,21 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// One requested root's own sell-side figures - the SellableQuantity/
         /// NetSaleValue/TargetUnitSellPrice arithmetic factored out of
-        /// ApplySellSideEconomics so both the single-item path
-        /// (one call, on the plan's own tree root) and
-        /// ApplyBatchSellSideEconomics
-        /// share IDENTICAL fee math and instant-sell revenue basis - no
-        /// parallel/duplicate costing logic. itemId is passed explicitly
-        /// rather than read from itemRoot.Id: both call sites already
-        /// guarantee itemRoot.Id == itemId by construction (RecipeService.
-        /// BuildTreeAsync/BuildMultiItemTreeAsync), but keeping it explicit
-        /// means this method never silently depends on that invariant
-        /// holding.
+        /// ApplySellSideEconomics so the single-item path and
+        /// ApplyBatchSellSideEconomics share identical fee math and the same
+        /// instant-sell revenue basis, with no parallel costing logic.
         ///
-        /// ItemCraftCost is itemRoot's own SolverDecision.TotalCost (the
-        /// same post-correction, shared-vendor-batch-reconciled per-node
-        /// real coin figure CraftingTreeBuilder copies onto
-        /// CraftingTreeNode.SubtreeCost for that node's own pill display -
-        /// see PlanSolver.Solve's AllocateVendorNodeCosts/RecomputeCraftCosts
-        /// passes) - 0 when the root has no decision entry at all (should
-        /// never happen for a real tree root passed to a completed Solve,
-        /// but defensive rather than throwing). The single-item path never
-        /// reads this field (it already has its own, equivalent
-        /// solveResult.Plan.TotalCoinCost); only ApplyBatchSellSideEconomics
-        /// uses it, to attribute each item's own fair share of a batch's
-        /// (possibly materials-shared) total cost.
+        /// ItemCraftCost is itemRoot's own SolverDecision.TotalCost - the
+        /// post-correction, shared-vendor-batch-reconciled per-node real coin
+        /// figure CraftingTreeBuilder also copies onto CraftingTreeNode.
+        /// SubtreeCost - and 0 when the root has no decision entry at all. Only
+        /// ApplyBatchSellSideEconomics reads it, to attribute each item's own
+        /// fair share of a batch's (possibly materials-shared) total cost; the
+        /// single-item path has its own equivalent in
+        /// solveResult.Plan.TotalCoinCost.
+        ///
+        /// Why itemId is passed explicitly rather than read from itemRoot.Id:
+        /// docs/ARCHITECTURE.md, "Services Q-Z: relocated design narrative".
         /// </summary>
         internal struct PerItemEconomics
         {
@@ -262,72 +254,24 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Multi-item sell-side economics (gw2efficiency parity,
-        /// closes KNOWN-ISSUES #25): batch analog of ApplySellSideEconomics
-        /// for a 2+ item request. Computes each requested root's own
-        /// economics via ComputePerItemEconomics (the SAME TradingPostMath
-        /// fee math and SellInstant/instant-sell revenue basis the
-        /// single-item path already uses) and sums the survivors into the
-        /// batch-level CraftingPlanResult fields. See
-        /// docs/KNOWN-ISSUES #25's FIXED record for the full
-        /// design rationale; summary of how this diverges from gw2e's own
-        /// multi-item rollup (the `o()` function in the live app bundle -
-        /// see docs/research/m37-r2-batch-economics.md Sections 1.2/4.1):
-        ///   1. DIVERGED: unlike gw2e's rollup, there is NO craft-vs-buy
-        ///      filter here - any requested root with a live TP sell price
-        ///      contributes its own SellableQuantity/NetSaleValue/
-        ///      CraftingProfit regardless of whether the solver bought or
-        ///      crafted it. This matches this module's own already-shipped
-        ///      single-item ApplySellSideEconomics semantics (which has
-        ///      never filtered by craft-vs-buy - a flip/arbitrage number is
-        ///      still meaningful) and the research report's explicit
-        ///      recommendation (Section 4.1.1) NOT to add gw2e's own
-        ///      craft===true filter - see
-        ///      MultiItemPlanTests.GenerateStructuredAsync_MultiItem_OneRootBoughtButTradable_IncludedInSum.
-        ///   2. DIVERGED: a CRAFTED root with no live TP sell price still
-        ///      contributes NOTHING to the sum (excluded entirely - both
-        ///      its revenue AND its own craft cost drop out together) -
-        ///      NOT gw2e's silent "-cost" drag for an untradable crafted
-        ///      root.
-        ///   3. DIVERGED: single profit basis (instant-sell/buy-order, via
-        ///      SellInstant), matching the single-item row - gw2e always
-        ///      shows a second sell-listing-basis figure this module has
-        ///      never surfaced.
+        /// Multi-item sell-side economics: the batch analog of
+        /// ApplySellSideEconomics for a 2+ item request. Computes each requested
+        /// root's economics via ComputePerItemEconomics - the SAME TradingPostMath
+        /// fee math and instant-sell revenue basis the single-item path uses - and
+        /// sums the survivors into the batch-level CraftingPlanResult fields.
         ///
-        /// TargetUnitSellPrice is left null (batch fields stay at their
-        /// type default there): a batch has N per-item unit sell prices,
-        /// one per requested item, and no single number generalizes them -
-        /// mirrors that field's own "one item, one price" contract (see
-        /// CraftingPlanResult.TargetUnitSellPrice's doc comment).
+        /// TargetUnitSellPrice is left null: a batch has N per-item unit sell
+        /// prices and no single number generalizes them, matching that field's own
+        /// "one item, one price" contract. SellableQuantity/NetSaleValue/
+        /// CraftingProfit stay at their type defaults when NOT ONE requested root
+        /// has a live sell price. MaterialOpportunityCost is set whenever Valued
+        /// mode produced any usedMaterials, sellable roots or not, and is a SINGLE
+        /// sum over the batch's whole merged UsedMaterials list rather than being
+        /// scoped down to the roots that contribute to the three fields above.
         ///
-        /// MaterialOpportunityCost is always set when Valued mode produced
-        /// any usedMaterials, regardless of whether any root turns out
-        /// sellable - matching ApplySellSideEconomics' own "opportunity
-        /// cost is not gated on target sellability" contract
-        /// (CraftingPlanResult.MaterialOpportunityCost's doc comment).
-        /// SellableQuantity/NetSaleValue/CraftingProfit stay at their type
-        /// defaults (0/null/null) when NOT ONE requested root has a live
-        /// sell price - the batch equivalent of the single-item "no sell
-        /// price at all" case.
-        ///
-        /// Documented nuance, under the decision-guided reduction:
-        /// MaterialOpportunityCost
-        /// is a SINGLE sum over the batch's whole merged UsedMaterials list
-        /// (Reduce still runs on the entire wrapper tree before Solve ever
-        /// picks Buy vs Craft per root - see GenerateStructuredMultiAsync's
-        /// own step ordering) - it is NOT scoped down to only the roots
-        /// that end up contributing to SellableQuantity/NetSaleValue/
-        /// CraftingProfit above. What changed: UsedMaterials itself is now
-        /// decision-aware (InventoryReducer.Reduce's zeroOwnedDecisions
-        /// guide, fed by a throwaway zero-owned Solve() on the same
-        /// unreduced tree) - a root the solver decides to buy no longer has
-        /// its never-crafted subtree's owned ingredient stock recorded as
-        /// "used" at all, so there is nothing left to deduct from
-        /// CraftingProfit for that root. This matches the single-item
-        /// path's own updated behavior exactly (ApplySellSideEconomics'
-        /// MaterialOpportunityCost is likewise now decision-aware via the
-        /// same guided reduction) - see
-        /// MultiItemPlanTests.GenerateStructuredAsync_MultiItem_ValuedMode_MixedBuyCraftBatch_MaterialOpportunityCostNullForBoughtRootOwnedIngredient.
+        /// How this diverges from gw2efficiency's own rollup, and why
+        /// UsedMaterials is decision-aware: docs/ARCHITECTURE.md,
+        /// "Services Q-Z: relocated design narrative".
         /// </summary>
         internal static void ApplyBatchSellSideEconomics(
             CraftingPlanResult result,

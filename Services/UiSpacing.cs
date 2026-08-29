@@ -1,25 +1,23 @@
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// The spacing values that more than one layout class genuinely shares
-    /// an ORIGIN with, so a change to one lands at every site that meant it.
+    /// The spacing values that more than one layout class genuinely shares an
+    /// ORIGIN with, so a change to one lands at every site that meant it.
     ///
     /// <para>
     /// A number belongs here only when two or more classes want it for the
-    /// same reason, and their own doc comments already said so - not when
-    /// they merely happen to hold the same integer today. 8px also ships as
-    /// LogToolbarLayout.Gap and LogRowLayout.RightPad, and 20px as both
-    /// SettingsFormLayout.SectionGap (vertical, between section blocks) and
-    /// TreeToolbarRowLayout.GroupGap (horizontal, between button groups);
-    /// those are coincidences, they stay where they are, and coupling them
-    /// would make a deliberate change to one silently move the others.
+    /// same reason, and their own doc comments already said so - not when they
+    /// merely happen to hold the same integer today. Coupling a coincidence
+    /// would make a deliberate change to one silently move the others; see
+    /// docs/ARCHITECTURE.md, "Services Q-Z: relocated design narrative", for
+    /// the coincidences on record.
     /// </para>
     ///
     /// <para>
     /// Blish-free, in Services, because every consumer is: the *Layout and
     /// *Math classes are the module's testable geometry layer and may not
-    /// reference Views.Rendering. Control geometry that DOES need a Blish
-    /// type stays in Views/Rendering/UiMetrics.
+    /// reference Views.Rendering. Control geometry that DOES need a Blish type
+    /// stays in Views/Rendering/UiMetrics.
     /// </para>
     /// </summary>
     internal static class UiSpacing

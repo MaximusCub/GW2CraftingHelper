@@ -3,31 +3,23 @@ using System.Collections.Generic;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// Pure column-edge arithmetic (Blish-free, unit-testable) for the
-    /// shopping list's Source/Amount/Each/Total table columns. Each column
-    /// reserves a band; a right-aligned column's values grow leftward
-    /// inside it. Those band widths are derived per-render from the widest
-    /// actual string in each column (measured in the view via
-    /// BitmapFont.MeasureString, which is Blish-bound and therefore not
-    /// tested here), clamped to fixed minimums so short/low-value lists
-    /// don't look cramped. See ShoppingListSectionRenderer.Render for
-    /// the pre-scan that produces them.
-    ///
+    /// Pure column-edge arithmetic (Blish-free, unit-testable) for the shopping
+    /// list's Source/Amount/Each/Total table columns. Each column reserves a
+    /// band; a right-aligned column's values grow leftward inside it. Band
+    /// widths are derived per-render from the widest actual string in each
+    /// column - measured in the view via BitmapFont.MeasureString, which is
+    /// Blish-bound and so not tested here - and clamped to fixed minimums so
+    /// short lists do not look cramped. See ShoppingListSectionRenderer.Render
+    /// for the pre-scan that produces them.
     /// <para>
-    /// The bands are DISTRIBUTED over equal tracks
-    /// (<see cref="TrackCount"/>) rather than packed against the panel's
-    /// right edge, which is what stops a short item name being stranded far
-    /// left with the middle of the row empty. Below the width that supports
-    /// distribution they pack right-to-left as they always did.
-    /// </para>
-    ///
-    /// <para>
-    /// Cells keep their own rule inside their band - badges left, numbers
-    /// and coin runs right - and each HEADER centres over that band
-    /// (<see cref="HeaderX"/>) rather than sharing an edge with it. See
-    /// <see cref="JustifiedColumnTracks"/> for why a shared edge is not
-    /// enough. The Item column is the exception: it flexes, and a flexing
-    /// column's header stays on the left rule its names keep.
+    /// The bands are DISTRIBUTED over equal tracks (<see cref="TrackCount"/>)
+    /// rather than packed against the panel's right edge; below the width that
+    /// supports distribution they pack right-to-left as they always did. Cells
+    /// keep their own rule inside their band - badges left, numbers and coin
+    /// runs right - and each HEADER centres over that band
+    /// (<see cref="HeaderX"/>) rather than sharing an edge with it. The Item
+    /// column flexes, so its header stays on the left rule its names keep.
+    /// Why: docs/ARCHITECTURE.md, "Services Q-Z: relocated design narrative".
     /// </para>
     /// </summary>
     internal static class ShoppingColumnMath

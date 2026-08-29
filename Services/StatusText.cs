@@ -67,26 +67,17 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// The re-solve status line for
         /// TreeSectionController.ApplyOverridesAndResolve.
-        ///
         /// <para>
-        /// It reports the EVENT and nothing else. It used to carry the
-        /// standing override count - "Decisions updated (3 override(s))" -
-        /// which is a different kind of fact: how many decisions you have
-        /// overridden is the plan's STATE, true until you change it, while
-        /// this line says what just happened and is replaced by the next
-        /// thing that does. The two are not connected, and a line that
-        /// mixed them made the count vanish the moment anything else
-        /// happened. The count lives in the top strip's Overrides chip now
-        /// (see StatusText.ForOverridesChip), where it persists and can be
-        /// acted on.
+        /// It reports the EVENT and nothing else - never the standing override
+        /// count, which is plan STATE and lives in the top strip's Overrides
+        /// chip (see StatusText.ForOverridesChip). Why the two must not share
+        /// one line: docs/ARCHITECTURE.md, S2.8.
         /// </para>
-        ///
         /// <para>
-        /// "Best path restored" is the Best Path preset's own label and
-        /// must only be written when that preset is the trigger - never
-        /// inferred from a zero override count, which every other trigger
-        /// (Clear Overrides, a per-node pill, the ignore toggle) can also
-        /// produce.
+        /// "Best path restored" is the Best Path preset's own label and must
+        /// only be written when that preset is the trigger - never inferred
+        /// from a zero override count, which every other trigger (Clear
+        /// Overrides, a per-node pill, the ignore toggle) can also produce.
         /// </para>
         /// </summary>
         public static string ForOverrideResolve(bool isBestPathPreset)
