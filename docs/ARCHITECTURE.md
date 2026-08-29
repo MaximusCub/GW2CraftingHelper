@@ -1212,3 +1212,80 @@ header shows rides on the same walk for the same stability reason.
 `TreeToolbarRowLayout.GroupGap` (horizontal, between button groups). Those
 are coincidences, they stay where they are, and coupling them would make a
 deliberate change to one silently move the others.
+
+### S2.4 Tooltip text: wrap seams and scope vocabulary
+
+**`ShoppingRowTooltipFormatter.BuildCurrencyLines` - why "THIS ROW" and
+"wallet" are load-bearing.** Both numbers on a shopping-row currency line
+are that *row's* own total (`cc.Amount`, one `PlanStep`'s
+`VendorCurrencyCosts`), never the whole plan's requirement for that
+currency id. Without a scope marker, two shopping rows drawing on the same
+wallet currency - Karma split across two vendor rows, say - can each
+independently read as "fully covered" and double-count the one wallet
+balance. That is the same misreading class `DecisionPillPlanner`'s
+plan-scope `HAVE {have}/{planTotal} TOTAL` pill
+(`AppendCurrencyOwnershipPill`) exists to avoid, via its own explicit
+"TOTAL" suffix; "THIS ROW" is the row-scope mirror of that convention, and
+the vocabulary must never look plan-scope when it is not. The "(wallet N)"
+aside is worded the same way for the same reason: "wallet" is the one term
+this codebase uses for a raw account-wide holding figure, matching the
+Summary column-header table's "Have" column and the tree's
+`HAVE x/y TOTAL` pill.
+
+**`TooltipLayoutMath.ItemTooltipMaxContentWidth` - the corpus.** The cap is
+derived from the game's own break decisions rather than from a game-pixel
+cap converted by a scale factor, because a mean font ratio hides a real
+per-string spread (0.99x to 1.03x at Menomonia 14): `LetterSpacing = -1`
+tightens tracking on a face whose glyph boxes are already wider than the
+game's, so how a given string lands depends on its letter count as much as
+its length. Each live capture that wraps a paragraph pins the cap twice -
+it must be at least the width of the line the game *kept whole*, and below
+that line plus the word the game *pushed down*. Measured through this face,
+in this constant's units:
+
+- Gift of Twilight 19648: 320 kept / 381 with "Twilight." pushed down; its
+  "Made by combining these items in the Mystic Forge:" line, 359, stays
+  whole.
+- eyes-of-kormir 83103: 354 kept / 415 with "because"; 357 kept / 400 with
+  "under".
+- heart-of-destroyer 67017: 330 kept / 408 with "Bloodstone"; 372 kept /
+  442 with "Destroyer".
+- fury-scorched 86967: 406 kept / 430 with "for" - the one outlier.
+
+Every constraint but fury's intersects at [372, 381); 376 is its midpoint,
+so no decision sits within 4px of flipping. Fury's kept line would need a
+cap of 406+, which would un-wrap Gift of Twilight *and* eyes' second line,
+so it loses 1 constraint to 5.
+
+**`TooltipTextFormat.LineBudgetChars` - why 71, not the shipped 75.** Every
+prose string of 55 characters or more that this module builds (73 of them,
+swept out of `Services/` and `Views/`) was measured against the installed
+Menomonia 14 XNB with MonoGame.Extended's own advance / `XOffset+Width`
+rule - the same parse behind
+[`docs/research/minimum-window-width.md`](research/minimum-window-width.md)
+- and averages 7.03px per character. 500px is therefore 71 characters, not
+the 76 the original 6.5px/char estimate assumed. Per-string the spread is
+6.7 to 7.5px/char, so prose at the wide end still crosses 500px inside a
+71-character line; Blish's own space wrap takes those, which costs a break
+it would have made anyway and never loses text. The one case only this seam
+handles - a single token wider than the cap, which Blish's wrapper will not
+split - is hard-cut by `TextWrapMath` before the budget matters.
+
+The budget is a **character** count, not pixels, because a tooltip string
+is composed in `Services/`, far from any font; the alternative - threading a
+measured `Func<string, int>` down from `Views/Rendering/` - would put a
+Blish dependency on the very seam the class exists to keep Blish-free.
+
+**`TreeRowTooltipComposer.BuildExtraTooltipContent`.** The returned content
+is computed once and reused verbatim by `RenderTreeNode`'s
+`extraTooltipLines`. There was once a second entry point returning
+pre-wrapped strings; nothing called it and it is gone.
+
+**`ValueDetailTooltipBuilder`.** The hover template is duplicated verbatim
+from gw2efficiency's own crafting-pill hover, and the class is kept
+Blish-free - unlike `TreeSectionController`, which only calls it and assigns
+the result to `BasicTooltipText` - so the text-building logic is directly
+unit-testable, matching this repo's established pattern for tree-rendering
+logic (`DecisionPillPlanner`, `CoinSegmentMath`, and the rest). The
+divergence it surfaces can be an unpriceable descendant's own divergence
+rolled up recursively; see `DecisionValue`'s own doc comment.

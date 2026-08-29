@@ -69,46 +69,22 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// The item tooltip's own wrap maximum, in the width units
-        /// <c>BitmapFont.MeasureString</c> reports for the shipped
-        /// Menomonia 16 face with Blish's <c>LetterSpacing = -1</c> - the
-        /// face <c>RichTooltipSurface.BuildContent</c> draws the box in.
-        /// It is not transferable to another face: re-derive it from the
-        /// corpus below whenever that font changes.
+        /// <c>BitmapFont.MeasureString</c> reports for the shipped Menomonia 16
+        /// face with Blish's <c>LetterSpacing = -1</c> - the face
+        /// <c>RichTooltipSurface.BuildContent</c> draws the box in. It is NOT
+        /// transferable to another face: re-derive it whenever the font changes.
         /// <para>
-        /// DERIVED FROM THE GAME'S OWN BREAK DECISIONS rather than from a
-        /// game-pixel cap converted by a scale factor. A mean font ratio
-        /// hides a real per-string spread (0.99x to 1.03x at Menomonia 14),
-        /// because LetterSpacing = -1 tightens tracking on a face whose
-        /// glyph boxes are already wider than the game's, so how a given
-        /// string lands depends on its letter count as much as its length.
+        /// Derived from the game's own break decisions over a corpus of live
+        /// captures, not from a game-pixel cap converted by a scale factor: a
+        /// mean font ratio hides a real per-string spread (0.99x to 1.03x at
+        /// Menomonia 14). Every constraint but one intersects at [372, 381),
+        /// and 376 is its midpoint, so no decision sits within 4px of flipping.
+        /// The one outlier - fury-scorched 86967, the corpus's widest-measuring
+        /// string in this face - wraps one word early, a recorded, measured
+        /// cost of rendering the game's text at a face the game does not ship.
         /// </para>
-        /// <para>
-        /// Each live capture that wraps a paragraph pins the cap twice: it
-        /// must be at least the width of the line the game KEPT whole, and
-        /// below that line plus the word the game PUSHED down. Measured
-        /// through this face for the whole wrapped corpus (widths in this
-        /// constant's units):
-        /// </para>
-        /// <list type="bullet">
-        /// <item>Gift of Twilight 19648: 320 kept / 381 with "Twilight."
-        /// pushed down; its "Made by combining these items in the Mystic
-        /// Forge:" line, 359, stays whole.</item>
-        /// <item>eyes-of-kormir 83103: 354 kept / 415 with "because";
-        /// 357 kept / 400 with "under".</item>
-        /// <item>heart-of-destroyer 67017: 330 kept / 408 with
-        /// "Bloodstone"; 372 kept / 442 with "Destroyer".</item>
-        /// <item>fury-scorched 86967: 406 kept / 430 with "for" - the ONE
-        /// outlier, see below.</item>
-        /// </list>
-        /// <para>
-        /// Every constraint but fury's intersects at [372, 381); 376 is its
-        /// midpoint, so no decision sits within 4px of flipping. Fury's
-        /// kept line needs a cap of 406+, which would un-wrap Gift of
-        /// Twilight AND eyes' second line, so it loses 1 constraint to 5.
-        /// Fury's own line is the corpus's widest-measuring string in this
-        /// face and it will wrap one word early - a recorded, measured cost
-        /// of rendering the game's text at a face the game does not ship.
-        /// </para>
+        /// <para>The corpus and the arithmetic over it: docs/ARCHITECTURE.md,
+        /// "Services Q-Z: relocated design narrative".</para>
         /// </summary>
         public const int ItemTooltipMaxContentWidth = 376;
 
