@@ -126,6 +126,7 @@ Services/InlineSpinnerLayout.cs                                                 
 Services/InventoryReducer.cs                                                            383
 Services/ItemDescriptionSanitizer.cs                                                    204
 Services/ItemIconTiers.cs                                                               180
+Services/ItemInputGridLayout.cs                                                         283
 Services/ItemMetadataService.cs                                                         327
 Services/ItemRarityResolution.cs                                                         78
 Services/ItemRowRequestBuilder.cs                                                       101
@@ -399,6 +400,7 @@ tests/TaimisToolbench.Tests/Services/InlineSpinnerLayoutTests.cs                
 tests/TaimisToolbench.Tests/Services/InventoryReducerTests.cs                        1617
 tests/TaimisToolbench.Tests/Services/ItemDescriptionSanitizerTests.cs                 155
 tests/TaimisToolbench.Tests/Services/ItemIconTiersTests.cs                            150
+tests/TaimisToolbench.Tests/Services/ItemInputGridLayoutTests.cs                      303
 tests/TaimisToolbench.Tests/Services/ItemMetadataServiceConcurrencyTests.cs           197
 tests/TaimisToolbench.Tests/Services/ItemMetadataServiceStatCacheTests.cs             214
 tests/TaimisToolbench.Tests/Services/ItemMetadataServiceTests.cs                      245
