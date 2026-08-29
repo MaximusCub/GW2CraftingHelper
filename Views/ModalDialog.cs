@@ -135,6 +135,31 @@ namespace TaimisToolbench.Views
         // disables its Snapshot buttons) knows not to arm it.
         public bool Show(string message, Action onConfirm, Action onCancel, string confirmText, string cancelText = "Cancel")
         {
+            return ShowCore(message, onConfirm, onCancel, confirmText, cancelText, acknowledgeOnly: false);
+        }
+
+        /// <summary>
+        /// A dialog with nothing to confirm: one button, which only
+        /// dismisses it. For telling the user why the thing they just did
+        /// produced no result - the status line under the toolbar says the
+        /// same thing and keeps saying it, but it is nowhere near the
+        /// button they pressed, so on its own it reads as no response.
+        /// <para>
+        /// Same refusal contract as <see cref="Show"/>: false when another
+        /// caller's dialog is already up. A refused acknowledgement is
+        /// simply not shown - there is no state to unwind, and the status
+        /// line has the message either way.
+        /// </para>
+        /// </summary>
+        public bool ShowAcknowledgement(string message, string dismissText = "OK")
+        {
+            return ShowCore(message, null, null, dismissText, null, acknowledgeOnly: true);
+        }
+
+        private bool ShowCore(
+            string message, Action onConfirm, Action onCancel,
+            string confirmText, string cancelText, bool acknowledgeOnly)
+        {
             if (_isShowing)
             {
                 return false;
@@ -208,7 +233,7 @@ namespace TaimisToolbench.Views
             int btnW = System.Math.Max(100, buttonMeasure(confirmText ?? "") + ButtonSidePadding);
             int cancelW = System.Math.Max(70, buttonMeasure(cancelLabel) + ButtonSidePadding);
             int btnGap = 16;
-            int totalBtnW = btnW + btnGap + cancelW;
+            int totalBtnW = acknowledgeOnly ? btnW : btnW + btnGap + cancelW;
             int btnX = (ContentWidth - totalBtnW) / 2;
             int btnY = ButtonY;
 
@@ -221,14 +246,17 @@ namespace TaimisToolbench.Views
             };
             confirmBtn.Click += (_, __) => Dismiss(confirmed: true);
 
-            var cancelBtn = new FeedbackButton()
+            if (!acknowledgeOnly)
             {
-                Text = cancelLabel,
-                Size = new Point(cancelW, ButtonHeight),
-                Location = new Point(btnX + btnW + btnGap, btnY),
-                Parent = _window,
-            };
-            cancelBtn.Click += (_, __) => Dismiss(confirmed: false);
+                var cancelBtn = new FeedbackButton()
+                {
+                    Text = cancelLabel,
+                    Size = new Point(cancelW, ButtonHeight),
+                    Location = new Point(btnX + btnW + btnGap, btnY),
+                    Parent = _window,
+                };
+                cancelBtn.Click += (_, __) => Dismiss(confirmed: false);
+            }
 
             // Position: restore saved location, or center on first show
             var screen = GameService.Graphics.SpriteScreen;

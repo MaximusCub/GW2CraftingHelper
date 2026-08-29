@@ -35,6 +35,10 @@ namespace TaimisToolbench.Views
         // Inner padding between border chrome and view content
         private const int INNER_PADDING = WindowSizing.TabPanelInnerPadding;
 
+        // Above the hosted view's content panel, which keeps Blish's
+        // default 0 - see the assignment in Build for why.
+        private const int ContentChromeZIndex = 1;
+
         private readonly Action<Container> _buildAction;
         private readonly Action<Container> _decorateBand;
         private readonly string _title;
@@ -115,6 +119,16 @@ namespace TaimisToolbench.Views
             // the x-range Blish's own title header would have used.
             var titleBand = HeaderBands.CreateTabTitleBand(
                 borderedPanel, BandWidth(borderedSize), _title, INNER_PADDING + UiSpacing.Inset);
+
+            // Painted after the view's content panel, not before it. A
+            // scrolling panel inside that view paints a few pixels above
+            // its own top edge - see CraftingPlanView.TopStripZIndex for
+            // the clip arithmetic and where it is transcribed from - and
+            // the band is the one opaque surface in the chain, so it is
+            // also the one that can be relied on to cover a leak that
+            // reaches this far up. Costs nothing: the band and the content
+            // panel do not overlap, so no hit test changes.
+            titleBand.ZIndex = ContentChromeZIndex;
 
             // The decorator's strip starts where the content panel starts
             // and is as wide, so a caller right-anchoring against its width
