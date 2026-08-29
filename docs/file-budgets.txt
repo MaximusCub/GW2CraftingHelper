@@ -93,7 +93,7 @@ Services/CoinSegmentMath.cs                                                     
 Services/ColumnBoardLayout.cs                                                           130
 Services/CompetencyOpportunityCalculator.cs                                              83
 Services/CompositeRecipeApiClient.cs                                                     84
-Services/CostLineValuation.cs                                                           105
+Services/CostLineValuation.cs                                                           121
 Services/CraftCompetencyEvaluator.cs                                                    125
 Services/CraftableItemSearchProvider.cs                                                 127
 Services/CraftingPlanPipeline.cs                                                        1629
@@ -261,7 +261,7 @@ Services/TreeToolbarRowLayout.cs                                                
 Services/TypeRampMetrics.cs                                                             171
 Services/UiSpacing.cs                                                                    53
 Services/ValueDetailTooltipBuilder.cs                                                   159
-Services/VendorBatchSolver.cs                                                          1052
+Services/VendorBatchSolver.cs                                                          1066
 Services/VendorOfferLoader.cs                                                            51
 Services/VendorOfferStore.cs                                                            218
 Services/WheelDeltaSanitizer.cs                                                          92
@@ -458,6 +458,7 @@ tests/TaimisToolbench.Tests/Services/PlanSolverCoreDecisionTests.cs             
 tests/TaimisToolbench.Tests/Services/PlanSolverCraftCompetencyTests.cs                585
 tests/TaimisToolbench.Tests/Services/PlanSolverCraftVendorComparabilityTests.cs       557
 tests/TaimisToolbench.Tests/Services/PlanSolverCurrencyValuationTests.cs              456
+tests/TaimisToolbench.Tests/Services/PlanSolverEmptyCostLineOfferTests.cs             141
 tests/TaimisToolbench.Tests/Services/PlanSolverForceBuyOnlyTests.cs                   166
 tests/TaimisToolbench.Tests/Services/PlanSolverGoldenTests.cs                         289
 tests/TaimisToolbench.Tests/Services/PlanSolverGuildUpgradeTests.cs                   356
@@ -472,7 +473,7 @@ tests/TaimisToolbench.Tests/Services/PlanSolverUnpricedBarterOfferTests.cs      
 tests/TaimisToolbench.Tests/Services/PlanSolverVendorBatchingTests.cs                 805
 tests/TaimisToolbench.Tests/Services/PlanSolverVendorCapTests.cs                      455
 tests/TaimisToolbench.Tests/Services/PlanSolverVendorOfferTests.cs                    614
-tests/TaimisToolbench.Tests/Services/PlanStoreTests.cs                               2438
+tests/TaimisToolbench.Tests/Services/PlanStoreTests.cs                               2439
 tests/TaimisToolbench.Tests/Services/PlanStripStatusBoardTests.cs                     406
 tests/TaimisToolbench.Tests/Services/PlanStripTickDecisionTests.cs                    166
 tests/TaimisToolbench.Tests/Services/PlanTableSorterTests.cs                          446

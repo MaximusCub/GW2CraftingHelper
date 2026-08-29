@@ -2228,7 +2228,11 @@ namespace TaimisToolbench.Tests.Services
         // exactly what an unserialized writer collision looks like. The
         // serialization claim therefore gets its own reader-free phase
         // where zero failures is the only permitted result. ---
-        [Fact]
+        // The 60s is a hang catcher, not a latency claim - every verdict
+        // below is about WHAT the racing threads produced, never how fast.
+        // Framework-held for the reason spelled out on the same attribute in
+        // Gw2BuildApiClientTests.TryGetBuildId_HungResponse_IsAbandonedAndRetried.
+        [Fact(Timeout = 60000)]
         public async Task SaveAndLoad_ConcurrentWriters_SerializeAndNeverYieldATornPlan()
         {
             var shallowPipeline = BuildPipeline(out var shallowPrices);
@@ -2304,9 +2308,7 @@ namespace TaimisToolbench.Tests.Services
             };
 
             start.Set();
-            var all = Task.WhenAll(tasks);
-            Assert.Same(all, await Task.WhenAny(all, Task.Delay(TimeSpan.FromSeconds(60))));
-            await all;
+            await Task.WhenAll(tasks);
 
             // Nothing may escape the public surface: Save and LoadLatest
             // both degrade IO failure to their callbacks, and a lost write
@@ -2372,7 +2374,6 @@ namespace TaimisToolbench.Tests.Services
                 Task.Run(() => serializedWriter(shallowPlan)),
                 Task.Run(() => serializedWriter(deepPlan)));
             serializedStart.Set();
-            Assert.Same(writersOnly, await Task.WhenAny(writersOnly, Task.Delay(TimeSpan.FromSeconds(60))));
             await writersOnly;
 
             Assert.Empty(escaped);

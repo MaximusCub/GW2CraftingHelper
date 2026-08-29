@@ -5,8 +5,9 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// Small, self-contained coin-valuation helper shared by
-    /// RecipeSheetSavingsCalculator and SeasonalVendorTipCalculator - both
+    /// Small, self-contained coin-valuation helper. TryGetCoinCost is
+    /// shared by RecipeSheetSavingsCalculator and
+    /// SeasonalVendorTipCalculator - both
     /// need "what do these CostLines cost in coin", and both keep the strict
     /// "skip rather than guess" posture: a non-coin Currency line, an
     /// unpriced/zero-priced Item line, or any unrecognized CostLine.Type
@@ -20,10 +21,30 @@ namespace TaimisToolbench.Services
     /// These two callers have none of those - each needs one "is this
     /// priceable, and for how much" answer for ONE unscaled purchase - so
     /// the strict posture is right HERE and the two must not converge.
+    /// HasAnyCostLine is the one rule they DO share; the solver calls it.
     /// </para>
     /// </summary>
     internal static class CostLineValuation
     {
+        /// <summary>
+        /// The one home of "never invent a zero-cost purchase out of an
+        /// empty or missing cost-line list": a fold over no lines
+        /// terminates at 0, the cheapest number there is, and outranks
+        /// every priced route. Not hypothetical - 1,896 of the 59,414 rows
+        /// in ref/vendor_offers.json ship with an empty costLines array,
+        /// across 721 distinct output items (MEASURED 2026-08-29).
+        /// <para>
+        /// Shared with VendorBatchSolver.EvaluateVendorOffers, which cannot
+        /// reuse TryGetCoinCost itself - see the type doc above for why the
+        /// two valuations must not converge - but must apply this one rule
+        /// identically.
+        /// </para>
+        /// </summary>
+        internal static bool HasAnyCostLine(IReadOnlyList<CostLine> costLines)
+        {
+            return costLines != null && costLines.Count > 0;
+        }
+
         internal static bool TryGetCoinCost(
             IReadOnlyList<CostLine> costLines,
             IReadOnlyDictionary<int, ItemPrice> prices,
@@ -31,10 +52,8 @@ namespace TaimisToolbench.Services
             out long coinCost)
         {
             coinCost = 0;
-            if (costLines == null || costLines.Count == 0)
+            if (!HasAnyCostLine(costLines))
             {
-                // Nothing to value - never invent a zero-cost offer out of
-                // an empty/missing cost-line list.
                 return false;
             }
 

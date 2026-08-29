@@ -137,22 +137,24 @@ namespace TaimisToolbench.Tests.Services
             }
         }
 
-        [Fact]
+        // Bounded by the framework rather than by a wall clock inside the
+        // test: the per-attempt timeout is the ONLY thing that ever completes
+        // this call when the caller passes None, so if that timeout regresses
+        // this test must go RED rather than hang the suite to the job timeout
+        // with no test named as the culprit. The 30s is a hang catcher, not a
+        // latency claim - the real run is three 50ms attempts - because a
+        // bound raced inside the test is a race a starved CI thread pool can
+        // lose while the code under test is correct. MEASURED on xUnit 2.6.6:
+        // Timeout is enforced for async tests only, and it abandons the
+        // overrunning test rather than waiting it out.
+        [Fact(Timeout = 30000)]
         public async Task TryGetBuildId_HungResponse_IsAbandonedAndRetried()
         {
             using (var handler = new HangingHandler())
             using (var http = new HttpClient(handler))
             {
-                // Bounded by the test, not just by the code under test. The
-                // per-attempt timeout is the ONLY thing that ever completes
-                // this call when the caller passes None, so if that timeout
-                // regresses this test must go RED rather than hang the whole
-                // suite - an unbounded await here burns a CI runner to the job
-                // timeout with no test named as the culprit.
-                var pending = NoDelay(http, TimeSpan.FromMilliseconds(50))
+                var result = await NoDelay(http, TimeSpan.FromMilliseconds(50))
                     .TryGetBuildIdAsync(CancellationToken.None);
-                Assert.Same(pending, await Task.WhenAny(pending, Task.Delay(TimeSpan.FromSeconds(10))));
-                var result = await pending;
 
                 // A response that never arrives must be given up on per attempt
                 // and retried, not waited out: the caller is told to degrade.
