@@ -1702,20 +1702,17 @@ namespace TaimisToolbench.Views
 
                 RankerRowLayout.GateBar(bands, i, labelBand, out int barX, out int barWidth);
 
-                // A gate this item does not have gets NO bar. An empty bar
-                // would be a 0% reading, and "this item needs no recipe
-                // unlocks" is not the same claim as "you have unlocked none
-                // of the recipes it needs".
-                double fraction = gate.Applies ? gate.Completion : -1;
+                // A gate this item does not have draws a FULL bar: there is
+                // nothing outstanding behind a barrier that is not there, so
+                // it reads 100% like any other finished gate
+                // (RankerReadinessCalculator.FormatGate, which is also where
+                // the caveat about the headline lives).
+                double fraction = gate.Applies ? gate.Completion : 1.0;
                 row.GateFractions.Add(fraction);
-                Panel track = null;
-                Panel fill = null;
-                if (gate.Applies)
-                {
-                    track = CreateBar(
-                        row.Panel, barX, gateY + GateBarOffsetY, barWidth,
-                        RankerRowLayout.GateBarHeight, gate.Completion, out fill);
-                }
+                Panel fill;
+                Panel track = CreateBar(
+                    row.Panel, barX, gateY + GateBarOffsetY, barWidth,
+                    RankerRowLayout.GateBarHeight, fraction, out fill);
 
                 row.GateBarTracks.Add(track);
                 row.GateBarFills.Add(fill);
@@ -1727,7 +1724,7 @@ namespace TaimisToolbench.Views
                     // on the ramp (Services/RankerReadinessRamp) - which is
                     // the constraint that made the ramp as deep as it is.
                     Text = RankerReadinessCalculator.FormatGate(gate),
-                    TextColor = gate.Applies ? Color.White : ValueTextColor,
+                    TextColor = Color.White,
                     AutoSizeWidth = true,
                     AutoSizeHeight = true,
                     Location = new Point(0, gateY + GateValueY),
@@ -1898,18 +1895,12 @@ namespace TaimisToolbench.Views
 
                 RankerRowLayout.GateBar(bands, i, labelBand, out int barX, out int barWidth);
                 var track = row.GateBarTracks[i];
-                if (track != null)
-                {
-                    track.Location = new Point(barX, track.Location.Y);
-                    track.Size = new Point(barWidth, RankerRowLayout.GateBarHeight);
-                    row.GateBarFills[i].Size = new Point(
-                        RankerReadinessRamp.FillWidth(barWidth, row.GateFractions[i]),
-                        RankerRowLayout.GateBarHeight);
-                }
+                track.Location = new Point(barX, track.Location.Y);
+                track.Size = new Point(barWidth, RankerRowLayout.GateBarHeight);
+                row.GateBarFills[i].Size = new Point(
+                    RankerReadinessRamp.FillWidth(barWidth, row.GateFractions[i]),
+                    RankerRowLayout.GateBarHeight);
 
-                // Centred in the bar's own span whether or not a bar was
-                // drawn, so an inapplicable gate's dash sits where every
-                // other cell's number sits rather than trailing its label.
                 var value = row.GateValueLabels[i];
                 value.Location = new Point(
                     barX + Math.Max(0, (barWidth - value.Width) / 2), value.Location.Y);
@@ -2268,7 +2259,7 @@ namespace TaimisToolbench.Views
                 lines.Add(gate.Applies
                     ? label + ": " + RankerReadinessCalculator.FormatPercent(gate.Completion) +
                       " at weight " + gate.Weight.ToString("0.00", CultureInfo.InvariantCulture)
-                    : label + ": this item has none");
+                    : label + ": this item has none, so it is not part of the blend");
             }
 
             lines.Add("");

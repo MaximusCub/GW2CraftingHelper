@@ -178,15 +178,32 @@ namespace TaimisToolbench.Services
                 : metrics.DaysRemaining.ToString(CultureInfo.InvariantCulture) + "d";
         }
 
-        /// <summary>One gate's cell in the breakdown sub-line: "82%" or a dash.</summary>
+        /// <summary>
+        /// One gate's cell in the breakdown sub-line: "82%", or 100% for a
+        /// gate the item does not have - nothing is outstanding behind a
+        /// barrier that is not there (owner ruling, 2026-08-28).
+        /// <para>
+        /// The cell is NOT a term of the headline. An inapplicable gate is
+        /// dropped from the weighted mean entirely (see <see cref="Compute"/>),
+        /// which is not the same as entering it at 1.0: dropping
+        /// renormalises, so the gate ends up worth the mean of the others
+        /// rather than pulling the mean upward. A row can therefore read
+        /// 100% in this cell and still be under 100% overall, and the Ready
+        /// hover is what says which gates the headline was blended from.
+        /// </para>
+        /// <para>
+        /// The dash survives for a MISSING gate object - a row that has
+        /// never been measured, not a barrier the item does not have.
+        /// </para>
+        /// </summary>
         public static string FormatGate(RankerGateScore gate)
         {
-            if (gate == null || !gate.Applies)
+            if (gate == null)
             {
                 return DashText;
             }
 
-            return FormatPercent(gate.Completion);
+            return FormatPercent(gate.Applies ? gate.Completion : 1.0);
         }
 
         public static string GateLabel(RankerGate gate)
