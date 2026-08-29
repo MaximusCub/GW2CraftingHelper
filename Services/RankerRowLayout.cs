@@ -481,7 +481,7 @@ namespace TaimisToolbench.Services
         /// <para>
         /// A block with no lines takes no height AND no gap, so a row with
         /// nothing below its headline is exactly RowHeight tall - which is
-        /// what compact mode is.
+        /// what the table shows with both display toggles off.
         /// </para>
         /// </summary>
         public readonly struct SubLineBlock
@@ -556,8 +556,11 @@ namespace TaimisToolbench.Services
             /// <summary>Left edge of the right-anchored Refresh button.</summary>
             public readonly int RefreshX;
 
-            /// <summary>Left edge of the compact toggle, seated left of Refresh.</summary>
-            public readonly int CompactX;
+            /// <summary>Left edge of the first display toggle, seated left of the second.</summary>
+            public readonly int FirstToggleX;
+
+            /// <summary>Left edge of the second display toggle, seated left of Refresh.</summary>
+            public readonly int SecondToggleX;
 
             /// <summary>Left edge of the status line's band.</summary>
             public readonly int StatusX;
@@ -568,10 +571,12 @@ namespace TaimisToolbench.Services
             /// </summary>
             public readonly int StatusWidth;
 
-            public ToolbarSlots(int refreshX, int compactX, int statusX, int statusWidth)
+            public ToolbarSlots(
+                int refreshX, int firstToggleX, int secondToggleX, int statusX, int statusWidth)
             {
                 RefreshX = refreshX;
-                CompactX = compactX;
+                FirstToggleX = firstToggleX;
+                SecondToggleX = secondToggleX;
                 StatusX = statusX;
                 StatusWidth = statusWidth;
             }
@@ -579,20 +584,30 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// The toolbar row: one full-width status band on the left, the
-        /// Refresh button pinned right, the inline spinner between them.
+        /// Refresh button pinned right, the two display toggles between them
+        /// in reading order, the inline spinner after the status text.
         /// The refresh-progress text renders in the status band and ONLY
         /// there - the field test showed status-length text stamped onto
         /// the fixed-width button spilling past its edges.
+        /// <para>
+        /// A toggle whose width is zero takes no slot at all, so the status
+        /// band keeps the space rather than a rail of nothing sitting in it.
+        /// </para>
         /// </summary>
         public static ToolbarSlots Toolbar(
-            int barWidth, int spinnerSize, int labelGap, int compactWidth = 0)
+            int barWidth, int spinnerSize, int labelGap,
+            int firstToggleWidth = 0, int secondToggleWidth = 0)
         {
             int refreshX = Math.Max(0, barWidth - RefreshButtonWidth);
-            int compactX = compactWidth <= 0
+            int secondX = secondToggleWidth <= 0
                 ? refreshX
-                : Math.Max(Inset, refreshX - CellGap - compactWidth);
-            int statusRight = compactX - spinnerSize - 2 * labelGap;
-            return new ToolbarSlots(refreshX, compactX, Inset, Math.Max(0, statusRight - Inset));
+                : Math.Max(Inset, refreshX - CellGap - secondToggleWidth);
+            int firstX = firstToggleWidth <= 0
+                ? secondX
+                : Math.Max(Inset, secondX - CellGap - firstToggleWidth);
+            int statusRight = firstX - spinnerSize - 2 * labelGap;
+            return new ToolbarSlots(
+                refreshX, firstX, secondX, Inset, Math.Max(0, statusRight - Inset));
         }
 
         public readonly struct ModeStripSlots

@@ -75,12 +75,21 @@ namespace TaimisToolbench.Models
         internal RankerMode Mode { get; set; }
 
         /// <summary>
-        /// Whether the table hides each row's currency detail and notes,
-        /// showing the headline and the gate percentages alone. Additive in
-        /// exactly the same way as Mode: a file written before the field
-        /// existed deserializes to false, which is the full breakdown the
-        /// tab has always shown.
+        /// Whether every row draws the category strip - materials,
+        /// currencies, time gates, disciplines, recipes - and the notes that
+        /// explain it. Off by default, as <see cref="ShowCurrencies"/> is:
+        /// the headline row is the comparison and everything under it is the
+        /// explanation, so the table opens on twenty rows of comparison
+        /// rather than five rows of essay.
         /// </summary>
-        public bool Compact { get; set; }
+        public bool ShowCategories { get; set; }
+
+        /// <summary>
+        /// Whether every row lists the currencies it is still short of.
+        /// Independent of <see cref="ShowCategories"/>: the currency list
+        /// answers "which currency, and how much", which the Currencies
+        /// category percentage alone cannot.
+        /// </summary>
+        public bool ShowCurrencies { get; set; }
     }
 }

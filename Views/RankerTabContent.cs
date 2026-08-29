@@ -165,7 +165,8 @@ namespace TaimisToolbench.Views
         private Label _modeLabel;
         private readonly List<ModeRadio> _modeRadios = new List<ModeRadio>();
         private Label _statusLabel;
-        private Checkbox _compactCheckbox;
+        private Checkbox _categoriesCheckbox;
+        private Checkbox _currenciesCheckbox;
         private LoadingSpinner _spinner;
         private Panel _bannerPanel;
         private Label _bannerLabel;
@@ -345,11 +346,14 @@ namespace TaimisToolbench.Views
         private RankerMode Mode => _watchlist.Mode;
 
         /// <summary>
-        /// Headline plus gate percentages only - see RenderSubLines. Persisted
-        /// beside the mode, because it is the same kind of choice: how the
-        /// user wants to read the table, not what the table says.
+        /// The two display toggles - see RenderSubLines. Persisted beside the
+        /// mode, because they are the same kind of choice: how the user wants
+        /// to read the table, not what the table says. Both off is the
+        /// default, and is the headline row alone.
         /// </summary>
-        private bool Compact => _watchlist.Compact;
+        private bool ShowCategories => _watchlist.ShowCategories;
+
+        private bool ShowCurrencies => _watchlist.ShowCurrencies;
 
         // ---------------------------------------------------------------
         // Comparison mode
@@ -647,15 +651,27 @@ namespace TaimisToolbench.Views
 
             // Blish's own Checkbox, art and all - the module's established
             // shape for a persisted on/off, and no glyph anywhere near it.
-            _compactCheckbox = new Checkbox
+            // Two of them, in the order the detail they reveal appears down
+            // the row: the category strip, then the currency list under it.
+            _categoriesCheckbox = new Checkbox
             {
-                Text = "Compact",
-                Checked = Compact,
+                Text = CategoriesToggleText,
+                Checked = ShowCategories,
                 Location = new Point(0, 12),
                 Parent = _toolbarPanel,
             };
-            TooltipFacility.ApplyPlain(_compactCheckbox, CompactTooltip);
-            _compactCheckbox.CheckedChanged += (_, e) => OnCompactChanged(e.Checked);
+            TooltipFacility.ApplyPlain(_categoriesCheckbox, CategoriesTooltip);
+            _categoriesCheckbox.CheckedChanged += (_, e) => OnShowCategoriesChanged(e.Checked);
+
+            _currenciesCheckbox = new Checkbox
+            {
+                Text = CurrenciesToggleText,
+                Checked = ShowCurrencies,
+                Location = new Point(0, 12),
+                Parent = _toolbarPanel,
+            };
+            TooltipFacility.ApplyPlain(_currenciesCheckbox, CurrenciesTooltip);
+            _currenciesCheckbox.CheckedChanged += (_, e) => OnShowCurrenciesChanged(e.Checked);
 
             _refreshButton = new FeedbackButton
             {
@@ -667,21 +683,40 @@ namespace TaimisToolbench.Views
             _refreshButton.Click += (_, __) => OnRefreshClicked();
         }
 
-        private const string CompactTooltip =
-            "Show each row's headline and its five category percentages only, so more rows fit on screen. The currency detail and the notes come back when you switch it off.";
+        private const string CategoriesToggleText = "Show Categories";
+        private const string CurrenciesToggleText = "Show Currencies";
+
+        private const string CategoriesTooltip =
+            "Show the five categories under each row - materials, currencies, time gates, disciplines and recipes - as the bars the Ready figure is blended from, along with the notes that explain them. Off by default so more rows fit on screen.";
+
+        private const string CurrenciesTooltip =
+            "List the currencies each row is still short of, and by how much. The Currencies category says how close you are; this says which currency.";
 
         /// <summary>
         /// A display choice, not a measurement one: nothing is recomputed and
         /// no answer changes, so both modes' answer sets survive it untouched.
         /// </summary>
-        private void OnCompactChanged(bool compact)
+        private void OnShowCategoriesChanged(bool show)
         {
-            if (compact == _watchlist.Compact)
+            if (show == _watchlist.ShowCategories)
             {
                 return;
             }
 
-            _watchlist.Compact = compact;
+            _watchlist.ShowCategories = show;
+            Persist();
+            RebuildRows();
+        }
+
+        /// <summary>See <see cref="OnShowCategoriesChanged"/>.</summary>
+        private void OnShowCurrenciesChanged(bool show)
+        {
+            if (show == _watchlist.ShowCurrencies)
+            {
+                return;
+            }
+
+            _watchlist.ShowCurrencies = show;
             Persist();
             RebuildRows();
         }
@@ -745,14 +780,14 @@ namespace TaimisToolbench.Views
             // The checkbox's art hangs 9px left of its own Location (Blish
             // draws it at x-9), so the width the toolbar reserves for it
             // includes that overhang and the control is seated 9px inside.
-            int compactWidth = CheckboxArtOverhang + CheckboxTextInset
-                + LabelHelpers.MeasureWith(UiFonts.Caption)(_compactCheckbox.Text);
             var toolbar = RankerRowLayout.Toolbar(
                 barWidth, InlineSpinnerLayout.SnapshotStatusSize, InlineSpinnerLayout.LabelGap,
-                compactWidth);
+                ToggleFootprint(_categoriesCheckbox), ToggleFootprint(_currenciesCheckbox));
             _refreshButton.Location = new Point(toolbar.RefreshX, _refreshButton.Location.Y);
-            _compactCheckbox.Location = new Point(
-                toolbar.CompactX + CheckboxArtOverhang, _compactCheckbox.Location.Y);
+            _categoriesCheckbox.Location = new Point(
+                toolbar.FirstToggleX + CheckboxArtOverhang, _categoriesCheckbox.Location.Y);
+            _currenciesCheckbox.Location = new Point(
+                toolbar.SecondToggleX + CheckboxArtOverhang, _currenciesCheckbox.Location.Y);
             _statusLabel.Width = toolbar.StatusWidth;
             InlineSpinner.PlaceAfter(_spinner, _statusLabel, InlineSpinnerLayout.LabelGap);
 
@@ -767,6 +802,16 @@ namespace TaimisToolbench.Views
             _contentPanel.Size = new Point(
                 width, Math.Max(0, height - TopChromeHeight - captionsHeight));
             _contentPanel.Location = new Point(0, TopChromeHeight);
+        }
+
+        /// <summary>
+        /// What one toggle costs the toolbar: Blish's checkbox art, the inset
+        /// it draws its label at, and the label itself.
+        /// </summary>
+        private static int ToggleFootprint(Checkbox checkbox)
+        {
+            return CheckboxArtOverhang + CheckboxTextInset
+                + LabelHelpers.MeasureWith(UiFonts.Caption)(checkbox.Text);
         }
 
         private void PositionColumnHeader(int barWidth)
@@ -1652,12 +1697,14 @@ namespace TaimisToolbench.Views
         /// The row's breakdown, under its headline. Returns the block the
         /// row's height is taken from.
         /// <para>
-        /// COMPACT MODE stops after the gate strip: the five category
-        /// percentages are the comparison, the currency detail and the notes
-        /// are the explanation, and a user comparing twenty rows wants the
-        /// former on screen at once (owner ruling, 2026-08-27). Nothing is
-        /// lost - the hidden detail is one toggle away, and the gate strip
-        /// itself still hovers with its own numbers.
+        /// TWO TOGGLES, both off by default: the headline row is the
+        /// comparison and everything here is the explanation, and a user
+        /// comparing twenty rows wants the comparison on screen at once
+        /// (owner ruling, 2026-08-28). Nothing is lost - each half is one
+        /// toggle away, and the headline itself still hovers with the
+        /// breakdown. The NOTES travel with the category strip because that
+        /// is what they explain: a discipline gap, a contested claim, a
+        /// vendor cap on one of the five categories.
         /// </para>
         /// </summary>
         private RankerRowLayout.SubLineBlock RenderSubLines(
@@ -1669,15 +1716,14 @@ namespace TaimisToolbench.Views
                 return RankerRowLayout.SubLines(false, 0, 0);
             }
 
-            bool detail = !Compact;
-            int currencyLines = detail
+            int currencyLines = ShowCurrencies
                 ? RankerRowLayout.CurrencyLineCount(metrics.CurrencyShortfalls.Count)
                 : 0;
-            var notes = detail ? BuildNotes(metrics) : EmptyNotes;
+            var notes = ShowCategories ? BuildNotes(metrics) : EmptyNotes;
 
             // A measured row always has gates; one that somehow has none
             // must not reserve a line for a strip it will not draw.
-            bool hasGates = metrics.Gates != null && metrics.Gates.Count > 0;
+            bool hasGates = ShowCategories && metrics.Gates != null && metrics.Gates.Count > 0;
             var block = RankerRowLayout.SubLines(hasGates, currencyLines, notes.Count);
 
             // The gate breakdown, justified across the full sub-line band so
