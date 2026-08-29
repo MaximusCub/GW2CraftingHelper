@@ -6,34 +6,24 @@ using TaimisToolbench.Services;
 namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
-    /// THE background stat top-up, for a tab that draws item rows whose
-    /// stat blocks nothing has fetched yet.
-    ///
-    /// <para>
-    /// It exists because the session stat cache
+    /// THE background stat top-up, for a tab that draws item rows whose stat
+    /// blocks nothing has fetched yet. The session stat cache
     /// (<c>ItemMetadataService.GetCachedStatBlock</c>) is a PURE READ - it
-    /// never fetches, because its caller is a hover on the UI thread. A tab
-    /// handed only that accessor can therefore render a full item tooltip
-    /// only for items some earlier plan happened to touch, and shows the
-    /// identity-only fallback for everything else. Warming is what closes
-    /// the gap between "this row knows its name, icon and rarity" and "this
-    /// row shows the same tooltip the game does".
-    /// </para>
-    ///
+    /// never fetches, because its caller is a hover on the UI thread - so a
+    /// tab handed only that accessor renders a full item tooltip only for
+    /// items some earlier plan happened to touch.
     /// <para>
     /// Fire and forget by design: the rows are already on screen and their
     /// hovers are DEFERRED, so the next hover picks up whatever landed
     /// without a re-render. <c>RefreshCurrent</c> covers the one case that
-    /// cannot wait for a next hover - the cursor already resting on a row
-    /// when the batch lands.
+    /// cannot wait - the cursor resting on a row when the batch lands.
     /// </para>
-    ///
     /// <para>
     /// Cancellation lives in the delegate, not here: every call site binds
     /// <c>WarmStatBlocksAsync</c> to the module lifetime token in Module.cs,
-    /// so unloading the module ends an in-flight warm before the HttpClient
-    /// underneath it is disposed.
+    /// so unloading ends an in-flight warm before the HttpClient is disposed.
     /// </para>
+    /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </summary>
     internal sealed class ItemStatWarmer
     {

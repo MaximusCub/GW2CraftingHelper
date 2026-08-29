@@ -6,24 +6,17 @@ namespace TaimisToolbench.Views.Rendering
     /// The Recipe Tree actions and per-plan state, handed from
     /// TreeSectionController (which owns the override/ignore state they act
     /// on) to CraftingPlanView (which owns the non-scrolling strip their
-    /// buttons and chips live in).
-    /// <para>
-    /// The buttons used to sit in the tree's own section header, inside the
-    /// scroll flow - so on a long plan, the moment Collapse All became
-    /// useful was the moment it had scrolled off screen. The buttons moved
-    /// out; the state they act on could not follow, hence this seam. A
-    /// fresh instance is published on every tree render and dropped by
-    /// TreeSectionController.ResetTreeRenderState, so a command can never
-    /// outlive the controls it was built against.
-    /// </para>
+    /// buttons and chips live in). A fresh instance is published on every
+    /// tree render and dropped by TreeSectionController.ResetTreeRenderState,
+    /// so a command can never outlive the controls it was built against.
     /// <para>
     /// The would-change predicates are answered at CLICK time, never per
-    /// render: two of them build a whole preset to compare against, which
-    /// is a bounded tree walk - cheap enough for a click, wasteful sixty
-    /// times a second. They exist because a dialog that protects nothing
-    /// teaches people to click through dialogs, and a click that changes
-    /// nothing has to say so rather than silently re-solving.
+    /// render: two of them build a whole preset to compare against, which is
+    /// a bounded tree walk - cheap enough for a click, wasteful sixty times
+    /// a second.
     /// </para>
+    /// Why the buttons left the section header, and why the predicates exist
+    /// at all: docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </summary>
     internal sealed class TreeToolbarCommands
     {

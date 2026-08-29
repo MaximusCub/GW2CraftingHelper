@@ -8,29 +8,20 @@ namespace TaimisToolbench.Views.Rendering
     /// while the left button is held and plays Blish's UI click sound the
     /// moment the press lands.
     /// <para>
-    /// The dim is applied to <c>Control.Opacity</c>, not to the target's
-    /// background or text color, and that is the point. Every clickable
-    /// thing here already owns its own hover vocabulary written to a
-    /// different property - a decision pill swaps BackgroundColor, a
-    /// sortable header swaps TextColor, a tree row and a section header each
-    /// swap to a different translucent wash - and a helper that wrote to
-    /// those same properties would have to capture and restore a resting
-    /// value that the site's own MouseLeft handler is also writing, making
-    /// correctness depend on which handler was subscribed first. Opacity is
-    /// touched by nothing else on any of these controls, so this helper
-    /// composes with all four schemes and restores the control's OWN
-    /// resting opacity rather than a hardcoded 1f.
+    /// The dim is applied to <c>Control.Opacity</c>, not to background or
+    /// text color. Each clickable thing here already owns a hover vocabulary
+    /// on a different property (BackgroundColor, TextColor, two translucent
+    /// washes); Opacity is touched by nothing else, so this composes with
+    /// all four and restores the control's OWN resting opacity, not 1f.
     /// </para>
     /// <para>
-    /// Measured from the vendored Blish HUD 1.3.0 binary
-    /// (packages/BlishHUD.1.3.0/lib/net472/"Blish HUD.exe", decompiled with
-    /// ilspycmd): <c>Control.Opacity</c> reaches the GPU through
-    /// <c>AbsoluteOpacity()</c>, which every <c>SpriteBatchExtensions.
-    /// DrawOnCtrl</c>/<c>DrawStringOnCtrl</c> overload multiplies into its
-    /// draw color, and which walks the parent chain - so dimming a panel
-    /// dims its label and icon children with it, which is what makes this
-    /// legible on a target whose own background is transparent.
+    /// Measured from the vendored Blish HUD 1.3.0 binary: <c>Opacity</c>
+    /// reaches the GPU through <c>AbsoluteOpacity()</c>, which every
+    /// <c>DrawOnCtrl</c>/<c>DrawStringOnCtrl</c> overload multiplies into
+    /// its draw color and which walks the parent chain - so dimming a panel
+    /// dims its label and icon children with it.
     /// </para>
+    /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </summary>
     internal static class PressFeedback
     {

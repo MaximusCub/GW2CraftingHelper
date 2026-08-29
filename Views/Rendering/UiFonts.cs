@@ -9,45 +9,21 @@ namespace TaimisToolbench.Views.Rendering
     /// The type sizes the module draws in, named by ROLE rather than by
     /// point size. Every view and renderer resolves its font through here,
     /// so <c>GameService.Content.DefaultFontNN</c> appears nowhere under
-    /// Views/ and a size decision is one edit rather than sixty.
-    ///
+    /// Views/. Which point size each promoted tier sits at is decided in
+    /// Services/TypeRampMetrics, beside the measured glyph metrics.
     /// <para>
-    /// The ramp is two reading sizes (<see cref="Caption"/> 14,
-    /// <see cref="Body"/> 16) and three emphatic tiers above them
-    /// (<see cref="ColumnHeader"/>, <see cref="SectionTitle"/>,
-    /// <see cref="Display"/>), with weight doing as much of the work as
-    /// size. Which point size each promoted tier sits at is decided in
-    /// Services/TypeRampMetrics, beside the measured glyph metrics the
-    /// height constants are derived from; this file only turns that
-    /// decision into a BitmapFont.
+    /// Two entries of the installed Menomonia inventory are unusable -
+    /// 18-regular collapses word gaps, 22-regular is really a 24 - measured
+    /// in TypeRampMetrics and ENFORCED in <see cref="Regular"/>.
     /// </para>
-    ///
     /// <para>
-    /// Blish surfaces five sizes as DefaultFontNN properties; every other
-    /// size in the installed Menomonia inventory (8-36, bold at 8-24 and
-    /// 36) loads through <c>ContentService.GetFont</c>. Two entries of that
-    /// inventory are unusable - 18-regular collapses word gaps, and
-    /// 22-regular is really a 24 - measured in TypeRampMetrics and
-    /// ENFORCED in <see cref="Regular"/>, so a tier seat cannot reach
-    /// either by moving a point size.
+    /// Three control types stay at Blish's own DefaultFont14 because they
+    /// expose no Font property or pad against it: Checkbox, TextBox and
+    /// Dropdown. Anything MEASURING one of those measures in
+    /// <see cref="Caption"/>, the size they actually paint - and so does
+    /// anything sizing a tooltip Blish renders (Services.TooltipTextFormat).
     /// </para>
-    ///
-    /// <para>
-    /// Blish's own Label default is DefaultFont14, so a Label this module
-    /// builds without an explicit Font renders one step below Body. Every
-    /// label site therefore sets one. Three control types are excluded and
-    /// stay at Blish's own default: Checkbox expose no Font property at all,
-    /// and TextBox and Dropdown have internal padding Blish authors against
-    /// DefaultFont14 while holding typed values rather than module prose.
-    /// Anything MEASURING one of those three measures in
-    /// <see cref="Caption"/>, which is the size they actually paint - and
-    /// so does anything sizing a tooltip Blish renders itself
-    /// (Services.TooltipTextFormat).
-    /// <see cref="FeedbackButton"/> used to be a fourth, because
-    /// StandardButton exposes no Font either; it now declares
-    /// <see cref="Caption"/> explicitly, so the button's size is a decision
-    /// this ramp made rather than a Blish default it happened to match.
-    /// </para>
+    /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </summary>
     internal static class UiFonts
     {

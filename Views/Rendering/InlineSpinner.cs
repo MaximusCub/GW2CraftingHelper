@@ -9,21 +9,16 @@ namespace TaimisToolbench.Views.Rendering
     /// rows in place of the rotating ASCII glyph the strips used to append
     /// to their text.
     /// <para>
-    /// Measured from the vendored Blish HUD 1.3.0 binary
-    /// (packages/BlishHUD.1.3.0/lib/net472/"Blish HUD.exe", decompiled with
-    /// ilspycmd): <c>Blish_HUD.Controls.LoadingSpinner</c> is a plain
-    /// public Control with a parameterless constructor whose only body is
-    /// Size = 64x64, and whose Paint hands its own bounds straight to
-    /// <c>LoadingSpinnerUtil.DrawLoadingSpinner</c>. That helper draws one
-    /// 64x64 source frame of the "spinner-atlas" texture (4096x64 in
-    /// ref.dat, i.e. 64 frames) into whatever destination bounds it is
-    /// given, so the control scales to any size. The frame index is
-    /// <c>GameService.Overlay.CurrentGameTime.TotalGameTime.TotalSeconds *
-    /// 21.333 % 64</c> - global game time, not per-control state, so the
-    /// animation costs us no ticker and starts mid-cycle rather than at
-    /// frame 0. Only the default size needed changing: 64x64 is taller than
-    /// either status row here.
+    /// Measured from the vendored Blish HUD 1.3.0 binary:
+    /// <c>LoadingSpinner</c> hands its own bounds straight to
+    /// <c>LoadingSpinnerUtil.DrawLoadingSpinner</c>, which draws one 64x64
+    /// source frame into whatever destination bounds it is given - so the
+    /// control scales to any size, and only its 64x64 default needed
+    /// changing (taller than either status row here). The frame index comes
+    /// from global game time, not per-control state, so the animation costs
+    /// no ticker and starts mid-cycle rather than at frame 0.
     /// </para>
+    /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
     /// </summary>
     internal static class InlineSpinner
     {

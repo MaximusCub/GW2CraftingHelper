@@ -269,25 +269,23 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// Re-seeds the
-        /// override loop's decision/ignore state from a persisted plan,
-        /// called from CraftingPlanView.ApplyRestoredPlan immediately after
-        /// ResetForNewPlan(result) (which the restore path also calls, to
-        /// adopt the restored result as _lastResult exactly like a fresh
-        /// Generate does - only the Clear()s above need undoing here).
-        /// Without this, a restored session's <see cref="_nodeOverrides"/>/
-        /// <see cref="_ignoredItemIds"/> would start empty even though the
-        /// restored <paramref name="result"/> already reflects the user's
-        /// prior overrides (it is the OUTPUT of applying them) - the very
-        /// next pill click would then re-solve with only that ONE new
-        /// override applied, silently discarding every override the user
-        /// set before restarting.
+        /// Re-seeds the override loop's decision/ignore state from a persisted
+        /// plan, called from CraftingPlanView.ApplyRestoredPlan immediately
+        /// after ResetForNewPlan(result). Without it, a restored session's
+        /// <see cref="_nodeOverrides"/>/<see cref="_ignoredItemIds"/> start
+        /// empty even though the restored <paramref name="result"/> already
+        /// reflects the user's prior overrides, and the very next pill click
+        /// re-solves with only that ONE new override applied - silently
+        /// discarding every override the user set before restarting.
+        /// <para>
         /// <paramref name="nodeOverrides"/>/<paramref name="ignoredItemIds"/>
-        /// are copied, not aliased - this instance owns its two collections
-        /// for their entire lifetime (every other mutator below assumes
-        /// that), and PersistedPlan's own copies must stay independent so a
-        /// later pill click's Dictionary/HashSet mutation here can never
-        /// reach back into the object PlanStoreHelpers just deserialized.
+        /// are copied, not aliased: this instance owns its two collections for
+        /// their entire lifetime (every other mutator below assumes that), and
+        /// PersistedPlan's own copies must stay independent so a later pill
+        /// click's mutation here can never reach back into the object
+        /// PlanStoreHelpers just deserialized.
+        /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         internal void RestoreOverrides(
             IReadOnlyDictionary<int, AcquisitionSource> nodeOverrides,
@@ -773,27 +771,24 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// Recomputes and re-assigns the explicit
-        /// Height of every tree childFlow container plus the top-level
-        /// treeFlow, from the SAME PlanContentHeightMath arithmetic used to
-        /// build the rows in the first place. Replaces the old
-        /// InvalidateUpToContentPanel, which only repositioned siblings and
-        /// relied on Blish's AutoSize convergence (one nested level per real
-        /// frame) to eventually grow/shrink ancestor containers to match -
-        /// the direct cause of #12/#14's multi-frame windows. Setting each
-        /// container's Size fires its own Resized event, which FlowPanel
-        /// already wires to reflow its own parent's sibling positions (see
-        /// ChangedChildOnResized in the vendored FlowPanel source) - so this
+        /// Recomputes and re-assigns the explicit Height of every tree childFlow
+        /// container plus the top-level treeFlow, from the SAME
+        /// PlanContentHeightMath arithmetic used to build the rows.
+        /// <para>
+        /// Setting each container's Size fires its own Resized event, which
+        /// FlowPanel already wires to reflow its own parent's sibling positions
+        /// (ChangedChildOnResized in the vendored FlowPanel source) - so this
         /// call alone both resizes and repositions every affected row,
         /// synchronously, with no separate Invalidate() needed.
-        /// Recomputes every node currently in _treeNodeStates rather than
-        /// walking only the toggled node's ancestor chain: each computation
-        /// is a pure function of that node's own structure + the shared
-        /// _nodeExpansion map, independent of any other container's current
-        /// state, so recomputing a few unaffected containers alongside the
-        /// affected ones is harmless - and this only runs once per user
-        /// toggle, never per frame, so the extra work is not a hot-path
-        /// concern.
+        /// </para>
+        /// <para>
+        /// It recomputes every node currently in _treeNodeStates rather than
+        /// walking only the toggled node's ancestor chain. Each computation is a
+        /// pure function of that node's own structure plus the shared
+        /// _nodeExpansion map, so recomputing unaffected containers is harmless,
+        /// and this runs once per user toggle, never per frame.
+        /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private void RefreshTreeContainerHeights()
         {
@@ -1351,41 +1346,24 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// Updates the already-built tree to a fresh solve WITHOUT
-        /// disposing a single row, returning false when it cannot - in
-        /// which case the caller renders the plan from scratch as before.
-        ///
+        /// Updates the already-built tree to a fresh solve WITHOUT disposing a
+        /// single row, returning false when it cannot - in which case the caller
+        /// renders the plan from scratch as before. Shortening the rebuild frame
+        /// is what stops rapid IGNORE toggling from dropping clicks; it is not a
+        /// complete fix, because <see cref="RepaintRow"/> still rebuilds a
+        /// matched row's pills, so no pill INSTANCE survives a re-solve.
         /// <para>
-        /// WHY (measured, decompiled Blish HUD 1.3.0). A decision pill's
-        /// click re-solves and, until now, rebuilt every control in the
-        /// plan. Two facts turn that into the reported "rapid IGNORE
-        /// toggling drops clicks":
-        /// <c>MouseHandler</c> holds exactly ONE pending mouse event
-        /// (<c>_mouseEvent</c>, written by the hook thread, consumed once
-        /// per <c>Update</c>), and <c>Control.OnLeftMouseButtonReleased</c>
-        /// raises Click only when that same control INSTANCE was primed by
-        /// its own press. A frame long enough to contain both halves of the
-        /// next click therefore loses the press, and the release lands on a
-        /// control that was never primed. Shortening the frame is the fix -
-        /// and the whole of it: <see cref="RepaintRow"/> still rebuilds a
-        /// matched row's pills, so no pill INSTANCE survives a re-solve and
-        /// nothing here removes the priming hazard outright. See
-        /// <see cref="HoverChainResync"/>, which states the same mechanism.
+        /// The gate is deliberately strict, and every rejection is a correct
+        /// full rebuild rather than a wrong cheap one: the new tree must present
+        /// the SAME built rows, in the same order, at the same depth and dim
+        /// state, each still passing <see cref="TreeRowIdentity"/> against the
+        /// node its row was built from, and the cost sub-column widths and the
+        /// header's node count must be unchanged (both are chrome this refresh
+        /// preserves rather than redraws). Ignoring a LEAF material satisfies
+        /// all of that; ignoring a node with children does not, because an
+        /// ignored node is built as a leaf, so that click pays for a full rebuild.
         /// </para>
-        ///
-        /// <para>
-        /// The gate is deliberately strict, and every rejection is a
-        /// correct full rebuild rather than a wrong cheap one: the new
-        /// tree must present the SAME built rows, in the same order, at the
-        /// same depth and dim state, each still passing
-        /// <see cref="TreeRowIdentity"/> against the node its row was built
-        /// from; the cost sub-column widths and the header's node count
-        /// must be unchanged (both are chrome this refresh preserves rather
-        /// than redraws). Ignoring a LEAF material - the common case, and the
-        /// one the field report is about - satisfies all of that. Ignoring
-        /// a node with children does not, because an ignored node is built
-        /// as a leaf, and that click still pays for a full rebuild.
-        /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         internal bool TryRefreshInPlace(IReadOnlyList<CraftingTreeNode> newRoots)
         {
@@ -1691,34 +1669,24 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// Renders the pill column into the caller's own list, which the
-        /// row's expand/collapse click handler closes over to exclude pills
-        /// from its hit-test (a pill click is a decision, not a toggle).
-        /// The list is REFILLED rather than replaced so an in-place refresh
-        /// can rebuild a row's pills without invalidating that closure.
-        ///
-        /// TreePillColumnWidth (256px) is
-        /// a fixed budget, but DecisionPillPlanner.AppendOwnershipPills now
-        /// unconditionally adds an "IGNORE" pill (plus "USING N OWNED" when
-        /// applicable) to every ordinary node, on top of its 1-3 source
-        /// pills - realistic combinations still exceed it (a measured
-        /// "HAVE n/m NEEDED" annotation run reaches 436px). Rather
-        /// than let trailing pills render on top of the right-aligned cost
-        /// column (this row has no wrap/second-line support - TreeRowHeight
-        /// is a fixed per-row height shared by every layout/scroll-height
-        /// calculation in this file), PlanRelayoutMath.ComputePillFit
-        /// decides the column: all pills at normal padding, else all pills
-        /// at tightened padding, else as many tightened pills as fit
-        /// alongside a trailing "+N" pill naming what was left out.
-        /// Trailing pills used to be dropped with nothing on the row to say
-        /// they existed at all.
+        /// Renders the pill column into the caller's own list, which the row's
+        /// expand/collapse click handler closes over to exclude pills from its
+        /// hit-test. The list is REFILLED rather than replaced so an in-place
+        /// refresh can rebuild a row's pills without invalidating that closure.
+        /// <para>
+        /// TreePillColumnWidth (256px) is a fixed budget that realistic pill
+        /// combinations exceed (a measured "HAVE n/m NEEDED" run reaches 436px),
+        /// and the row has no wrap or second line. So ComputePillFit decides the
+        /// column: all pills at normal padding, else all tightened, else as many
+        /// tightened pills as fit alongside a trailing "+N" pill.
+        /// </para>
         /// <para>
         /// The budget is width-INVARIANT: maxRightEdge - pillColX is always
-        /// TreePillColumnWidth - 4, whatever the panel width, because both
-        /// endpoints move together. That is why the fit is resolved once at
-        /// build time and the resize closure only repositions - there is no
-        /// window width at which a hidden pill would have fit.
+        /// TreePillColumnWidth - 4 at any panel width, because both endpoints
+        /// move together. That is why the fit is resolved once at build time and
+        /// the resize closure only repositions.
         /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private void RenderDecisionPills(
             Panel rowPanel, CraftingTreeNode node, int pillColX, int pillY, bool dimmed,
@@ -1931,25 +1899,17 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// The trailing "+N" pill: the row admitting that N of its pills
-        /// did not fit, instead of the column simply ending early. Styled
-        /// as non-interactive chrome, because it is - clicking it does
-        /// nothing, and its tooltip names what is missing.
+        /// The trailing "+N" pill: the row admitting that N of its pills did not
+        /// fit, instead of the column simply ending early. Styled as
+        /// non-interactive chrome, because it is - clicking it does nothing, and
+        /// its tooltip names what is missing.
         /// <para>
-        /// Deliberately NOT wired to a popup offering the hidden options.
-        /// The hidden pills are almost always the trailing annotation and
-        /// the IGNORE toggle, and a real affordance means a new
-        /// popup/menu surface (and its own dismiss, focus and scroll
-        /// behaviour) hanging off a case that tightened padding already
-        /// resolves most of the time. The tooltip states the fact; the
-        /// desktop gate decides whether the fact needs an affordance.
+        /// The tooltip must not suggest widening the window: the pill column's
+        /// budget is fixed at TreePillColumnWidth regardless of panel width (see
+        /// RenderDecisionPills), so that advice would be false.
         /// </para>
-        /// <para>
-        /// The tooltip does not suggest widening the window: the pill
-        /// column's budget is fixed at TreePillColumnWidth regardless of
-        /// panel width (see RenderDecisionPills), so that advice would be
-        /// false.
-        /// </para>
+        /// Why it is not wired to a popup offering the hidden options:
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private static void RenderOverflowPill(
             Panel rowPanel, IReadOnlyList<PillSpec> specs, PlanRelayoutMath.PillFitPlan fit,

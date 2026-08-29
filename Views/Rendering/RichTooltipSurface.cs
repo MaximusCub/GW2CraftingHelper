@@ -58,17 +58,9 @@ namespace TaimisToolbench.Views.Rendering
         private static readonly Color SurfaceBackgroundColor = new Color(25, 32, 34) * 0.82f;
 
         /// <summary>
-        /// Blish's own multiplier on the "tooltip" texture (decompiled
-        /// 1.3.0), and independently the live client's: fitting
-        /// composite = s*artAlpha*artRGB + (1 - s*artAlpha)*scene to two
-        /// clean interior patches of live2/k-2 puts s at 0.98 and 1.00,
-        /// residual std ~1 quantisation level (fidelity-audit, 8.4
-        /// closure). The audit's F5 note suggested 0.82 here; that number
-        /// belonged to the flat FILL, whose constant carries its own
-        /// coverage - the texture's alpha channel (mean ~0.80) already
-        /// supplies the transparency, so scaling it again would land the
-        /// box near 0.66 coverage and fail audit H6's no-legible-bleed
-        /// requirement. Measurement wins.
+        /// Blish's own multiplier on the "tooltip" texture (decompiled 1.3.0),
+        /// and independently the live client's - fitted from clean interior
+        /// patches of a live capture, residual ~1 quantisation level.
         /// <para>
         /// THE BOX IS MEANT TO BE SEE-THROUGH. The game's own tooltip is
         /// semi-transparent (the art's alpha channel, mean ~0.80) and so is
@@ -77,6 +69,8 @@ namespace TaimisToolbench.Views.Rendering
         /// mis-diagnosed as lost opacity - do not raise the coverage to
         /// "fix" it.
         /// </para>
+        /// The fit, and why the audit's 0.82 does not belong here:
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private const float CanvasArtOpacity = 0.98f;
 
@@ -180,24 +174,21 @@ namespace TaimisToolbench.Views.Rendering
 
         /// <summary>
         /// The game's canvas, drawn the way the game itself draws it: the
-        /// "tooltip" art cropped 1:1 from (3,4) at 0.98 - the exact call
-        /// Blish's own override makes (decompiled, 1.3.0), which the
-        /// live client provably shares: clean interior patches of
-        /// live2/k-2 correlate with the texture at r=0.983 at the
-        /// predicted alignment, and the composite model at 0.98 leaves
-        /// ~1 level of residual (fidelity-audit, 8.4 - the background is
-        /// textured, not flat, settling what F5's flat tint deferred).
-        /// What is still replaced relative to Blish: its eight dark edge
-        /// bands (the game has none - see the note where the vignette
-        /// rings used to be) give way to the single measured border pixel.
+        /// "tooltip" art cropped 1:1 from (3,4) at 0.98 - the exact call Blish's
+        /// own override makes (decompiled, 1.3.0), which the live client
+        /// provably shares. What is still replaced relative to Blish: its eight
+        /// dark edge bands (the game has none) give way to the single measured
+        /// border pixel.
         /// <para>
-        /// Blish's content edge buffer - <c>Thickness(4 top, 4 right,
-        /// 3 bottom, 6 left)</c>, which <c>RecalculateLayout</c> turns into
-        /// the ContentRegion every child is positioned inside - already IS
-        /// the game's measured 6px left padding with 3-4px on the other
-        /// edges (KNOWN-ISSUES #42, gap G23), so the padding needs no work
-        /// of its own once the art underneath it is gone.
+        /// Blish's content edge buffer - <c>Thickness(4 top, 4 right, 3 bottom,
+        /// 6 left)</c>, which <c>RecalculateLayout</c> turns into the
+        /// ContentRegion every child is positioned inside - already IS the
+        /// game's measured 6px left padding with 3-4px on the other edges
+        /// (KNOWN-ISSUES #42, gap G23), so the padding needs no work of its own
+        /// once the art underneath it is gone.
         /// </para>
+        /// The correlation figures behind "provably": docs/ARCHITECTURE.md,
+        /// "Views: relocated design narrative".
         /// </summary>
         public override void PaintBeforeChildren(SpriteBatch spriteBatch, Rectangle bounds)
         {

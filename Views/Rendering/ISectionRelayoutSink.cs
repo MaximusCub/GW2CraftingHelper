@@ -4,26 +4,22 @@ namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// The minimal seam a section renderer needs from CraftingPlanView to
-    /// participate in the resize-relayout contract (KNOWN-ISSUES
-    /// #13/#19) without holding a reference to the view itself.
+    /// participate in the resize-relayout contract (KNOWN-ISSUES #13/#19)
+    /// without holding a reference to the view itself: the two registries,
+    /// the read-only RelayoutCount, and the settle-time rebuild request.
     ///
-    /// Kept to the two registries plus the read-only RelayoutCount and the
-    /// settle-time rebuild request, which concern the same two lists'
-    /// replay. Shared chrome (CreateSectionHeader) and the static
-    /// primitives (LabelHelpers/IconControls/RarityColors/
-    /// CoinCurrencyRenderer) are called directly; a renderer that needs a
-    /// CraftingPlanView-private helper extracts it into Views/Rendering
-    /// rather than reaching back into the view (KNOWN-ISSUES #39). Shared
-    /// row-construction helpers with several callers (TextRowRenderer,
-    /// ColumnHeaderRowRenderer, RowRelayoutHelpers, IconNameRowHelpers) take
-    /// this interface as a method parameter rather than a
-    /// constructor-injected field, since none of them is itself a section
-    /// renderer.
+    /// Shared chrome (CreateSectionHeader) and the static primitives
+    /// (LabelHelpers/IconControls/RarityColors/CoinCurrencyRenderer) are
+    /// called directly; a renderer that needs a CraftingPlanView-private
+    /// helper extracts it into Views/Rendering rather than reaching back
+    /// into the view (KNOWN-ISSUES #39).
     ///
     /// RelayoutCount is observation, not registration: TreeSectionController
     /// carries CreateCollapsibleSection's DEBUG must-register assert but
     /// cannot read _relayoutActions directly.
-    /// <para>See docs/ARCHITECTURE.md section 5.</para>
+    /// <para>See docs/ARCHITECTURE.md section 5, and "Views: relocated
+    /// design narrative" for why shared row helpers take this as a
+    /// parameter.</para>
     /// </summary>
     internal interface ISectionRelayoutSink
     {

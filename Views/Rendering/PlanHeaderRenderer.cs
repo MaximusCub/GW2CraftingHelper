@@ -27,27 +27,18 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// Plan header: rarity-framed item icon + the item's own name in
-        /// its rarity colour + a grey quantity, left-aligned at the
-        /// content gutter every section below it also starts at.
-        ///
-        /// Three separate things used to compete here. The block was
-        /// CENTRED while everything under it was left-aligned, so the plan
-        /// had no single left edge. It carried a right-aligned "Generated:
-        /// ..." panel duplicating - to the minute - the timestamp the
-        /// fixed status strip 70px above already shows, so a plan opened
-        /// with the same text twice. And its title shared DefaultFont18
-        /// with every collapsible section header, leaving the page with no
-        /// typographic top level at all.
-        ///
-        /// So: the in-scroll timestamp is gone (the strip keeps it, and it
-        /// never scrolls away); the title is left-aligned and rendered at
-        /// DefaultFont32, and CreateSectionHeader drops to DefaultFont16,
-        /// so Font18-and-up now belongs to the page title alone. The
-        /// "Crafting Plan for " prefix is gone with it - the tab is
-        /// already titled "Crafting Plan" and the strip already says "Plan
-        /// generated", so the prefix cost half the title's width to repeat
-        /// what two other elements say.
+        /// Plan header: rarity-framed item icon + the item's own name in its
+        /// rarity colour + a grey quantity, left-aligned at the content gutter
+        /// every section below it also starts at.
+        /// <para>
+        /// The title renders at DefaultFont32 and CreateSectionHeader at
+        /// DefaultFont16, so Font18-and-up belongs to the page title alone -
+        /// this is the module's one Display-tier seat, not a local choice.
+        /// There is no in-scroll timestamp: the fixed status strip 70px above
+        /// carries it and never scrolls away.
+        /// </para>
+        /// What used to compete here: docs/ARCHITECTURE.md, "Views: relocated
+        /// design narrative".
         /// </summary>
         internal void Render(PlanViewModel vm, FlowPanel contentPanel, int panelWidth)
         {

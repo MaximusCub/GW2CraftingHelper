@@ -56,24 +56,19 @@ namespace TaimisToolbench.Views.Rendering
         /// <paramref name="face"/>'s baseline and inheriting its line height
         /// and letter spacing.
         /// <para>
-        /// This is what makes a sort indicator possible at all. The indicator
-        /// is part of the header's own <c>Label.Text</c> (see
-        /// SortableHeaderLabel) - which is what lets every right-aligned
-        /// header keep tracking its column, since the relayout closures
-        /// right-align off a width that already includes it - and a Label has
-        /// exactly one Font. A separate glyph Label beside the title would
-        /// have meant re-deriving nine call sites' worth of column arithmetic;
-        /// one merged font means every existing MeasureString keeps measuring
-        /// the whole string correctly and no call site learns anything new.
+        /// This is what makes a sort indicator possible at all: the indicator is
+        /// part of the header's own <c>Label.Text</c> (see SortableHeaderLabel),
+        /// and a Label has exactly one Font. One merged font means every
+        /// existing MeasureString keeps measuring the whole string correctly and
+        /// no call site learns anything new.
         /// </para>
         /// <para>
         /// The two fonts keep their own texture pages - a BitmapFontRegion
         /// carries its own TextureRegion2D - so a header string that has an
-        /// indicator costs one extra texture switch inside its own
-        /// DrawString. One per SORTED header, and only one header per table
-        /// is ever sorted, so it is a handful of switches per frame against
-        /// the alternative of re-deriving nine call sites' column arithmetic.
+        /// indicator costs one extra texture switch inside its own DrawString.
+        /// One per SORTED header, and only one header per table is ever sorted.
         /// </para>
+        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         internal static BitmapFont Merged(
             string name, BitmapFont face, int faceBaselineY, GlyphFontDescriptor descriptor, Texture2D page)
