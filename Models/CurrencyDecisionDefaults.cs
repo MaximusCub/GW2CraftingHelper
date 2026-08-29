@@ -1,3 +1,30 @@
+/*
+ * The default table below is adapted from @gw2efficiency/recipe-calculation,
+ * src/static/currencyDecisionPrices.ts -
+ * https://github.com/gw2efficiency/recipe-calculation
+ * License: MIT, Copyright (c) 2016 queicherius (David Reess).
+ * The MIT permission notice is reproduced verbatim below, as the license
+ * requires for substantial portions of the work.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
 using System.Collections.Generic;
 
 namespace TaimisToolbench.Models
@@ -5,50 +32,22 @@ namespace TaimisToolbench.Models
     /// <summary>
     /// Curated default DECISION-ONLY currency valuations (copper per unit),
     /// adapted from gw2efficiency's CURRENCY_DECISION_PRICES table so the
-    /// module ships usable comparison values out of the box. Every key is
-    /// the official GW2 wallet currency id, cross-checked against the live
-    /// API. An entry gw2e's own table marks `undefined` is simply absent
-    /// here, matching gw2e exactly - a currency with no entry stays
-    /// blank/unvalued rather than gaining an invented rate.
+    /// module ships usable comparison values out of the box. Every key is the
+    /// official GW2 wallet currency id, cross-checked against the live API.
+    /// An entry gw2e's own table marks `undefined` is simply absent here,
+    /// matching gw2e exactly - a currency with no entry stays unvalued rather
+    /// than gaining an invented rate.
     /// <para>
     /// DECISION-ONLY: a value here may tip a comparison but must never be
     /// folded into any displayed gold total. See
     /// CurrencyValuation.TryGetEffectiveCopperValue for the
-    /// user-override/cleared/default precedence.
-    /// </para>
-    /// <para>
-    /// Shipping this curated table is an explicit, one-time waiver of the
-    /// repo's "do not invent data" rule for this table only - every value is
-    /// sourced and attributed upstream, under the licence reproduced below.
+    /// user-override/cleared/default precedence. Shipping this curated table
+    /// is a one-time waiver of the repo's "do not invent data" rule for this
+    /// table only - every value is sourced and attributed upstream, under the
+    /// licence at the top of this file.
     /// Derivation: docs/ARCHITECTURE.md section 8.3.
     /// </para>
     /// </summary>
-    // Source (MIT-licensed): @gw2efficiency/recipe-calculation,
-    // src/static/currencyDecisionPrices.ts -
-    // https://github.com/gw2efficiency/recipe-calculation
-    // License: MIT, Copyright (c) 2016 queicherius (David Reess).
-    // The MIT permission notice is reproduced verbatim below, as the
-    // license requires for substantial portions of the work.
-    //
-    // Permission is hereby granted, free of charge, to any person
-    // obtaining a copy of this software and associated documentation
-    // files (the "Software"), to deal in the Software without
-    // restriction, including without limitation the rights to use, copy,
-    // modify, merge, publish, distribute, sublicense, and/or sell copies
-    // of the Software, and to permit persons to whom the Software is
-    // furnished to do so, subject to the following conditions:
-    //
-    // The above copyright notice and this permission notice shall be
-    // included in all copies or substantial portions of the Software.
-    //
-    // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-    // EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-    // MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-    // NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-    // BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-    // ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-    // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    // SOFTWARE.
     internal static class CurrencyDecisionDefaults
     {
         public static readonly IReadOnlyDictionary<int, long> DefaultCopperPerUnit = new Dictionary<int, long>

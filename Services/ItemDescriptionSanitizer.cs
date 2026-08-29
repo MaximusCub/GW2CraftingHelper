@@ -7,25 +7,19 @@ namespace TaimisToolbench.Services
     /// Turns a /v2/items "description" into tooltip spans. The API's own
     /// markup vocabulary is small and closed: colour spans
     /// (<c>&lt;c=@flavor&gt;</c>, <c>&lt;c=@abilitytype&gt;</c>) with their
-    /// <c>&lt;/c&gt;</c> closers, and <c>&lt;br&gt;</c> breaks alongside
-    /// real newlines.
-    ///
+    /// <c>&lt;/c&gt;</c> closers, and <c>&lt;br&gt;</c> breaks alongside real
+    /// newlines.
     /// <para>
     /// The colour spans carry MEANING, so they survive as
     /// <see cref="TooltipSpanRole"/>s rather than being discarded: the game
     /// colours only the marked runs (flavour teal, abilitytype pale yellow,
-    /// warning red) and leaves unmarked description text white, which is
-    /// the only way "A gift bag!" can be told apart from the quoted flavour
-    /// that follows it inside one description string (KNOWN-ISSUES #42,
-    /// gap G7).
+    /// warning red) and leaves unmarked description text white.
     /// </para>
-    ///
     /// <para>
-    /// Anything ELSE in angle brackets is passed through verbatim rather
-    /// than stripped. A blanket tag-stripper would silently delete real
-    /// item text the day the API uses a bracket for something that is not
-    /// markup; leaving an unknown tag visible is a reportable bug, deleting
-    /// unknown text is a silent one.
+    /// Anything ELSE in angle brackets is passed through VERBATIM rather than
+    /// stripped: leaving an unknown tag visible is a reportable bug, while
+    /// deleting unknown text is a silent one.
+    /// See docs/ARCHITECTURE.md section S1.4.
     /// </para>
     /// </summary>
     internal static class ItemDescriptionSanitizer

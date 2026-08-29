@@ -5,20 +5,17 @@ namespace TaimisToolbench.Services
     /// <summary>
     /// Pure column arithmetic for one Plan History row, in the shape of
     /// RankerRowLayout / LogRowLayout.
-    ///
-    /// Same law as every other table in the module: the action block is
-    /// pinned to the right edge, and the three data columns to its left -
-    /// Plan, Cost, Generated - are JUSTIFIED across the span the block
-    /// leaves, through the shared <see cref="JustifiedColumnTracks"/> the
-    /// Crafting Plan tab's currency table distributes by. At no width is
-    /// there empty space to the right of the action buttons.
     /// <para>
-    /// Cost and Generated CENTRE their bands on their own tracks rather
-    /// than pinning a right edge, so each column header sits over the
-    /// values it names instead of only meeting them at one edge - see
-    /// <see cref="JustifiedColumnTracks"/> for the law and for which bands
-    /// still pin (here: the action buttons). Inside a centred band the
-    /// cells stay right-aligned on <see cref="Bands.CostRightEdge"/> /
+    /// Same law as every other table in the module: the action block pins to
+    /// the right edge, and the three data columns to its left - Plan, Cost,
+    /// Generated - are JUSTIFIED across the span it leaves, through the
+    /// shared <see cref="JustifiedColumnTracks"/>. At no width is there
+    /// empty space to the right of the action buttons.
+    /// </para>
+    /// <para>
+    /// Cost and Generated CENTRE their bands on their own tracks rather than
+    /// pinning a right edge; inside a centred band the cells stay
+    /// right-aligned on <see cref="Bands.CostRightEdge"/> /
     /// <see cref="Bands.WhenRightEdge"/>, because a coin run that
     /// ragged-rights against the run above it is unreadable.
     /// </para>

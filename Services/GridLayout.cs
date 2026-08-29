@@ -4,30 +4,17 @@ namespace TaimisToolbench.Services
     /// The module's ONE column-grid law: how many equal columns of a given
     /// minimum width a panel holds, how wide one of them is, and how many
     /// rows a cell count fills. Blish-free, like every grid that uses it.
-    ///
-    /// <para>
-    /// It was stated three times before this class existed -
-    /// <see cref="SnapshotItemGridLayout"/>,
-    /// <see cref="SettingsCurrencyGridLayout"/> and
-    /// <see cref="ColumnBoardLayout"/> each carried their own
-    /// ComputeColumnCount and ComputeColumnWidth with character-identical
-    /// bodies - and the copies had already drifted apart once and been
-    /// re-synced by copying again, leaving a note that pointed a reader at a
-    /// sibling's prose rather than at shared code. Grid geometry that is
-    /// meant to agree now agrees by construction.
-    /// </para>
-    ///
     /// <para>
     /// What did NOT move here: each grid's own MinColumnWidth derivation and
     /// its cell-internal x offsets (CellAmountRightEdge, CellTagX, ...).
     /// Those are genuinely different per grid - a currency row holds a name
     /// and three controls, a snapshot cell a name and an amount - and
-    /// sharing them would be coupling numbers that only coincide. Nor did
-    /// the three placement/result types: their fields differ by real need
-    /// (a filtered grid marks cells hidden, a board hands each block its
-    /// column width), and merging them would widen three public shapes to
-    /// the union of all three for no behaviour.
+    /// sharing them would couple numbers that only coincide. Nor did the
+    /// three placement/result types: their fields differ by real need, and
+    /// merging them would widen three public shapes to the union of all
+    /// three for no behaviour.
     /// </para>
+    /// <para>Derivation: docs/ARCHITECTURE.md section S1.2.</para>
     /// </summary>
     internal static class GridLayout
     {

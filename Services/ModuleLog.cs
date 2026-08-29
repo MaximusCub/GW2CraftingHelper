@@ -8,58 +8,22 @@ using System.Threading.Tasks;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// Module-wide structured log sink (dev/proposals/
-    /// dev/proposals/d2-log-system.md Section 4). Two
-    /// responsibilities:
-    /// <list type="number">
-    /// <item>A thread-safe, fixed-capacity in-memory ring buffer, always
-    /// populated at every level regardless of any setting - this is what
-    /// backs the Log tab's live view.</item>
-    /// <item>An optional, gated file sink (a <see cref="ModuleLogStore"/>
-    /// attached via <see cref="Configure"/>) - Error/Warn/Info always reach
-    /// it, Debug only when <see cref="DiagnosticsEnabled"/> is true (the
-    /// disk-usage policy the user directive asked for - see d2 Section 6).
-    /// </item>
-    /// </list>
+    /// Module-wide structured log sink (dev/proposals/d2-log-system.md
+    /// Section 4). Two responsibilities: a thread-safe, fixed-capacity
+    /// in-memory ring buffer, always populated at every level regardless of
+    /// any setting - what backs the Log tab's live view - and an optional,
+    /// gated file sink (a <see cref="ModuleLogStore"/> attached via
+    /// <see cref="Configure"/>), where Error/Warn/Info always reach disk and
+    /// Debug only when <see cref="DiagnosticsEnabled"/> is true.
     /// <para>
-    /// An ordinary instantiable class (not a static class) so tests can
-    /// construct isolated instances (<c>new ModuleLog()</c>) with
-    /// deterministic, non-shared state regardless of xUnit's default
-    /// cross-class test parallelism. Production call sites throughout the
-    /// codebase use the single app-wide <see cref="Shared"/> instance
-    /// instead of threading a ModuleLog dependency through every
-    /// constructor - this is deliberately the "static-or-singleton" shape
-    /// d2 Section 4.1 describes, resolved as a singleton-by-default
-    /// instantiable type rather than a true static class specifically so
-    /// it stays testable.
-    /// </para>
-    /// <para>
-    /// Blish-free (no Blish_HUD/Gw2Sharp/Microsoft.Xna usings) - see
-    /// ModuleLogEntry's own doc comment. <see cref="Write"/> must never
-    /// touch a Blish control directly; the Log tab view reads the ring on
-    /// its own cadence (a Version poll), not via a push callback from here -
-    /// the same producer/consumer separation Module.cs already uses for its
-    /// own dirty-flag fields.
-    /// </para>
-    /// <para>
-    /// Two independent locks guard two independent concerns, deliberately
-    /// never held together by any caller other than <see cref="SeedFromStore"/>
-    /// (see its own doc comment for why that one case is safe):
-    /// <see cref="_gate"/> guards the in-memory ring/Version (fast, pure
-    /// in-memory work, taken by every <see cref="Write"/> call and by
-    /// <see cref="Snapshot()"/>) and <see cref="_fileGate"/> guards the
-    /// attached file sink (slow, real disk IO). <see cref="Write"/> never
-    /// performs disk IO itself - it hands the entry to a single-consumer
-    /// background flush queue instead - so neither lock, and therefore
-    /// neither the Log tab's every-frame <see cref="Version"/> poll nor any
-    /// other caller's ring access, can ever block behind file IO regardless
-    /// of which thread called <see cref="Write"/> or how large the file has
-    /// grown. This was a real, live hazard prior to this fix: the
-    /// [scrolldiag] Debug channel (CraftingPlanView) calls <see cref="Write"/>
-    /// on the main/UI thread from inside its frame-timing-sensitive
-    /// scroll-verify loop, so any synchronous disk IO
-    /// performed by Write itself - never mind an occasional full-file
-    /// read+rewrite trim pass - would stall that exact frame.
+    /// Blish-free, and <see cref="Write"/> must never touch a Blish control
+    /// directly: the Log tab view reads the ring on its own cadence (a
+    /// Version poll), never via a push callback from here. Two independent
+    /// locks guard two independent concerns and must never be held together
+    /// by any caller other than <see cref="SeedFromStore"/>:
+    /// <see cref="_gate"/> guards the in-memory ring/Version,
+    /// <see cref="_fileGate"/> the attached file sink, and Write never
+    /// performs disk IO itself. Derivation: docs/ARCHITECTURE.md S1.1.
     /// </para>
     /// </summary>
     internal class ModuleLog
@@ -233,22 +197,18 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// Attaches (or detaches, with a null store) the file sink and its
         /// error callback, and sets the size cap used by every subsequent
-        /// write's self-trim check. Safe to call more than once. The
-        /// callback must never itself call back into this ModuleLog - see
-        /// ModuleLogStore's own doc comment on why (unbounded recursion
-        /// into the sink whose own write just failed).
+        /// write's self-trim check. Safe to call more than once. The callback
+        /// must never itself call back into this ModuleLog - see
+        /// ModuleLogStore's own doc comment (unbounded recursion into the
+        /// sink whose own write just failed).
         /// <para>
-        /// Belt-and-braces, not the primary error path: every
-        /// ModuleLogStore public method already has its own internal
-        /// try/catch and never propagates an exception (it calls ITS OWN
-        /// onError constructor parameter instead and returns normally), so
-        /// in ordinary operation <paramref name="onStoreError"/> here is
-        /// only ever reached if a store call somehow throws outside that
-        /// internal catch (a bug in the store itself). Callers should still
-        /// wire the store's OWN constructor onError to whatever they want
-        /// store failures reported to (Module.cs wires both to the same
-        /// target) - this parameter exists as defense-in-depth, not as the
-        /// thing a caller should rely on seeing fire.
+        /// Belt-and-braces, not the primary error path: every ModuleLogStore
+        /// public method already has its own internal try/catch and never
+        /// propagates, calling its OWN onError constructor parameter instead,
+        /// so <paramref name="onStoreError"/> is only ever reached if a store
+        /// call throws outside that catch. Callers should still wire the
+        /// store's own constructor onError to whatever they want store
+        /// failures reported to.
         /// </para>
         /// </summary>
         public void Configure(ModuleLogStore store, long maxFileSizeBytes, Action<string, Exception> onStoreError)
@@ -262,27 +222,19 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Seeds the ring from the attached store's persisted history (d2
-        /// Section 7, Open Question 2 - resolved YES: pre-session history
-        /// is visible on first tab-open, not just "since this launch").
-        /// Meant to be called once, at Module.Initialize (immediately after
-        /// Configure, before any other store is constructed), so the
-        /// seeded history sorts before anything this session writes. A
-        /// no-op if no store is attached.
+        /// Seeds the ring from the attached store's persisted history, so
+        /// pre-session history is visible on first tab-open. Meant to be
+        /// called once, at Module.Initialize (immediately after Configure,
+        /// before any other store is constructed), so the seeded history
+        /// sorts before anything this session writes. A no-op if no store is
+        /// attached.
         /// <para>
-        /// Holds <see cref="_fileGate"/> for the whole read+seed (serializing
-        /// against the background flush loop and against PruneOlderThan, so
-        /// this read can never race a concurrent file write/rewrite), and
-        /// nests <see cref="_gate"/> only around the ring-append portion
-        /// (serializing against a concurrent Write's own ring append from a
-        /// background continuation during startup, e.g. the build-ID
-        /// fetch's Task.Run - without this, a brand-new entry could land in
-        /// the ring chronologically BEFORE the seeded history). This is the
-        /// one place in the class that holds both locks at once, always in
-        /// this order (_fileGate then _gate) - every other path
-        /// (Write/PruneOlderThan/Configure/the file-sink property/FlushLoop)
-        /// only ever holds one of the two at a time, so no other code path
-        /// can complete the opposite ordering and deadlock against this.
+        /// This is the ONE place in the class that holds both locks at once,
+        /// always in the order <see cref="_fileGate"/> then
+        /// <see cref="_gate"/>. Every other path holds only one at a time,
+        /// so nothing can complete the opposite ordering and deadlock
+        /// against this - a future path that needs both must keep this
+        /// order. Derivation: docs/ARCHITECTURE.md section S1.1.
         /// </para>
         /// </summary>
         public void SeedFromStore()
@@ -349,23 +301,18 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Writes one entry. Safe to call from ANY thread - ThreadPool
-        /// continuations, the main/UI thread, or a background Task.Run body
-        /// (d2 Section 4.3), including a frame-timing-sensitive one (the
-        /// [scrolldiag] channel). Always appends to the ring synchronously
-        /// (fast, in-memory, under <see cref="_gate"/> only). When the level
-        /// clears the policy in <see cref="ShouldWriteToFile"/> AND a store
-        /// is attached, the entry is handed to the background flush queue
-        /// instead of being written to disk here.
+        /// continuations, the main/UI thread, or a background Task.Run body,
+        /// including a frame-timing-sensitive one (the [scrolldiag]
+        /// channel). Always appends to the ring synchronously (fast,
+        /// in-memory, under <see cref="_gate"/> only). When the level clears
+        /// <see cref="ShouldWriteToFile"/> AND a store is attached, the entry
+        /// goes to the background flush queue, never to disk here.
         /// <para>
-        /// Deliberately checks <see cref="_store"/> directly (a volatile
-        /// field read) rather than through <see cref="_fileGate"/>: that
-        /// lock can legitimately be held for a while by the background
-        /// FlushLoop (a slow disk append, or an occasional full-file trim
-        /// rewrite) or by SeedFromStore/PruneOlderThan, and this method
-        /// must never block waiting for it - doing so would silently
-        /// reintroduce the exact cross-thread stall this design exists to
-        /// remove, just against a different lock. See the class doc
-        /// comment for why this method must never itself perform file IO.
+        /// Deliberately checks <see cref="_store"/> as a volatile field read
+        /// rather than through <see cref="_fileGate"/>: that lock can be held
+        /// for a while by the background FlushLoop or by
+        /// SeedFromStore/PruneOlderThan, and this method must never block
+        /// waiting for it. Derivation: docs/ARCHITECTURE.md section S1.1.
         /// </para>
         /// </summary>
         public void Write(ModuleLogLevel level, string tag, string message)
@@ -474,37 +421,20 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// The destructive "clear log file" action (dev/proposals/d2-log-system.md
-        /// Section 7, Open Question 4 - distinct from the Log tab's
-        /// view-only Clear): deletes the on-disk file AND clears the
-        /// in-memory ring, then writes one Info entry recording the
-        /// deletion so the action itself stays traceable (that entry also
-        /// recreates the file, via the ordinary flush queue). Both halves
-        /// are required - clearing only the view floor would let
-        /// SeedFromStore resurrect every entry from the file next session,
-        /// and deleting only the file would leave this session's ring
-        /// intact. Version stays monotonic throughout (the ring clear is
-        /// <see cref="Clear"/>'s own, which never resets it).
+        /// The destructive "clear log file" action, distinct from the Log
+        /// tab's view-only Clear: deletes the on-disk file AND clears the
+        /// in-memory ring, then writes one Info entry recording the deletion
+        /// (which also recreates the file, via the ordinary flush queue).
+        /// Both halves are required. Version stays monotonic throughout.
         /// <para>
-        /// Starts with a brief, bounded drain of the pending flush queue
-        /// (<see cref="FlushDrainBudget"/>) so
-        /// entries queued before this call land in the file BEFORE it is
-        /// deleted rather than resurrecting it afterwards. Best-effort: an
-        /// entry still in flight past the budget (a hung disk) can land in
-        /// the recreated file - a stale line in the new log, not a
-        /// correctness hazard. The drain is a spin-wait on the calling
-        /// thread; in practice the queue is empty at the moment a user
-        /// clicks the button, so the common cost is zero.
-        /// </para>
-        /// <para>
-        /// Blocks the calling thread beyond that budget too: after the
-        /// drain it acquires <see cref="_fileGate"/> with no bound and
-        /// does real disk IO under it, and FlushLoop can legitimately
-        /// hold that lock through a slow append or full-file trim (the
-        /// stall <see cref="Write"/>'s doc comment exists to keep off
-        /// latency-sensitive threads). Never call this from the main/UI
-        /// thread - the Log tab runs it on Task.Run and marshals its UI
-        /// tail back.
+        /// NEVER call this from the main/UI thread. It first spin-waits a
+        /// bounded drain of the pending flush queue
+        /// (<see cref="FlushDrainBudget"/>) on the calling thread, then
+        /// acquires <see cref="_fileGate"/> with NO bound and does real disk
+        /// IO under it - and FlushLoop can legitimately hold that lock
+        /// through a slow append or a full-file trim. The Log tab runs this
+        /// on Task.Run and marshals its UI tail back.
+        /// Derivation: docs/ARCHITECTURE.md section S1.1.
         /// </para>
         /// </summary>
         public void DeleteFileAndReset()

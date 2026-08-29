@@ -166,30 +166,24 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// how many of the recipe tree's
-        /// decision pills (already-measured widths, in
-        /// DecisionPillPlanner.BuildPillSpecs emission order - source pills
-        /// first, then the supplementary OwnedInfo/Ignore pills) fit
-        /// left-to-right starting at startX before the next one would cross
-        /// maxRightEdge (the boundary before the right-aligned cost
-        /// column). The tree row has no wrap/second-line support
-        /// (TreeRowHeight is a single fixed height shared by every
-        /// scroll/layout-height calculation in CraftingPlanView), so pills
-        /// that would overlap the cost column cannot be rendered.
+        /// How many of the recipe tree's decision pills (already-measured
+        /// widths, in DecisionPillPlanner.BuildPillSpecs emission order) fit
+        /// left-to-right from startX before the next one would cross
+        /// maxRightEdge, the boundary before the right-aligned cost column.
+        /// The tree row has no wrap or second line - TreeRowHeight is one
+        /// fixed height shared by every scroll/layout calculation in
+        /// CraftingPlanView - so a pill that would overlap the cost column
+        /// cannot be rendered.
+        /// <para>
+        /// Always returns at least 1 when pillWidths is non-empty, even if
+        /// that first pill alone exceeds the budget, and every pill after the
+        /// first is dropped strictly once it would not entirely fit.
+        /// </para>
         /// <para>
         /// This is the primitive, not the policy: <see cref="ComputePillFit"/>
-        /// calls it up to three times (normal padding, tightened padding,
-        /// tightened padding with room reserved for a "+N" pill) and is
-        /// what the renderer actually uses. Dropping the remainder without
-        /// announcing it is what ComputePillFit exists to stop.
+        /// calls it up to three times and is what the renderer actually uses.
+        /// Derivation: docs/ARCHITECTURE.md section S1.6.
         /// </para>
-        ///
-        /// Always returns at least 1 when pillWidths is non-empty, even if
-        /// that first pill alone would exceed the budget: a completely
-        /// empty pill column reads worse than one slightly-overflowing
-        /// pill, and every pill after the first is dropped strictly once it
-        /// would not entirely fit (a node's pills only ever grow wider
-        /// left-to-right, so once one is cut every later one would be too).
         /// </summary>
         public static int ComputeVisiblePillCount(
             IReadOnlyList<int> pillWidths, int gap, int startX, int maxRightEdge)
@@ -267,36 +261,19 @@ namespace TaimisToolbench.Services
         /// escalates:
         /// <list type="number">
         /// <item><description>Every pill fits at its normal padding - draw
-        /// them all, nothing else changes.</description></item>
+        /// them all.</description></item>
         /// <item><description>They fit once every pill is narrowed by
-        /// <paramref name="widthReduction"/> - draw them all that narrow.
-        /// Squeezing is cheaper than hiding a real option.
-        /// </description></item>
+        /// <paramref name="widthReduction"/> - draw them all that narrow.</description></item>
         /// <item><description>They still do not fit - reserve room for a
-        /// trailing "+N" pill and draw as many tightened pills as fit
-        /// before it, so the row states that options exist rather than
-        /// dropping them silently.</description></item>
+        /// trailing "+N" pill and draw as many tightened pills as fit before
+        /// it, so the row states that options exist rather than dropping
+        /// them silently.</description></item>
         /// </list>
-        /// The "+N" pill's own width depends on N, which depends on how
-        /// many pills its width displaced, so the last step iterates to a
-        /// fixed point. N is non-decreasing across iterations and bounded
-        /// by the pill count, so it settles immediately in practice (only a
-        /// digit-count change moves it at all); the loop is capped anyway,
-        /// and HiddenCount is derived from the final VisibleCount either
-        /// way, so an uncoverged width is a few pixels wrong and never a
-        /// wrong count.
-        /// <para>
-        /// <paramref name="overflowPillWidthForHidden"/> measures "+N" for
-        /// a given N. Null degrades to the old drop-silently behaviour
-        /// rather than throwing, as does a non-positive
-        /// <paramref name="widthReduction"/> for the tightening step.
-        /// </para>
-        /// <para>
-        /// Like <see cref="ComputeVisiblePillCount"/>, at least one pill is
-        /// always drawn even if it alone overruns - so a row whose budget
-        /// cannot even hold one pill plus the "+N" draws both slightly
-        /// over, which still beats an empty column.
-        /// </para>
+        /// <paramref name="overflowPillWidthForHidden"/> measures "+N" for a
+        /// given N; null degrades to dropping silently rather than throwing,
+        /// as does a non-positive <paramref name="widthReduction"/>. Like
+        /// <see cref="ComputeVisiblePillCount"/>, at least one pill is always
+        /// drawn. Derivation: docs/ARCHITECTURE.md section S1.6.
         /// </summary>
         public static PillFitPlan ComputePillFit(
             IReadOnlyList<int> pillWidths,

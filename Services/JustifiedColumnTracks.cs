@@ -5,32 +5,19 @@ namespace TaimisToolbench.Services
     /// row's span is divided into N EQUAL tracks and each data column is
     /// CENTRED on its own track, so the columns spread across the panel
     /// instead of stacking against its right-hand edge.
-    ///
-    /// <para>
-    /// A column's header and its cells centre on the same track, which is
-    /// what makes a header sit over the values it names. Right-aligning
-    /// both to a shared edge also lines them up, but only at that edge:
-    /// a short header over wide cells then reads as belonging to the
-    /// column on its right. <see cref="RightEdge"/> is kept for the bands
-    /// that genuinely pin to an edge (buttons, coin runs that must not
-    /// ragged-right against each other).
-    /// </para>
-    ///
-    /// <para>
-    /// It was written for the currency table, whose packed stack left
-    /// ~1000px of nothing between a currency's name and its first number
-    /// with no anchor for the eye between them. The Plan History table had
-    /// the same shape and the same complaint, so the arithmetic lives here
-    /// rather than in two places: a second copy is how two tables that are
-    /// supposed to read alike drift apart.
-    /// </para>
-    ///
     /// <para>
     /// TRACK COUNT is one per data column plus ONE for the label, which is
     /// the leftmost and the only flexing element. Data column i (0-based)
     /// right-aligns on <c>RightEdge(..., i + 1)</c>; the label fills from
     /// startX up to the first data column's reserved band, so it absorbs
     /// whatever that column does not need.
+    /// </para>
+    /// <para>
+    /// A column's header and its cells centre on the same track, which is
+    /// what makes a header sit over the values it names.
+    /// <see cref="RightEdge"/> is kept for the bands that genuinely pin to
+    /// an edge (buttons, coin runs that must not ragged-right against each
+    /// other). Derivation: docs/ARCHITECTURE.md section S1.2.
     /// </para>
     /// </summary>
     internal static class JustifiedColumnTracks

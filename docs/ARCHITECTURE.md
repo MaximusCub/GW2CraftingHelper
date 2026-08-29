@@ -1304,3 +1304,370 @@ It does cost bytes. The persisted `CurrencyMetadata` is the whole
 `/v2/currencies` reply, so every saved plan grows by the descriptions of
 all 79 currencies - measured 2026-08-28 at 8.5 KB raw, ~2.5 KB gzipped,
 per plan blob.
+
+---
+
+## S1. Services A-P: relocated design narrative
+
+Derivations, histories and investigations moved out of over-length XML doc
+comments under `Services/` (A-P) and `Models/`. Each subsection is cited by
+the comment it came from; the comment keeps the invariant a caller can
+violate, and this is where the "how we got here" lives.
+
+### S1.1 The logging system: one ring, one file sink, two locks
+
+`Services/ModuleLog.cs` is an ordinary instantiable class rather than a
+static one so tests can construct isolated instances (`new ModuleLog()`)
+with deterministic, non-shared state regardless of xUnit's default
+cross-class parallelism. Production call sites use the single app-wide
+`Shared` instance instead of threading a `ModuleLog` dependency through
+every constructor - deliberately the "static-or-singleton" shape
+`dev/proposals/d2-log-system.md` section 4.1 describes, resolved as a
+singleton-by-default instantiable type specifically so it stays testable.
+It is Blish-free for the same reason `ModuleLogEntry` is, and the Log tab
+reads the ring on its own `Version` poll rather than through a push
+callback - the same producer/consumer separation `Module.cs` already uses
+for its own dirty-flag fields.
+
+**Why two locks, and why `Write` never touches disk.** `_gate` guards the
+in-memory ring and `Version` - fast, pure in-memory work, taken by every
+`Write` and by `Snapshot()`. `_fileGate` guards the attached file sink -
+slow, real disk IO. `Write` hands its entry to a single-consumer background
+flush queue rather than performing IO itself, so neither lock, and
+therefore neither the Log tab's per-frame `Version` poll nor any other
+caller's ring access, can ever block behind file IO regardless of which
+thread called `Write` or how large the file has grown. That was a real
+live hazard before the split: the `[scrolldiag]` Debug channel calls
+`Write` on the main thread from inside `CraftingPlanView`'s
+frame-timing-sensitive scroll-verify loop, so any synchronous disk IO
+inside `Write` - never mind an occasional full-file read+rewrite trim -
+would stall that exact frame. `Write` checks `_store` as a volatile field
+read for the same reason: taking `_fileGate` to find out whether a sink
+exists would reintroduce the stall against a different lock.
+
+`SeedFromStore` is the one path that holds both locks, always `_fileGate`
+then `_gate`. It holds `_fileGate` for the whole read+seed, serializing
+against the background flush loop and against `PruneOlderThan` so the read
+can never race a concurrent file write or rewrite, and nests `_gate` only
+around the ring-append portion, serializing against a concurrent `Write`'s
+own ring append from a background continuation during startup (the build-ID
+fetch's `Task.Run`) - without which a brand-new entry could land in the ring
+chronologically *before* the seeded history. Every other path holds one lock
+at a time, so nothing can complete the opposite ordering and deadlock. It
+resolves d2 section 7's Open Question 2 as yes: pre-session history is
+visible on first tab-open, not just "since this launch".
+
+`DeleteFileAndReset` (d2 section 7, Open Question 4) starts with a brief,
+bounded spin-wait drain of the pending flush queue so entries queued before
+the call land in the file before it is deleted rather than resurrecting it
+afterwards. Best-effort: an entry still in flight past the budget - a hung
+disk - can land in the recreated file, which is a stale line in the new log
+rather than a correctness hazard, and in practice the queue is empty at the
+moment a user clicks the button, so the common cost is zero. Clearing only
+the view floor would let `SeedFromStore` resurrect every entry next session;
+deleting only the file would leave this session's ring intact - hence both
+halves.
+
+`Services/ModuleLogStore.cs` writes JSONL rather than one big JSON array
+(the `SnapshotStore`/`StatusStore`/`VendorOfferStore` shape) because a log
+is fundamentally append-heavy: a crash mid-append to JSONL loses at most the
+last, tolerated-as-partial line, whereas a crash mid-write to one big array
+can corrupt the entire file. Rotation is split into two independently
+callable, independently testable operations rather than d2's single combined
+`RotateIfNeeded(maxBytes, maxAgeDays)`, matching how they actually fire at
+different cadences. Every public method has its own internal try/catch and
+calls its own `onError` rather than propagating, which is why
+`ModuleLog.Configure`'s `onStoreError` parameter is defence-in-depth rather
+than the error path a caller should expect to see fire.
+
+### S1.2 Shared layout laws
+
+`Services/GridLayout.cs` states the column-grid law once. It was stated
+three times before the class existed - `SnapshotItemGridLayout`,
+`SettingsCurrencyGridLayout` and `ColumnBoardLayout` each carried their own
+`ComputeColumnCount` and `ComputeColumnWidth` with character-identical
+bodies - and the copies had already drifted apart once and been re-synced by
+copying again, leaving a note that pointed a reader at a sibling's prose
+rather than at shared code. Grid geometry meant to agree now agrees by
+construction.
+
+`Services/JustifiedColumnTracks.cs` was written for the currency table,
+whose packed stack left ~1000px of nothing between a currency's name and its
+first number with no anchor for the eye between them. The Plan History table
+had the same shape and the same complaint, so the arithmetic lives in one
+place rather than two: a second copy is how two tables that are supposed to
+read alike drift apart. Right-aligning a header and its cells to a shared
+edge also lines them up, but only at that edge - a short header over wide
+cells then reads as belonging to the column on its right, which is why the
+tracks centre instead. `Services/PlanHistoryRowLayout.cs` is that law applied
+to one row.
+
+`Services/LogGutterLayout.cs` replaced one worst-case prefix *template* -
+the widest level word, a widest-digit stamp, and a fourteen-`w` tag
+allowance, measured once and applied to every row at every width whatever
+the rows actually contained. The template existed for a real reason,
+recorded on `LogTabContent.FullPrefixWidth`: the incremental append path
+sees only the new entries, so a width derived from what it can see would
+drift from what a full rebuild produced. That is answered rather than
+reverted - the view holds the widest rendered tag as a monotonic high-water
+mark per render generation, so both paths agree by construction while the
+band still tracks the content.
+
+### S1.3 Icon tiers: measured from the game
+
+`Services/ItemIconTiers.cs` and `Services/CurrencyIconTiers.cs` hold two
+sizes each, matched to the game's own two inventory and two wallet tiers
+(owner rulings, 2026-08-26 and 2026-08-27). Both are Blish-free so the
+layout math that reserves room for an icon and the view that draws it read
+the same number.
+
+**Item tiers**, measured from the staged references against in-game tooltip
+text (~14px, the same class as `UiFonts.Body`, so game pixels at default UI
+scale read 1:1 as module logical pixels): `bag-icon-size-reference.png`
+shows a main bag grid at ~59-60px slot pitch with ~54-56px of slot art;
+`bag-sidebar-icon-size-reference.png` shows the bag side bar at ~44px pitch
+with ~39-40px of art - a sidebar-to-slot art ratio of ~0.72.
+
+**Currency tiers**, measured from `gate-ranker/currency-wallet-list-reference.png`
+and `gate-ranker/currency-summary-bar-reference.png`. Calibration follows
+the tooltip fidelity audit's method - a capture counts as native only once
+one of its metrics is shown to match a known native one - but lands a far
+tighter anchor than that audit's text pitch can. The live gold-coin currency
+texture (asset 156904) is 32x32, and template-matching it against the wallet
+list row is pixel-exact at scale 1.000: mean squared error 2.0 over the
+texture's opaque pixels, against 887 and 1176 one pixel either side. A
+capture cannot match an unresampled source that closely unless it is native
+1:1, so game pixels read 1:1 as module logical pixels - the same conclusion
+the item tiers reached, independently corroborated by the bag sidebar
+measuring the same 44px pitch in this capture as in its own reference.
+
+**Where the icon sits**, measured at both currency tiers: the box is centred
+on the number's *ink* rather than sitting on the baseline - list tier, icon
+box y178..209 (centre 193.5) against the "841" glyph ink y188..198 (centre
+193.0); bar tier, box y114..129 against ink y115..126, within a pixel at
+half the size. That is the rule the renderers spell as
+`iconYOffset = (textHeight - iconSize) / 2`, recorded here so it need not be
+re-derived from a screenshot.
+
+### S1.4 Item tooltips: what the API says and what the game shows
+
+`Services/ItemStatBlockFactory.cs` is where every "what does an absent field
+mean" decision is made, so the composer downstream only renders facts.
+Stat-*selectable* items (non-empty `stat_choices`) record only how many
+combinations exist: computing numbers for one nominated combination is
+possible - see `Services/ItemStatMath.cs` - but *which* one is an open
+judgment call (KNOWN-ISSUES #40, Q4), and it is the only thing in this
+feature that would need a `/v2/itemstats` request.
+
+**Bindings.** `ResolveBindings`' independence rule and its bare-versus-"on
+Use" wording come from captures: relic-livingcity 104938 (2026-08-26) shows
+"Account Bound" and "Soulbound on Use" stacked on one item (AccountBound +
+SoulBindOnUse), which is what rules out a most-specific ladder. Within a
+dimension the stronger flag wins - live3 almonds 12337 and fury-scorched
+86967 both carry AccountBound *and* AccountBindOnUse and render one account
+line. Five captures carry a bind-on-acquire flag and read bare: Gift of
+Twilight 19648 (the 2026-08-27 owner A/B, the same item hovered in the
+module and in the game), heart-of-destroyer 67017 and holographic-wings
+79157 - all AccountBound + AccountBindOnUse, all bare "Account Bound" -
+relic-livingcity 104938, and red-festival-lantern 68638 (SoulbindOnAcquire +
+SoulBindOnUse, bare "Soulbound"). The "on Acquire" wording appears on
+exactly two captures, almonds 12337 and fury-scorched 86967, and both are
+*material storage* hovers, where the copy shown is not bound to anyone yet.
+Which copy the player is looking at is instance state `/v2/items` cannot
+carry, so the majority-and-A/B wording wins.
+
+**Attribute arithmetic.** `ItemStatMath`'s formula is measured on
+Berserker's (itemstats 161, .35/.25/.25) against Zojja's
+Warfists/Pauldrons (adjustment 134.442 -> 47/34/34), Visor (179.256 ->
+63/45/45), Tassets (268.884 -> 94/67/67) and Breastplate (403.326 ->
+141/101/101). `ItemStatMathTests` asserts against those published answers
+rather than against the method's own arithmetic.
+
+**The consumable block.** `ItemStatTooltipComposer.AppendConsumableEffect`'s
+colours are measured on live3 soul-pastries / candy-corn / omnomberry
+(2026-08-26): all three saturate at (170,170,170) for every line of the
+block, superseding F7's white-first-line split, whose allspice/steak
+evidence was JPEG-era. The effect lines' own `+`/`%` prefixes come from the
+API text and are not normalised - omnomberry carries "30% Magic Find" beside
+"+10% Experience from Kills".
+
+**Descriptions.** `Services/ItemDescriptionSanitizer.cs` keeps the API's
+colour spans as roles rather than discarding them because the game colours
+only the marked runs and leaves unmarked text white, which is the only way
+"A gift bag!" can be told apart from the quoted flavour that follows it
+inside one description string (KNOWN-ISSUES #42, gap G7). Unknown angle-
+bracket content is passed through rather than stripped: a blanket
+tag-stripper would silently delete real item text the day the API uses a
+bracket for something that is not markup.
+
+`Models/ItemStatBlock` stays off `ItemMetadata` because `PersistedPlan.Result`
+is a `CraftingPlanResult` holding the `ItemMetadata` dictionary, and
+`PersistedPlanSchemaMemberSetTests` guards that whole reachable graph against
+`PersistedPlan.CurrentSchemaVersion` - so hanging stats there would force a
+schema bump (section 12).
+
+### S1.5 The two decision vocabularies
+
+`Models/AcquisitionSource` is the solver's vocabulary and
+`Models/CraftingDecision` the display layer's. They diverge because the
+solver never needs an owned/ignored state - that is display-only,
+`CraftingDecision.Have` - while the tree builder never needs a distinct
+currency-leaf source. The single bridge is
+`Services/CraftingTreeBuilder.MapSource`.
+
+Per-member mapping:
+
+| `AcquisitionSource` | `CraftingDecision` |
+| --- | --- |
+| `Craft` | `Craft` |
+| `BuyFromTp` | `BuyFromTp` |
+| `BuyFromVendor` | `BuyFromVendor` |
+| `Currency` | `Currency` in principle only - see below |
+| `UnknownSource` | `Unknown` |
+| (none) | `Have`, `GuildUpgrade`, `UnrecognizedIngredient` - set directly |
+
+`AcquisitionSource.Currency` exists because `PlanStep.Source` shares the
+enum for aggregation bookkeeping, but `CraftingTreeBuilder` never routes a
+currency leaf through `MapSource` at all: it sets `CraftingDecision.Currency`
+directly as soon as it sees a non-`"Item"` ingredient type, before any
+decision lookup. `UnknownSource` -> `Unknown` is a genuinely reachable
+production path - gw2efficiency's "Not sold or crafted": no recipe, no TP
+price, no vendor offer - and it is the only case that legitimately offers
+the pill layer's interactive IGNORE toggle, because the user may already
+have the item in hand with no way for the module to know.
+
+`GuildUpgrade` is set directly for a Guild Decoration recipe's
+claimed-upgrade requirement and is deliberately separate from `Currency`: a
+guild upgrade id and a wallet currency id are distinct id spaces with no
+defined relationship, so resolving one as if it were the other on the
+strength of a numeric match would risk silently showing the wrong name or
+price on any collision. Full guild-decoration crafting support - resolving
+the upgrade's real name, verifying ownership - is out of scope
+(KNOWN-ISSUES #54). `UnrecognizedIngredient` covers an ingredient type that
+is none of `"Item"`, `"Currency"` or `"GuildUpgrade"`, and is distinct from
+`Unknown` because a shared value once gave that leaf the interactive IGNORE
+toggle, keyed on a raw non-item id that could silently zero an unrelated
+`"Item"` node sharing the same numeric id. Its own value routes it to the
+single-locked-pill short-circuit instead.
+
+`GuildUpgrade` and `UnrecognizedIngredient` are appended last, after every
+pre-existing member, in the order they were introduced - the reason the
+enum's own doc comment states as a rule.
+
+### S1.6 Tree rows: vendor cost leaves and the pill column
+
+`CraftingTreeBuilder.BuildVendorCostComponentLeaves` synthesizes leaves only
+for a mixed-kind winning offer, plus the one pure-barter case. A pure-coin
+or pure-TP-item offer shows its whole cost in the parent's own coin cell,
+and a pure-currency one in that cell's currency segments
+(`TreeCostColumnMath.ShowsCurrencySegments`), but a barter quantity has
+neither. Currency leaves, and item leaves for an untradeable barter item,
+carry blank cost cells by design; only a TP-valued item leaf must visibly
+sum, which is what keeps "parent total = sum of the parts a leaf can show"
+true while a raw coin component stays folded into `SubtreeCost`.
+
+`Services/DecisionPillPlanner.cs`'s pill count *is* the affordance: 2-3
+pills means a real choice, exactly one means the source is locked. The
+`default` arm of its source switch is a non-crashing safety net for a future
+regression, not a real code path.
+
+`Services/PlanRelayoutMath.cs` fits those pills into the row.
+`ComputeVisiblePillCount` is the primitive: at least one pill is always
+drawn even when it alone overruns, because a completely empty pill column
+reads worse than one slightly-overflowing pill, and every pill after the
+first is dropped strictly once it would not entirely fit - a node's pills
+only ever grow wider left-to-right, so once one is cut every later one would
+be too. `ComputePillFit` is the policy, escalating normal padding ->
+tightened padding -> tightened padding with a trailing "+N": squeezing is
+cheaper than hiding a real option, and announcing the remainder is cheaper
+than dropping it silently. The "+N" pill's own width depends on N, which
+depends on how many pills its width displaced, so the last step iterates to
+a fixed point; N is non-decreasing across iterations and bounded by the pill
+count, so it settles immediately in practice (only a digit-count change
+moves it at all). The loop is capped anyway, and `HiddenCount` is derived
+from the final `VisibleCount` either way, so an unconverged width is a few
+pixels wrong and never a wrong count.
+
+### S1.7 Per-unit currency amounts
+
+`CurrencyDisplayResolver.ResolveUnitAmounts` resolves the winning offer's
+own per-batch rate rather than a truncated `total / quantity` average. The
+average could show a misleading "1" for a merged row whose real purchases
+were, say, a 3-for-3 batch plus a 1-for-1 batch. When the offer data is not
+available - mixed offers merged into one step, or a non-vendor row - it
+returns null rather than reviving that average: gw2efficiency itself never
+shows a per-unit currency price at all (`docs/gw2e-parity-spec.md` section
+4.3, directive 5), so omitting the Each cell is the closer parity choice
+than guessing. When a line's per-batch count does not divide evenly, the
+true rate is not a whole number, and rather than round - inventing data the
+spec does not ask for - the amount carries a literal "N for M" bundle label.
+
+`ResolveTreeNodeUnitAmounts` answers the same question for a single tree row
+(`TreeSectionController`'s "Unit price:" tooltip line, field-test finding B),
+where the true batch rate is simply not present: `OutputCount` and
+`CurrencyCostLinesPerBatch` exist only on `PlanStep`, threaded there by
+`VendorBatchSolver.FinalizeVendorBatches` for the merged shopping list - a
+later, separate pass a single tree node's `SolverDecision` never goes
+through. Dividing the node's own total by its own `Quantity` agrees with the
+true rate whenever the offer's batches divided evenly into that quantity,
+and falls back to the same bundle text when they did not (the total already
+includes rounding up to a whole purchase - `EvaluateVendorOffers`'
+`unitsNeeded`). It is a display-layer fix: no solver change was needed.
+
+### S1.8 Shopping List sort order
+
+`PlanTableSorter.CompareValue` sorts in three blocks because the column
+holds three kinds of cell, not one scale. Reversing the *blocks* would
+express nothing - "5 spirit shards" is neither more nor less than "3 gold"
+in either direction - and it would float the dash rows to the top, where
+they are pure noise, so the block order is direction-invariant while the
+order within a block flips.
+
+Currency-only rows sort by currency name first (ordinal, case-insensitive)
+so every karma row lands beside every other karma row, then by amount within
+that currency - the only numeric comparison in that block that is actually
+meaningful. A row carrying more than one currency is keyed on its
+ordinally-first currency name and that entry's amount, which is stable
+regardless of the order the resolver emitted them in; no attempt is made to
+add amounts across currencies. The numeric key is `UnitRate` rather than
+`Amount` because a per-unit amount whose rate does not divide evenly carries
+`Amount` 0 and shows its rate as bundle text ("912 for 92"), so keying on
+`Amount` would sort every such row as free and tie them all with each other.
+
+### S1.9 Session caches and timing diagnostics
+
+`Services/CachingAccountRecipeClient.cs` is a decorator rather than a field
+inside `Gw2AccountRecipeClient` because that class holds a Blish
+`Gw2ApiManager`, and tests in this repo are Blish-free, so caching logic
+living there could never be exercised by a test. Its staleness has two
+downstream consumers, both annotations rather than solver inputs: the
+"already known" flag on required recipes
+(`PlanResultBuilder`'s `RecipeRequirement.IsMissing`), and the gate on
+`RecipeSheetSavingsCalculator`, which emits a note advising the purchase of
+a recipe sheet the account does not own, carrying a `SavingsPerUnit` coin
+figure. So a recipe learned in-game inside the TTL window not only still
+reads as missing - the plan may keep recommending, priced, the sheet that
+taught it until the window passes.
+
+`Services/Diagnostics/PlanPhaseTimingSummary.cs` buckets the raw per-step
+`timingLog` lines `PlanTimingAnalyzer` already parses (Build recipe
+tree/trees, Collect item IDs, Fetch TP prices, Query vendor offers,
+Inventory reduction, Solve, Fetch item metadata, Fetch currency metadata,
+Fetch learned recipes, Build result) into the coarser phases
+`PlanPhaseEvent` exposes to the live UI, rather than
+`PlanTimingAnalyzer.Summarize`'s per-raw-step percentage breakdown. It reads
+straight from a full `CraftingPlanResult.DebugLog` - raw timing lines, then
+`PlanTimingAnalyzer.SummaryHeaderLine`, then `PlanResultBuilder`'s own
+reduction/decision lines - rather than needing the pipeline to plumb its
+local `timingLog` list out to the wrapper that calls this.
+
+The `wallClockMs` parameter exists because the sum of the raw per-step lines
+necessarily omits every un-instrumented gap between them - task scheduling,
+awaits resuming, GC - so it is always less than or equal to the wrapper's
+own wall-clock `Stopwatch`, and for a real ~19s generation the two can
+differ by seconds rather than milliseconds. The single number a field tester
+actually experiences ("it took 19 seconds") is the wall-clock figure, so
+when it is supplied it becomes the "total" with the phase sum appended
+alongside as "(phases Nms)" for comparison; when absent - every existing
+test, any future non-UI caller - the "total" stays the phase sum exactly as
+before.

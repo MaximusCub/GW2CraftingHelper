@@ -345,27 +345,23 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Synthesizes display-only child leaves for a BuyFromVendor node
-        /// whose winning offer mixed 2+ cost kinds (coin / non-coin
-        /// currency / TP-valued item); a single-kind offer (the vast
-        /// majority) returns null and the caller falls back to the
-        /// reference branch. One single-kind offer is the exception: a
-        /// pure-BARTER offer, whose cost is an untradeable item's units.
-        /// A pure-coin or pure-TP-item offer shows its whole cost in the
-        /// parent's own coin cell and a pure-currency one in that cell's
-        /// currency segments (TreeCostColumnMath.ShowsCurrencySegments),
-        /// but a barter quantity has neither, so without a leaf the row
-        /// would state no cost at all.
-        ///
+        /// whose winning offer mixed 2+ cost kinds (coin / non-coin currency
+        /// / TP-valued item); a single-kind offer returns null and the caller
+        /// falls back to the reference branch. The one single-kind exception
+        /// is a pure-BARTER offer, whose cost is an untradeable item's units:
+        /// it has neither a coin cell nor currency segments to show it in, so
+        /// without a leaf the row would state no cost at all.
+        /// <para>
         /// A raw coin component never gets its own leaf - it stays folded
-        /// into the parent's SubtreeCost, which keeps "parent total = sum
-        /// of the parts a leaf can show" true (currency leaves, and item
-        /// leaves for an untradeable barter item, have blank cost cells by
-        /// design; only a TP-valued item leaf must visibly sum).
-        ///
+        /// into the parent's SubtreeCost, which keeps "parent total = sum of
+        /// the parts a leaf can show" true. See docs/ARCHITECTURE.md S1.6.
+        /// </para>
+        /// <para>
         /// Every number on a leaf is read from
         /// decision.VendorCurrencyCosts/VendorItemCosts - nothing is
-        /// recomputed, so a leaf's displayed amount can never drift from
-        /// the parent's SubtreeCost.
+        /// recomputed, so a leaf's displayed amount can never drift from the
+        /// parent's SubtreeCost.
+        /// </para>
         /// </summary>
         private static List<CraftingTreeNode> BuildVendorCostComponentLeaves(
             int parentNodeId,
