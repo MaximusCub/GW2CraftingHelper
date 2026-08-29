@@ -1381,6 +1381,33 @@ namespace TaimisToolbench
         }
 
         /// <summary>
+        /// Best-effort active character name. Debug, not Warn: a user running
+        /// Blish without Mumble wired up would hit this on every plan
+        /// generation and every ranker refresh, and the fallback is purely
+        /// cosmetic (active-character is only used for account-bound recipe
+        /// checks).
+        /// </summary>
+        private string TryGetActiveCharacterName()
+        {
+            try
+            {
+                var mumble = GameService.Gw2Mumble;
+                if (mumble != null &&
+                    mumble.PlayerCharacter != null &&
+                    !string.IsNullOrEmpty(mumble.PlayerCharacter.Name))
+                {
+                    return mumble.PlayerCharacter.Name;
+                }
+            }
+            catch (Exception ex)
+            {
+                ModuleLog.Shared.Write(ModuleLogLevel.Debug, "plan", $"Gw2Mumble unavailable, active character unknown: {ex.GetType().Name} - {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Asks whether to keep or drop unsaved Settings edits, once the
         /// user has already left the tab.
         ///
@@ -1419,33 +1446,6 @@ namespace TaimisToolbench
         /// the typed text again.
         /// </para>
         /// </summary>
-        /// <summary>
-        /// Best-effort active character name. Debug, not Warn: a user running
-        /// Blish without Mumble wired up would hit this on every plan
-        /// generation and every ranker refresh, and the fallback is purely
-        /// cosmetic (active-character is only used for account-bound recipe
-        /// checks).
-        /// </summary>
-        private string TryGetActiveCharacterName()
-        {
-            try
-            {
-                var mumble = GameService.Gw2Mumble;
-                if (mumble != null &&
-                    mumble.PlayerCharacter != null &&
-                    !string.IsNullOrEmpty(mumble.PlayerCharacter.Name))
-                {
-                    return mumble.PlayerCharacter.Name;
-                }
-            }
-            catch (Exception ex)
-            {
-                ModuleLog.Shared.Write(ModuleLogLevel.Debug, "plan", $"Gw2Mumble unavailable, active character unknown: {ex.GetType().Name} - {ex.Message}");
-            }
-
-            return null;
-        }
-
         private void PromptForUnsavedSettings()
         {
             if (_settingsContent == null || _modalDialog == null)
