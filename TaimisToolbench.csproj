@@ -302,6 +302,7 @@
     <Compile Include="Services\RankerReadinessRamp.cs" />
     <Compile Include="Services\RankerRowLayout.cs" />
     <Compile Include="Services\RankerResultCache.cs" />
+    <Compile Include="Services\RankerSnapshotWatch.cs" />
     <Compile Include="Views\Rendering\RankerReadinessColors.cs" />
     <Compile Include="Views\RankerTabContent.cs" />
     <Compile Include="Views\SettingsTabContent.cs" />

@@ -82,6 +82,11 @@ namespace TaimisToolbench
         private RankerStore _rankerStore;
         private RankerTabContent _rankerContent;
 
+        // Held so Update can poll the Ranker for a snapshot change ONLY
+        // while it is the tab on screen; compared by reference, like
+        // _logTab/_settingsTab.
+        private Tab _rankerTab;
+
         // Carried from BuildViews to BuildTabs so the Ranker's rows serve
         // the same session stat-cache tooltips the plan and snapshot rows
         // do. Never a fetch (see ItemMetadataService.GetCachedStatBlock).
@@ -1188,14 +1193,15 @@ namespace TaimisToolbench
                 _getItemStatBlock,
                 _warmItemStatsAsync);
 
-            _mainWindow.Tabs.Add(new Tab(
+            _rankerTab = new Tab(
                 AsyncTexture2D.FromAssetId(156686),
                 () =>
                 {
                     _rankerContent.BeginRebuild();
                     return new ViewAdapter("Crafting Ranker", c => _rankerContent.Build(c));
                 },
-                "Crafting Ranker"));
+                "Crafting Ranker");
+            _mainWindow.Tabs.Add(_rankerTab);
 
             _logTab = new Tab(
                 AsyncTexture2D.FromAssetId(156701),
@@ -1659,6 +1665,20 @@ namespace TaimisToolbench
             if (_logContent != null && _mainWindow?.SelectedTab == _logTab)
             {
                 _logContent.PollForUpdates();
+            }
+
+            // The Ranker's own poll, on the same terms and for the same
+            // reason - a nullable-DateTime compare when nothing changed.
+            // Gated on a VISIBLE window as well as the selected tab,
+            // unlike the Log's: what this poll can start is a rebuild of
+            // every row, and it runs where the user can watch it happen or
+            // not at all (Views/RankerTabContent.PollForSnapshotChange).
+            if (_rankerContent != null
+                && _mainWindow != null
+                && _mainWindow.Visible
+                && _mainWindow.SelectedTab == _rankerTab)
+            {
+                _rankerContent.PollForSnapshotChange();
             }
 
             // "Applying restored plan to view" - mirrors the

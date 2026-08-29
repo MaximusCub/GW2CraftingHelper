@@ -193,7 +193,7 @@ namespace TaimisToolbench.Views
         private CancellationTokenSource _refreshCts;
         private bool _isRefreshing;
         private bool _firstRefreshDone;
-        private DateTime? _snapshotStamp;
+        private readonly RankerSnapshotWatch _snapshotWatch = new RankerSnapshotWatch();
         private bool _rarityDirty;
         private DateTime? _lastRefreshLocal;
         private string _statusOverride;
@@ -1146,29 +1146,61 @@ namespace TaimisToolbench.Views
         /// holdings of one account snapshot; a newer one makes all of them
         /// claims about an account that no longer exists.
         /// <para>
-        /// Checked when the table is being rebuilt rather than on a timer,
-        /// deliberately: the snapshot re-fetches itself on a schedule, and
-        /// blanking a table the user is reading - possibly mid-hover - to
-        /// announce a background event is worse than answering with the
-        /// numbers they were already reading until they next ask for them.
+        /// The rows on screen are NOT re-rendered here: blanking a table the
+        /// user is reading - possibly mid-hover - to announce a background
+        /// event is worse than leaving the numbers they were already reading
+        /// until the rebuild replaces them row by row.
+        /// </para>
+        /// <para>
+        /// A table that never had results does not ask for one. The first
+        /// run of a session is the user's to start: it is up to
+        /// RankerWatchlistLimits.MaxEntries rows at two plan solves each,
+        /// and nothing on screen is waiting on it.
         /// </para>
         /// </summary>
         private void InvalidateOnSnapshotChange()
         {
-            var stamp = _getSnapshot()?.CapturedAt;
-            if (stamp == _snapshotStamp)
+            if (_snapshotWatch.Observe(_getSnapshot()?.CapturedAt, _results.HasAnyResults))
+            {
+                _results.InvalidateEverything();
+            }
+        }
+
+        /// <summary>
+        /// The snapshot poll, on the same terms as the Log tab's own: a
+        /// nullable-DateTime compare per tick, run by Module.Update ONLY
+        /// while this tab is the selected tab of a window the user can see.
+        /// <para>
+        /// That gate is the whole design, and the cost it guards plus the
+        /// coalescing rule are stated on
+        /// <see cref="RankerSnapshotWatch"/>: a change that lands while the
+        /// tab is hidden is remembered there and spent on the first tick
+        /// after it is next shown.
+        /// </para>
+        /// </summary>
+        public void PollForSnapshotChange()
+        {
+            if (!_buildComplete || !IsLive)
             {
                 return;
             }
 
-            bool hadResults = _results.HasAnyResults;
-            _snapshotStamp = stamp;
-            _results.InvalidateEverything();
-
-            if (hadResults)
+            InvalidateOnSnapshotChange();
+            if (!_snapshotWatch.TryTakeRebuild(_isRefreshing, Entries.Count > 0))
             {
-                SetStatus("Your account snapshot changed - press Analyze to recalculate.", isError: false);
+                return;
             }
+
+            // Says why the numbers are about to move. The run's own
+            // per-row progress replaces it as soon as the first solve
+            // reports, and the spinner and the Analyzing... button carry it
+            // from here on.
+            SetStatus("Account snapshot changed - recalculating.", isError: false);
+
+            // recomputeAll, for the reason the button passes it: every
+            // number in the set was measured against holdings that have
+            // moved, so none of them can be replayed from cache.
+            StartRefresh(Mode, recomputeAll: true);
         }
 
         private void BuildBanner(int barWidth)
@@ -2593,7 +2625,7 @@ namespace TaimisToolbench.Views
             // used - not whatever a background re-fetch has replaced it with
             // by the time the run ends.
             var snapshot = _getSnapshot();
-            _snapshotStamp = snapshot?.CapturedAt;
+            _snapshotWatch.MeasuredAgainst(snapshot?.CapturedAt);
 
             var work = new List<RefreshRow>(Entries.Count);
             for (int i = 0; i < Entries.Count; i++)

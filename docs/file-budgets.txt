@@ -182,6 +182,7 @@ Services/RankerReadinessRamp.cs                                                 
 Services/RankerReadinessWeights.cs                                                       61
 Services/RankerResultCache.cs                                                           263
 Services/RankerRowLayout.cs                                                             745
+Services/RankerSnapshotWatch.cs                                                          93
 Services/RankerStore.cs                                                                 132
 Services/RankerWatchlistLimits.cs                                                        17
 Services/ReceiptCaptionHelper.cs                                                        106
@@ -278,7 +279,7 @@ Views/MainView.cs                                                               
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
 Views/PlanHistoryTabContent.cs                                                          1424
-Views/RankerTabContent.cs                                                               2963
+Views/RankerTabContent.cs                                                               2995
 Views/Rendering/ClickSound.cs                                                            197
 Views/Rendering/CoinCurrencyRenderer.cs                                                  607
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              198
@@ -488,6 +489,7 @@ tests/TaimisToolbench.Tests/Services/RankerReadinessCalculatorTests.cs          
 tests/TaimisToolbench.Tests/Services/RankerReadinessRampTests.cs                      225
 tests/TaimisToolbench.Tests/Services/RankerResultCacheTests.cs                        215
 tests/TaimisToolbench.Tests/Services/RankerRowLayoutTests.cs                            933
+tests/TaimisToolbench.Tests/Services/RankerSnapshotWatchTests.cs                        141
 tests/TaimisToolbench.Tests/Services/RankerStoreTests.cs                                285
 tests/TaimisToolbench.Tests/Services/ReceiptCaptionHelperTests.cs                     124
 tests/TaimisToolbench.Tests/Services/RecipeCacheStoreTests.cs                         998
