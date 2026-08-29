@@ -106,11 +106,13 @@ namespace TaimisToolbench.Views.Rendering
 
             var scan = new ColumnScan(statusColumnWidth, disciplineColumnWidth);
 
-            // Both data headers centre over the band their own cells
-            // occupy rather than sharing an edge with them - the module's
-            // centred column law, see Services/JustifiedColumnTracks. Only
-            // Recipe stays on a rule: it is the flexing column, and its
-            // names start at NameX on every row.
+            // Both data headers centre over the INK their own cells cover
+            // rather than sharing an edge with them - the module's header
+            // law, JustifiedColumnTracks.CenteredOverContent. CenteredInBand
+            // satisfies it here only because neither band carries a floor
+            // beyond its own header, so the band IS the ink. Only Recipe
+            // stays on a rule: it is the flexing column, and its names
+            // start at NameX on every row.
             int disciplineHeaderWidth = MeasureWidth(headerFont, DisciplineHeaderText);
             int statusHeaderWidth = MeasureWidth(headerFont, StatusHeaderText);
             Func<int, int> statusLabelX = w => JustifiedColumnTracks.CenteredInBand(

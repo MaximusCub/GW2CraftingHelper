@@ -101,11 +101,11 @@ namespace TaimisToolbench.Views.Rendering
             // column-header tables', so it can never disagree with
             // PlanContentHeightMath.SectionBodyHeight, which counts it the
             // same way. No rightXForWidth: the Amount column is pinned to
-            // the panel edge, which is ColumnHeaderRowRenderer's own default.
-            // rightLabelXForWidth, though: the band is pinned but the WORD
-            // over it centres on it (Services/JustifiedColumnTracks), which
-            // is what puts "Amount" over the quantities rather than over the
-            // panel's right margin.
+            // the panel edge, ColumnHeaderRowRenderer's own default.
+            // rightLabelXForWidth, though: the WORD centres on the
+            // quantities, not on the panel's right margin. CenteredInBand
+            // satisfies JustifiedColumnTracks.CenteredOverContent here only
+            // because this band carries no floor beyond its own header.
             int amountHeaderWidth =
                 (int)System.Math.Ceiling(HeaderBands.Font.MeasureString(amountHeaderText).Width);
             ColumnHeaderRowRenderer.CreateColumnHeaderRow(
