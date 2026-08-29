@@ -2985,3 +2985,201 @@ see such a change because it only ever fetches ids the corpus lacks. The one
 comparison the refresher does make - is the fetched row identical to the
 seed's? - exists to keep the overlay from becoming a 10 MB duplicate of the
 shipped seed for no gain.
+
+---
+
+## T. Tests and tools: relocated design narrative
+
+Derivations, histories and investigations moved out of over-length XML doc
+comments under `tools/` and `tests/`. Section 9 above describes the data
+pipeline these tools feed; this section is the level below it - the wiki
+shapes, the incidents, and the coverage gaps that explain why the offline
+tools and a handful of test fixtures are built the way they are. Each
+comment they came from keeps the part a caller can violate and points
+here for the rest.
+
+### T.1 `HomesteadTierResolver`: the parity shape and the live probe
+
+The merchant-name test matches gw2efficiency's own `cheapestTree.ts`
+matching shape (`docs/research/m37-r1-homestead.md` section 1.2): a row
+participates in tier gating only when its merchant name contains the
+literal substring "Homestead Refinement" (gw2e:
+`tree.merchant.name.includes('Homestead Refinement')`), which catches all
+three station pages ("...-Farm", "...-Lumber Mill", "...-Metal Forge") the
+same way a plain `.includes()` would.
+
+The tier encoding was confirmed live, by a direct SMW ask probe against
+Homestead Refinement-Metal Forge: a tier-0 row's "Has requirement"
+printout returns an empty array, and a tier-1 or tier-2 row returns
+exactly one `_txt` value, "one [[Homestead Upgrade: ...]]" or "two
+[[Homestead Upgrade: ...]]" respectively. That is not an inference from
+the rendered page - the wiki's `{{vendor table row}}` template parameter
+is literally `requirement=one [[...]]` / `requirement=two [[...]]`.
+
+The class is separate from `ConvertToOffer` so this pure resolution logic
+is covered by direct unit tests without a `Gw2ApiHelper`/`HttpClient`
+fixture.
+
+### T.2 `TemporaryTemplateParser`: the wikitext shapes that were observed
+
+Every shape below was read off a live page through the wiki mirror
+(`api.php?action=parse&prop=wikitext`), not inferred from the template's
+documentation.
+
+- **Template name casing varies in the wild.** Both `{{Temporary|...}}`
+  and `{{temporary|...}}` appear verbatim on real pages ("Mad King's
+  Realm" uses the lowercase form), which is why the match is
+  case-insensitive.
+- **Parameter name varies too.** The six recurring festival vendor NPC
+  pages this module cares about all use `seasonal=` - for example "Candy
+  Corn Vendor (Weekly)":
+  `{{Temporary|release=Shadow of the Mad King 2019|seasonal=Halloween}}`.
+  A minority of vendor NPC pages use `event=` for the identical purpose:
+  confirmed on "Trader" (Bazaar of the Four Winds),
+  `{{Temporary|release=Bazaar of the Four Winds|event=Festival of the
+  Four Winds}}`, and on the non-festival one-off vendors "Consortium
+  Trader (Fractal Rush)" and "Starter Equipment Vendor",
+  `{{temporary|event=Fractal Rush}}` / `{{temporary|event=Fractal
+  Incursion}}`. The parser treats both parameters identically; it is
+  `Gw2Constants.ResolveSeasonalFestivalKey`, not the parser, that decides
+  whether an extracted value is one of the six known festivals or an
+  unrecognized one-off event or release.
+- **A page can carry `{{Temporary|release=...}}` with neither parameter**
+  - a one-off, non-festival, non-`event` release vendor. That returns
+  null, the same as a page with no `{{Temporary}}` template at all.
+- **One shape has never been observed and is therefore untested:** the
+  extracted value is not normalized against wiki markup, so
+  `seasonal=[[Halloween]]` would extract the literal "[[Halloween]]".
+  `Gw2Constants.ResolveSeasonalFestivalKey` correctly leaves that
+  untagged with a warning rather than fuzzy-matching or guessing (the
+  never-guess repo invariant), but it is worth knowing about if a future
+  wiki edit introduces wikilink-wrapped parameter values.
+
+The template regex matches up to the first literal `}` via a negated
+character class rather than up to the first `}}`, so a single stray `}`
+inside a real template's parameter list would make that template
+unmatchable rather than truncate its captured body early. Not observed on
+any real page, and left unhardened for that reason.
+
+### T.3 `VendorOfferDiff`: why a raw id diff is useless
+
+`git diff` on `ref/vendor_offers.json` reports "1 insertion(+), 1
+deletion(-)" on a 14.8MB single line: the entire dataset replaced as one
+indivisible hunk. A reviewer of a `data(vendor):` commit cannot see what
+changed.
+
+The naive improvement - list the offerIds that appeared and disappeared -
+is almost as useless, because `offerId` is a SHA-256 over the offer's
+whole content. Change one price and the row does not "change": it
+vanishes and a different hash appears, so a raw added/removed pair list
+turns every repricing into two unrelated-looking hex strings.
+
+Re-pairing by (merchant, output item) is what the hash does not preserve
+but a human reads instantly. The converse case matters more, because a
+`VendorOfferHasher` hash-format change does it to every row at once: a row
+whose content is unchanged but whose id is not has not been repriced. One
+such migration reported 48,750 of 53,544 rows as repriced, each printing
+an identical before and after, and cross-paired rows differing only in
+`OutputCount` into price moves that never happened. Counting those as
+rehashed rather than listing them is what keeps the report readable.
+
+### T.4 `Program.MergeIntoBaseline`: why an incomplete batch never replaces
+
+Wholesale replacement of a merchant's rows on the strength of a fresh
+scrape is correct only when the fresh set is complete. It has silently
+deleted shipped offers before, when a pass returned rows with
+`GameId <= 0` that the GameId filter then dropped. Hence the
+`merchantsWithSkippedRows` opt-out: those merchants union instead of
+replace. A possibly-stale baseline row surviving an extra run is visible
+and fixable; a silent deletion is neither.
+
+### T.5 `Program.ResolveSeasonalFestivalValuesAsync`: opt-in, budgeted, page-keyed
+
+**Why opt-in.** Every other field on `WikiVendorResult` comes from SMW
+"ask" printouts already fetched by
+`QueryVendorItemsAsync`/`ResolveItemGameIdsAsync`. There is no Semantic
+MediaWiki property for a page's `{{Temporary}}` template, so unioning a
+distinct-page wikitext parse into every full refresh would add one HTTP
+request per distinct vendor page - thousands, for a from-scratch scrape -
+on top of the existing two-pass budget, silently changing the cost and
+time profile of the default `./tools/refresh-vendor-data.sh` workflow. A
+developer who wants full coverage passes `--tag-seasonal-festivals`
+explicitly.
+
+**Why the cache is keyed by stripped page title.**
+`WikiVendorResult.PageName` is the SMW subject key of the vendor's "Sells
+item" SUBOBJECT, not the vendor's own wiki page title - confirmed live
+(`api.php?action=ask` against `[[Has vendor::Candy Corn Vendor
+(Weekly)]]`): every row's subject is "Candy Corn Vendor (Weekly)#vendor1",
+"...#vendor2", and so on, one subobject per sold item. The fetchable page
+title is everything before the first `#` (`StripSubobjectSuffix`).
+Caching and fetching by the stripped title is also what keeps the pass
+cheap: one wikitext fetch per distinct VENDOR, not per sold item.
+
+**Why the budget is self-healing rather than fatal.** An over-budget run
+fetches up to the budget, saves the cache, and logs how many pages remain.
+The next run's `toFetch` list is smaller, so repeated runs converge on
+full coverage instead of every run past the first throwing on the same
+unmet budget.
+
+**Why the budget is scoped to this run's query.** `wikiResults` at the
+caller's call site is the FULL merged `wiki_vendor_cache.json` (Step 2's
+`MergeWikiCache` union), not just this run's query. Scoping the fetch
+budget to it meant a narrow `--query` on a real dev-machine cache
+(thousands of distinct vendor pages) computed thousands of "uncached"
+pages, exceeded `--max-seasonal-pages`, and threw `SafetyLimitException`
+BEFORE Steps 4-6 ever wrote output, discarding the scoped run's
+already-completed live work. `queryScopedResults` scopes the budget to the
+pages this run's `--query` actually returned, and is null for
+`--resolve-item-currencies-only`, which has no `--query` and processes the
+whole cache by design. The cache-apply loop still runs over the full
+`wikiResults` either way, since applying an already-cached tag is a
+dictionary lookup, not a fetch.
+
+### T.6 `WikiSmwClient.FetchWikitextAsync`: the redirect that looked like an answer
+
+`action=parse` does not resolve redirects by default, unlike `action=ask`'s
+SMW queries. Without `&redirects=1`, a vendor page whose SMW subject title
+is a redirect returned "#REDIRECT [[Target]]" as its wikitext, in which
+`TemplateRegex` then correctly found no `{{Temporary}}` template - so the
+caller cached `""` ("checked, no tag"), which looked identical to a real,
+deliberate absence and was never retried.
+
+That is also why a null return and an empty wikitext body are not
+interchangeable at the call site. `ResolveSeasonalFestivalValuesAsync`
+warns about and leaves uncached the "wikitext came back null at all" case
+(missing or renamed page, API error object), precisely because a null does
+not mean "checked, no template" the way an empty body legitimately can.
+
+### T.7 `VendorOfferHasherGoldenVectorTests`: why the fixture lives in `tests/shared/`
+
+`tests/shared/vendor_offer_hasher_vectors.json` was originally a
+CROSS-PROJECT net: the module carried its own copy of the hasher under
+`Services/`, and both suites replayed these same rows so the two copies
+could not drift. That copy had no callers anywhere in the module and has
+been deleted, leaving one implementation, so the fixture's job is now
+regression pinning over time rather than agreement between two files. It
+stays outside either project's `Helpers/` because it is still the right
+home for a hash contract that keys shipped data, and because a second
+consumer may return.
+
+### T.8 The festival tagging pass behind `SeasonalFestivalRoundTripTests`
+
+The shipped `ref/vendor_offers.json` baseline carries `seasonalFestival`
+on 57 offers across all six known festivals, not just the three
+hand-tagged Candy Corn Vendor (Weekly) ecto offers it started with.
+Dragon Bash Merchant (Weekly), Wintersday Trader (Weekly), Festival
+Rewards Vendor (Weekly), Gauntlet Ticket Vendor, New Year Vendor and
+Super Adventure Box Weekly Trader were live-tagged by a scoped
+`--tag-seasonal-festivals --merge-into` run targeting exactly those six
+merchants.
+
+Candy Corn Vendor (Weekly) was deliberately excluded from that scoped
+query. A fresh scrape of ANY merchant recomputes new OfferIds for that
+merchant (see `VendorOfferHasher`'s own doc comment on the Astral Acclaim
+hash-format migration), so touching it would have broken the test's "the
+three known offer IDs survive identically" requirement - and with it the
+evidence that a `--merge-into` run does not silently drop tags. Coverage
+is deliberately partial: thousands of non-festival vendor pages remain
+untagged, since the pass covered the known festival vendor list rather
+than a full re-scrape (KNOWN-ISSUES #63).

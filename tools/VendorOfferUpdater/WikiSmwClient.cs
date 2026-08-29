@@ -86,8 +86,8 @@ namespace VendorOfferUpdater
             "|?Has requirement";
 
         /// <summary>
-        /// Queries the wiki for items sold by vendors, returning raw parsed results
-        /// and query statistics.
+        /// Queries the wiki for items sold by vendors, returning the raw
+        /// parsed rows and this query's statistics.
         ///
         /// Vendor data lives on subobject pages (e.g. "NPC#vendor1") with properties:
         ///   Sells item          - the item page
@@ -101,10 +101,9 @@ namespace VendorOfferUpdater
         ///   Has seasonal purchase cap - Wizard's Vault seasonal purchase limit
         ///                               (absent = uncapped or not a Vault offer)
         ///
-        /// The wiki SMW API limits pagination to ~5500 results per query condition.
-        /// When that limit is hit, the query is automatically partitioned by vendor
-        /// name prefix (e.g. [[Has vendor::~A*]]) with empty prefixes probed and
-        /// skipped. Safety limits prevent runaway execution.
+        /// Past the SMW API's ~5500-result pagination limit per query condition, the
+        /// query is automatically partitioned by vendor name prefix (e.g. [[Has
+        /// vendor::~A*]]), empty prefixes probed and skipped, under safety limits.
         /// </summary>
         public async Task<(List<WikiVendorResult> Results, QueryStats Stats)> QueryVendorItemsAsync(
             string? queryCondition = null, QueryOptions? options = null, CancellationToken ct = default)
@@ -695,29 +694,18 @@ namespace VendorOfferUpdater
         /// <summary>
         /// Fetches a single wiki page's raw wikitext via
         /// action=parse&amp;prop=wikitext - used by the festival-vendor
-        /// auto-tagging pass (Program.ResolveSeasonalFestivalValuesAsync)
-        /// to read a vendor NPC page's own {{Temporary|...}} template,
-        /// which (unlike "Has requirement"/"Has seasonal purchase cap")
-        /// has no equivalent Semantic MediaWiki property to query via
-        /// action=ask. Returns null if the page does not exist or the API
-        /// response otherwise has no wikitext (reused FetchWithRetryAsync
-        /// already retries transient failures; a null here means the page
-        /// itself does not have a "wikitext" result, not a network error).
+        /// auto-tagging pass (Program.ResolveSeasonalFestivalValuesAsync) to
+        /// read a vendor NPC page's own {{Temporary|...}} template, which
+        /// (unlike "Has requirement"/"Has seasonal purchase cap") has no
+        /// equivalent Semantic MediaWiki property to query via action=ask.
+        /// The &amp;redirects=1 is load-bearing: action=parse does not follow
+        /// redirects by default, unlike action=ask's SMW queries.
         ///
-        /// Action=parse does NOT resolve
-        /// redirects by default (unlike action=ask's SMW queries) -
-        /// without &amp;redirects=1, a vendor page whose SMW subject title
-        /// is a redirect returned "#REDIRECT [[Target]]" as its wikitext,
-        /// which TemplateRegex then correctly finds no {{Temporary}}
-        /// template in, so the caller's cache[pageName] = "" ("checked -
-        /// no tag") looked identical to a real, deliberate absence and
-        /// never got retried. See ResolveSeasonalFestivalValuesAsync's own
-        /// caller-side fix for the companion "wikitext came back null at
-        /// all" (missing/renamed page, API error object) case - that one
-        /// is now warned about and left uncached rather than baked into
-        /// the cache as "", precisely because a null return here does NOT
-        /// mean "checked, no template" the way an empty wikitext body
-        /// legitimately can.
+        /// Returns null if the page does not exist or the response otherwise
+        /// has no wikitext - never a network error, since FetchWithRetryAsync
+        /// has already retried those. A null is NOT interchangeable with an
+        /// empty wikitext body at the call site: see docs/ARCHITECTURE.md
+        /// section T.6.
         /// </summary>
         public async Task<string?> FetchWikitextAsync(string pageName, CancellationToken ct = default)
         {
