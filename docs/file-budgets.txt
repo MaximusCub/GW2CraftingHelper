@@ -181,7 +181,7 @@ Services/RankerReadinessCalculator.cs                                           
 Services/RankerReadinessRamp.cs                                                         265
 Services/RankerReadinessWeights.cs                                                       61
 Services/RankerResultCache.cs                                                           263
-Services/RankerRowLayout.cs                                                             735
+Services/RankerRowLayout.cs                                                             745
 Services/RankerStore.cs                                                                 132
 Services/RankerWatchlistLimits.cs                                                        17
 Services/ReceiptCaptionHelper.cs                                                        106
@@ -278,7 +278,7 @@ Views/MainView.cs                                                               
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    398
 Views/PlanHistoryTabContent.cs                                                          1424
-Views/RankerTabContent.cs                                                               2945
+Views/RankerTabContent.cs                                                               2961
 Views/Rendering/ClickSound.cs                                                            197
 Views/Rendering/CoinCurrencyRenderer.cs                                                  600
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              198

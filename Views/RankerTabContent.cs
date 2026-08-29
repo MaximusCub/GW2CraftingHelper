@@ -74,9 +74,16 @@ namespace TaimisToolbench.Views
 
         private const int MainLineIconY = 3;
 
-        /// <summary>The readiness percentage, centred inside its own bar.</summary>
+        /// <summary>
+        /// The readiness percentage, centred inside its own bar. One ramp
+        /// tier below the row's own Status text: Bold18's 23px line box in a
+        /// 24px bar left the number filling the paint edge to edge, and a
+        /// meter reads as a meter only if the bar is visible around its
+        /// figure. Body's 20 leaves 2px of plate above and below the box,
+        /// 5px above and below the ink.
+        /// </summary>
         private static int ReadyLineY =>
-            MainLineBarY + ((RankerRowLayout.ReadyBarHeight - TypeRampMetrics.StatusInk.LineHeight) / 2);
+            MainLineBarY + ((RankerRowLayout.ReadyBarHeight - TypeRampMetrics.BodyInk.LineHeight) / 2);
 
         /// <summary>A gate's label and its bar, centred in the gate strip's pitch.</summary>
         private static int GateTextY =>
@@ -85,9 +92,16 @@ namespace TaimisToolbench.Views
         private static int GateBarOffsetY =>
             (RankerRowLayout.GateLineHeight - RankerRowLayout.GateBarHeight) / 2;
 
-        /// <summary>The percentage centred inside a gate's bar.</summary>
+        /// <summary>
+        /// The percentage centred inside a gate's bar, one ramp tier below
+        /// the gate NAME beside it for the reason <see cref="ReadyLineY"/>
+        /// gives: Body's 20px line box exactly equalled GateBarHeight, so
+        /// the figure had no plate above or below it at all. Caption's 18
+        /// leaves a pixel of box either side and 3px of ink clearance.
+        /// </summary>
         private static int GateValueY =>
-            GateBarOffsetY + ((RankerRowLayout.GateBarHeight - TypeRampMetrics.BodyInk.LineHeight) / 2);
+            GateBarOffsetY
+                + ((RankerRowLayout.GateBarHeight - TypeRampMetrics.CaptionInk.LineHeight) / 2);
 
         // Muted grey is reserved for content meant to leave the user's
         // focus: the footer captions and the empty-state onboarding prose
@@ -1635,7 +1649,8 @@ namespace TaimisToolbench.Views
 
             row.ReadyLabel = new Label
             {
-                Font = UiFonts.Status,
+                // Seated with ReadyLineY, which is derived from this tier.
+                Font = UiFonts.Body,
                 Text = RankerReadinessCalculator.FormatReadiness(metrics),
                 TextColor = Color.White,
                 AutoSizeWidth = true,
@@ -1780,7 +1795,8 @@ namespace TaimisToolbench.Views
                 row.GateBarFills.Add(fill);
                 row.GateValueLabels.Add(new Label
                 {
-                    Font = UiFonts.Body,
+                    // Seated with GateValueY, which is derived from this tier.
+                    Font = UiFonts.Caption,
 
                     // White over the bar, at 5.07:1 or better at every point
                     // on the ramp (Services/RankerReadinessRamp) - which is

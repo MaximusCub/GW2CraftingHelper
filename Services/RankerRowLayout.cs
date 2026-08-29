@@ -34,12 +34,19 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// The gate strip's own pitch. Taller than a text sub-line because
         /// each cell now carries a painted bar rather than a bare number,
-        /// and the bar has to hold a Body line box with the percentage
-        /// centred inside it.
+        /// and the bar has to hold the percentage's line box with plate
+        /// left around it.
         /// </summary>
         public const int GateLineHeight = 22;
 
-        /// <summary>Height of a gate cell's bar inside <see cref="GateLineHeight"/>.</summary>
+        /// <summary>
+        /// Height of a gate cell's bar inside <see cref="GateLineHeight"/>.
+        /// The figure inside draws at Caption, one ramp tier below the gate
+        /// NAME beside it, so its 18px line box leaves a pixel of bar top
+        /// and bottom - at Body it filled the 20 exactly and the meter read
+        /// as a number with paint behind it. Seat:
+        /// Views/RankerTabContent's GateValueY.
+        /// </summary>
         public const int GateBarHeight = 20;
 
         /// <summary>Gap between a gate's label band and its bar.</summary>
@@ -76,26 +83,29 @@ namespace TaimisToolbench.Services
         // to the width of a dash.
 
         /// <summary>
-        /// Fits the bold "Ready" header (~50px) and the readiness BAR, whose
-        /// centred "100%" draws one tier above the rest of the row
-        /// (UiFonts.Status, 18 bold) and measures ~46px there. This is the
-        /// cell's floor, not its width: under distribution the bar takes its
-        /// whole track.
+        /// Fits the bold "Ready" header (~50px), which is now the binding
+        /// term: the bar's centred "100%" was derived against bold 18 at
+        /// ~46px and draws one tier down at Body, so it is narrower than the
+        /// header above it. This is the cell's floor, not its width: under
+        /// distribution the bar takes its whole track.
         /// </summary>
         public const int ReadyCellWidth = 66;
 
         /// <summary>
-        /// Height of the headline readiness bar. 24, so a Status line box
-        /// (23) centres inside it with a pixel to spare; the bar itself
+        /// Height of the headline readiness bar. 24, and the percentage
+        /// inside it is a Body line box (20), leaving 2px of plate above and
+        /// below so the bar reads around the figure instead of being filled
+        /// by it (Views/RankerTabContent's ReadyLineY). The bar itself
         /// centres in <see cref="RowHeight"/>.
         /// </summary>
         public const int ReadyBarHeight = 24;
 
         /// <summary>
         /// Floor for the headline bar. Below this the centred "100%" it
-        /// carries (bold 18, ~46px) has no plate left around it; the packed
-        /// fallback's ReadyCellWidth - CellGap is 54, so nothing at a
-        /// supported width goes under it.
+        /// carries has no plate left around it - derived when that figure
+        /// was bold 18 at ~46px, and clear by more since it dropped a tier.
+        /// The packed fallback's ReadyCellWidth - CellGap is 54, so nothing
+        /// at a supported width goes under it.
         /// </summary>
         public const int MinReadinessBarWidth = 50;
 
