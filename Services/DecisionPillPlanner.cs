@@ -80,6 +80,17 @@ namespace TaimisToolbench.Services
         private const string CurrencyPillText = "CURRENCY";
 
         /// <summary>
+        /// The Ignore toggle's two texts. Public because the view reserves
+        /// ONE slot wide enough for either of them, so the pill does not
+        /// move or resize when a click flips it - see
+        /// <see cref="TreePillRunLayout"/>.
+        /// </summary>
+        public const string IgnorePillText = "IGNORE";
+
+        /// <summary>The toggled state of <see cref="IgnorePillText"/>.</summary>
+        public const string IgnoredPillText = "IGNORED";
+
+        /// <summary>
         /// True when <paramref name="text"/> would render identically to a
         /// module-owned source badge. Case-insensitive: nothing
         /// upper-cases a badge on the way to the screen, so "Vendor"
@@ -178,7 +189,7 @@ namespace TaimisToolbench.Services
                 // same item to ignored - this pill is the only way back.
                 if (node.IsIgnored)
                 {
-                    specs.Add(new PillSpec("IGNORED", null, PillKind.Ignore));
+                    specs.Add(new PillSpec(IgnoredPillText, null, PillKind.Ignore));
                 }
 
                 return specs;
@@ -422,7 +433,7 @@ namespace TaimisToolbench.Services
 
             if (!node.IsPlanRoot)
             {
-                specs.Add(new PillSpec("IGNORE", null, PillKind.Ignore));
+                specs.Add(new PillSpec(IgnorePillText, null, PillKind.Ignore));
             }
         }
     }

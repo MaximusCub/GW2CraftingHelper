@@ -104,7 +104,7 @@ Services/CurrencyTooltipComposer.cs                                             
 Services/CurrencyTooltipFacts.cs                                                         80
 Services/CurrencyValuationSerializer.cs                                                 221
 Services/DailyCooldownItemService.cs                                                     77
-Services/DecisionPillPlanner.cs                                                         431
+Services/DecisionPillPlanner.cs                                                         440
 Services/Diagnostics/PlanPhaseTimingSummary.cs                                          215
 Services/Diagnostics/PlanTimingAnalyzer.cs                                              100
 Services/ExcessCraftOutputCalculator.cs                                                 158
