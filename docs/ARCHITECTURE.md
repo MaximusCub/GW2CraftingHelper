@@ -2627,6 +2627,51 @@ when it is supplied it becomes the "total" with the phase sum appended
 alongside as "(phases Nms)" for comparison; when absent - every existing
 test, any future non-UI caller - the "total" stays the phase sum exactly as
 before.
+
+### S1.10 Dialog sizing: the width bracket and the balanced wrap
+
+`Services/DialogLayoutMath.cs` replaced two fixed rectangles. `ModalDialog`
+was a 560x190 window whose every inner offset was derived from those two
+numbers, so a one-line acknowledgement and a four-line warning drew the same
+box; `ApiAccessDialog` was a second fixed rectangle, 560x300, with its own
+copy of the same constants. Both were sized for their worst case.
+
+**Why the width has a floor at all.** Nothing about readability stops a
+dialog at 500px. The title bar does. Decompiled BlishHUD 1.3.0,
+`WindowBase2.RecalculateLayout`, draws the left title-bar texture into
+`Min(textureWidth, windowWidth - 216)` and `DrawOnCtrl` stretches rather
+than crops, so a narrow window squeezes the art. The recorded evidence is
+two points: a 400px window (about 184px of draw) rasterized as coloured
+streaks behind the title, and 560 (about 344px) renders clean. 500 - the
+480px `MinContentWidth` plus the shell's 2x10 side insets - sits at about
+284px of draw. That is inferred from the bracket, not measured; if the art
+degrades in the field the floor moves up, and nothing else has to change.
+
+**Why the title can push past the ceiling.** `PaintTitleText` draws the
+title in `DefaultFont32` at a fixed 80px indent with no alignment control,
+and the exit button sits at a fixed inset from the right, so window width is
+the only lever a dialog has over its own title. `ApiAccessDialog` learned
+this the expensive way: at 480 its title clipped three characters mid-word.
+That is now a rule rather than a magic number - the caller measures its
+title in the face Blish paints it in and the width floor becomes
+`TitleTextIndent + titleWidth + TitleRightReserve`, which reproduces the 560
+that dialog needs without anyone writing 560 down.
+
+**The balanced wrap.** Wrapping at the ceiling and stopping there gives a
+full first line and a stub second one. The width is instead the narrowest
+that still reaches the same line count, found by binary search over
+`TextWrapMath.Wrap`: greedy wrapping never yields fewer lines as the width
+shrinks, so the predicate is monotone and the search is exact. It runs once
+per `Show`, about ten wraps of one message, and never on a render path.
+
+**Order of operations.** Balance within the preferred wrap ceiling; raise to
+the largest of the button row, the title and the width floor; clamp to what
+the screen can actually hold. The screen wins last, which is why
+`MaxContentWidth` returns the screen's hard ceiling and applies no preferred
+clamp of its own - a button row wider than the preferred width must be able
+to grow the box, and only the screen may refuse it.
+
+
 ## S2. Services Q-Z: relocated design narrative
 
 Design narrative moved out of doc comments in `Services/` (files whose

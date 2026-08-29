@@ -107,6 +107,7 @@ Services/DailyCooldownItemService.cs                                            
 Services/DecisionPillPlanner.cs                                                         440
 Services/Diagnostics/PlanPhaseTimingSummary.cs                                          215
 Services/Diagnostics/PlanTimingAnalyzer.cs                                              100
+Services/DialogLayoutMath.cs                                                            361
 Services/DisciplinesColumnMath.cs                                                       121
 Services/ExcessCraftOutputCalculator.cs                                                 158
 Services/FirstLoadSnapshotGate.cs                                                        86
@@ -391,6 +392,7 @@ tests/TaimisToolbench.Tests/Services/CurrencyValuationSerializerTests.cs        
 tests/TaimisToolbench.Tests/Services/DailyCooldownItemServiceTests.cs                 209
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerSubduingTests.cs              187
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerTests.cs                     1036
+tests/TaimisToolbench.Tests/Services/DialogLayoutMathTests.cs                         342
 tests/TaimisToolbench.Tests/Services/DisciplinesColumnMathTests.cs                    131
 tests/TaimisToolbench.Tests/Services/ExcessCraftOutputCalculatorTests.cs              345
 tests/TaimisToolbench.Tests/Services/FirstLoadSnapshotGateTests.cs                    153
