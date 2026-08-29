@@ -27,10 +27,11 @@ namespace TaimisToolbench.Views.Rendering
         // Gap the name's ellipsis budget keeps before the Source column.
         private const int NameToQtyGap = 12;
 
-        // Left x of the name column (past the row's tier-2 icon frame at
-        // x=8, plus an 8px gap).
-        private const int IconX = 8;
-        private const int NameX = IconX + PlanContentHeightMath.RowIconFrameSize + 8;
+        // The name column's own x's live with the column arithmetic: NameX
+        // is the left end of the distributed track span, so the two cannot
+        // be defined apart.
+        private const int IconX = ShoppingColumnMath.IconX;
+        private const int NameX = ShoppingColumnMath.NameX;
 
         // Text anchor of the row's single reading line - see the identical
         // derivation note on UsedMaterialsSectionRenderer.RowTextY.
@@ -326,7 +327,7 @@ namespace TaimisToolbench.Views.Rendering
             HeaderCellPlan plan, ColumnScan scan, int panelWidth, int[] boundaries)
         {
             ShoppingColumnMath.HeaderCellBoundaries(
-                scan.EdgesFor(panelWidth), scan.SourceColumnWidth, NameToQtyGap, boundaries);
+                scan.EdgesFor(panelWidth), NameToQtyGap, boundaries);
             for (int i = 0; i < boundaries.Length; i++)
             {
                 plan.SetBoundary(i, boundaries[i]);
