@@ -301,6 +301,10 @@ namespace TaimisToolbench.Views
         // item id and a currency id are different id spaces - see
         // CurrencyRow.Id.
         private IReadOnlyDictionary<int, ItemMetadata> _barterItemMetadata;
+
+        // The session item-stat cache the barter rows' hovers read, from
+        // the module's one ItemMetadataService.
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
         private readonly List<HomesteadTierRow> _homesteadRows = new List<HomesteadTierRow>();
 
         private FlowPanel _rootPanel;
@@ -415,14 +419,23 @@ namespace TaimisToolbench.Views
         // a half-built form has nothing to compare, not everything.
         private volatile bool _buildComplete;
 
+        /// <param name="getItemStatBlock">
+        /// The session stat cache the grid's barter rows hover from. Never
+        /// a fetch (ItemMetadataService.GetCachedStatBlock); null degrades
+        /// those hovers to their icon+name header.
+        /// </param>
         /// <param name="modalDialog">
         /// Raises the Discard confirm. Null degrades to discarding without
         /// one rather than losing the affordance - the confirm matrix is a
         /// UX rule, not a correctness gate.
         /// </param>
-        public SettingsTabContent(ModuleSettings settings, ModalDialog modalDialog = null)
+        public SettingsTabContent(
+            ModuleSettings settings,
+            Func<int, ItemStatBlock> getItemStatBlock,
+            ModalDialog modalDialog = null)
         {
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _getItemStatBlock = getItemStatBlock;
             _modalDialog = modalDialog;
 
             _resizeSettle = new ResizeSettleDebounce(
@@ -2214,17 +2227,24 @@ namespace TaimisToolbench.Views
                     return;
                 }
 
+                // These rows ARE items, unlike their currency neighbours,
+                // and the rarity came from the same /v2/items entry as the
+                // icon beside it. Resolved once and fed to the frame and
+                // the hover header alike - see ItemTooltipIdentity.ForItem.
+                string rarity = ItemRarityResolution.Normalize(item.Rarity);
+                int itemId = row.Id;
                 row.Icon = IconControls.CreateItemIcon(
                     row.Cell,
                     item.IconUrl,
-                    // These rows ARE items, unlike their currency
-                    // neighbours, and the rarity came from the same
-                    // /v2/items entry as the icon beside it.
-                    ItemIconFrame.ForRarity(ItemRarityResolution.Normalize(item.Rarity)),
+                    ItemIconFrame.ForRarity(rarity),
                     SettingsCurrencyGridLayout.CellIconX,
                     SettingsCurrencyGridLayout.CellIconY,
                     ItemIconTier.CurrencyListRow,
-                    ItemIconTooltip.Naming(row.Name));
+                    ItemIconTooltip.ForItem(
+                        ItemTooltipIdentity.ForItem(row.Name, item.IconUrl, rarity),
+                        _getItemStatBlock == null || itemId <= 0
+                            ? (Func<ItemStatBlock>)null
+                            : () => _getItemStatBlock(itemId)));
                 return;
             }
 
@@ -2233,9 +2253,11 @@ namespace TaimisToolbench.Views
                 return;
             }
 
+            int currencyId = row.Id;
+            string currencyName = row.Name;
             row.Icon = IconControls.CreateItemIcon(
                 row.Cell,
-                CurrencyDisplayResolver.ResolveIconUrl(row.Id, _currencyMetadata),
+                CurrencyDisplayResolver.ResolveIconUrl(currencyId, _currencyMetadata),
                 // A currency has no rarity to resolve: neutral by intent,
                 // the same call ItemIconFrame.NotAnItem() records at the
                 // Snapshot tab's wallet rows.
@@ -2243,7 +2265,16 @@ namespace TaimisToolbench.Views
                 SettingsCurrencyGridLayout.CellIconX,
                 SettingsCurrencyGridLayout.CellIconY,
                 ItemIconTier.CurrencyListRow,
-                ItemIconTooltip.Naming(row.Name));
+                ItemIconTooltip.ForCurrency(
+                    currencyName,
+                    // No balance: this tab reads no wallet snapshot, and
+                    // null is "not known", which drops the line rather than
+                    // claiming the player holds none.
+                    () => CurrencyTooltipFacts.For(
+                        currencyName,
+                        CurrencyDisplayResolver.ResolveIconUrl(currencyId, _currencyMetadata),
+                        CurrencyDisplayResolver.ResolveDescription(currencyId, _currencyMetadata),
+                        null)));
         }
 
         /// <summary>
