@@ -1240,6 +1240,32 @@ rather than invented, and the permission notice the licence requires is
 reproduced verbatim in the source file itself. Research notes live in
 [`docs/research/gw2e-currency-decision-prices.md`](research/gw2e-currency-decision-prices.md).
 
+**Rolling raid currencies, and the one row dropped from upstream.** The
+live API gives two wallet currencies the same name, "Gaeting Crystal".
+Currency 39 is the Path of Fire one: it was retired on 2022-07-19, every
+held balance force-converted into Magnetite Shards (currency 28), and no
+account has been able to hold one since. It is absent from
+`CurrencyDecisionDefaults` even though gw2efficiency's upstream table
+values it at 3600 - a deliberate divergence, not drift, annotated at the
+row in the research notes above. Its item form, item 86094, is absent from
+`BarterItemDecisionDefaults` for the same reason. Nothing in
+`ref/vendor_offers.json` charges currency 39 at all, and every offer that
+charges item 86094 belongs to one merchant the wiki marks historical,
+`Scholar Glenna (Gaeting Crystal)`.
+
+Currency 77 is the live one, and it is a *rolling* currency rather than a
+stable one. Each expansion its vendors are switched over to Magnetite
+Shards and every held balance is converted, but the id itself carries the
+role forward instead of being replaced the way 39 was: id 77's own
+`/v2/currencies` description still names Janthir Wilds while the wiki
+records the current content as Castora and flags the description as stale.
+So what a Gaeting Crystal buys - and therefore what one is worth - has a
+shelf life of one expansion. Any hardcoded valuation for id 77 is a
+snapshot of one expansion, not a constant, and is due a re-derivation
+whenever the next one ships. Measured evidence for all of the above,
+including the API and wiki captures:
+`dev/records/gaeting-crystal-duplicate-ids.md`.
+
 The barter table has no upstream to adapt - gw2efficiency values wallet
 currencies only - so each entry is derived here under a single stated
 rule, recorded per entry in the file: the cheapest repeatable vendor
