@@ -335,6 +335,22 @@ contest safe rather than janky:
   changing first - so a user scrolling during a live restore is never
   contested.
 
+**Why the restore refreshes the scrollbar first:** Blish's `Scrollbar`
+caches `_scrollbarPercent` (viewport height over content height) and
+refreshes it only inside its own `RecalculateLayout`, which also assigns
+`ScrollDistance = 0` whenever that percent has moved. `ScrollDistance`'s
+setter calls `Invalidate()`, and `Invalidate` reaches `RecalculateLayout`
+SYNCHRONOUSLY - so a restore written while the cache is stale resets itself
+to zero inside its own assignment statement. A rebuild leaves the cache
+stale: `Panel.UpdateContentRegionBounds` only re-writes the scrollbar's
+`Height`/`Top`/`Right`, all three unchanged by a content rebuild, so
+`SetProperty` short-circuits and no layout pass runs. Both restore paths
+(`ApplySavedScrollSynchronously` and `PreserveScrollAcrossResize`)
+therefore call `scrollbar.RecalculateLayout()` first, letting the expected
+reset happen while nothing is riding on it. This is the field-reported
+"toggle a decision and the view jumps to the top": the currency table
+gaining or losing rows is precisely a content-height change.
+
 **Why the correction is computed in pixel space:**
 `Services/ScrollMath.ApplyPixelDelta` converts a scrollbar ratio to pixels,
 applies the delta, and converts back, rather than working in ratio space
@@ -2097,6 +2113,54 @@ property whose default this module does not control; if it were `Middle`,
 growing a box by 2 would push its glyphs down by 1 while an unswept sibling on
 the same row stayed put, and a ragged baseline inside one sentence ("Craft 12x
 " plus an item name) is worse than the clip the sweep fixes.
+
+### V.26.1 `ClipCutoff`: the viewport's hard top edge
+
+The same round trip V.26 analyses at a row divider's BOTTOM edge is what
+lets scrolled content paint over the plan tab's pinned top strip, and the
+answer there is different because the edge is different. `Container.Paint`
+is `sealed`: it reads `GraphicsDevice.ScissorRectangle` back, unscales it
+with `ScaleBy(1f / uiScale)`, and hands the result to `PaintChildren`,
+which re-intersects it with the container's own content region. That
+re-intersection re-clamps the top edge only when the container's own top is
+BELOW the inherited clip - false for every ancestor of a row scrolled out
+of view - so the `floor(floor(y*s)/s) <= y` loss accumulates once per
+nested container and grows with recipe-tree depth. Measured at UI Size
+Small: 2, 3, 4, 5, 7, 8, 9, 10 logical pixels at depths 1 through 8, and
+still climbing at 64.
+
+Three things follow, and the third is the fix.
+
+- **A gap cannot be the fix.** Any inset sized against "the deepest
+  realistic tree" is a guess about content, and the module does not bound
+  recipe depth. `ClipTopSlipSimulationTests` keeps that measurement, and
+  keeps it labelled as the defect.
+- **Positioning the viewport lower does not prevent it either.** The
+  leaked pixels are drawn relative to the viewport's top edge, so they move
+  down with it; a gap only changes what they land on.
+- **One line, re-asserted at every container, does.** `Control.Draw` is
+  `public virtual`, and it is the one seam the vendor leaves open.
+  `Views/Rendering/ClipCutoff.cs` publishes an absolute logical y for the
+  duration of the viewport's own paint (`ClipAuthorityFlowPanel`), and
+  `ClippedPanel`/`ClippedFlowPanel` clamp the clip they were handed back to
+  it before the vendor code uses it. A container that re-asserts the line
+  hands its children an edge that has drifted at most ONE round trip, so
+  the reach stops accumulating: it is `cutoff - SlipBudget`, at depth 1 and
+  at depth 64 alike. `Services/ClipCutoffMath.cs` owns the arithmetic and
+  the budget - 2 logical pixels, the worst single round trip across all
+  four GW2 UI Sizes - and `ClipCutoffMathTests` proves the bound without
+  mentioning depth.
+
+The line is set one budget BELOW the viewport's top edge, so what a
+descendant can reach is the edge itself and not a pixel above it. That
+spends the viewport's top 2 logical pixels rather than 2 pixels of the
+strip above it, and at rest they fall inside the plan header's own icon
+padding.
+
+Coverage is per-container by construction: a plain `Panel` left in the
+chain re-opens the accumulation below itself, which is why the swap is a
+sweep rather than a single site, and why the strip's `TopStripZIndex`
+cover stays until the sweep is complete.
 
 ### V.27 `PlanHeaderRenderer`: the three things that used to compete
 

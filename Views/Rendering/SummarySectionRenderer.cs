@@ -233,7 +233,7 @@ namespace TaimisToolbench.Views.Rendering
             bool lone = tileCount == 1;
             var geometry = PlanRelayoutMath.ComputeCostTileGeometry(panelWidth, tileCount, totalMargin, minTileWidth);
 
-            var rowPanel = new Panel()
+            var rowPanel = new ClippedPanel()
             {
                 Size = new Point(panelWidth, rowHeight),
                 Parent = parent,
@@ -514,7 +514,7 @@ namespace TaimisToolbench.Views.Rendering
         private static Panel CreateHighlightBox(
             Panel parent, int x, int y, int width, int height)
         {
-            var box = new Panel()
+            var box = new ClippedPanel()
             {
                 Size = new Point(width, height),
                 Location = new Point(x, y),
@@ -538,7 +538,7 @@ namespace TaimisToolbench.Views.Rendering
                 return;
             }
 
-            new Panel()
+            new ClippedPanel()
             {
                 Size = new Point(width, height),
                 Location = new Point(x, y),
@@ -760,7 +760,7 @@ namespace TaimisToolbench.Views.Rendering
         private static Panel CreateCurrencyRowPanel(
             FlowPanel parent, int panelWidth, int rowHeight, Color background)
         {
-            return new Panel()
+            return new ClippedPanel()
             {
                 Size = new Point(panelWidth, rowHeight),
                 BackgroundColor = background,
@@ -779,7 +779,7 @@ namespace TaimisToolbench.Views.Rendering
         /// </summary>
         private void CreateCurrencyTableTopGap(FlowPanel parent, int panelWidth)
         {
-            var gap = new Panel()
+            var gap = new ClippedPanel()
             {
                 Size = new Point(panelWidth, SummarySectionLayoutMath.CurrencyTableTopGap),
                 Parent = parent,
@@ -1002,7 +1002,7 @@ namespace TaimisToolbench.Views.Rendering
 
         private void CreateFootnoteRow(string text, FlowPanel parent, int panelWidth)
         {
-            var rowPanel = new Panel()
+            var rowPanel = new ClippedPanel()
             {
                 Size = new Point(panelWidth, PlanContentHeightMath.FallbackTextRowHeight),
                 Parent = parent,

@@ -104,7 +104,7 @@ namespace TaimisToolbench.Views.Rendering
             // line, so the two sit on one reading line.
             int qtyY = textY + textHeight - qtyHeight - 4;
 
-            var titlePanel = new Panel()
+            var titlePanel = new ClippedPanel()
             {
                 Size = new Point(panelWidth, headerHeight),
                 Parent = contentPanel,

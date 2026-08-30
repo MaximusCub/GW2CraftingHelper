@@ -130,9 +130,9 @@ namespace TaimisToolbench.Views.Rendering
             // wrote the same rule as a literal 4).
             const int badgeY = (rowHeight - badgeSize) / 2;
 
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+            var rowPanel = new ClippedPanel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
-            new Panel()
+            new ClippedPanel()
             {
                 Size = new Point(badgeSize, badgeSize),
                 Location = new Point(badgeX, badgeY),

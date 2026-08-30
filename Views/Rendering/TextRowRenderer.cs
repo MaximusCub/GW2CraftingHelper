@@ -13,7 +13,7 @@ namespace TaimisToolbench.Views.Rendering
     {
         internal static void CreateTextRow(string text, FlowPanel parent, int panelWidth, ISectionRelayoutSink sink)
         {
-            var rowPanel = new Panel()
+            var rowPanel = new ClippedPanel()
             {
                 Size = new Point(panelWidth, PlanContentHeightMath.FallbackTextRowHeight),
                 Parent = parent,
