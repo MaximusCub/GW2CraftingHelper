@@ -21,10 +21,13 @@ namespace TaimisToolbench.Views.Rendering
     internal sealed class SummarySectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
 
-        internal SummarySectionRenderer(ISectionRelayoutSink sink)
+        internal SummarySectionRenderer(
+            ISectionRelayoutSink sink, Func<int, ItemStatBlock> getItemStatBlock = null)
         {
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
+            _getItemStatBlock = getItemStatBlock;
         }
 
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
@@ -921,7 +924,9 @@ namespace TaimisToolbench.Views.Rendering
                     row.IsBarterItemCost
                         ? ItemIconTooltip.ForItem(
                             ItemTooltipIdentity.ForItem(row.Label ?? "", row.IconUrl, row.Rarity),
-                            null)
+                            _getItemStatBlock == null || row.ItemId <= 0
+                                ? (Func<ItemStatBlock>)null
+                                : () => _getItemStatBlock(row.ItemId))
                         // CurrencyOwnedQuantity is already the raw
                         // unclamped wallet holding the game's tooltip
                         // states.
