@@ -27,9 +27,9 @@ Status: OPEN | IN PROGRESS (branch) | DONE (PR #n) | RULED OUT (reason)
 
 | id | Item | Status |
 |----|------|--------|
-| B1 | Toggling a node between CRAFT and VENDOR repopulates the Total Cost currency table, moving the scroll position; sometimes it grows enough to push the whole Recipe Tree section off the viewport. Repro: Obsidian Heavy Breastplate, collapse the breastplate node, toggle back and forth. | OPEN |
+| B1 | Toggling a node between CRAFT and VENDOR repopulates the Total Cost currency table, moving the scroll position; sometimes it grows enough to push the whole Recipe Tree section off the viewport. Repro: Obsidian Heavy Breastplate, collapse the breastplate node, toggle back and forth. | IN PROGRESS (`w6-viewport`) - cause was not the table growing: Blish's `Scrollbar` zeroes `ScrollDistance` inside the restore's own assignment when its cached percent is stale. |
 | B2 | **REGRESSION - still broken.** Clicking IGNORE repeatedly without moving the mouse eventually expands/collapses the node instead of toggling IGNORE. Two causes were fixed in PR #232 (pill membership, cost-column re-derivation); a third remains. | OPEN |
-| B3 | Tree content still overdraws the pinned header when scrolled. Owner's question, which must be answered not deflected: "why aren't we just positioning the viewport lower so this can never happen?" | OPEN |
+| B3 | Tree content still overdraws the pinned header when scrolled. Owner's question, which must be answered not deflected: "why aren't we just positioning the viewport lower so this can never happen?" | IN PROGRESS (`w6-viewport`), **PARTIAL** - hard cutoff built and every container outside the tree swept. RESIDUAL: the per-depth containers in `Views/Rendering/TreeSectionController.cs` still need the mechanical `Panel`/`FlowPanel` -> `ClippedPanel`/`ClippedFlowPanel` swap. Blocked on `w6-tree` owning that file. B3 is NOT closed until that lands. |
 
 ## Layout and dynamic sizing
 
@@ -44,18 +44,19 @@ Status: OPEN | IN PROGRESS (branch) | DONE (PR #n) | RULED OUT (reason)
 
 | id | Item | Status |
 |----|------|--------|
-| V1 | Currency icon is not vertically centred against the numeric digits of the amount text beside it. | OPEN |
-| V2 | **Regression from PR #232.** Currency icons were given a grey BACKGROUND. Only a gentle grey BORDER was asked for; the fill was never requested and the background was previously transparent. | OPEN |
-| V3 | Settings: "Copper per unit" header not centred over the content below it. | OPEN |
-| V4 | Crafting Ranker X buttons should match the size scale of the X control in the top corner of the GW2 Trading Post window. | OPEN |
-| V7 | Clear Overrides dialog: "Ignore marks are kept" should be centred under the text above it. | OPEN |
-| V8 | Log tab: long lines run off the edge. They should wrap, with the full detail available on hover. | OPEN |
+| V1 | Currency icon is not vertically centred against the numeric digits of the amount text beside it. | IN PROGRESS (`w6-icons`) - the seat was 0 at nearly every inline site, not a line-box-vs-digits mismatch. |
+| V2 | **Regression from PR #232.** Currency icons were given a grey BACKGROUND. Only a gentle grey BORDER was asked for; the fill was never requested and the background was previously transparent. | IN PROGRESS (`w6-icons`) - the frame builder always drew a filled plate; #232 merely routed currency art onto it, and transparent art let it show. |
+| V3 | Settings: "Copper per unit" header not centred over the content below it. | IN PROGRESS (`w6-polish`) |
+| V4 | Crafting Ranker X buttons should match the size scale of the X control in the top corner of the GW2 Trading Post window. | IN PROGRESS (`w6-icons`) - 28 -> 24px, the floor the 16px glyph allows. Owner eyeball needed; no TP capture exists to measure against. |
+| V7 | Clear Overrides dialog: "Ignore marks are kept" should be centred under the text above it. | IN PROGRESS (`w6-polish`) - `ModalDialog` centred the block, not the lines. |
+| V8 | Log tab: long lines run off the edge. They should wrap, with the full detail available on hover. | IN PROGRESS (`w6-polish`) - wrapping shipped with variable row heights. NOTE: the agent could not reproduce the overrun itself (the column already ellipsized). If it persists after the next build, the cause is upstream of the message fit. |
 
 ## Research
 
 | id | Item | Status |
 |----|------|--------|
-| R1 | Two currency ids (39 and 77) are both named "Gaeting Crystal". Establish whether one is deprecated, or produce a thesis for why both exist. Answered: id 39 was retired in-game 2022-07-19 and force-converted to Magnetite Shards; id 77 is the live one. Currency 39 and its item form 86094 removed from the module; id 77 added to `KnownCurrencyNames`. Evidence: `dev/records/gaeting-crystal-duplicate-ids.md`. | IN PROGRESS (w6-gaeting) |
+| R1 | Two currency ids (39 and 77) are both named "Gaeting Crystal". Establish whether one is deprecated, or produce a thesis for why both exist. Answered: id 39 was retired in-game 2022-07-19 and force-converted to Magnetite Shards; id 77 is the live one and carries the role forward across expansions rather than being replaced. Currency 39 and its item form 86094 removed from the module. Evidence: `dev/records/gaeting-crystal-duplicate-ids.md`. | IN PROGRESS (PR #235, not yet merged) |
+| R2 | Currency 77 is absent from `Gw2Constants` while 82 cost lines in `ref/vendor_offers.json` are priced in it. Found while answering R1. | IN PROGRESS (PR #235, not yet merged) |
 
 ## Confirmed working in the wave-2 build (owner-verified)
 
