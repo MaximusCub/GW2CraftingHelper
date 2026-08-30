@@ -49,6 +49,12 @@ namespace TaimisToolbench.Views
         private static readonly int MainLineButtonY =
             (PlanHistoryRowLayout.RowHeight - UiMetrics.ButtonHeight) / 2;
 
+        // The remove X is a compact square, not an on-tab button, so it
+        // centres on its own height rather than sharing the seat of the
+        // text buttons beside it.
+        private static readonly int RemoveButtonY =
+            (PlanHistoryRowLayout.RowHeight - PlanHistoryRowLayout.IconButtonWidth) / 2;
+
         // Not a row: one prose line with no icon column, so it does not
         // follow the rows' frame-driven height. It does share their left
         // edge - it stands where the list would.
@@ -694,8 +700,9 @@ namespace TaimisToolbench.Views
         {
             var button = new FeedbackButton
             {
-                Size = new Point(PlanHistoryRowLayout.IconButtonWidth, UiMetrics.ButtonHeight),
-                Location = new Point(x, MainLineButtonY),
+                Size = new Point(
+                    PlanHistoryRowLayout.IconButtonWidth, PlanHistoryRowLayout.IconButtonWidth),
+                Location = new Point(x, RemoveButtonY),
                 Parent = parent,
             };
             button.SetGlyph(UiGlyphs.RemoveMark);
@@ -1080,7 +1087,7 @@ namespace TaimisToolbench.Views
 
             row.Resolve.Location = new Point(bands.ResolveX, MainLineButtonY);
             row.Pin.Location = new Point(bands.PinX, MainLineButtonY);
-            row.Delete.Location = new Point(bands.DeleteX, MainLineButtonY);
+            row.Delete.Location = new Point(bands.DeleteX, RemoveButtonY);
 
             if (row.DetailPanel != null)
             {

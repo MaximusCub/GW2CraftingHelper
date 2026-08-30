@@ -161,7 +161,8 @@ namespace TaimisToolbench.Views
         private const int SearchToFilterGapY = 3;
         // Caption-driven, not icon-driven: the block holds the caption
         // label's own line box beside an inline coin run drawn at y=2. The
-        // run is the wallet BAR tier (2 + 16 = 18), so the icons clear this
+        // run is the wallet BAR tier, seated on the digits' ink two pixels
+        // into its line box (2 + 2 + 16 = 20), so the icons clear this
         // height with room to spare; it is the caption that sets it.
         private const int CoinHeight = 24;
         private const int SectionGapY = 4;

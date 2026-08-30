@@ -207,6 +207,8 @@
     <Compile Include="Models\SeasonalVendorTip.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\CurrencyIconTiers.cs" />
+    <Compile Include="Services\GlyphButtonMetrics.cs" />
+    <Compile Include="Services\IconFrameGeometry.cs" />
     <Compile Include="Services\ItemIconTiers.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
     <Compile Include="Services\ItemRarityResolution.cs" />
@@ -257,6 +259,7 @@
     <Compile Include="Views\Rendering\RarityColors.cs" />
     <Compile Include="Views\Rendering\InlineSpinner.cs" />
     <Compile Include="Views\Rendering\IconControls.cs" />
+    <Compile Include="Views\Rendering\OutlineFramePanel.cs" />
     <Compile Include="Views\Rendering\ItemIconTooltip.cs" />
     <Compile Include="Views\Rendering\ItemStatWarmer.cs" />
     <Compile Include="Views\Rendering\LabelHelpers.cs" />

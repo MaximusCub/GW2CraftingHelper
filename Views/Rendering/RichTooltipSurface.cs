@@ -457,11 +457,6 @@ namespace TaimisToolbench.Views.Rendering
                         textY,
                         font,
                         1f,
-                        // Fixed-size coin icons centred against a taller
-                        // number font, the same correction the Summary
-                        // band's tiles make - without it the icons stick
-                        // to the top of their row.
-                        System.Math.Max(0, (lineHeight - coinIconSize) / 2),
                         showShadow: true,
                         iconSize: coinIconSize);
                     continue;

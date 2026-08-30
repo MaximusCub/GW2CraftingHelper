@@ -35,6 +35,29 @@ namespace TaimisToolbench.Services
         public const int CoinLabelIconGap = 2;
         public const int CoinSegmentGap = 6;
 
+        /// <summary>
+        /// Where an inline coin/currency icon's BOX sits inside the line box
+        /// of the number it marks, given the digits' own ink.
+        /// <para>
+        /// A Label's line box carries ascender and descender space that
+        /// digits never occupy, so an icon seated at the top of it rides
+        /// high against the figures beside it - the reported defect. This is
+        /// the rule <see cref="CurrencyIconTiers.VerticalAlignmentRule"/>
+        /// records from the game's own wallet: the icon box is centred on
+        /// the number's INK.
+        /// </para>
+        /// <para>
+        /// Never negative. An icon taller than the digits' ink would
+        /// otherwise start above the line box and overdraw the row above,
+        /// whose height was reserved from that box.
+        /// </para>
+        /// </summary>
+        public static int InlineIconY(int digitInkTop, int digitInkHeight, int iconSize)
+        {
+            int offset = ((2 * digitInkTop) + digitInkHeight - iconSize) / 2;
+            return offset < 0 ? 0 : offset;
+        }
+
         // GW2 coin asset ids (repo CLAUDE.md). Named here because the
         // recipe tree's per-denomination cost columns have to map an
         // already-built segment back to its denomination, which the raw

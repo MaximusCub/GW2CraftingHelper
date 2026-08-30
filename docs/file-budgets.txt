@@ -89,7 +89,7 @@ Services/AchievementBitDedupPrePass.cs                                          
 Services/AcquisitionHintService.cs                                                       75
 Services/BoundedConcurrency.cs                                                           51
 Services/ClickSoundVolume.cs                                                             90
-Services/CoinSegmentMath.cs                                                             203
+Services/CoinSegmentMath.cs                                                             226
 Services/ColumnBoardLayout.cs                                                           130
 Services/CompetencyOpportunityCalculator.cs                                              83
 Services/CompositeRecipeApiClient.cs                                                     84
@@ -111,6 +111,7 @@ Services/DialogLayoutMath.cs                                                    
 Services/DisciplinesColumnMath.cs                                                       148
 Services/ExcessCraftOutputCalculator.cs                                                 158
 Services/FirstLoadSnapshotGate.cs                                                        86
+Services/GlyphButtonMetrics.cs                                                           44
 Services/GridLayout.cs                                                                   93
 Services/Gw2AccountRecipeClient.cs                                                       30
 Services/Gw2AccountSnapshotService.cs                                                   491
@@ -124,6 +125,7 @@ Services/IItemApiClient.cs                                                      
 Services/IMysticForgeRecipeSource.cs                                                      9
 Services/IPriceApiClient.cs                                                              47
 Services/IRecipeApiClient.cs                                                            100
+Services/IconFrameGeometry.cs                                                            67
 Services/InlineSpinnerLayout.cs                                                          72
 Services/InventoryReducer.cs                                                            383
 Services/ItemDescriptionSanitizer.cs                                                    204
@@ -164,7 +166,7 @@ Services/PlanHistoryBlobStore.cs                                                
 Services/PlanHistoryDedupKey.cs                                                         104
 Services/PlanHistoryLabels.cs                                                           118
 Services/PlanHistoryRetention.cs                                                        102
-Services/PlanHistoryRowLayout.cs                                                        361
+Services/PlanHistoryRowLayout.cs                                                        366
 Services/PlanHistoryStore.cs                                                            155
 Services/PlanPhaseEvent.cs                                                               73
 Services/PlanRelayoutMath.cs                                                            429
@@ -184,7 +186,7 @@ Services/RankerReadinessCalculator.cs                                           
 Services/RankerReadinessRamp.cs                                                         265
 Services/RankerReadinessWeights.cs                                                       61
 Services/RankerResultCache.cs                                                           263
-Services/RankerRowLayout.cs                                                             745
+Services/RankerRowLayout.cs                                                             750
 Services/RankerSnapshotWatch.cs                                                          93
 Services/RankerStore.cs                                                                 132
 Services/RankerWatchlistLimits.cs                                                        17
@@ -282,10 +284,10 @@ Views/MainView.cs                                                               
 Views/DialogWindow.cs                                                                   84
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    379
-Views/PlanHistoryTabContent.cs                                                          1424
+Views/PlanHistoryTabContent.cs                                                          1428
 Views/RankerTabContent.cs                                                               3014
 Views/Rendering/ClickSound.cs                                                            197
-Views/Rendering/CoinCurrencyRenderer.cs                                                  607
+Views/Rendering/CoinCurrencyRenderer.cs                                                  647
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              206
 Views/Rendering/CraftStepsSectionRenderer.cs                                             264
 Views/Rendering/DisciplinesSectionRenderer.cs                                           288
@@ -296,16 +298,17 @@ Views/Rendering/HeaderCellPlan.cs                                               
 Views/Rendering/HoverChainResync.cs                                                      75
 Views/Rendering/ISectionRelayoutSink.cs                                                  75
 Views/Rendering/ITreePlanHost.cs                                                         88
-Views/Rendering/IconControls.cs                                                         286
+Views/Rendering/IconControls.cs                                                         295
 Views/Rendering/IconNameRowHelpers.cs                                                   182
 Views/Rendering/InlineSpinner.cs                                                         65
 Views/Rendering/LabelHelpers.cs                                                         273
 Views/Rendering/NotesSectionRenderer.cs                                                 222
+Views/Rendering/OutlineFramePanel.cs                                                     55
 Views/Rendering/PillColors.cs                                                           125
 Views/Rendering/PlanHeaderRenderer.cs                                                   322
 Views/Rendering/PressFeedback.cs                                                        118
 Views/Rendering/RankerReadinessColors.cs                                                 99
-Views/Rendering/RarityColors.cs                                                         169
+Views/Rendering/RarityColors.cs                                                         185
 Views/Rendering/RecipesSectionRenderer.cs                                               357
 Views/Rendering/RichTooltipSurface.cs                                                   607
 Views/Rendering/RowRelayoutHelpers.cs                                                    72
@@ -365,7 +368,7 @@ tests/TaimisToolbench.Tests/Services/BoundedConcurrencyTests.cs                 
 tests/TaimisToolbench.Tests/Services/ClickSoundVolumeTests.cs                         131
 tests/TaimisToolbench.Tests/Services/ClipTopSlipSimulationTests.cs                    158
 tests/TaimisToolbench.Tests/Services/CoinFormattingTests.cs                           211
-tests/TaimisToolbench.Tests/Services/CoinSegmentMathTests.cs                          319
+tests/TaimisToolbench.Tests/Services/CoinSegmentMathTests.cs                          367
 tests/TaimisToolbench.Tests/Services/ColumnBoardLayoutTests.cs                        193
 tests/TaimisToolbench.Tests/Services/CompetencyOpportunityCalculatorTests.cs          205
 tests/TaimisToolbench.Tests/Services/CompositeRecipeApiClientTests.cs                 221
@@ -403,6 +406,7 @@ tests/TaimisToolbench.Tests/Services/Gw2ItemApiClientDetailParseTests.cs        
 tests/TaimisToolbench.Tests/Services/Gw2RecipeApiClientHttpTests.cs                   264
 tests/TaimisToolbench.Tests/Services/Gw2RecipeApiClientParseTests.cs                  248
 tests/TaimisToolbench.Tests/Services/HeaderCellMathTests.cs                           221
+tests/TaimisToolbench.Tests/Services/IconFrameGeometryTests.cs                         96
 tests/TaimisToolbench.Tests/Services/InlineSpinnerLayoutTests.cs                       87
 tests/TaimisToolbench.Tests/Services/InventoryReducerTests.cs                        1617
 tests/TaimisToolbench.Tests/Services/ItemDescriptionSanitizerTests.cs                 155
@@ -551,6 +555,7 @@ tests/TaimisToolbench.Tests/Services/StatusTextTests.cs                         
 tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                         33
 tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                  1112
 tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                           198
+tests/TaimisToolbench.Tests/Services/GlyphButtonMetricsTests.cs                        79
 tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                      332
 tests/TaimisToolbench.Tests/Services/TextWrapMathTests.cs                             297
 tests/TaimisToolbench.Tests/Services/TooltipComposerContentTests.cs                   215

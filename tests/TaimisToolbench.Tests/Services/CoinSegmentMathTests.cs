@@ -21,6 +21,54 @@ namespace TaimisToolbench.Tests.Services
         private const int LabelIconGap = CoinSegmentMath.CoinLabelIconGap;
         private const int SegmentGap = CoinSegmentMath.CoinSegmentGap;
 
+        // --- InlineIconY ---
+
+        // The reported defect: the icon beside a coin figure sat above the
+        // digits' optical centre. Every inline run but two passed a seat of
+        // 0, which puts the icon box on the top edge of the number's line
+        // box - and a line box carries ascender and descender space the
+        // digits never reach.
+        [Theory]
+        [InlineData(3, 14, CoinSegmentMath.CoinIconSize)]
+        [InlineData(2, 13, CoinSegmentMath.CoinIconSize)]
+        [InlineData(6, 24, CurrencyIconTiers.WalletListIconSize)]
+        [InlineData(4, 17, 12)]
+        public void TheInlineIconSeat_CentresTheIconOnTheDigitsInk(
+            int digitInkTop, int digitInkHeight, int iconSize)
+        {
+            int y = CoinSegmentMath.InlineIconY(digitInkTop, digitInkHeight, iconSize);
+
+            // Doubled so an odd span has no half pixel to argue about; a
+            // whole-pixel seat can only land on or one pixel above centre.
+            int iconCentre = (2 * y) + iconSize;
+            int inkCentre = (2 * digitInkTop) + digitInkHeight;
+            Assert.InRange(iconCentre - inkCentre, -1, 0);
+        }
+
+        [Fact]
+        public void TheInlineIconSeat_IsNotTheTopOfTheLineBox()
+        {
+            // Menomonia 16's cap ink, the face every table cell's coin run
+            // draws in. A seat of 0 here is the defect returning.
+            Assert.NotEqual(
+                0,
+                CoinSegmentMath.InlineIconY(
+                    TypeRampMetrics.BodyInk.CapTopY,
+                    TypeRampMetrics.BodyInk.CapHeight,
+                    CoinSegmentMath.CoinIconSize));
+        }
+
+        [Theory]
+        [InlineData(3, 14, 24)]
+        [InlineData(0, 0, 16)]
+        public void AnIconTallerThanTheDigits_StaysInsideTheLineBox(
+            int digitInkTop, int digitInkHeight, int iconSize)
+        {
+            // Centring one would start it above the label's own top, and
+            // the row above reserved its height from that line box.
+            Assert.Equal(0, CoinSegmentMath.InlineIconY(digitInkTop, digitInkHeight, iconSize));
+        }
+
         // --- Split ---
 
         // Pins the shared three-way coin split every display site now

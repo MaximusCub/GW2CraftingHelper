@@ -259,7 +259,6 @@ namespace TaimisToolbench.Views.Rendering
             int noteHeight = (int)System.Math.Ceiling(noteFont.MeasureString("0").Height);
 
             int amountHeight = AmountBlockHeight(amountFont);
-            int iconYOffset = (amountHeight - CoinSegmentMath.CoinIconSize) / 2;
 
             // One amountY for the whole band, hung the SAME
             // label-to-value gap under the caption in both bands (the
@@ -349,7 +348,7 @@ namespace TaimisToolbench.Views.Rendering
                 var segmentHandle = CoinCurrencyRenderer.LayoutCoinSegments(
                     host, segments,
                     TileContentX(boxed, hostWidth, lone, tileX, geometry.TileWidth, segmentsWidth),
-                    amountY - hostTop, amountFont, 1f, iconYOffset);
+                    amountY - hostTop, amountFont);
 
                 // Built after the amount because it hangs UNDER it: the
                 // disclosure is a footnote on this tile's number, not a
