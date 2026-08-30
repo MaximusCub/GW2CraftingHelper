@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using TaimisToolbench.Services;
 using Xunit;
@@ -541,7 +543,7 @@ namespace TaimisToolbench.Tests.Services
                 var data = MysticForgeRecipeData.Load(stream);
 
                 Assert.Empty(data.LoadWarnings);
-                Assert.Equal(1591, data.RecipeCount);
+                Assert.Equal(1681, data.RecipeCount);
 
                 // Recipe: Tray of Banana Cream Pies (from wiki).
                 var recipe = data.GetRecipe(-1);
@@ -554,6 +556,58 @@ namespace TaimisToolbench.Tests.Services
                 Assert.NotEmpty(data.SearchByOutput(9638));
                 Assert.Contains(-1, data.SearchByOutput(9638));
             }
+        }
+
+        // Ids -1596..-1685 are hand-authored and a MysticForgeSeeder rerun
+        // DELETES them rather than reproducing them: that tool resolves a
+        // wiki ingredient by name, and all 90 of these recipes name their
+        // ascended precursor with a variant anchor (".. Breastplate#item2"),
+        // which resolves to no item id, so its Step 4 skips the recipe
+        // whole. Without this pin the module silently loses every WvW and
+        // PvP legendary armour plan again.
+        [Fact]
+        public void Load_ShippedSeedFile_KeepsTheHandAuthoredLegendaryArmourBlock()
+        {
+            string path = FindRepoFile(Path.Combine("ref", "mystic_forge_recipes.json"));
+
+            using (var stream = File.OpenRead(path))
+            {
+                var data = MysticForgeRecipeData.Load(stream);
+
+                for (int id = -1596; id >= -1685; id--)
+                {
+                    var row = data.GetRecipe(id);
+                    Assert.True(row != null, "recipe " + id + " is missing");
+                    Assert.Equal(4, row.Ingredients.Count);
+                    Assert.Equal(1, row.OutputItemCount);
+                    Assert.Contains("MysticForge", row.Disciplines);
+                    Assert.Contains(id, data.SearchByOutput(row.OutputItemId));
+                }
+
+                // Triumphant Hero's Breastplate (WvW): ascended 81304 plus
+                // the three Gifts of War.
+                var wvw = Assert.Single(data.SearchByOutput(83394));
+                AssertUpgradeRecipe(
+                    data.GetRecipe(wvw), 81304, 82746, 84168, 83259);
+
+                // Ardent Glorious Breastplate (PvP): ascended 67143 plus
+                // the three Gifts of Competitive.
+                var pvp = Assert.Single(data.SearchByOutput(83348));
+                AssertUpgradeRecipe(
+                    data.GetRecipe(pvp), 67143, 84174, 82350, 84203);
+            }
+        }
+
+        private static void AssertUpgradeRecipe(
+            RawRecipe recipe, int precursorItemId, params int[] giftItemIds)
+        {
+            Assert.NotNull(recipe);
+            Assert.All(recipe.Ingredients, i => Assert.Equal("Item", i.Type));
+            Assert.All(recipe.Ingredients, i => Assert.Equal(1, i.Count));
+
+            var ids = new List<int> { precursorItemId };
+            ids.AddRange(giftItemIds);
+            Assert.Equal(ids, recipe.Ingredients.Select(i => i.Id).ToList());
         }
     }
 }
