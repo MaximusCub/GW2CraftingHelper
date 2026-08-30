@@ -573,22 +573,93 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void CurrencyColumnHeader_FitsBetweenTheInputAndTagColumns()
+        public void UnitHeader_CentresOverTheClusterInkAndNotOverItsBand()
         {
-            // "Copper per unit" sits on the input column's own X and is what
-            // now carries the unit for the whole column. It may run over the
-            // Ignore checkbox beside it (that column has no header of its
-            // own), but not into the tag slot, whose three states are the
-            // rightmost thing in the cell.
-            // Width-invariant: the block is pinned as a unit, so the gap
-            // between the input's x and the tag's x is the same at every
-            // column width.
+            // "Copper per unit" names the whole value cluster - the amount
+            // box, the Ignore checkbox and the tag - so it centres over what
+            // those three ink, not over the box alone and not over the slack
+            // CellTagWidth reserves past the widest tag.
+            // Width-invariant: the block is pinned as a unit, so every x
+            // inside it moves with the column and none of them relative to
+            // each other.
+            const int headerWidth = 15 * MaxCharWidthPx;
+            const int tagInk = 98;
+
             foreach (int columnWidth in new[] { 530, 616, 1210 })
             {
-                int headerRegion = SettingsCurrencyGridLayout.CellTagX(columnWidth)
-                    - SettingsCurrencyGridLayout.CellInputX(columnWidth);
+                int inkLeft = SettingsCurrencyGridLayout.CellInputX(columnWidth);
+                int inkRight = SettingsCurrencyGridLayout.CellTagX(columnWidth) + tagInk;
+                int x = SettingsCurrencyGridLayout.UnitHeaderX(columnWidth, headerWidth, tagInk);
 
-                Assert.True("Copper per unit".Length * MaxCharWidthPx <= headerRegion);
+                // The property, not the formula: the header's centre lands
+                // on the cluster's, to the pixel integer division loses.
+                Assert.InRange(
+                    (x + (headerWidth / 2)) - (inkLeft + ((inkRight - inkLeft) / 2)), -1, 1);
+
+                // Strictly right of where it used to sit, which is the
+                // reported defect: it was pinned to the box's own left edge.
+                Assert.True(x > inkLeft);
+
+                // And it stays inside the cell.
+                Assert.True(
+                    x + headerWidth <= SettingsCurrencyGridLayout.CellRightEdge(columnWidth));
+            }
+        }
+
+        [Fact]
+        public void UnitHeader_NeverCrossesIntoTheNameColumnsBudget()
+        {
+            // A header wider than its room pins to the room's left bound and
+            // spills rightward - the one direction every over-wide header in
+            // the module spills. The name column's ellipsis budget is what
+            // that bound is measured from, so a long name can never be
+            // overhung by this header.
+            foreach (int columnWidth in new[] { 530, 616, 1210 })
+            {
+                int x = SettingsCurrencyGridLayout.UnitHeaderX(columnWidth, 4000, 98);
+                Assert.True(x >= SettingsCurrencyGridLayout.CellNameBudgetRight(columnWidth));
+            }
+        }
+
+        [Fact]
+        public void UnitHeader_WithNoTagInkCentresOverTheBoxAndCheckboxAlone()
+        {
+            // The degenerate case the caller cannot hit with the shipped
+            // tables (every curated default inks a tag) but which the
+            // arithmetic still has to answer: the cluster is then the box,
+            // the gap and the checkbox.
+            const int columnWidth = 616;
+            const int headerWidth = 60;
+
+            int inkLeft = SettingsCurrencyGridLayout.CellInputX(columnWidth);
+            int inkRight = SettingsCurrencyGridLayout.CellTagX(columnWidth);
+
+            int x = SettingsCurrencyGridLayout.UnitHeaderX(columnWidth, headerWidth, 0);
+            Assert.InRange(
+                (x + (headerWidth / 2)) - (inkLeft + ((inkRight - inkLeft) / 2)), -1, 1);
+        }
+
+        [Fact]
+        public void WidestTagFamily_IsWhatTheHeaderCentresAgainst()
+        {
+            // The view measures "default N"/"was N" over both curated
+            // tables. This pins the premise that lets it: those two families
+            // are the widest the slot shows, and they all fit CellTagWidth.
+            foreach (var kvp in CurrencyDecisionDefaults.DefaultCopperPerUnit)
+            {
+                string value = kvp.Value.ToString(CultureInfo.InvariantCulture);
+                Assert.True(("default " + value).Length >= "ignored".Length);
+                Assert.True(
+                    ("default " + value).Length * MaxCharWidthPx
+                    <= SettingsCurrencyGridLayout.CellTagWidth);
+            }
+
+            foreach (var kvp in BarterItemDecisionDefaults.Defaults)
+            {
+                string value = kvp.Value.CopperPerUnit.ToString(CultureInfo.InvariantCulture);
+                Assert.True(
+                    ("default " + value).Length * MaxCharWidthPx
+                    <= SettingsCurrencyGridLayout.CellTagWidth);
             }
         }
     }

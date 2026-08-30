@@ -187,6 +187,52 @@ namespace TaimisToolbench.Services
                 CellRightEdge(columnWidth), CellControlBlockWidth, NameToControlGap, CellNameX);
         }
 
+        /// <summary>
+        /// Right edge of the flexing name column's ellipsis budget - the
+        /// left-hand neighbour <see cref="UnitHeaderX"/> backs its header
+        /// off from. A name column that ellipsizes fills this whether or
+        /// not any row's name reaches it.
+        /// </summary>
+        public static int CellNameBudgetRight(int columnWidth)
+        {
+            return CellNameX + CellNameMaxWidth(columnWidth);
+        }
+
+        /// <summary>
+        /// X of the "Copper per unit" header, centred over the extent the
+        /// cell's value cluster actually INKS: the amount box, the Ignore
+        /// checkbox and the tag beside them. All three are that column's
+        /// content - the box holds the number, the checkbox suppresses it,
+        /// the tag states the one in effect - so the cluster, not the box
+        /// alone, is what a reader sees under the word.
+        /// <para>
+        /// <paramref name="widestTagInk"/> is the measured width of the
+        /// widest tag the slot can ever show, so the slack
+        /// <see cref="CellTagWidth"/> reserves beyond it is not centred
+        /// over: JustifiedColumnTracks.CenteredOverContent's law is about
+        /// ink, not bands. The room runs from the name column's ellipsis
+        /// budget to the cell's own pinned right edge, there being no
+        /// further column inside the cell.
+        /// </para>
+        /// </summary>
+        public static int UnitHeaderX(int columnWidth, int headerWidth, int widestTagInk)
+        {
+            int inkLeft = CellInputX(columnWidth);
+            int rightEdge = CellRightEdge(columnWidth);
+            int inkRight = CellTagX(columnWidth) + (widestTagInk > 0 ? widestTagInk : 0);
+            if (inkRight > rightEdge)
+            {
+                inkRight = rightEdge;
+            }
+
+            var room = JustifiedColumnTracks.HeaderRoom.Between(
+                JustifiedColumnTracks.RoomLeftBound(CellNameBudgetRight(columnWidth), inkLeft),
+                rightEdge);
+
+            return JustifiedColumnTracks.CenteredOverContent(
+                inkLeft, inkRight > inkLeft ? inkRight - inkLeft : 0, headerWidth, room);
+        }
+
         public readonly struct CellPlacement
         {
             public readonly bool Visible;
