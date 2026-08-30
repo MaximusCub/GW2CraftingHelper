@@ -32,7 +32,7 @@ Models/BarterItemDecisionDefaults.cs                                            
 Models/CompetencyOpportunity.cs                                                          30
 Models/CostLine.cs                                                                       11
 Models/CraftingDecision.cs                                                               73
-Models/CraftingPlan.cs                                                                   23
+Models/CraftingPlan.cs                                                                   31
 Models/CraftingPlanResult.cs                                                            200
 Models/CraftingTreeNode.cs                                                              235
 Models/CurrencyCost.cs                                                                    9
@@ -56,8 +56,8 @@ Models/PlanHistoryEntry.cs                                                      
 Models/PlanRequestItem.cs                                                                26
 Models/PlanSolveContext.cs                                                              212
 Models/PlanStatus.cs                                                                     11
-Models/PlanStep.cs                                                                       51
-Models/PlanViewModel.cs                                                                 431
+Models/PlanStep.cs                                                                       62
+Models/PlanViewModel.cs                                                                 454
 Models/PriceBasis.cs                                                                     32
 Models/RankerRowMetrics.cs                                                              152
 Models/RankerSlotAvailability.cs                                                         59
@@ -169,14 +169,14 @@ Services/PlanHistoryStore.cs                                                    
 Services/PlanPhaseEvent.cs                                                               73
 Services/PlanRelayoutMath.cs                                                            429
 Services/PlanResultBuilder.cs                                                           375
-Services/PlanSolver.cs                                                                 2304
+Services/PlanSolver.cs                                                                 2323
 Services/PlanStore.cs                                                                   219
 Services/PlanStoreHelpers.cs                                                            374
 Services/PlanStripStatusBoard.cs                                                        307
 Services/PlanStripTickDecision.cs                                                        97
 Services/PlanStructuralValidator.cs                                                     597
 Services/PlanTableSorter.cs                                                             261
-Services/PlanViewModelBuilder.cs                                                       1570
+Services/PlanViewModelBuilder.cs                                                       1692
 Services/RankerPriorityCascade.cs                                                       364
 Services/RankerPriorityOrdering.cs                                                      183
 Services/RankerRarityAdoption.cs                                                         87
@@ -241,7 +241,7 @@ Services/StaticItemSearchProvider.cs                                            
 Services/StatusStore.cs                                                                  73
 Services/StatusText.cs                                                                  286
 Services/StatusUpdateGuard.cs                                                            38
-Services/SummarySectionLayoutMath.cs                                                    656
+Services/SummarySectionLayoutMath.cs                                                    724
 Services/TableSortState.cs                                                              114
 Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
@@ -261,7 +261,7 @@ Services/TreeToolbarRowLayout.cs                                                
 Services/TypeRampMetrics.cs                                                             171
 Services/UiSpacing.cs                                                                    53
 Services/ValueDetailTooltipBuilder.cs                                                   159
-Services/VendorBatchSolver.cs                                                          1066
+Services/VendorBatchSolver.cs                                                          1171
 Services/VendorOfferLoader.cs                                                            51
 Services/VendorOfferStore.cs                                                            218
 Services/WheelDeltaSanitizer.cs                                                          92
@@ -490,7 +490,7 @@ tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSellEconomicsTests.cs  
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderShoppingListTests.cs         444
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderStepSectionsTests.cs         784
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSublabelTests.cs             264
-tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSummaryTests.cs             1221
+tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSummaryTests.cs             1241
 tests/TaimisToolbench.Tests/Services/RankerCascadeIntegrationTests.cs                 354
 tests/TaimisToolbench.Tests/Services/RankerPriorityCascadeTests.cs                    377
 tests/TaimisToolbench.Tests/Services/RankerPriorityOrderingTests.cs                   256
@@ -549,7 +549,7 @@ tests/TaimisToolbench.Tests/Services/SourceFilterFlowLayoutTests.cs             
 tests/TaimisToolbench.Tests/Services/StatusStoreTests.cs                              116
 tests/TaimisToolbench.Tests/Services/StatusTextTests.cs                               345
 tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                         33
-tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                  1112
+tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                  1162
 tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                           198
 tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                      332
 tests/TaimisToolbench.Tests/Services/TextWrapMathTests.cs                             297

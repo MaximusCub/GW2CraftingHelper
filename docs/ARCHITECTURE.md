@@ -998,6 +998,58 @@ what the wiki says the offer is.
 **Gates this model still does not have** are recorded in
 `docs/KNOWN-ISSUES.md` item 44.
 
+### 7.5 The plan's non-coin price
+
+**What:** `CraftingPlan` reports three costs, not one:
+`TotalCoinCost`, `CurrencyCosts` (per wallet currency) and
+`BarterItemCosts` (per untradeable vendor token). All three are summed
+across the whole plan from the same merged, aggregate-then-ceil vendor
+steps section 7 derives, never from the per-occurrence decision lines.
+`PlanViewModel.NonCoinCostTotals` and the Total Cost section's table are
+the display side, and they are one list projected from one set of rows so
+the plan-level figure and the table a reader checks it against cannot
+drift.
+
+**Why the barter half was missing.** A barter line's units ARE the price -
+nothing of it folds into any coin figure (section 8.3) - so before this,
+its only record anywhere in the plan was `PlanStep.VendorHasBarterItemCost`,
+a bool, plus per-node display leaves the tree suppresses whenever a merged
+step's component costs are unreliable. Measured over the shipped corpus,
+Legendary Rune (91536) buys 6 of its 7 vendor steps for no coin at all; a
+plan of that shape presenting one gold figure presents a fraction of its
+own price.
+
+**Never folded together.** A currency total, a barter total and a coin
+total are three quantities in three units, reported side by side. The
+module holds no exchange rate between them and must not invent one: a
+`CurrencyValuation` moves a comparison and never a committed total
+(section 8.3), and `Gw2Constants.CoinCurrencyId` is excluded from
+`CurrencyCosts` precisely so coin is never double-reported as a currency
+line. The two id spaces stay apart for the same reason `BarterItemCost` is
+a separate type from `CurrencyCost`: item 24 and currency 24 are unrelated
+things.
+
+**What the coin total still leaves out.** A cost line resolved through a
+subtree (section 7.4) contributes only its `RealCoin` to the offer above
+it; whatever CURRENCY that subtree spends is not carried up, so it reaches
+neither `CurrencyCosts` nor any other plan-level total. `CostLineUnitValue`
+records only that such a cost existed (`HasUnvaluedCost`), which is enough
+to keep the offer fallback-tier but not to report the quantity. Closing
+that would mean carrying cost lines up through `CostLineUnitValue` and
+de-duplicating them against the main tree's own demand, which is why it is
+recorded here rather than done in passing.
+
+**The floor disclosure.** Because a plan can carry a real cost the coin
+total counts as zero - an unpriceable node, or a barter line - the Total
+Cost section marks its tiles and states that the totals are a floor. The
+gate is that condition, not `TotalCoinCost == 0`: it had been the latter,
+which silenced the sentence on exactly the priced plans where a reader is
+most likely to mistake the coin figure for the whole answer (Legendary
+Rune: 49 unpriceable components under a five-figure silver total, with the
+disclosure suppressed). The zero-total case keeps its own narrower
+consequence, suppressing the profit band, which the widened gate does not
+touch.
+
 ---
 
 ## 8. Solver decision rules
@@ -2451,12 +2503,19 @@ reached.
 
 ### 12.4 What the shape hash last moved for
 
-`PersistedPlan.SchemaShapeHash` last moved for the currency tooltip work,
-which is purely additive: one string, `CurrencyMetadata.Description`,
-absent from an older file and left null by Newtonsoft, which drops the
-tooltip's paragraph and nothing else. A plan written before it still
-deserializes and `CurrentSchemaVersion` stays at 3. A bump now costs a
-re-solve rather than the plan, but it still costs one.
+`PersistedPlan.SchemaShapeHash` last moved for the plan-level barter item
+total, which is purely additive: `CraftingPlan.BarterItemCosts`,
+`PlanStep.VendorBarterItemCosts` and the `BarterItemCost` type they reach.
+An older file omits all three, Newtonsoft leaves the lists null, and a
+restored plan then shows no barter rows in its Total Cost table until it is
+re-solved - the same degradation shape the previous addition had. A plan
+written before it still deserializes and `CurrentSchemaVersion` stays at 3.
+
+Before that it moved for the currency tooltip work, also purely additive:
+one string, `CurrencyMetadata.Description`, absent from an older file and
+left null by Newtonsoft, which drops the tooltip's paragraph and nothing
+else. A bump now costs a re-solve rather than the plan, but it still costs
+one.
 
 It does cost bytes. The persisted `CurrencyMetadata` is the whole
 `/v2/currencies` reply, so every saved plan grows by the descriptions of
