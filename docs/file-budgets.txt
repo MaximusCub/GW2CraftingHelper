@@ -124,6 +124,7 @@ Services/IItemApiClient.cs                                                      
 Services/IMysticForgeRecipeSource.cs                                                      9
 Services/IPriceApiClient.cs                                                              47
 Services/IRecipeApiClient.cs                                                            100
+Services/IconFrameGeometry.cs                                                            67
 Services/InlineSpinnerLayout.cs                                                          72
 Services/InventoryReducer.cs                                                            383
 Services/ItemDescriptionSanitizer.cs                                                    204
@@ -296,16 +297,17 @@ Views/Rendering/HeaderCellPlan.cs                                               
 Views/Rendering/HoverChainResync.cs                                                      75
 Views/Rendering/ISectionRelayoutSink.cs                                                  75
 Views/Rendering/ITreePlanHost.cs                                                         88
-Views/Rendering/IconControls.cs                                                         286
+Views/Rendering/IconControls.cs                                                         295
 Views/Rendering/IconNameRowHelpers.cs                                                   182
 Views/Rendering/InlineSpinner.cs                                                         65
 Views/Rendering/LabelHelpers.cs                                                         273
 Views/Rendering/NotesSectionRenderer.cs                                                 222
+Views/Rendering/OutlineFramePanel.cs                                                     55
 Views/Rendering/PillColors.cs                                                           125
 Views/Rendering/PlanHeaderRenderer.cs                                                   322
 Views/Rendering/PressFeedback.cs                                                        118
 Views/Rendering/RankerReadinessColors.cs                                                 99
-Views/Rendering/RarityColors.cs                                                         169
+Views/Rendering/RarityColors.cs                                                         185
 Views/Rendering/RecipesSectionRenderer.cs                                               357
 Views/Rendering/RichTooltipSurface.cs                                                   607
 Views/Rendering/RowRelayoutHelpers.cs                                                    72
@@ -403,6 +405,7 @@ tests/TaimisToolbench.Tests/Services/Gw2ItemApiClientDetailParseTests.cs        
 tests/TaimisToolbench.Tests/Services/Gw2RecipeApiClientHttpTests.cs                   264
 tests/TaimisToolbench.Tests/Services/Gw2RecipeApiClientParseTests.cs                  248
 tests/TaimisToolbench.Tests/Services/HeaderCellMathTests.cs                           221
+tests/TaimisToolbench.Tests/Services/IconFrameGeometryTests.cs                         96
 tests/TaimisToolbench.Tests/Services/InlineSpinnerLayoutTests.cs                       87
 tests/TaimisToolbench.Tests/Services/InventoryReducerTests.cs                        1617
 tests/TaimisToolbench.Tests/Services/ItemDescriptionSanitizerTests.cs                 155
