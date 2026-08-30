@@ -55,7 +55,8 @@ Status: OPEN | IN PROGRESS (branch) | DONE (PR #n) | RULED OUT (reason)
 
 | id | Item | Status |
 |----|------|--------|
-| R1 | Two currency ids (39 and 77) are both named "Gaeting Crystal". Establish whether one is deprecated, or produce a thesis for why both exist. | OPEN |
+| R1 | Two currency ids (39 and 77) are both named "Gaeting Crystal". Establish whether one is deprecated, or produce a thesis for why both exist. | ANSWERED, removal IN PROGRESS on `w6-gaeting` |
+| R2 | Currency 77 is absent from `Gw2Constants` while 82 cost lines in `ref/vendor_offers.json` are priced in it. Found while answering R1. | IN PROGRESS on `w6-gaeting` |
 
 ## Confirmed working in the wave-2 build (owner-verified)
 

@@ -36,7 +36,7 @@ already-merged-into-wave5-data sources `w5-currvals`, `w5-forgerecipes`,
 | w6-viewport | B1, B3 | currency table reflow moving the scroll; the header overdraw. |
 | w6-icons | V1, V2, V4 | currency icon vertical centring; the grey-background REGRESSION we caused; Ranker X button scale. |
 | w6-polish | V3, V7, V8 | Copper-per-unit header centring; dialog body centring; Log line wrapping with VARIABLE row heights. |
-| w6-gaeting | R1 | why two currency ids are both named "Gaeting Crystal". |
+| w6-gaeting | R1, R2 | R1 answered: currency 39 / item 86094 is the Path of Fire era Gaeting Crystal, historical since the 2022-07-19 update; currency 77 / item 104026 is the live Janthir Wilds one. Owner ruled the retired id be removed outright rather than relabelled. R2: currency 77 is missing from `Gw2Constants` while 82 corpus cost lines are priced in it. |
 
 ## Owner rulings that shape the work
 
@@ -48,6 +48,10 @@ already-merged-into-wave5-data sources `w5-currvals`, `w5-forgerecipes`,
   gap sized against clip slip. No correctness argument may mention tree depth.
 - Gold/silver/copper coin icons take **no** frame; other currency icons take a
   border and NO background fill.
+- **A currency retired from the game is removed outright, not relabelled** - no
+  valuation row, no Settings row, no name entry. A currency no account can hold
+  and nothing in the corpus is priced in cannot affect a solve, so carrying it
+  only invites the reader to think it can.
 - Prerequisites belong between Total Cost and the Recipe Tree. Total Cost owns
   everything priced (gold AND currencies); Prerequisites owns what is not
   priced at all. A "prereq steps" list mirroring Crafting Steps is wanted.
