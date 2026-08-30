@@ -103,10 +103,11 @@ namespace TaimisToolbench.Tests.Services.Recipes
                 Assert.Equal(103974, recipes[-1595].OutputItemId);
                 Assert.Contains("Merchant", recipes[-1595].Disciplines);
 
-                // Every pre-existing negative-id (Mystic Forge) recipe must
-                // still parse untouched by this addition.
-                Assert.True(recipes.ContainsKey(-1591));
-                Assert.True(recipes.ContainsKey(-1));
+                // The Mystic Forge block must still parse alongside them.
+                var mysticForge = recipes.Values
+                    .Where(r => r.Id < 0 && r.Disciplines.Contains("MysticForge"))
+                    .ToList();
+                Assert.NotEmpty(mysticForge);
 
                 // The reseed
                 // that added the rows above silently dropped recipe
@@ -120,8 +121,13 @@ namespace TaimisToolbench.Tests.Services.Recipes
                 // craftsNeeded math to OutputItemCount (1) instead of
                 // ceil(q/0.31) for every legendary chain that forges Mystic
                 // Clovers. Pinned directly so a future reseed can never
-                // drop this again without a red test.
-                Assert.Equal(0.31, recipes[-1591].ExpectedOutputCount);
+                // drop this again without a red test. Reached through the
+                // output item, not the recipe id: tools/MysticForgeSeeder
+                // renumbers the whole generated block on every run.
+                var clover = Assert.Single(
+                    mysticForge.Where(r => r.OutputItemId == 19675
+                        && r.ExpectedOutputCount != null));
+                Assert.Equal(0.31, clover.ExpectedOutputCount);
             }
         }
 

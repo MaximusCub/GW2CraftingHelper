@@ -5,18 +5,18 @@
   "files": [
     {
       "name": "recipes_seed.json",
-      "rowCount": 15056,
-      "sha256": "e2f7011bd8c5cf2d083db4771d2eddea0d5ea5770bd5ef25ecd52a0c532cf209"
+      "rowCount": 15109,
+      "sha256": "766ea63c283f3a6ab281b7f27feddc9b1339c4b57d9eccbd3a63c630be6afd43"
     },
     {
       "name": "recipe_search_seed.json",
-      "rowCount": 16204,
-      "sha256": "903c193ae4d3316298ea9aadc4ea9a1d0af53b4b5b1cfaca20f1082a3d48a33b"
+      "rowCount": 16282,
+      "sha256": "e00d040c8a105e4a3e5b25b9d124ed49618674ea3a632d683920c1139e5111f7"
     },
     {
       "name": "item_name_seed.json",
-      "rowCount": 14856,
-      "sha256": "8a1746123bceb4a9db4d87c671de2da8c825044217922b95d2610ceb3a270917"
+      "rowCount": 14906,
+      "sha256": "c4e21c6bff876d3af7497f40ed39c078983393b066f599974b1acc02da08afeb"
     }
   ]
 }
