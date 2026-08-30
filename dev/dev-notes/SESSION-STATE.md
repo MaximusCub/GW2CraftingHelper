@@ -270,15 +270,18 @@ Read this section first. Everything above is history and evidence.
 
 ## What is true right now
 
-- **`master` is green** and carries PRs #233, #235 and #236. Suite: 4091 + 238 + 3
-  = **4332**. Build is 0 warnings.
+- **`master` is green** and carries PRs #233, #235, #236 and #237. Suite:
+  4092 + 238 + 3 = **4333**. Build is 0 warnings.
 - **The owner's live install runs this build** (deployed 2026-08-29 21:21,
   Release x64, checksum verified). Rollbacks beside it:
   `TaimisToolbench.bhm.rollback-pre-wave6` (the wave-2 build) and
   `.rollback-pre-wave2`.
-- **PR #237 is open** (`gaeting-equality-pin`): pins currency 77 to currency 28 as
-  an equality rather than a duplicated literal, and corrects two false claims in
-  our own prose. Small, three commits. Merge it if CI is green.
+- **PR #237 is merged.** It pinned currency 77 to currency 28 as an equality
+  rather than a duplicated literal, and corrected two false claims in our own
+  prose. **There are ZERO open PRs.** Suite is now 4092 + 238 + 3 = **4333**.
+- **The deployed .bhm predates #237 and that is fine.** #237 changed a test, two
+  comments, a doc and a record - **no runtime code**. The installed build is
+  behaviourally identical to `master`, so do NOT redeploy on account of it.
 - **Worktrees are down to 7** from 30. Only `master` plus the six wave-6 branches
   remain; they are kept ONLY as a way back to an individual fix if the field test
   turns one up. Prune them once the owner confirms the build behaves.
