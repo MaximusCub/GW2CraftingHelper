@@ -1844,14 +1844,13 @@ namespace TaimisToolbench.Views.Rendering
             int anchoredIndex = specs.Count > 0 && specs[specs.Count - 1].Kind == PillKind.Ignore
                 ? specs.Count - 1
                 : -1;
-            int anchoredWidth = anchoredIndex >= 0 ? ReservedIgnorePillWidth(font) : 0;
+            int anchoredWidth = anchoredIndex >= 0 ? ReservedIgnorePillWidth() : 0;
             int leadingCount = anchoredIndex >= 0 ? anchoredIndex : specs.Count;
 
             var pillWidths = new List<int>(leadingCount);
             for (int specIndex = 0; specIndex < leadingCount; specIndex++)
             {
-                pillWidths.Add(
-                    (int)System.Math.Ceiling(font.MeasureString(specs[specIndex].Text).Width) + PillPadding);
+                pillWidths.Add(MeasuredPillWidth(specs[specIndex], font));
             }
 
             var fit = PlanRelayoutMath.ComputePillFit(
@@ -1878,7 +1877,7 @@ namespace TaimisToolbench.Views.Rendering
                     anchoredIndex,
                     TreePillRunLayout.AnchoredSlotX(maxRightEdge, anchoredWidth),
                     anchoredWidth,
-                    (int)System.Math.Ceiling(font.MeasureString(specs[anchoredIndex].Text).Width)));
+                    IgnoreGlyphWidth()));
             }
 
             // Right edge of this row's INK, which the "Source" header
@@ -1900,10 +1899,20 @@ namespace TaimisToolbench.Views.Rendering
                 }
 
                 PillColors.GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
+
+                // The IGNORE toggle draws a mark, not a word - see
+                // IgnoreGlyphText - so it takes the glyph face, its own
+                // line-box offset, and a colour that inverts with the key
+                // under it.
+                bool isToggle = spec.Kind == PillKind.Ignore;
+                var pillFont = isToggle ? IgnoreGlyphFont() : font;
+                string pillText = isToggle ? IgnoreGlyphText() : spec.Text;
+                int labelY = isToggle ? GlyphPillLabelY : PillLabelY;
+
                 // White, not borderColor: Selected/Available fills expose the
                 // border hue behind the label, so border-colored text has zero
                 // contrast against its own backdrop.
-                Color textColor = Color.White;
+                Color textColor = isToggle ? PillColors.GlyphColor(node.IsIgnored) : Color.White;
                 // Chrome (UNKNOWN/UNRECOGNIZED/CURRENCY/GUILD UPGRADE/the
                 // sole-source badge) reads one tier below a pill you can
                 // act on, matching the recessed ring PillColors gives it.
@@ -1923,7 +1932,8 @@ namespace TaimisToolbench.Views.Rendering
                     textColor *= PillColors.DimmedPillFactor;
                 }
 
-                var outer = CreatePillPanel(rowPanel, spec.Text, font, pillWidth, textWidth, placement.X, pillY,
+                var outer = CreatePillPanel(
+                    rowPanel, pillText, pillFont, pillWidth, textWidth, placement.X, pillY, labelY,
                     borderColor, fillColor, textColor, out Panel inner, out Label label);
 
                 // The dimmed-only difference between this and the two flags
@@ -2144,19 +2154,74 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// The slot the IGNORE toggle is drawn into, wide enough for
-        /// either of its two texts so a click cannot resize or move it -
-        /// see <see cref="TreePillRunLayout"/>. Measured per row rather
-        /// than cached: two MeasureString calls on constant strings, on a
-        /// path that already measures every pill it draws.
+        /// The slot the IGNORE toggle is drawn into. Both of its states
+        /// draw the same mark, so the slot is the same rectangle either
+        /// side of a click by construction rather than by taking the wider
+        /// of two words - still asked of
+        /// <see cref="TreePillRunLayout.ReservedSlotWidth"/>, which is
+        /// where that invariant is stated and tested.
         /// </summary>
-        private static int ReservedIgnorePillWidth(BitmapFont font)
+        /// <summary>
+        /// One pill's slot width. The IGNORE toggle answers from its own
+        /// reserved slot whatever position it lands in, so a run that ever
+        /// flowed it (it does not - DecisionPillPlanner emits it last, and
+        /// RenderDecisionPills anchors it there) could not size it from a
+        /// word it no longer draws.
+        /// </summary>
+        private static int MeasuredPillWidth(PillSpec spec, BitmapFont font)
         {
-            return TreePillRunLayout.ReservedSlotWidth(
-                (int)Math.Ceiling(font.MeasureString(DecisionPillPlanner.IgnorePillText).Width),
-                (int)Math.Ceiling(font.MeasureString(DecisionPillPlanner.IgnoredPillText).Width),
-                PillPadding);
+            return spec.Kind == PillKind.Ignore
+                ? ReservedIgnorePillWidth()
+                : (int)Math.Ceiling(font.MeasureString(spec.Text).Width) + PillPadding;
         }
+
+        private static int ReservedIgnorePillWidth()
+        {
+            int mark = IgnoreGlyphWidth();
+            return TreePillRunLayout.ReservedSlotWidth(mark, mark, PillPadding);
+        }
+
+        /// <summary>
+        /// The IGNORE toggle's face: a remove mark rather than a word, so
+        /// the control needs no translating and its two states cannot
+        /// differ in width. State is carried by the key it is drawn into -
+        /// outlined when off, filled and darker-edged when on
+        /// (PillColors) - and named in words only by the tooltip
+        /// (PillTooltipTextComposer), which is the one place the reader
+        /// can ask.
+        /// <para>
+        /// Same degraded path FeedbackButton.SetGlyph takes: an install
+        /// whose ref/glyphs.fnt did not load falls back to the ASCII the
+        /// mark stands in for, because a codepoint with no region draws
+        /// nothing AND advances nothing.
+        /// </para>
+        /// </summary>
+        private static string IgnoreGlyphText()
+        {
+            return UiFonts.GlyphsAvailable
+                ? UiGlyphs.RemoveMark
+                : UiGlyphs.AsciiFallback(UiGlyphs.RemoveMark);
+        }
+
+        private static BitmapFont IgnoreGlyphFont()
+        {
+            return UiFonts.GlyphsAvailable ? UiFonts.Glyphs : UiFonts.Caption;
+        }
+
+        private static int IgnoreGlyphWidth()
+        {
+            return (int)Math.Ceiling(IgnoreGlyphFont().MeasureString(IgnoreGlyphText()).Width);
+        }
+
+        /// <summary>
+        /// Label y inside the pill's inset fill panel for the glyph face,
+        /// whose 24px line box is the pill's whole height: the mark's own
+        /// ink sits 3px down that box (ref/glyphs.fnt), and the inset panel
+        /// is PillHeight - 2 tall, so 0 centres the 16px mark in it. The
+        /// text faces keep <see cref="PillLabelY"/>.
+        /// </summary>
+        private const int GlyphPillLabelY = 0;
+        private const int PillLabelY = 2;
 
         /// <summary>
         /// The trailing "+N" pill: the row admitting that N of its pills did not
@@ -2199,7 +2264,7 @@ namespace TaimisToolbench.Views.Rendering
             string tooltipText = $"No room to show: {string.Join(", ", hiddenTexts)}";
 
             var outer = CreatePillPanel(
-                rowPanel, text, font, fit.OverflowPillWidth, textWidth, x, pillY,
+                rowPanel, text, font, fit.OverflowPillWidth, textWidth, x, pillY, PillLabelY,
                 borderColor, fillColor, textColor, out Panel inner, out Label label);
 
             TooltipFacility.ApplyPlain(outer, tooltipText);
@@ -2237,7 +2302,7 @@ namespace TaimisToolbench.Views.Rendering
         /// </summary>
         private static Panel CreatePillPanel(
             Panel rowPanel, string text, BitmapFont font, int pillWidth, int textWidth,
-            int x, int pillY, Color borderColor, Color fillColor, Color textColor,
+            int x, int pillY, int labelY, Color borderColor, Color fillColor, Color textColor,
             out Panel inner, out Label label)
         {
             var outer = new Panel()
@@ -2272,7 +2337,7 @@ namespace TaimisToolbench.Views.Rendering
                 TextColor = textColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(labelX, 2),
+                Location = new Point(labelX, labelY),
                 Parent = inner,
             };
             return outer;

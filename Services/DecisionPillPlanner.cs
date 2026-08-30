@@ -80,10 +80,11 @@ namespace TaimisToolbench.Services
         private const string CurrencyPillText = "CURRENCY";
 
         /// <summary>
-        /// The Ignore toggle's two texts. Public because the view reserves
-        /// ONE slot wide enough for either of them, so the pill does not
-        /// move or resize when a click flips it - see
-        /// <see cref="TreePillRunLayout"/>.
+        /// The Ignore toggle's two STATE names. Not what the control
+        /// draws - it draws a remove mark in a raised or pressed key, so
+        /// that there is nothing on it to translate - but what its tooltip
+        /// leads with (<see cref="PillTooltipTextComposer"/>), which is the
+        /// only place a reader can ask which state a row is in.
         /// </summary>
         public const string IgnorePillText = "IGNORE";
 

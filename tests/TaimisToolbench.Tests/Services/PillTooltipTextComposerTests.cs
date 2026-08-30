@@ -48,9 +48,11 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Theory]
-        [InlineData(false, "Treat this item as fully in-hand (ignore its owned-stock requirement)")]
-        [InlineData(true, "Stop treating this item as fully in-hand")]
-        public void TheIgnoreToggleNamesTheDirectionItWouldMove(bool isIgnored, string expected)
+        [InlineData(
+            false,
+            "IGNORE - treat this item as fully in-hand (ignore its owned-stock requirement)")]
+        [InlineData(true, "IGNORED - click to stop treating this item as fully in-hand")]
+        public void TheIgnoreToggleNamesItsStateAndTheDirectionItWouldMove(bool isIgnored, string expected)
         {
             var node = Node();
             node.IsIgnored = isIgnored;
@@ -59,6 +61,26 @@ namespace TaimisToolbench.Tests.Services
 
             Assert.Equal(expected, plan.Text);
             Assert.False(plan.AppendSubduing);
+        }
+
+        /// <summary>
+        /// The control on screen is a mark, not a word, so this tooltip is
+        /// the only place the toggle is named - and it has to name the
+        /// state the user is IN, not only the one the click would move to.
+        /// </summary>
+        [Fact]
+        public void TheIgnoreTooltipLeadsWithTheStateTheControlNoLongerSpells()
+        {
+            var live = Node();
+            var ignored = Node();
+            ignored.IsIgnored = true;
+
+            Assert.StartsWith(
+                DecisionPillPlanner.IgnorePillText,
+                Compose(Spec("IGNORE", null, PillKind.Ignore), live, ignoreInteractive: true).Text);
+            Assert.StartsWith(
+                DecisionPillPlanner.IgnoredPillText,
+                Compose(Spec("IGNORE", null, PillKind.Ignore), ignored, ignoreInteractive: true).Text);
         }
 
         [Fact]
