@@ -30,7 +30,7 @@ already-merged-into-wave5-data sources `w5-currvals`, `w5-forgerecipes`,
 
 | branch | backlog items | brief |
 |---|---|---|
-| w5-seederfix | - | root-cause fix for the MysticForgeSeeder variant-anchor bug that silently dropped 90 legendary armour recipes and drops ~338 more. MUST land before anyone reruns that tool: a rerun today deletes the 90 rows PR #235 adds. A tripwire test holds the line meanwhile. |
+| w5-seederfix | - | MERGED into `wave5-data` (PR #235). The variant-anchor diagnosis was DISPROVEN; the real defect was output-side name resolution. See "Claims retracted" below. |
 | w6-tables | F1, F2 | sticky table headers; persistent sort indicators (opacity-only, never width). NO sorting in the Ranker (owner ruling). |
 | w6-tree | B2, L1, L2, V5, V6 | third cause of the IGNORE repeated-click bug; "+N no room" firing when space exists; IGNORE text pill to a language-free control; Cost header centring; Item header anchor. |
 | w6-viewport | B1, B3 | currency table reflow moving the scroll; the header overdraw. |
@@ -84,3 +84,56 @@ was an agent's report repeated without checking the primary.
 
 The owner's live install runs the wave-2 build (2026-08-29 18:34). None of
 wave 5 or 6 is deployed. Rollback copy: `TaimisToolbench.bhm.rollback-pre-wave2`.
+
+
+## Wave 5 integration, as of 2026-08-29
+
+`wave5-data` (PR #235) now carries `w5-forgerecipes`, `w5-currvals`,
+`w5-deadvendors`, `w5-noncoin` and `w5-seederfix`. Pushed; suite **4,239 green**
+(3,998 + 238 + 3). Measured in the merged tree: vendor offers 59,244, recipes
+seed 15,109, forge recipes 1,734, hints 17, and the negative id partition holds
+at 4 hand-authored rows in `[-99999, -1]` against 1,734 generated at or below
+-100000.
+
+`PersistedPlan.CurrentSchemaVersion` is still **3**. `w5-noncoin` moved only
+`SchemaShapeHash`; its three new members are additive and every consumer
+null-guards the list an older plan deserializes as null. No saved plan is lost.
+
+## Claims retracted, and what replaced them
+
+Kept because the process rule exists to stop these recurring: a factual claim
+entering a proposal, an agent brief or a PR body must cite a primary source,
+never another agent's summary.
+
+- **"The seeder dropped 90 legendary armour recipes because anchored ingredient
+  names resolve to no item id."** False, and it had reached PR #235's body.
+  `[[Ardent Glorious Armguards#item1]]|?Has game id` resolves fine through the
+  tool's existing path, and the dev cache already held 377 anchored names with
+  zero misses. The real defect is output-side: a recipe's `Has canonical name`
+  is a disambiguated display name that is no wiki page, and multi-variant pages
+  carry no page-level `Has game id`.
+- **"~338 further `Recipe: Box/Satchel` recipes are dropped by the same bug."**
+  False. 286 already ship in master; 4 were actually dropped.
+- **"Scholar Glenna (Gaeting Crystal) is 110 offers over 10 items."** It is 121
+  rows over 112 output items; the 110 counted only the rows that charge the
+  crystal.
+- **"Currency 39 should stay valued so its Settings row remains clearable."**
+  Overruled by the owner and by measurement: zero cost lines in the corpus are
+  priced in currency 39, and no wallet has held it since 2022-07-19.
+- **"The currency table growing is what moves the scroll."** The table growing
+  is only the trigger. Blish's `Scrollbar` zeroes `ScrollDistance` inside the
+  restore's own assignment statement when its cached percent is stale.
+- **"The icon sits off-centre because the line box and the digit ink disagree."**
+  For Menomonia they agree within 1px at every face in the ramp. The seat was
+  simply 0.
+
+## Hazards worth remembering
+
+- `MysticForgeSeeder`'s `FindRepoRoot` used to probe for a `.git` **directory**.
+  A linked worktree's `.git` is a file, so a run inside any of the ~28 worktrees
+  walked past the worktree root and would rewrite `ref/` in whichever repo it
+  found next. Fixed on `w5-seederfix`; the shape of the bug is worth checking for
+  in any other tool that walks up to find the repo root.
+- A branch checked out in a worktree cannot be `git checkout`ed in the main
+  clone. `git diff master..branch` on a stale-based branch shows master-only
+  work as deletions; use the three-dot form to see the real change set.
