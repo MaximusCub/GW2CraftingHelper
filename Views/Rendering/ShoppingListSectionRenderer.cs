@@ -98,10 +98,6 @@ namespace TaimisToolbench.Views.Rendering
             // measures this section by) is identical sorted or not.
             var rows = PlanTableSorter.Sort(section.Rows, _sortState);
 
-            string amountHeaderText =
-                SortableHeaderLabel.Decorate("Amount", _sortState.IndicatorFor(PlanTableColumn.Amount));
-            string sourceHeaderText =
-                SortableHeaderLabel.Decorate("Source", _sortState.IndicatorFor(PlanTableColumn.Source));
             int maxEachWidth = 0;
             int maxTotalWidth = 0;
             int maxQtyInk = 0;
@@ -156,9 +152,9 @@ namespace TaimisToolbench.Views.Rendering
             // widths stay separate - they are what each header centres
             // over, and the floor is exactly the difference.
             int maxQtyWidth = Max(
-                maxQtyInk, Measure(HeaderBands.Font, amountHeaderText));
+                maxQtyInk, SortIndicator.BlockWidthFor(HeaderBands.Font, "Amount"));
             int sourceColumnWidth = Max(
-                maxSourceInk, Measure(HeaderBands.Font, sourceHeaderText));
+                maxSourceInk, SortIndicator.BlockWidthFor(HeaderBands.Font, "Source"));
 
             // The header and every data row derive their build-time edges
             // from this SAME scan, and their relayout closures re-derive
@@ -168,7 +164,7 @@ namespace TaimisToolbench.Views.Rendering
             var scan = new ColumnScan(
                 maxEachWidth, maxTotalWidth, maxQtyWidth, sourceColumnWidth, maxNameWidth,
                 maxQtyInk, maxSourceInk);
-            CreateShoppingListHeaderRow(contentFlow, panelWidth, scan, amountHeaderText, sourceHeaderText);
+            CreateShoppingListHeaderRow(contentFlow, panelWidth, scan);
             for (int i = 0; i < rows.Count; i++)
             {
                 CreateShoppingRow(rows[i], contentFlow, panelWidth, scan, i == rows.Count - 1);
@@ -222,90 +218,60 @@ namespace TaimisToolbench.Views.Rendering
         // Column edges come from Render()'s shared pre-scan, so the header
         // lands on the same x as the rows below it.
         private void CreateShoppingListHeaderRow(
-            FlowPanel parent, int panelWidth, ColumnScan scan,
-            string amountHeaderText, string sourceHeaderText)
+            FlowPanel parent, int panelWidth, ColumnScan scan)
         {
             var edges = scan.EdgesFor(panelWidth);
             var rowPanel = HeaderBands.CreateColumnHeaderBand(parent, panelWidth);
             var font = HeaderBands.Font;
             var color = HeaderBands.LabelColor;
 
-            // This section builds its own header row rather than going
-            // through ColumnHeaderRowRenderer, so "Item" has to opt into the
-            // same box treatment its Amount/Each/Total siblings get for
-            // free from CreateRightAlignedLabel.
-            // Each label carries its own sort indicator inside its text, so
-            // the right-aligned three keep right-aligning off their own
-            // Width exactly as before (below, and on every resize tick).
-            var itemLabel = LabelHelpers.WithDescenderClearance(new Label()
-            {
-                Text = SortableHeaderLabel.Decorate("Item", _sortState.IndicatorFor(PlanTableColumn.Item)),
-                Font = font, TextColor = color,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(NameX, HeaderBands.LabelY), Parent = rowPanel,
-            });
-
             // The Item column flexes and its cells rule left, so its header
             // stays on that rule at NameX. Every other header CENTRES over
             // the INK its own cells cover, bounded by the columns either
             // side of it and not by the band around that ink - see
-            // Services/JustifiedColumnTracks.HeaderRoom. Widths measured
-            // from the strings (each carries its own sort indicator), so the
-            // resize closure below never measures and never reads a Blish
-            // Label's Width, which is not settled until its next layout
-            // pass.
-            string eachHeaderText =
-                SortableHeaderLabel.Decorate("Each", _sortState.IndicatorFor(PlanTableColumn.Each));
-            string totalHeaderText =
-                SortableHeaderLabel.Decorate("Total", _sortState.IndicatorFor(PlanTableColumn.Total));
-            int sourceHeaderWidth = Measure(font, sourceHeaderText);
-            int amountHeaderWidth = Measure(font, amountHeaderText);
-            int eachHeaderWidth = Measure(font, eachHeaderText);
-            int totalHeaderWidth = Measure(font, totalHeaderText);
-
-            var rooms = HeaderRoomsFor(edges, scan);
-            var sourceLabel = CreateHeaderLabelAt(
-                rowPanel, sourceHeaderText, font, color,
-                SourceHeaderX(edges, scan, sourceHeaderWidth, rooms.Source));
-            var amountLabel = CreateHeaderLabelAt(
-                rowPanel, amountHeaderText, font, color,
-                JustifiedColumnTracks.CenteredOverContentRightAligned(
-                    edges.QtyRightEdge, scan.QtyInk, amountHeaderWidth, rooms.Amount));
-            var eachLabel = CreateHeaderLabelAt(
-                rowPanel, eachHeaderText, font, color,
-                JustifiedColumnTracks.CenteredOverContentRightAligned(
-                    edges.EachRightEdge, scan.MaxEachWidth, eachHeaderWidth, rooms.Each));
-            var totalLabel = CreateHeaderLabelAt(
-                rowPanel, totalHeaderText, font, color,
-                JustifiedColumnTracks.CenteredOverContentRightAligned(
-                    edges.TotalRightEdge, scan.MaxTotalWidth, totalHeaderWidth, rooms.Total));
-
-            // The hit area is each column's whole header CELL (see
-            // SortableHeaderCells); the labels carry only the note.
-            var labels = new[] { itemLabel, sourceLabel, amountLabel, eachLabel, totalLabel };
+            // Services/JustifiedColumnTracks.HeaderRoom. Every one of the
+            // five carries a persistent sort indicator, and the block width
+            // that covers it is what the placement below is handed, so a
+            // sort click moves no column.
             var columns = new[]
             {
                 PlanTableColumn.Item, PlanTableColumn.Source, PlanTableColumn.Amount,
                 PlanTableColumn.Each, PlanTableColumn.Total,
             };
-            var widths = new[]
+            var titles = new[] { "Item", "Source", "Amount", "Each", "Total" };
+            var blocks = new SortableHeaderBlock[columns.Length];
+            for (int i = 0; i < columns.Length; i++)
             {
-                Measure(font, itemLabel.Text), sourceHeaderWidth, amountHeaderWidth,
-                eachHeaderWidth, totalHeaderWidth,
-            };
+                blocks[i] = SortableHeaderBlock.Create(
+                    rowPanel, font, color, HeaderBands.LabelY, titles[i],
+                    _sortState.DirectionFor(columns[i]));
+            }
 
-            var plan = new HeaderCellPlan(labels.Length, new SortableHeaderCells(rowPanel));
-            for (int i = 0; i < labels.Length; i++)
+            int sourceHeaderWidth = blocks[1].Width;
+            int amountHeaderWidth = blocks[2].Width;
+            int eachHeaderWidth = blocks[3].Width;
+            int totalHeaderWidth = blocks[4].Width;
+
+            blocks[0].MoveTo(NameX);
+            PlaceDataHeaders(
+                blocks, scan, edges,
+                sourceHeaderWidth, amountHeaderWidth, eachHeaderWidth, totalHeaderWidth);
+
+            // The hit area is each column's whole header CELL (see
+            // SortableHeaderCells); the labels carry only the note.
+            var plan = new HeaderCellPlan(blocks.Length, new SortableHeaderCells(rowPanel));
+            for (int i = 0; i < blocks.Length; i++)
             {
                 var column = columns[i];
-                SortableHeaderLabel.MarkSortable(labels[i]);
-                plan.Set(i, labels[i], widths[i], () => SortBy(column));
+                SortableHeaderLabel.MarkSortable(blocks[i].Title);
+                SortableHeaderLabel.MarkSortable(blocks[i].IndicatorLabel);
+                plan.Set(i, blocks[i].Title, blocks[i].Width, () => SortBy(column), blocks[i].IndicatorLabel);
             }
 
             // Each cell owns its COLUMN, not the pixels its word covers,
             // from the same pre-scan the columns come from. The buffer is
             // the closure's and is never reallocated.
-            var boundaries = new int[labels.Length - 1];
+            var boundaries = new int[blocks.Length - 1];
             ApplyHeaderBoundaries(plan, scan, panelWidth, boundaries);
             plan.Sync(rowPanel.Width);
 
@@ -316,23 +282,10 @@ namespace TaimisToolbench.Views.Rendering
             // call).
             _sink.AddRelayout(w =>
             {
-                var e = scan.EdgesFor(w);
-                var moved = HeaderRoomsFor(e, scan);
                 rowPanel.Size = new Point(w, HeaderBands.RowHeight);
-                sourceLabel.Location = new Point(
-                    SourceHeaderX(e, scan, sourceHeaderWidth, moved.Source), HeaderBands.LabelY);
-                amountLabel.Location = new Point(
-                    JustifiedColumnTracks.CenteredOverContentRightAligned(
-                        e.QtyRightEdge, scan.QtyInk, amountHeaderWidth, moved.Amount),
-                    HeaderBands.LabelY);
-                eachLabel.Location = new Point(
-                    JustifiedColumnTracks.CenteredOverContentRightAligned(
-                        e.EachRightEdge, scan.MaxEachWidth, eachHeaderWidth, moved.Each),
-                    HeaderBands.LabelY);
-                totalLabel.Location = new Point(
-                    JustifiedColumnTracks.CenteredOverContentRightAligned(
-                        e.TotalRightEdge, scan.MaxTotalWidth, totalHeaderWidth, moved.Total),
-                    HeaderBands.LabelY);
+                PlaceDataHeaders(
+                    blocks, scan, scan.EdgesFor(w),
+                    sourceHeaderWidth, amountHeaderWidth, eachHeaderWidth, totalHeaderWidth);
 
                 // Every data column's x is width-derived - a track under
                 // distribution, the pinned right edge under the packed
@@ -342,9 +295,23 @@ namespace TaimisToolbench.Views.Rendering
             });
         }
 
-        private static int Measure(BitmapFont font, string text)
+        /// <summary>
+        /// Seats the four data headers over the ink their own cells cover.
+        /// One method for the build and for every resize tick, so the two
+        /// cannot answer differently; position only, and no measurement.
+        /// </summary>
+        private static void PlaceDataHeaders(
+            SortableHeaderBlock[] blocks, ColumnScan scan, ShoppingColumnMath.ColumnEdges edges,
+            int sourceHeaderWidth, int amountHeaderWidth, int eachHeaderWidth, int totalHeaderWidth)
         {
-            return (int)System.Math.Ceiling(font.MeasureString(text ?? "").Width);
+            var rooms = HeaderRoomsFor(edges, scan);
+            blocks[1].MoveTo(SourceHeaderX(edges, scan, sourceHeaderWidth, rooms.Source));
+            blocks[2].MoveTo(JustifiedColumnTracks.CenteredOverContentRightAligned(
+                edges.QtyRightEdge, scan.QtyInk, amountHeaderWidth, rooms.Amount));
+            blocks[3].MoveTo(JustifiedColumnTracks.CenteredOverContentRightAligned(
+                edges.EachRightEdge, scan.MaxEachWidth, eachHeaderWidth, rooms.Each));
+            blocks[4].MoveTo(JustifiedColumnTracks.CenteredOverContentRightAligned(
+                edges.TotalRightEdge, scan.MaxTotalWidth, totalHeaderWidth, rooms.Total));
         }
 
         /// <summary>
@@ -366,21 +333,6 @@ namespace TaimisToolbench.Views.Rendering
             return ShoppingColumnMath.HeaderRoomsFor(
                 edges, NameToQtyGap, scan.SourceInk, scan.QtyInk,
                 scan.MaxEachWidth, scan.MaxTotalWidth);
-        }
-
-        private static Label CreateHeaderLabelAt(
-            Panel parent, string text, BitmapFont font, Color color, int x)
-        {
-            return LabelHelpers.WithDescenderClearance(new Label()
-            {
-                Text = text ?? "",
-                Font = font,
-                TextColor = color,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Location = new Point(x, HeaderBands.LabelY),
-                Parent = parent,
-            });
         }
 
         private static void ApplyHeaderBoundaries(

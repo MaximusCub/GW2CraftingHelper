@@ -106,6 +106,7 @@
     <Compile Include="Services\PlanHistoryBlobStore.cs" />
     <Compile Include="Services\PlanHistoryDedupKey.cs" />
     <Compile Include="Services\PlanHistoryRetention.cs" />
+    <Compile Include="Services\PlanHistoryTableSorter.cs" />
     <Compile Include="Services\PlanHistoryRowLayout.cs" />
     <Compile Include="Services\PlanHistoryItemIds.cs" />
     <Compile Include="Services\PlanHistoryLabels.cs" />
@@ -115,6 +116,7 @@
     <Compile Include="Services\PlanStructuralValidator.cs" />
     <Compile Include="Services\StatusStore.cs" />
     <Compile Include="Services\StatusText.cs" />
+    <Compile Include="Services\StickyHeaderLayout.cs" />
     <Compile Include="Models\RecipeNode.cs" />
     <Compile Include="Models\RecipeOption.cs" />
     <Compile Include="Services\IRecipeApiClient.cs" />
@@ -144,6 +146,7 @@
     <Compile Include="Services\ShoppingColumnMath.cs" />
     <Compile Include="Services\DisciplinesColumnMath.cs" />
     <Compile Include="Services\RecipesColumnMath.cs" />
+    <Compile Include="Services\SortIndicatorLayout.cs" />
     <Compile Include="Services\TableSortState.cs" />
     <Compile Include="Services\UiGlyphs.cs" />
     <Compile Include="Services\GlyphFontDescriptor.cs" />
@@ -283,7 +286,10 @@
     <Compile Include="Views\Rendering\ShoppingListSectionRenderer.cs" />
     <Compile Include="Views\Rendering\HeaderBands.cs" />
     <Compile Include="Views\Rendering\SortableHeaderLabel.cs" />
+    <Compile Include="Views\Rendering\SortIndicator.cs" />
+    <Compile Include="Views\Rendering\SortableHeaderBlock.cs" />
     <Compile Include="Views\Rendering\SortableHeaderCells.cs" />
+    <Compile Include="Views\Rendering\StickyHeaderHost.cs" />
     <Compile Include="Views\Rendering\HeaderCellPlan.cs" />
     <Compile Include="Views\Rendering\UiFonts.cs" />
     <Compile Include="Views\Rendering\GlyphFont.cs" />

@@ -20,8 +20,8 @@ Status: OPEN | IN PROGRESS (branch) | DONE (PR #n) | RULED OUT (reason)
 
 | id | Item | Status |
 |----|------|--------|
-| F1 | **Sticky table header rows.** When scrolling a long table the header row pins to the top of the viewport while any of that table's rows are visible, then scrolls away past the table's end. Wanted as a MODULE-WIDE standard for all full-width tables. | OPEN |
-| F2 | **Sort indicators, option 3.** Persistent dim indicator on every sortable column at rest, solid + directional when active. Dim to solid is an OPACITY change so header width never moves. Reuse `UiGlyphs.SortAscending`. Owner ruled: **NO sorting in the Crafting Ranker** (its row order is already an answer). Snapshot table's Amount column must widen to accommodate. | OPEN |
+| F1 | **Sticky table header rows.** When scrolling a long table the header row pins to the top of the viewport while any of that table's rows are visible, then scrolls away past the table's end. Wanted as a MODULE-WIDE standard for all full-width tables. | IN PROGRESS (w6-tables) - mechanism built (`Services/StickyHeaderLayout`, `Views/Rendering/StickyHeaderHost`) and wired on the Snapshot tab, whose two runs share one scroll. The Crafting Plan tab is NOT wired: its bands flow in a `FlowPanel` and the adoption needs a change in `Views/CraftingPlanView.cs` / `Views/Rendering/TreeSectionController.cs`, which another agent owned this wave. See "Plan tab adoption" below. |
+| F2 | **Sort indicators, option 3.** Persistent dim indicator on every sortable column at rest, solid + directional when active. Dim to solid is an OPACITY change so header width never moves. Reuse `UiGlyphs.SortAscending`. Owner ruled: **NO sorting in the Crafting Ranker** (its row order is already an answer). Snapshot table's Amount column must widen to accommodate. | IN PROGRESS (w6-tables) - done on Shopping List, Used Materials, both Snapshot runs, and Plan History (newly sortable). Awaiting a merged PR number. |
 
 ## Bugs
 
@@ -64,3 +64,36 @@ Status: OPEN | IN PROGRESS (branch) | DONE (PR #n) | RULED OUT (reason)
 - Crafting Ranker Analyze / Analyzing...
 - Clear History dialog sizing
 - Dimmed-subtree grey vertical lines are gone
+
+---
+
+## Plan tab adoption of sticky headers (F1's remaining half)
+
+`StickyHeaderHost` moves the REAL band rather than drawing a copy, so a
+pinned header still sorts. That works on the Snapshot tab because its
+bands sit in an absolutely-placed grid panel: taking one out leaves no
+hole. The Crafting Plan tab's bands are children of a `FlowPanel`, and
+removing one reflows every section below it by the band's height.
+
+The change, when `Views/CraftingPlanView.cs` is free:
+
+1. Add a fixed-height SPACER to `Views/Rendering/HeaderBands.cs` - a
+   `Panel` of `HeaderBands.RowHeight` that stays in the flow, with the
+   band as its only child at (0,0). The flow then measures the spacer,
+   not the band, and pinning the band out of it moves nothing.
+2. `CraftingPlanView` builds one `StickyHeaderHost(<the container that
+   holds the scrolling content panel>, <the scrolling content panel>)`
+   per `Build`, and calls `Clear()` before every teardown of its section
+   controls - a pinned band is not a child of the content panel, so the
+   dispose walk would otherwise miss it.
+3. Each section renderer that owns a band hands it over with the spacer
+   as its `home`, and a geometry of
+   `(present, 0, 0, panelWidth, HeaderBands.RowHeight, HeaderBands.RowHeight + <that section's rows' height>)`.
+   The rows' height is already synchronous in
+   `Services/PlanContentHeightMath`, and the spacer's own live position
+   supplies both the flow offset and the scroll, so nothing new has to be
+   tracked per frame.
+4. The Recipe Tree is the same call, with its subtree height as the rows'
+   height (`TreeSectionController` already computes it). Its pinned band
+   lands at the top of the content panel's own viewport, which is BELOW
+   the pinned top strip - so this does not touch B3 either way.

@@ -20,9 +20,10 @@ namespace TaimisToolbench.Tests.Services
     /// so an identical sweep afterwards is proof the collapse changed no
     /// pixel at any width, not merely that the older assertions still pass.
     ///
-    /// The currency columns were re-captured once when the Settings grid's
-    /// cell gained its leading currency icon and its minimum column width
-    /// grew with the band; the snapshot/board columns are still the original
+    /// Two columns have been re-captured since, each because a CELL's
+    /// minimum width grew: the currency ones when the Settings cell gained
+    /// its leading icon, the snapshot ones when the Amount header gained a
+    /// persistent sort indicator. The board columns are still the original
     /// pre-collapse capture, and the law itself has never moved.
     /// </summary>
     public class GridLawGoldenTests
