@@ -25,9 +25,7 @@ namespace MysticForgeSeeder
         /// silently replaces a hand-authored row with a forge one. The two
         /// producers therefore own disjoint halves of the negative id
         /// space: hand-authored rows take [-99999, -1], the generated block
-        /// takes RecipeIdBase and below. Growth moves the generated block
-        /// away from the hand-authored half rather than into it, which is
-        /// what makes the partition hold rather than merely be roomy.
+        /// takes RecipeIdBase and below.
         /// tests/TaimisToolbench.Tests/Services/Recipes/MysticForgeSeedIdSpaceTests
         /// fails the build if the shipped data ever breaches it.
         /// </para>
@@ -603,24 +601,12 @@ namespace MysticForgeSeeder
         /// the id the name itself resolved to and falling back to the id the
         /// wiki's recipe subobject asserts.
         /// <para>
-        /// Name resolution wins where it succeeds because a page that
-        /// declares its own item id is stating the id of the item that page
-        /// is about. The wiki's asserted id is only stated explicitly when
-        /// the recipe template carries an "output item id" parameter;
-        /// otherwise the wiki derives it by name lookup, which picks one
-        /// arbitrary member of a same-name pair (GW2 ships several, e.g.
-        /// "Recipe: Satchel of Mighty Embroidered Armor" is both 9960 and
-        /// 9962) and so is the weaker source where both exist.
-        /// </para>
-        /// <para>
-        /// The fallback is what makes multi-variant equipment resolvable at
-        /// all: a page like "Ardent Glorious Armguards" covers an ascended
-        /// and a legendary item, holds no page-level "Has game id", and
-        /// names its recipe's output "Ardent Glorious Armguards (legendary)",
-        /// which is no page at all. Every id it has lives on an "equipment
-        /// variant table row" subobject, and the recipe template's explicit
-        /// "output item id" is the wiki's own statement of which row the
-        /// forge produces.
+        /// Neither source is redundant and the precedence is not arbitrary:
+        /// the wiki derives an unasserted id by a name lookup that picks one
+        /// arbitrary member of a same-name pair, while an asserted id is the
+        /// only id a multi-variant equipment page carries at all. Both
+        /// cases, with the wiki pages they were measured on:
+        /// docs/ARCHITECTURE.md section 9.
         /// </para>
         /// </summary>
         private static bool TryResolveId(

@@ -1455,6 +1455,25 @@ the user was most likely to hit. Nothing waits on it: the verifier licenses
 negatives, this repairs positives, and plan generation uses the best corpus
 it has while this improves it underneath.
 
+**Item-id resolution in `tools/MysticForgeSeeder`** (`TryResolveId`). Each
+output and ingredient name has up to two candidate item ids: the id the
+name itself resolves to on the wiki, and the id the wiki's recipe subobject
+asserts. The name-resolved id wins wherever it succeeds, because a page
+that declares its own item id is stating the id of the item that page is
+about. The wiki states an asserted id explicitly only when the recipe
+template carries an `output item id` parameter; otherwise it derives one by
+name lookup, which picks an arbitrary member of a same-name pair - GW2
+ships several, e.g. `Recipe: Satchel of Mighty Embroidered Armor` is both
+9960 and 9962 - so it is the weaker source wherever both exist.
+
+The asserted id is nonetheless what makes multi-variant equipment
+resolvable at all. A page like `Ardent Glorious Armguards` covers an
+ascended and a legendary item, holds no page-level `Has game id`, and names
+its recipe's output `Ardent Glorious Armguards (legendary)`, which is no
+page at all. Every id it has lives on an `equipment variant table row`
+subobject, and the recipe template's explicit `output item id` is the
+wiki's own statement of which row the forge produces.
+
 **Where:** loaders - `Services/VendorOfferLoader.cs`,
 `Services/Recipes/RecipeCacheSerializer.cs`,
 `Services/Recipes/ItemNameSeedData.cs`; wiki
