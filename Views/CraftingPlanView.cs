@@ -4807,6 +4807,28 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
+        /// Whether the cursor is over the section header's checkbox, from
+        /// the checkbox's own live rectangle rather than
+        /// <c>Control.MouseOver</c>. Toggling it rebuilds the whole plan,
+        /// so the control this asks about is a different instance on every
+        /// click and the hover chain has not resolved to it - the same
+        /// staleness Services/TreeRowPillHitTest was written for, and the
+        /// same half-open convention answers it.
+        /// </summary>
+        private static bool CursorOverCheckbox(Checkbox checkbox)
+        {
+            if (checkbox == null)
+            {
+                return false;
+            }
+
+            var cursor = checkbox.RelativeMousePosition;
+            return TreeRowPillHitTest.Covers(
+                new TreeRowPillHitTest.PillBox(0, 0, checkbox.Width, checkbox.Height),
+                cursor.X, cursor.Y);
+        }
+
+        /// <summary>
         /// Required Recipes' own CreateCollapsibleSection variant.
         /// section.Rows is guaranteed non-empty here (the builder only adds
         /// this section when a non-Mystic-Forge recipe survives its filter), so
@@ -4818,9 +4840,9 @@ namespace TaimisToolbench.Views
         /// <para>
         /// pressStartedOnCheckbox must be declared BEFORE CreateSectionHeader
         /// runs: the click-to-toggle wiring captures the suppressToggle closure
-        /// by reference and reads the checkbox's MouseOver lazily at click
-        /// time, well after the checkbox itself exists below, so a click
-        /// landing on the checkbox never also collapses the section.
+        /// by reference and resolves the checkbox lazily at click time, well
+        /// after the checkbox itself exists below, so a click landing on the
+        /// checkbox never also collapses the section.
         /// </para>
         /// Toggling re-renders through RenderPlan(_currentPlan), the same full
         /// rebuild path a pill click and a fresh Generate use.
@@ -4834,17 +4856,17 @@ namespace TaimisToolbench.Views
 
             // suppressToggle reads the press-time flag (a click that began
             // off the checkbox still toggles the section); the press
-            // feedback has to read MouseOver live instead, because it runs
-            // during the very press that sets that flag and would otherwise
-            // see the previous press's value. The checkbox is built below,
-            // after the header it parents to - both predicates are only ever
-            // called from a mouse event, long after that.
+            // feedback has to hit-test live instead, because it runs during
+            // the very press that sets that flag and would otherwise see the
+            // previous press's value. The checkbox is built below, after the
+            // header it parents to - both predicates are only ever called
+            // from a mouse event, long after that.
             Checkbox hideUnlockedCheckbox = null;
             bool pressStartedOnCheckbox = false;
             var header = CreateSectionHeader(
                 headerTitle, section.SectionType, panelWidth, section.IsDefaultExpanded,
                 () => pressStartedOnCheckbox,
-                () => hideUnlockedCheckbox != null && hideUnlockedCheckbox.MouseOver);
+                () => CursorOverCheckbox(hideUnlockedCheckbox));
             var headerPanel = header.HeaderPanel;
             var contentFlow = header.ContentFlow;
 
@@ -4864,7 +4886,7 @@ namespace TaimisToolbench.Views
 
             headerPanel.LeftMouseButtonPressed += (_, __) =>
             {
-                pressStartedOnCheckbox = hideUnlockedCheckbox.MouseOver;
+                pressStartedOnCheckbox = CursorOverCheckbox(hideUnlockedCheckbox);
             };
 
             hideUnlockedCheckbox.CheckedChanged += (_, e) =>
