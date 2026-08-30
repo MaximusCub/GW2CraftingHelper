@@ -111,6 +111,7 @@ Services/DialogLayoutMath.cs                                                    
 Services/DisciplinesColumnMath.cs                                                       148
 Services/ExcessCraftOutputCalculator.cs                                                 158
 Services/FirstLoadSnapshotGate.cs                                                        86
+Services/GlyphButtonMetrics.cs                                                           44
 Services/GridLayout.cs                                                                   93
 Services/Gw2AccountRecipeClient.cs                                                       30
 Services/Gw2AccountSnapshotService.cs                                                   491
@@ -165,7 +166,7 @@ Services/PlanHistoryBlobStore.cs                                                
 Services/PlanHistoryDedupKey.cs                                                         104
 Services/PlanHistoryLabels.cs                                                           118
 Services/PlanHistoryRetention.cs                                                        102
-Services/PlanHistoryRowLayout.cs                                                        361
+Services/PlanHistoryRowLayout.cs                                                        366
 Services/PlanHistoryStore.cs                                                            155
 Services/PlanPhaseEvent.cs                                                               73
 Services/PlanRelayoutMath.cs                                                            429
@@ -185,7 +186,7 @@ Services/RankerReadinessCalculator.cs                                           
 Services/RankerReadinessRamp.cs                                                         265
 Services/RankerReadinessWeights.cs                                                       61
 Services/RankerResultCache.cs                                                           263
-Services/RankerRowLayout.cs                                                             745
+Services/RankerRowLayout.cs                                                             750
 Services/RankerSnapshotWatch.cs                                                          93
 Services/RankerStore.cs                                                                 132
 Services/RankerWatchlistLimits.cs                                                        17
@@ -283,7 +284,7 @@ Views/MainView.cs                                                               
 Views/DialogWindow.cs                                                                   84
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    379
-Views/PlanHistoryTabContent.cs                                                          1424
+Views/PlanHistoryTabContent.cs                                                          1428
 Views/RankerTabContent.cs                                                               3014
 Views/Rendering/ClickSound.cs                                                            197
 Views/Rendering/CoinCurrencyRenderer.cs                                                  647
@@ -554,6 +555,7 @@ tests/TaimisToolbench.Tests/Services/StatusTextTests.cs                         
 tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                         33
 tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                  1112
 tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                           198
+tests/TaimisToolbench.Tests/Services/GlyphButtonMetricsTests.cs                        79
 tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                      332
 tests/TaimisToolbench.Tests/Services/TextWrapMathTests.cs                             297
 tests/TaimisToolbench.Tests/Services/TooltipComposerContentTests.cs                   215

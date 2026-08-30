@@ -206,6 +206,7 @@
     <Compile Include="Models\SeasonalVendorTip.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\CurrencyIconTiers.cs" />
+    <Compile Include="Services\GlyphButtonMetrics.cs" />
     <Compile Include="Services\IconFrameGeometry.cs" />
     <Compile Include="Services\ItemIconTiers.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />

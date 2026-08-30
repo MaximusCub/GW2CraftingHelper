@@ -68,7 +68,7 @@ namespace TaimisToolbench.Views
 
         private static int MainLineChipY => RankerRowLayout.MainLineY(LabelHelpers.SmallTagHeight);
 
-        private static int MainLineButtonY => RankerRowLayout.MainLineY(UiMetrics.ButtonHeight);
+        private static int MainLineButtonY => RankerRowLayout.MainLineY(RankerRowLayout.ButtonWidth);
 
         private static int MainLineBarY => RankerRowLayout.MainLineY(RankerRowLayout.ReadyBarHeight);
 
@@ -1611,7 +1611,7 @@ namespace TaimisToolbench.Views
         {
             var button = new FeedbackButton
             {
-                Size = new Point(RankerRowLayout.ButtonWidth, UiMetrics.ButtonHeight),
+                Size = new Point(RankerRowLayout.ButtonWidth, RankerRowLayout.ButtonWidth),
                 Location = new Point(x, MainLineButtonY),
                 Parent = parent,
             };
