@@ -55,7 +55,7 @@ Status: OPEN | IN PROGRESS (branch) | DONE (PR #n) | RULED OUT (reason)
 
 | id | Item | Status |
 |----|------|--------|
-| R1 | Two currency ids (39 and 77) are both named "Gaeting Crystal". Establish whether one is deprecated, or produce a thesis for why both exist. | OPEN |
+| R1 | Two currency ids (39 and 77) are both named "Gaeting Crystal". Establish whether one is deprecated, or produce a thesis for why both exist. Answered: id 39 was retired in-game 2022-07-19 and force-converted to Magnetite Shards; id 77 is the live one. Currency 39 and item 86094 relabelled "Gaeting Crystal (historical)". Evidence: `dev/records/gaeting-crystal-duplicate-ids.md`. | IN PROGRESS (w6-gaeting) |
 
 ## Confirmed working in the wave-2 build (owner-verified)
 

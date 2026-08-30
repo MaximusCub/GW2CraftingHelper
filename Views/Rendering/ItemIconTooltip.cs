@@ -105,7 +105,7 @@ namespace TaimisToolbench.Views.Rendering
         /// <para>
         /// The KIND is the caller's to choose and it must come from the id
         /// space the caller drew the icon from, never from the name:
-        /// Gaeting Crystal is item 86094 AND wallet currencies 39 and 77,
+        /// Gaeting Crystal is item 86094 AND wallet currency 39,
         /// one in-game good in two id spaces, so a name lookup cannot tell
         /// which tooltip it is owed. A good the module lists among its
         /// currencies but which is really an ITEM - Crystalline Ore 46682

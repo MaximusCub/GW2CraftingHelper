@@ -49,9 +49,9 @@ namespace TaimisToolbench.Tests.Models
         }
 
         [Theory]
-        // Item 86094 Gaeting Crystal is the item form of wallet currencies
-        // 39 and 77 (all three carry that same name on the live API), so
-        // the two forms must not disagree about what one is worth.
+        // Item 86094 Gaeting Crystal is the item form of wallet currency
+        // 39 (currency 77 shares the name but is a different good), so the
+        // two forms must not disagree about what one is worth.
         [InlineData(86094, 3600)]
         [InlineData(19925, 667)] // Obsidian Shard: 25 Fractal Relics at 80, for 3
         [InlineData(86069, 200)] // Kralkatite Ore: 4 Volatile Magic at 50
