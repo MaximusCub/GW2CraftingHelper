@@ -113,5 +113,49 @@ namespace TaimisToolbench.Tests.Services
             Assert.True(LogRowLayout.KeepsFitting(true, fitted, newWidth: 900));
             Assert.True(LogRowLayout.KeepsFitting(true, fitted, newWidth: fitted));
         }
+
+        [Fact]
+        public void SingleLineRow_KeepsTheHeightItAlwaysHad()
+        {
+            // The pitch every unwrapped row in the tab renders at is
+            // untouched by the wrap: one line is still the measured text
+            // height plus its descender clearance, and nothing else.
+            Assert.Equal(22, LogRowLayout.RowHeight(1, singleLineHeight: 22, lineAdvance: 20));
+        }
+
+        [Fact]
+        public void WrappedRow_GrowsByOneAdvancePerExtraLine()
+        {
+            // The descender clearance the single-line height carries is
+            // counted once, at the bottom of the row - not once per line, or
+            // a four-line row would gain 6px of dead space its own text
+            // never occupies.
+            Assert.Equal(42, LogRowLayout.RowHeight(2, 22, 20));
+            Assert.Equal(62, LogRowLayout.RowHeight(3, 22, 20));
+            Assert.Equal(82, LogRowLayout.RowHeight(4, 22, 20));
+        }
+
+        [Fact]
+        public void RowHeight_IsCappedAtTheLineCapWhateverTheCallerCounted()
+        {
+            // Second line of defence: the wrap is already capped, so a
+            // caller reaching this with more lines has a bug - but the row
+            // must not become the only thing on screen because of it.
+            int capped = LogRowLayout.RowHeight(LogRowLayout.MaxMessageLines, 22, 20);
+            Assert.Equal(capped, LogRowLayout.RowHeight(40, 22, 20));
+            Assert.Equal(capped, LogRowLayout.RowHeight(int.MaxValue, 22, 20));
+        }
+
+        [Fact]
+        public void RowHeight_TreatsADegenerateCountOrAdvanceAsOneLine()
+        {
+            // Zero lines is not a zero-height row: a row with no message at
+            // all still has a timestamp to draw, and a zero-height child
+            // would collapse the flow panel's spacing around it.
+            Assert.Equal(22, LogRowLayout.RowHeight(0, 22, 20));
+            Assert.Equal(22, LogRowLayout.RowHeight(-3, 22, 20));
+            Assert.Equal(22, LogRowLayout.RowHeight(3, 22, lineAdvance: 0));
+            Assert.Equal(0, LogRowLayout.RowHeight(3, singleLineHeight: 0, lineAdvance: 0));
+        }
     }
 }
