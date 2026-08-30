@@ -50,10 +50,21 @@ namespace TaimisToolbench.Views.Rendering
         /// draws when the key is OFF and unfilled. The pill's own
         /// <see cref="GetPillColors"/> arm carries the rest of the
         /// raised/pressed pair.
+        /// <para>
+        /// The punch-out is a FULL-STRENGTH affordance only.
+        /// <see cref="DimmedPillFactor"/> multiplies both the mark and the
+        /// key toward black, which compresses that 4.19:1 to 2.17:1 - below
+        /// the 3:1 non-text minimum, on a row a tree-wide ignore can
+        /// perfectly well reach (ignores are keyed by item id, so an
+        /// occurrence under a bought parent draws the ON key too). A dimmed
+        /// ON key therefore keeps the light mark, which reads 3.05:1
+        /// against it and still says "filled key" - the state signal is the
+        /// fill, not the inversion.
+        /// </para>
         /// </summary>
-        internal static Color GlyphColor(bool isIgnoreActive)
+        internal static Color GlyphColor(bool isIgnoreActive, bool dimmed)
         {
-            return isIgnoreActive ? new Color(28, 20, 6) : Color.White; // #1C1406
+            return isIgnoreActive && !dimmed ? new Color(28, 20, 6) : Color.White; // #1C1406
         }
 
         /// <summary>

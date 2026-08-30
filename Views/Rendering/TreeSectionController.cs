@@ -2021,7 +2021,9 @@ namespace TaimisToolbench.Views.Rendering
                 // White, not borderColor: Selected/Available fills expose the
                 // border hue behind the label, so border-colored text has zero
                 // contrast against its own backdrop.
-                Color textColor = isToggle ? PillColors.GlyphColor(node.IsIgnored) : Color.White;
+                Color textColor = isToggle
+                    ? PillColors.GlyphColor(node.IsIgnored, dimmed)
+                    : Color.White;
                 // Chrome (UNKNOWN/UNRECOGNIZED/CURRENCY/GUILD UPGRADE/the
                 // sole-source badge) reads one tier below a pill you can
                 // act on, matching the recessed ring PillColors gives it.
