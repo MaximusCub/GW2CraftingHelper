@@ -107,6 +107,20 @@
       "badge": "WVW",
       "sourceUrl": "https://wiki.guildwars2.com/wiki/Hero_Weapon_Box",
       "lastVerified": "2026-08-29"
+    },
+    {
+      "itemId": 88485,
+      "hint": "No longer obtainable: the July 19, 2022 game update replaced Legendary Divinations with Legendary Insights, and the retired Path of Fire raid vendor page is the only place the wiki records them being sold. Double-click one you already hold to exchange it for a Legendary Insight. Account bound; not tradable; no recipe.",
+      "badge": "REMOVED",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Legendary_Divination",
+      "lastVerified": "2026-08-29"
+    },
+    {
+      "itemId": 86094,
+      "hint": "No longer obtainable: the July 19, 2022 game update retired the Path of Fire raid Gaeting Crystal, exchanged every one held for an equal number of Magnetite Shards, and switched the merchants that took it over to Magnetite Shards. The wallet currency of the same name earned in Janthir Wilds raids is a different one. Account bound; not tradable; no recipe.",
+      "badge": "REMOVED",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gaeting_Crystal_(historical)",
+      "lastVerified": "2026-08-29"
     }
   ]
 }
