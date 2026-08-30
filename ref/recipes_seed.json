@@ -2,6 +2,3786 @@
   "schemaVersion": 1,
   "recipes": [
     {
+      "id": -1685,
+      "outputItemId": 84110,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81489,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1684,
+      "outputItemId": 84176,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81330,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1683,
+      "outputItemId": 82801,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81336,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1682,
+      "outputItemId": 82994,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81446,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1681,
+      "outputItemId": 82093,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81420,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1680,
+      "outputItemId": 83036,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81338,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1679,
+      "outputItemId": 82963,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81333,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1678,
+      "outputItemId": 82902,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81476,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1677,
+      "outputItemId": 82196,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81418,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1676,
+      "outputItemId": 82903,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81386,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1675,
+      "outputItemId": 83497,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81279,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1674,
+      "outputItemId": 82456,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81349,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1673,
+      "outputItemId": 83289,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81500,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1672,
+      "outputItemId": 82437,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81315,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1671,
+      "outputItemId": 82173,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81285,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1670,
+      "outputItemId": 84578,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81434,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1669,
+      "outputItemId": 83394,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81304,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1668,
+      "outputItemId": 84629,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81428,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1667,
+      "outputItemId": 84508,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81365,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1666,
+      "outputItemId": 82102,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81483,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1665,
+      "outputItemId": 84481,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81509,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1664,
+      "outputItemId": 82552,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81286,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1663,
+      "outputItemId": 84301,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81498,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1662,
+      "outputItemId": 83094,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81437,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1661,
+      "outputItemId": 83087,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81471,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1660,
+      "outputItemId": 83699,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81422,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1659,
+      "outputItemId": 84181,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81375,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1658,
+      "outputItemId": 82925,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81487,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1657,
+      "outputItemId": 83702,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81340,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1656,
+      "outputItemId": 83862,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81527,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1655,
+      "outputItemId": 82502,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81397,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1654,
+      "outputItemId": 82348,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81458,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1653,
+      "outputItemId": 83482,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81419,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1652,
+      "outputItemId": 82180,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81325,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1651,
+      "outputItemId": 83308,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81482,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1650,
+      "outputItemId": 82109,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 81510,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82746,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 83259,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1649,
+      "outputItemId": 89134,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89171,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1648,
+      "outputItemId": 89252,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89244,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1647,
+      "outputItemId": 89234,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89208,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1646,
+      "outputItemId": 89235,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89161,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1645,
+      "outputItemId": 89174,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89204,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1644,
+      "outputItemId": 89117,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89217,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1643,
+      "outputItemId": 89209,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89089,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1642,
+      "outputItemId": 89266,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89121,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1641,
+      "outputItemId": 89094,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89242,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1640,
+      "outputItemId": 89101,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89160,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1639,
+      "outputItemId": 89093,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89177,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1638,
+      "outputItemId": 89245,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89230,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1637,
+      "outputItemId": 89158,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89138,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1636,
+      "outputItemId": 89260,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89190,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1635,
+      "outputItemId": 89126,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89110,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1634,
+      "outputItemId": 89183,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89168,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1633,
+      "outputItemId": 89152,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89151,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1632,
+      "outputItemId": 89167,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 89099,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1631,
+      "outputItemId": 83676,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67121,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1630,
+      "outputItemId": 83957,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67134,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1629,
+      "outputItemId": 82268,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67120,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1628,
+      "outputItemId": 82272,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67123,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1627,
+      "outputItemId": 83729,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67129,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1626,
+      "outputItemId": 82698,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67153,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1625,
+      "outputItemId": 84561,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67149,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1624,
+      "outputItemId": 84748,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67154,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1623,
+      "outputItemId": 83240,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67119,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1622,
+      "outputItemId": 84341,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67125,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1621,
+      "outputItemId": 82410,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67132,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1620,
+      "outputItemId": 84427,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67130,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1619,
+      "outputItemId": 84723,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67124,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1618,
+      "outputItemId": 82423,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67126,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1617,
+      "outputItemId": 82401,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67116,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1616,
+      "outputItemId": 82098,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67122,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1615,
+      "outputItemId": 82334,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67133,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1614,
+      "outputItemId": 84461,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67127,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1613,
+      "outputItemId": 82245,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67117,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1612,
+      "outputItemId": 84655,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67142,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1611,
+      "outputItemId": 83929,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67158,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1610,
+      "outputItemId": 82214,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67128,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1609,
+      "outputItemId": 83113,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67118,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1608,
+      "outputItemId": 83921,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67145,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1607,
+      "outputItemId": 83127,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67147,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1606,
+      "outputItemId": 83323,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67146,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1605,
+      "outputItemId": 82512,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67157,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1604,
+      "outputItemId": 84546,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67151,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1603,
+      "outputItemId": 82465,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67144,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1602,
+      "outputItemId": 82519,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67148,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1601,
+      "outputItemId": 83595,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67152,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1600,
+      "outputItemId": 84633,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67141,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1599,
+      "outputItemId": 84643,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67156,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1598,
+      "outputItemId": 82670,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67115,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1597,
+      "outputItemId": 83348,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67143,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
+      "id": -1596,
+      "outputItemId": 83162,
+      "outputItemCount": 1,
+      "expectedOutputCount": null,
+      "ingredients": [
+        {
+          "type": "Item",
+          "id": 67131,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84174,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 82350,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        },
+        {
+          "type": "Item",
+          "id": 84203,
+          "count": 1,
+          "achievementId": null,
+          "achievementBit": null
+        }
+      ],
+      "disciplines": [
+        "MysticForge"
+      ],
+      "minRating": 0,
+      "flags": [],
+      "achievementId": null
+    },
+    {
       "id": -1595,
       "outputItemId": 103974,
       "outputItemCount": 1,

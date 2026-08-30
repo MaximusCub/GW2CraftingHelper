@@ -60,3 +60,29 @@ that root's `ref/` directory.
   tool merges `ref/mystic_forge_recipes.json` into the search index it
   produces - a stale seed here means stale Mystic Forge search results in
   the module.
+
+## A rerun DELETES the hand-authored block (ids -1596..-1685)
+
+This tool rewrites `ref/mystic_forge_recipes.json` whole and renumbers every
+row from -1 downwards, so anything it cannot reproduce is lost. It currently
+cannot reproduce the 90 WvW/PvP legendary armour upgrade recipes that occupy
+ids -1596..-1685: every one of them names its ascended precursor with a wiki
+variant anchor (`1 Triumphant Hero's Breastplate#item2`), Step 3 resolves that
+name to no item ID, and Step 4 then skips the whole recipe. The recipes are
+present in the SMW query results - they are dropped downstream of it.
+
+Resolving an anchor means reading the page's `equipment variant table row`
+blocks in order and taking the Nth `id`, which is how those 90 rows were
+authored by hand. Until this tool does that, before you re-run it:
+
+1. Note that `MysticForgeRecipeDataTests.
+   Load_ShippedSeedFile_KeepsTheHandAuthoredLegendaryArmourBlock` will go red
+   if the block disappears. That test is the guard, not a formality.
+2. Re-append the block (and any other hand-authored rows below the generated
+   range) to the regenerated file before re-running
+   `tools/TaimisToolbench.RecipeSeeder`.
+
+The same rewrite is also on a collision course with `ref/recipes_seed.json`,
+which carries four synthetic Merchant/achievement rows at ids -1592..-1595:
+if the generated block ever exceeds 1591 rows, the seeder's own numbering
+will overwrite them.
