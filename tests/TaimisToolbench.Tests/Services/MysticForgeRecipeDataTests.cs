@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using TaimisToolbench.Services;
 using Xunit;
@@ -541,19 +543,91 @@ namespace TaimisToolbench.Tests.Services
                 var data = MysticForgeRecipeData.Load(stream);
 
                 Assert.Empty(data.LoadWarnings);
-                Assert.Equal(1591, data.RecipeCount);
+                Assert.Equal(1734, data.RecipeCount);
 
-                // Recipe: Tray of Banana Cream Pies (from wiki).
-                var recipe = data.GetRecipe(-1);
+                // Recipe: Tray of Banana Cream Pies (from wiki), reached
+                // through its output rather than by id - the generated
+                // block renumbers on every tools/MysticForgeSeeder run.
+                int recipeId = Assert.Single(data.SearchByOutput(9638));
+                var recipe = data.GetRecipe(recipeId);
                 Assert.NotNull(recipe);
                 Assert.Equal(9638, recipe.OutputItemId);
                 Assert.Equal(1, recipe.OutputItemCount);
                 Assert.Equal(4, recipe.Ingredients.Count);
                 Assert.Contains("MysticForge", recipe.Disciplines);
-
-                Assert.NotEmpty(data.SearchByOutput(9638));
-                Assert.Contains(-1, data.SearchByOutput(9638));
             }
+        }
+
+        // Every WvW and PvP legendary armour piece is forged from its own
+        // ascended version plus three gifts, and the whole set was missing
+        // from the module until tools/MysticForgeSeeder learned to resolve
+        // an output the wiki names "<piece> (legendary)" - a name that is no
+        // wiki page, on a multi-variant page that carries no page-level item
+        // id of its own. Counted rather than listed by recipe id: the
+        // generated block renumbers on every seeder run, so an id list would
+        // go red on a routine reseed and could be greened by editing the
+        // list. A gift triple plus a count cannot.
+        [Fact]
+        public void Load_ShippedSeedFile_KeepsTheLegendaryArmourBlock()
+        {
+            // Gift of War Prosperity / Prowess / Dedication, and the three
+            // Gifts of Competitive.
+            var warGifts = new[] { 82746, 84168, 83259 };
+            var competitiveGifts = new[] { 84174, 82350, 84203 };
+
+            string path = FindRepoFile(Path.Combine("ref", "mystic_forge_recipes.json"));
+
+            using (var stream = File.OpenRead(path))
+            {
+                var data = MysticForgeRecipeData.Load(stream);
+                var all = data.AllRecipes.ToList();
+
+                var war = all.Where(r => warGifts.All(
+                    g => r.Ingredients.Any(i => i.Id == g))).ToList();
+                var competitive = all.Where(r => competitiveGifts.All(
+                    g => r.Ingredients.Any(i => i.Id == g))).ToList();
+
+                // Triumphant Hero's (18) + Mistforged Triumphant Hero's (15)
+                // + Sublime Mistforged Triumphant Hero's (3).
+                Assert.Equal(36, war.Count);
+
+                // Ardent Glorious + Glorious Hero's + Mistforged Glorious
+                // Hero's, 18 pieces each.
+                Assert.Equal(54, competitive.Count);
+
+                foreach (var row in war.Concat(competitive))
+                {
+                    Assert.Equal(4, row.Ingredients.Count);
+                    Assert.Equal(1, row.OutputItemCount);
+                    Assert.All(row.Ingredients, i => Assert.Equal(1, i.Count));
+                    Assert.Contains("MysticForge", row.Disciplines);
+                    Assert.Contains(row.Id, data.SearchByOutput(row.OutputItemId));
+                }
+
+                // Triumphant Hero's Breastplate (WvW): ascended 81304 plus
+                // the three Gifts of War.
+                var wvw = Assert.Single(data.SearchByOutput(83394));
+                AssertUpgradeRecipe(
+                    data.GetRecipe(wvw), 81304, 82746, 84168, 83259);
+
+                // Ardent Glorious Breastplate (PvP): ascended 67143 plus
+                // the three Gifts of Competitive.
+                var pvp = Assert.Single(data.SearchByOutput(83348));
+                AssertUpgradeRecipe(
+                    data.GetRecipe(pvp), 67143, 84174, 82350, 84203);
+            }
+        }
+
+        private static void AssertUpgradeRecipe(
+            RawRecipe recipe, int precursorItemId, params int[] giftItemIds)
+        {
+            Assert.NotNull(recipe);
+            Assert.All(recipe.Ingredients, i => Assert.Equal("Item", i.Type));
+            Assert.All(recipe.Ingredients, i => Assert.Equal(1, i.Count));
+
+            var ids = new List<int> { precursorItemId };
+            ids.AddRange(giftItemIds);
+            Assert.Equal(ids, recipe.Ingredients.Select(i => i.Id).ToList());
         }
     }
 }

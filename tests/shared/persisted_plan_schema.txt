@@ -3,6 +3,8 @@ AcquisitionHint.Hint:String
 AcquisitionHint.ItemId:Int32
 AcquisitionHint.LastVerified:String
 AcquisitionHint.SourceUrl:String
+BarterItemCost.Amount:Int64
+BarterItemCost.ItemId:Int32
 CompetencyOpportunity.CraftCost:Int64
 CompetencyOpportunity.DeltaCost:Int64
 CompetencyOpportunity.Disciplines:IReadOnlyList`1<String>
@@ -14,6 +16,7 @@ CostLine.Type:String
 CostLineUnitValue.ComparisonExtra:Int64
 CostLineUnitValue.HasUnvaluedCost:Boolean
 CostLineUnitValue.RealCoin:Int64
+CraftingPlan.BarterItemCosts:List`1<BarterItemCost>
 CraftingPlan.CurrencyCosts:List`1<CurrencyCost>
 CraftingPlan.Steps:List`1<PlanStep>
 CraftingPlan.TargetItemId:Int32
@@ -171,6 +174,7 @@ PlanStep.RecipeId:Int32
 PlanStep.Source:AcquisitionSource
 PlanStep.TotalCost:Int64
 PlanStep.UnitCost:Int64
+PlanStep.VendorBarterItemCosts:List`1<CostLine>
 PlanStep.VendorCurrencyCosts:List`1<CostLine>
 PlanStep.VendorHasBarterItemCost:Boolean
 PlanStep.VendorOfferCurrencyCostLinesPerBatch:List`1<CostLine>

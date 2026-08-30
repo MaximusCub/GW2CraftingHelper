@@ -180,7 +180,7 @@ live API's `name` field for the same id, as a sanity check on the id/name pairin
 | 36 | 135 | Testimony of Desert Heroics | Testimony of Desert Heroics | match |
 | 37 | undefined | Exalted Key | Exalted Key | match |
 | 38 | undefined | Machete | Machete | match |
-| 39 | 3600 | Gaeting Crystal | Gaeting Crystal | match (see 3c: id collides with a second, newer Gaeting Crystal at id 77) |
+| 39 | 3600 | Gaeting Crystal | Gaeting Crystal | match, but **this row is deliberately not imported** - see 3c |
 | 40 | undefined | Bandit Skeleton Key | Bandit Skeleton Key | match |
 | 41 | undefined | Pact Crowbar | Pact Crowbar | match |
 | 42 | undefined | Vial of Chak Acid | Vial of Chak Acid | match |
@@ -313,6 +313,16 @@ id 39 (`"Earned from bosses and events inside Path of Fire raids."`) and id 77
 row for id 39 (3600 copper); id 77 has no row (postdates their table). If the maintainer's
 import logic ever resolves gw2e prices by *name* instead of id, id 39 and id 77 would collide -
 another reason id-keyed import (as gw2e itself does) is the only safe approach.
+
+**Resolved 2026-08-29: id 39 is deliberately NOT imported.** It is the only row in gw2e's
+table that this module drops on purpose, so the gap is a divergence and not drift. The
+currency was retired in-game on 2022-07-19 and every held balance force-converted into
+Magnetite Shards (id 28), so no account can hold one; and no offer in `ref/vendor_offers.json`
+charges it, so it cannot reach a solve even if one could. Its item form, item 86094, is
+dropped from `Models/BarterItemDecisionDefaults.cs` for the same reason. Id 77, the live
+Gaeting Crystal, is a rolling currency whose worth resets each expansion - what that means for
+any valuation of it is stated once in `docs/ARCHITECTURE.md` section 8.3, with the measured
+evidence in `dev/records/gaeting-crystal-duplicate-ids.md`.
 
 ### 3d. `id` 74 is a malformed/placeholder entry in the live API
 

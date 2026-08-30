@@ -143,3 +143,92 @@ never another agent's summary.
 - A branch checked out in a worktree cannot be `git checkout`ed in the main
   clone. `git diff master..branch` on a stale-based branch shows master-only
   work as deletions; use the three-dot form to see the real change set.
+
+
+## The reference was already in the owner's screenshots
+
+An agent reported V4's 24px X button as unverifiable because "no Trading Post
+capture exists in this repo", and that was relayed to the owner as needing his
+eye. The owner then pointed out the Trading Post was in the top corner of the
+ranker screenshot he had already sent. It was.
+
+The images the owner pastes are on disk at
+`~/.claude/image-cache/<session-id>/*.png` and can be measured with PIL. When a
+UI question is "does ours match the game's", check the owner's existing captures
+before declaring it unmeasurable - and prefer a RATIO between two controls in
+the SAME image, which needs no UI-scale assumption at all.
+
+
+## Where this session ended (2026-08-29)
+
+Three PRs open, all CI-green at the time of writing, none merged. Nothing is
+deployed: **the owner's live install still runs the wave-2 build.**
+
+| PR | Branch | Contents |
+|---|---|---|
+| #233 | `legendary-research-docs` | six research documents + the harness. Was red on the ASCII gate from a UTF-8 BOM on three harness sources; fixed. |
+| #235 | `wave5-data` | forge recipes + their root cause, five currency valuations, two dead vendors, barter plan totals, the Gaeting removal. 4,240 tests. |
+| #236 | `wave6-ui` | all sixteen wave-6 feedback items across five branches. 4,300 tests, exactly the expected sum of the branch deltas. |
+
+`FEEDBACK-BACKLOG.md` rule still stands: an item closes only when a MERGED PR is
+named beside it. Everything currently reads `IN PR #235` or `IN PR #236`, so
+nothing has closed yet.
+
+### Owed to the owner, none of it startable without him
+
+- **A deploy and a field test.** Nothing in #235 or #236 has been seen in game.
+- **F1 stays OPEN**: sticky headers are wired on the Snapshot tab only. The plan
+  tab needs a fixed-height spacer per band first; the recipe is in the backlog.
+- Three specific in-game checks: the mouse wheel over a pinned header strip, the
+  IGNORE toggle's smaller click target (29x24 mark vs a ~70x24 word), and V4's
+  24px against the real Trading Post at his UI scale.
+- **Git credential**: the default OAuth credential lacks `workflow` scope, so any
+  branch touching `.github/workflows/` must be pushed with the `gh` token.
+
+### Open design question, raised by the owner, not yet actioned
+
+Gaeting Crystal valuation. There is exactly one live id at a time. The table
+currently holds `{ 28, 3600 }` (Magnetite Shard) and `{ 77, 3600 }` as two
+independent literals, while 77's own comment says it must equal what 28 charges.
+Proposal on the table: peg 77 to 28 rather than pin a number or match by name -
+the name is the ambiguous part, and the only discriminator (the description) is
+documented on the wiki as stale. **Verify the 1:1 vendor claim before building
+anything on it.** A CI assertion that exactly one live currency is named "Gaeting
+Crystal" would turn the next transition from silent staleness into a loud failure
+with no runtime behaviour at all.
+
+## Wiki rate limiting: we tripped it, and how to not do it again
+
+On 2026-08-29 the GW2 wiki began injecting "An automated filter has identified
+this page view as potentially automated" into rendered page views for this
+household's IP. Measured: the block page is served with **HTTP 200** and is
+within one byte of the real article's size (151,933 vs 151,934), because the
+warning is injected INTO the article rather than replacing it. Checking the
+status code and `Content-Length` therefore says nothing; three wrong conclusions
+were drawn in a row from exactly that. **Grep the body for "potentially
+automated" before declaring wiki access healthy.**
+
+Scope, measured: it affects `/wiki/<Page>` rendered views. `api.php` was still
+serving real content (`action=parse` returned the correct wikitext) while the
+rendered path was blocked. The wiki's own headers show nginx + Varnish with
+`vary: Accept-Encoding, Cookie`; a cookie-less request is a cache hit and a
+cookie-bearing one passes through, but BOTH carried the warning, so the cache is
+a red herring.
+
+The cause was almost certainly this session: `tools/VendorOfferUpdater`,
+`tools/MysticForgeSeeder`, the dead-vendor sweep, the Gaeting research and a
+number of ad-hoc `curl` calls all hit the wiki within a few hours, and the
+ad-hoc ones sent curl's default User-Agent.
+
+**Rules for future wiki work:**
+- Use the tools' own throttles (`--delay`, `--max-requests`) and never raise them
+  to go faster. `MysticForgeSeeder`'s 200-request default exists for this reason.
+- Every ad-hoc request gets a real User-Agent identifying the project, the same
+  way `WikiRecipeClient` sets `TaimisToolbench-MysticForgeSeeder/1.0`.
+- Prefer `api.php` over scraping rendered pages, and prefer one batched SMW query
+  over many page fetches.
+- Never run two wiki-touching agents concurrently. Several ran in parallel here.
+- The "report this error" link in the warning points at **English Wikipedia** and
+  is useless: it is Wikipedia's boilerplate left in, the projects share no
+  administrators, and its preloaded title makes the reporter declare themselves a
+  long-term abuser. The real venue is the GW2 wiki's own admin noticeboard.

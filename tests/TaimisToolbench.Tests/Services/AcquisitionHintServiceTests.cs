@@ -158,12 +158,12 @@ namespace TaimisToolbench.Tests.Services
 
                 // Deliberately still an exact literal, unlike the four
                 // machine-generated corpora that moved to manifest digests:
-                // acquisition_hints_seed.json is 3KB of HAND-curated rows
-                // with no seeder behind it, so there is no regeneration
-                // churn to absorb and no manifest a tool could write. Ten
-                // rows means the ten below, and adding an eleventh is
-                // exactly the edit that should stop and read this test.
-                Assert.Equal(10, hints.Count);
+                // acquisition_hints_seed.json is HAND-curated rows with no
+                // seeder behind it, so there is no regeneration churn to
+                // absorb and no manifest a tool could write. Seventeen
+                // rows means the seventeen below, and adding an eighteenth
+                // is exactly the edit that should stop and read this test.
+                Assert.Equal(17, hints.Count);
                 foreach (var hint in hints.Values)
                 {
                     Assert.False(string.IsNullOrEmpty(hint.Hint));
@@ -203,6 +203,40 @@ namespace TaimisToolbench.Tests.Services
                 Assert.Contains("Canach", hints[105804].Hint);
                 Assert.Equal("ACHIEVEMENT", hints[106986].Badge);
                 Assert.Contains("Radiance of the Sun God", hints[106986].Hint);
+
+                // The five items orphaned by refusing the Battle Historian
+                // (ref/vendor_offer_exclusions.json). That vendor was the
+                // only seller the WIKI has for any of them - checked with
+                // [[Sells item::<name>]], which returns it alone - so
+                // removing its rows left each with no source at all, and
+                // these hints are the whole of what the plan can say. The
+                // first two carry the weight: Dragonite Ore and Empyreal
+                // Fragment are ingredients in shipped recipes, including
+                // legendary-tree Mystic Forge gifts.
+                Assert.Equal("WORLD", hints[46733].Badge);
+                Assert.Contains("world boss chests", hints[46733].Hint);
+                Assert.Equal("CHESTS", hints[46735].Badge);
+                Assert.Contains("dungeon explorable paths", hints[46735].Hint);
+                Assert.Equal("REMOVED", hints[43244].Badge);
+                Assert.Contains("No longer obtainable", hints[43244].Hint);
+                Assert.Equal("WVW", hints[64283].Badge);
+                Assert.Equal("WVW", hints[64285].Badge);
+                Assert.Contains("Hero Weapon Box", hints[64285].Hint);
+
+                // The two orphaned by refusing Scholar Glenna (Gaeting
+                // Crystal), the historical variant page of a merchant who
+                // is otherwise live. Both items are themselves retired by
+                // the same 2022-07-19 update that retired her offers, so
+                // "no route" is the truth rather than a gap: Legendary
+                // Divination became Legendary Insight, and the Path of
+                // Fire Gaeting Crystal became Magnetite Shards. The
+                // Janthir Wilds wallet currency shares the item's name
+                // (both read "Gaeting Crystal" on the live API) and is a
+                // different currency, which is why the hint says so.
+                Assert.Equal("REMOVED", hints[88485].Badge);
+                Assert.Contains("Legendary Insight", hints[88485].Hint);
+                Assert.Equal("REMOVED", hints[86094].Badge);
+                Assert.Contains("Magnetite Shard", hints[86094].Hint);
             }
         }
 

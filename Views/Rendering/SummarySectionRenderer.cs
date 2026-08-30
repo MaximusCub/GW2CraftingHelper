@@ -21,10 +21,13 @@ namespace TaimisToolbench.Views.Rendering
     internal sealed class SummarySectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
+        private readonly Func<int, ItemStatBlock> _getItemStatBlock;
 
-        internal SummarySectionRenderer(ISectionRelayoutSink sink)
+        internal SummarySectionRenderer(
+            ISectionRelayoutSink sink, Func<int, ItemStatBlock> getItemStatBlock = null)
         {
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
+            _getItemStatBlock = getItemStatBlock;
         }
 
         internal void Render(PlanSectionViewModel section, FlowPanel contentFlow, int panelWidth)
@@ -82,7 +85,7 @@ namespace TaimisToolbench.Views.Rendering
                     costBandRows, contentFlow, panelWidth,
                     SummarySectionLayoutMath.CostBandHeight(currencyRows.Count > 0),
                     highlightResult: true,
-                    currencyNoteText: SummarySectionLayoutMath.CurrencyRequirementNote(currencyRows.Count),
+                    currencyNoteText: SummarySectionLayoutMath.CurrencyRequirementNote(currencyRows),
                     currencyNoteTooltip: SummarySectionLayoutMath.CurrencyRequirementNoteTooltip(currencyRows));
             }
 
@@ -606,7 +609,8 @@ namespace TaimisToolbench.Views.Rendering
             var scan = ScanCurrencyColumns(rows);
 
             CreateCurrencyTableTopGap(parent, panelWidth);
-            CreateCurrencyTableHeaderRow(parent, panelWidth, scan);
+            CreateCurrencyTableHeaderRow(
+                parent, panelWidth, scan, SummarySectionLayoutMath.NonCoinNameHeader(rows));
             for (int i = 0; i < rows.Count; i++)
             {
                 CreateCurrencyTableRow(rows[i], parent, panelWidth, scan);
@@ -788,13 +792,13 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         private void CreateCurrencyTableHeaderRow(
-            FlowPanel parent, int panelWidth, CurrencyColumnScan scan)
+            FlowPanel parent, int panelWidth, CurrencyColumnScan scan, string nameHeaderText)
         {
             var band = HeaderBands.CreateColumnHeaderBand(parent, panelWidth);
             var font = HeaderBands.Font;
             LabelHelpers.WithDescenderClearance(new Label()
             {
-                Text = "Currency", Font = font, TextColor = HeaderBands.LabelColor,
+                Text = nameHeaderText, Font = font, TextColor = HeaderBands.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
                 Location = new Point(SummarySectionLayoutMath.CurrencyNameX, HeaderBands.LabelY),
                 Parent = band,
@@ -904,21 +908,32 @@ namespace TaimisToolbench.Views.Rendering
                 int iconY = (rowHeight - SummarySectionLayoutMath.CurrencyIconSize) / 2;
                 // Framed like every other icon in the module, with the art
                 // inset inside the box the unframed icon occupied so the
-                // currency column's own x's do not move.
+                // currency column's own x's do not move. The two row kinds
+                // this table carries are framed and hovered by the id space
+                // they actually belong to - a barter row's id is an ITEM
+                // id, which the wallet and /v2/currencies know nothing
+                // about (see PlanRowViewModel.IsBarterItemCost).
                 IconControls.CreateItemIcon(
-                    rowPanel, row.IconUrl, ItemIconFrame.Currency(),
+                    rowPanel, row.IconUrl,
+                    row.IsBarterItemCost
+                        ? ItemIconFrame.ForRarity(row.Rarity)
+                        : ItemIconFrame.Currency(),
                     SummarySectionLayoutMath.CurrencyIconX, iconY,
                     ItemIconTier.CurrencyListRow,
-                    // A CurrencyCost row is a wallet currency by
-                    // construction (PlanViewModelBuilder.
-                    // BuildCurrencyTableRows reads Plan.CurrencyCosts), and
-                    // CurrencyOwnedQuantity is already the raw unclamped
-                    // wallet holding the game's tooltip states.
-                    ItemIconTooltip.ForCurrency(
-                        row.Label,
-                        () => CurrencyTooltipFacts.For(
-                            row.Label, row.IconUrl, row.CurrencyDescription,
-                            row.CurrencyOwnedQuantity)));
+                    row.IsBarterItemCost
+                        ? ItemIconTooltip.ForItem(
+                            ItemTooltipIdentity.ForItem(row.Label ?? "", row.IconUrl, row.Rarity),
+                            _getItemStatBlock == null || row.ItemId <= 0
+                                ? (Func<ItemStatBlock>)null
+                                : () => _getItemStatBlock(row.ItemId))
+                        // CurrencyOwnedQuantity is already the raw
+                        // unclamped wallet holding the game's tooltip
+                        // states.
+                        : ItemIconTooltip.ForCurrency(
+                            row.Label,
+                            () => CurrencyTooltipFacts.For(
+                                row.Label, row.IconUrl, row.CurrencyDescription,
+                                row.CurrencyOwnedQuantity)));
             }
 
             const int nameX = SummarySectionLayoutMath.CurrencyNameX;

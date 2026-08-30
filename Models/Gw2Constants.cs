@@ -22,7 +22,7 @@ namespace TaimisToolbench.Models
         /// "recipe" (whose Ingredients are the N selected items' own real
         /// trees, each already carrying its own requested amount as its
         /// ingredient quantity - gw2e's mechanism verbatim). Distinct from
-        /// both real recipe ids (positive) and the small negative synthetic
+        /// both real recipe ids (positive) and the negative synthetic
         /// ids ref/mystic_forge_recipes.json assigns to Mystic Forge
         /// recipes (moot in practice - the wrapper's own step is never
         /// collected into a plan at all, see PlanSolver.Collect - but kept
@@ -127,7 +127,6 @@ namespace TaimisToolbench.Models
             { 34, "Trade Contracts" },
             { 35, "Elegy Mosaic" },
             { 36, "Testimony of Desert Heroics" },
-            { 39, "Gaeting Crystal" },
             { 45, "Volatile Magic" },
             { 47, "Racing Medallions" },
             { 49, "Mistborn Keys" },
@@ -142,13 +141,19 @@ namespace TaimisToolbench.Models
             { 63, "Astral Acclaim" },
             { 64, "Jade Sliver" },
             { 65, "Testimony of Jade Heroics" },
+            { 66, "Ancient Coins" },
             { 67, "Canach Coins" },
             // Live name is the singular "Imperial Favor".
             { 68, "Imperial Favor" },
             { 69, "Tales of Dungeon Delving" },
+            { 76, "Ursus Oblige" },
+            // The live API also names retired currency 39 "Gaeting Crystal";
+            // 77 is the live one. docs/ARCHITECTURE.md section 8.3.
+            { 77, "Gaeting Crystal" },
             { 78, "Fine Rift Essence" },
             { 79, "Rare Rift Essence" },
             { 80, "Masterwork Rift Essence" },
+            { 82, "Testimony of Castoran Heroics" },
         };
 
         public static string ResolveCurrencyName(int currencyId)

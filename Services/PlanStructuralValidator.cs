@@ -97,6 +97,11 @@ namespace TaimisToolbench.Services
                 {
                     return false;
                 }
+
+                if (!NoNullEntries(step.VendorBarterItemCosts, "PlanStep.VendorBarterItemCosts", out reason))
+                {
+                    return false;
+                }
             }
 
             // PlanViewModelBuilder.BuildSummarySection/BuildCraftingStepsSection
@@ -104,6 +109,11 @@ namespace TaimisToolbench.Services
             // every entry (cc.CurrencyId, timegated.ItemId, ...) with no
             // per-entry null check.
             if (!NoNullEntries(craftingPlan.CurrencyCosts, "Plan.CurrencyCosts", out reason))
+            {
+                return false;
+            }
+
+            if (!NoNullEntries(craftingPlan.BarterItemCosts, "Plan.BarterItemCosts", out reason))
             {
                 return false;
             }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using TaimisToolbench.Models;
 using Xunit;
 
@@ -49,6 +50,7 @@ namespace TaimisToolbench.Tests.Models
             { 63, "Astral Acclaim" },
             { 65, "Testimony of Jade Heroics" },
             { 68, "Imperial Favor" },
+            { 77, "Gaeting Crystal" },
             { 78, "Fine Rift Essence" },
         };
 
@@ -77,6 +79,7 @@ namespace TaimisToolbench.Tests.Models
             { 63, "Astral Acclaim" },
             { 65, "Testimony of Jade Heroics" },
             { 68, "Imperial Favor" },
+            { 77, "Gaeting Crystal" },
             { 78, "Fine Rift Essence" },
         };
 
@@ -162,6 +165,19 @@ namespace TaimisToolbench.Tests.Models
         public void ResolveCurrencyName_Id68_ReturnsImperialFavor_NotGenericFallback()
         {
             Assert.Equal("Imperial Favor", Gw2Constants.ResolveCurrencyName(68));
+        }
+
+        // A second { 77, ... } row here compiles and then throws
+        // ArgumentException from this dictionary's static constructor,
+        // taking the module down at load; enumerating the table forces that
+        // constructor. Retired id 39 carries the same name and must stay
+        // absent: docs/ARCHITECTURE.md section 8.3.
+        [Fact]
+        public void KnownCurrencyNames_CarryGaetingCrystalOnceAndOnlyTheLiveId()
+        {
+            Assert.Equal(1, Gw2Constants.KnownCurrencyNames.Count(entry => entry.Key == 77));
+            Assert.Equal(0, Gw2Constants.KnownCurrencyNames.Count(entry => entry.Key == 39));
+            Assert.Equal("Gaeting Crystal", Gw2Constants.KnownCurrencyNames[77]);
         }
 
         [Fact]

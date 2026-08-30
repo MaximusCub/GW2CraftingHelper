@@ -11,8 +11,8 @@ namespace TaimisToolbench.Services
     /// It is a separate type from the item identity ON PURPOSE. Currency
     /// ids and item ids are different id spaces that collide numerically -
     /// id 24 is both a real item and the currency "Pristine Fractal
-    /// Relics", and Gaeting Crystal exists as item 86094 AND as wallet
-    /// currencies 39 and 77 - so a tooltip has to be built from the kind
+    /// Relics", and "Gaeting Crystal" is both wallet currency 77 and item
+    /// 104026 - so a tooltip has to be built from the kind
     /// the CALLER knows its id to be. Two types is what makes that a
     /// compile-time choice instead of a name lookup.
     /// </para>

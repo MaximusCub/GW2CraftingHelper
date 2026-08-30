@@ -4723,7 +4723,8 @@ namespace TaimisToolbench.Views
                     // Row rendering (the cost-tile row, the
                     // MultiItemNote banner, and the per-currency rows) moved
                     // to Views/Rendering/SummarySectionRenderer.
-                    new SummarySectionRenderer(this).Render(section, contentFlow, panelWidth);
+                    new SummarySectionRenderer(this, _getItemStatBlock)
+                        .Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.UsedMaterials:
                     // Row rendering moved to

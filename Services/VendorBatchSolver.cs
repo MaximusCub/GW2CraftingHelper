@@ -22,6 +22,19 @@ namespace TaimisToolbench.Services
             public int OutputCount;
             public long CoinCostPerBatch;
             public List<CostLine> CurrencyCostLinesPerBatch;
+
+            // This offer's BARTER Item cost lines for ONE purchase, Item-
+            // typed and unscaled - the untradeable lines that fold nothing
+            // into CoinCostPerBatch. Null when the offer takes no barter.
+            // Deliberately NOT compared by VendorBatchesEqual: that
+            // comparison decides VendorBatchState.Conflict, which decides
+            // whether a merged step's coin total is re-derived at all, and
+            // widening it would move reported coin totals. Two offers for
+            // the same item that agree on output count, coin, currency
+            // lines and caps but not on which token they take would
+            // therefore report the first-seen occurrence's token here.
+            public List<CostLine> BarterItemCostLinesPerBatch;
+
             public int? DailyCap;
             public int? WeeklyCap;
 
@@ -453,6 +466,12 @@ namespace TaimisToolbench.Services
                 // below, can only fire above int.MaxValue scaled quantity,
                 // and skips rather than clamps - a clamp is silently wrong.
                 List<VendorItemCostLine> scaledItemCosts = null;
+
+                // The barter half of itemCostRaw, kept UNSCALED so
+                // FinalizeVendorBatches can re-scale it to a merged step's
+                // aggregate purchase count the same way it re-scales
+                // CurrencyCostLinesPerBatch - see VendorOfferBatch.
+                List<CostLine> barterLinesPerBatch = null;
                 bool itemsScalable = true;
                 if (itemCostRaw != null)
                 {
@@ -507,6 +526,9 @@ namespace TaimisToolbench.Services
                         }
 
                         totalBarterUnits += scaledQty;
+                        (barterLinesPerBatch ?? (barterLinesPerBatch = new List<CostLine>()))
+                            .Add(new CostLine { Type = "Item", Id = ic.ItemId, Count = ic.Count });
+
                         if (!allValued)
                         {
                             continue;
@@ -629,6 +651,7 @@ namespace TaimisToolbench.Services
                                 OutputCount = offer.OutputCount,
                                 CoinCostPerBatch = coinCost,
                                 CurrencyCostLinesPerBatch = currencyCosts.Count > 0 ? currencyCosts : null,
+                                BarterItemCostLinesPerBatch = barterLinesPerBatch,
                                 DailyCap = offer.DailyCap,
                                 WeeklyCap = offer.WeeklyCap,
                                 SeasonalCap = offer.SeasonalCap,
@@ -674,6 +697,7 @@ namespace TaimisToolbench.Services
                         OutputCount = offer.OutputCount,
                         CoinCostPerBatch = coinCost,
                         CurrencyCostLinesPerBatch = currencyCosts.Count > 0 ? currencyCosts : null,
+                        BarterItemCostLinesPerBatch = barterLinesPerBatch,
                         DailyCap = offer.DailyCap,
                         WeeklyCap = offer.WeeklyCap,
                         SeasonalCap = offer.SeasonalCap,
@@ -769,6 +793,68 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// Sums the BARTER lines of <paramref name="add"/> - the Item cost lines
+        /// carrying no <see cref="VendorItemCostLine.GoldValue"/>, i.e. the ones
+        /// that folded nothing into the coin total - into
+        /// <paramref name="existing"/> by ITEM id, as Item-typed CostLines. The
+        /// barter twin of <see cref="MergeVendorCurrencyCosts"/>, with the same
+        /// fresh-list and int-clamp contract; TP-valued Item lines are skipped
+        /// because their whole cost is already in the step's coin figure.
+        /// </summary>
+        internal List<CostLine> MergeVendorBarterItemCosts(
+            List<CostLine> existing, IReadOnlyList<VendorItemCostLine> add)
+        {
+            if (add == null || add.Count == 0)
+            {
+                return existing;
+            }
+
+            bool anyBarter = false;
+            foreach (var line in add)
+            {
+                if (line != null && !line.GoldValue.HasValue && line.Quantity > 0)
+                {
+                    anyBarter = true;
+                    break;
+                }
+            }
+
+            if (!anyBarter)
+            {
+                return existing;
+            }
+
+            var merged = existing != null
+                ? new List<CostLine>(existing)
+                : new List<CostLine>();
+
+            foreach (var line in add)
+            {
+                if (line == null || line.GoldValue.HasValue || line.Quantity <= 0)
+                {
+                    continue;
+                }
+
+                int idx = merged.FindIndex(c => c.Id == line.ItemId);
+                if (idx >= 0)
+                {
+                    merged[idx] = new CostLine
+                    {
+                        Type = merged[idx].Type,
+                        Id = merged[idx].Id,
+                        Count = ClampToInt((long)merged[idx].Count + line.Quantity),
+                    };
+                }
+                else
+                {
+                    merged.Add(new CostLine { Type = "Item", Id = line.ItemId, Count = line.Quantity });
+                }
+            }
+
+            return merged;
+        }
+
+        /// <summary>
         /// Re-derives every merged BuyFromVendor PlanStep's true cost from its
         /// AGGREGATE Quantity and the winning offer's batch shape, ceiling the
         /// purchase count exactly once. Applied only when every occurrence resolved
@@ -777,21 +863,22 @@ namespace TaimisToolbench.Services
         /// branch that sums a cap notice for Conflict steps whose occurrences agree
         /// on the raw cap tuple - the premise is false, see VendorBatchState.
         ///
-        /// Also folds every vendor step's final VendorCurrencyCosts into currencyMap
-        /// (the single place vendor currency reaches the plan-wide total) and
-        /// collects timegated notices for any uniform step whose aggregate purchase
-        /// count exceeds the daily (preferred) or weekly cap, plus an independent
-        /// Seasonal-cap notice - the checks do not suppress each other. Caps never
-        /// exclude an offer or change Source/TotalCost.
+        /// Also folds each vendor step's final VendorCurrencyCosts into currencyMap
+        /// and its VendorBarterItemCosts into barterItemMap - the only place either
+        /// reaches a plan-wide total - and collects timegated notices for any
+        /// uniform step whose aggregate purchase count exceeds the daily (preferred)
+        /// or weekly cap, plus an independent Seasonal-cap notice; the checks do not
+        /// suppress each other. Caps never exclude an offer or change Source/TotalCost.
         ///
         /// The recomputed step.UnitCost is the winning offer's own
-        /// CoinCostPerBatch/OutputCount rate, not a truncating total/Quantity
-        /// average. Derivation: docs/ARCHITECTURE.md, "Merged-ceil vendor batching".
+        /// CoinCostPerBatch/OutputCount rate, not a truncating total/Quantity average.
+        /// Derivation: docs/ARCHITECTURE.md, "Merged-ceil vendor batching".
         /// </summary>
         internal List<TimegatedItem> FinalizeVendorBatches(
             Dictionary<(int, AcquisitionSource, int), PlanStep> stepMap,
             Dictionary<(int, AcquisitionSource, int), VendorBatchState> vendorBatchTracking,
-            Dictionary<int, long> currencyMap)
+            Dictionary<int, long> currencyMap,
+            Dictionary<int, long> barterItemMap)
         {
             var timegatedItems = new List<TimegatedItem>();
 
@@ -826,6 +913,12 @@ namespace TaimisToolbench.Services
                     // already guarded > 0 by the branch condition above).
                     step.UnitCost = batch.CoinCostPerBatch / batch.OutputCount;
                     step.VendorCurrencyCosts = ScaleCostLines(batch.CurrencyCostLinesPerBatch, unitsNeeded);
+
+                    // Re-derived from the batch shape for the same reason
+                    // the currency lines above are: AggregateStep's own
+                    // sum is of per-occurrence ceils and overcounts a
+                    // merged step.
+                    step.VendorBarterItemCosts = ScaleCostLines(batch.BarterItemCostLinesPerBatch, unitsNeeded);
                     step.VendorOfferOutputCount = batch.OutputCount;
                     step.VendorOfferCurrencyCostLinesPerBatch = batch.CurrencyCostLinesPerBatch;
 
@@ -872,6 +965,16 @@ namespace TaimisToolbench.Services
                         currencyMap[cc.Id] = currencyMap.TryGetValue(cc.Id, out var existing)
                             ? checked(existing + cc.Count)
                             : cc.Count;
+                    }
+                }
+
+                if (barterItemMap != null && step.VendorBarterItemCosts != null)
+                {
+                    foreach (var bc in step.VendorBarterItemCosts)
+                    {
+                        barterItemMap[bc.Id] = barterItemMap.TryGetValue(bc.Id, out var existing)
+                            ? checked(existing + bc.Count)
+                            : bc.Count;
                     }
                 }
             }
@@ -1024,10 +1127,12 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Scales a per-batch (one purchase's worth) currency cost-line list
-        /// by the number of purchases, clamping to int.MaxValue rather than
+        /// Scales a per-batch (one purchase's worth) cost-line list by the
+        /// number of purchases, clamping to int.MaxValue rather than
         /// overflowing a CostLine's int Count (mirrors the identical clamp
-        /// in MergeVendorCurrencyCosts).
+        /// in MergeVendorCurrencyCosts). Used for both a batch's currency
+        /// lines and its barter Item lines; Type/Id are carried through
+        /// untouched, so the caller's id space is preserved.
         /// </summary>
         internal List<CostLine> ScaleCostLines(List<CostLine> perBatch, int unitsNeeded)
         {

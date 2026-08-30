@@ -69,7 +69,9 @@ namespace TaimisToolbench.Services
             // everything else below is exactly the gw2e ordering.
 
             // 1. Total Cost section (always present)
-            vm.Sections.Add(BuildSummarySection(result, isMultiItem));
+            var summarySection = BuildSummarySection(result, isMultiItem);
+            vm.Sections.Add(summarySection);
+            vm.NonCoinCostTotals = BuildNonCoinCostTotals(summarySection);
 
             // 2. Used Materials section (only if non-null and non-empty)
             if (result.UsedMaterials != null && result.UsedMaterials.Count > 0)
@@ -198,16 +200,20 @@ namespace TaimisToolbench.Services
         internal const string FootnoteText =
             "Prices are Trading Post data - actual purchase and sale prices are likely to vary.";
 
-        // The unpriced-zero disclosure. A plan totalling 0 only because
-        // some node could be neither crafted nor priced still renders the
-        // whole band at zero (the maintainer's call: a band that loses its
+        // The floor disclosure. A plan can carry a real cost that reaches
+        // the coin total as a zero - a node nothing could price or craft,
+        // or a barter item whose units are the price - and the band still
+        // renders every tile (the maintainer's call: a band that loses its
         // cells reads as a broken section), so the fact that one of those
-        // zeros was never measured has to be stated instead of implied by
-        // the missing tiles. UnpricedTileMarker ties the marked tiles to
-        // the footnote that explains them.
+        // figures was never measured has to be stated instead of implied
+        // by a missing tile. UnpricedTileMarker ties the marked tiles to
+        // the footnote that explains them. The wording says "nothing that
+        // could cost them" rather than naming a missing recipe: a barter
+        // line is exactly a line neither the Trading Post nor a solve of
+        // its own could price, whether or not it has a recipe.
         internal const string UnpricedTileMarker = "*";
         internal const string UnpricedFootnoteText =
-            "* Some items in this plan have no recipe and no Trading Post price, so they count as 0 here. These totals are a floor, not a measured cost.";
+            "* Some items in this plan have no Trading Post price and nothing that could cost them, so they count as 0 here. These totals are a floor, not a measured cost.";
 
         internal const string UnpricedTooltipSuffix =
             "\nSome items in this plan could not be priced and count as 0, so this figure is a floor rather than a measured total.";
@@ -234,12 +240,26 @@ namespace TaimisToolbench.Services
                 IsDefaultExpanded = true,
             };
 
-            // Walked once here rather than per band: HasUnpricedNode is a
-            // whole-display-tree walk, and only a zero total can turn an
-            // unpriced node into a claim about the totals.
-            bool unpricedZero = result.Plan.TotalCoinCost == 0 && HasUnpricedNode(result);
+            // The plan holds a real cost the coin total counts as 0: a
+            // node nothing could price or craft, or a barter item whose
+            // units ARE the price. A non-coin CURRENCY does NOT qualify -
+            // it is reported in full, at its own quantity, in its own
+            // table, and was never counted as 0 anything. Deliberately not
+            // gated on a zero total, which is where the disclosure matters
+            // least. Derivation: docs/ARCHITECTURE.md section 7.5.
+            //
+            // Ordered so the cheap test short-circuits HasUnpricedNode's
+            // whole-display-tree walk.
+            bool coinTotalIsFloor =
+                (result.Plan.BarterItemCosts != null && result.Plan.BarterItemCosts.Count > 0) ||
+                HasUnpricedNode(result);
 
-            BuildCostFormulaBand(section, result, unpricedZero);
+            // The narrower "the whole band reads 0 and one of those zeros
+            // was never measured" case, which additionally suppresses the
+            // profit band (see BuildProfitFormulaBand).
+            bool unpricedZero = result.Plan.TotalCoinCost == 0 && coinTotalIsFloor;
+
+            BuildCostFormulaBand(section, result, coinTotalIsFloor);
             BuildProfitFormulaBand(section, result, isMultiItem, unpricedZero);
             BuildCurrencyTableRows(section, result);
 
@@ -259,7 +279,7 @@ namespace TaimisToolbench.Services
                 });
             }
 
-            if (unpricedZero)
+            if (coinTotalIsFloor)
             {
                 section.Rows.Add(new PlanRowViewModel
                 {
@@ -270,7 +290,7 @@ namespace TaimisToolbench.Services
                 // Same condition BuildProfitFormulaBand returns on, so the
                 // note appears exactly when a band the plan would otherwise
                 // have shown is missing.
-                if (result.NetSaleValue.HasValue)
+                if (unpricedZero && result.NetSaleValue.HasValue)
                 {
                     section.Rows.Add(new PlanRowViewModel
                     {
@@ -300,18 +320,21 @@ namespace TaimisToolbench.Services
         /// to Craft is result.Plan.TotalCoinCost; the price-basis
         /// qualifier lives in this tile's tooltip.
         /// <para>
-        /// unpricedZero (a zero total that some unpriceable node produced)
-        /// does NOT suppress any tile - it marks every tile it renders and
-        /// adds the section's unpriced footnote, so an unmeasured zero
-        /// still reads differently from a measured one.
+        /// coinTotalIsFloor (the plan holds a real cost the coin total
+        /// counts as 0 - see BuildSummarySection) does NOT suppress any
+        /// tile: it marks every tile it renders and adds the section's
+        /// floor footnote, so a total that understates the plan still
+        /// reads differently from a measured one. It is deliberately NOT
+        /// gated on a zero total, which is where the disclosure matters
+        /// least.
         /// </para>
         /// </summary>
         private static void BuildCostFormulaBand(
-            PlanSectionViewModel section, CraftingPlanResult result, bool unpricedZero)
+            PlanSectionViewModel section, CraftingPlanResult result, bool coinTotalIsFloor)
         {
             long actualCost = result.Plan.TotalCoinCost;
-            string mark = unpricedZero ? UnpricedTileMarker : "";
-            string unpricedSuffix = unpricedZero ? UnpricedTooltipSuffix : "";
+            string mark = coinTotalIsFloor ? UnpricedTileMarker : "";
+            string unpricedSuffix = coinTotalIsFloor ? UnpricedTooltipSuffix : "";
 
             // The per-item TP price-side fallback means not every item in
             // this total priced on the preferred side; the suffix says so
@@ -380,8 +403,13 @@ namespace TaimisToolbench.Services
         /// instead (see CraftingTreeBuilder.BuildNode), so ignoring every
         /// child still reads as a genuine zero.
         /// <para>
-        /// Walked once per section build, from the zero-cost gate in
-        /// BuildSummarySection only, never on the ordinary priced path.
+        /// Walked once per section build, and now on every plan rather
+        /// than only a zero-total one - that is the point of the widened
+        /// gate (see BuildSummarySection). One O(nodes) walk per BUILD, on
+        /// a tree the builder already walks several times; nothing here
+        /// runs per frame. It is short-circuited behind the cheap
+        /// barter-cost test, so a plan already known to be a floor never
+        /// pays for it.
         /// </para>
         /// </summary>
         private static bool HasUnpricedNode(CraftingPlanResult result)
@@ -540,20 +568,48 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Currency table rows: Label is the resolved currency name, rows
-        /// sort alphabetically by it, and CurrencyOwnedQuantity is the raw
-        /// unclamped wallet holding. Needed/FullyCovered are derived here
-        /// so the column-header table renderer stays a dumb read of
-        /// computed fields.
+        /// The Total Cost section's non-coin table: one row per wallet
+        /// currency AND one per barter item the plan spends. Label is the
+        /// resolved name, rows sort alphabetically by it, and
+        /// CurrencyOwnedQuantity is the raw unclamped wallet holding.
+        /// Needed/FullyCovered are derived here so the column-header table
+        /// renderer stays a dumb read of computed fields.
+        /// <para>
+        /// Both kinds share <see cref="PlanRowType.CurrencyCost"/> and this
+        /// one table because they are one statement to the reader - what
+        /// this plan costs that is not coin - and because the coin total
+        /// excludes both for the same reason. IsBarterItemCost is what
+        /// keeps the two apart where it matters (an item id is not a
+        /// currency id, and only a currency has a wallet holding or
+        /// /v2/currencies prose).
+        /// </para>
         /// </summary>
         private static void BuildCurrencyTableRows(PlanSectionViewModel section, CraftingPlanResult result)
+        {
+            var currencyRows = new List<PlanRowViewModel>();
+            AddCurrencyCostRows(currencyRows, result);
+            AddBarterItemCostRows(currencyRows, result);
+            if (currencyRows.Count == 0)
+            {
+                return;
+            }
+
+            // OrderBy (stable), not List.Sort (unstable) - two different
+            // unknown currency ids both fall back to the same generic
+            // "Currency" display name (CurrencyDisplayResolver), and an
+            // unstable sort could reorder that tied pair nondeterministically
+            // run to run.
+            section.Rows.AddRange(currencyRows.OrderBy(r => r.Label, StringComparer.Ordinal));
+        }
+
+        private static void AddCurrencyCostRows(
+            List<PlanRowViewModel> currencyRows, CraftingPlanResult result)
         {
             if (result.Plan.CurrencyCosts == null || result.Plan.CurrencyCosts.Count == 0)
             {
                 return;
             }
 
-            var currencyRows = new List<PlanRowViewModel>(result.Plan.CurrencyCosts.Count);
             foreach (var cc in result.Plan.CurrencyCosts)
             {
                 string currencyName = CurrencyDisplayResolver.ResolveName(cc.CurrencyId, result.CurrencyMetadata);
@@ -589,13 +645,79 @@ namespace TaimisToolbench.Services
                     CurrencyFullyCovered = fullyCovered,
                 });
             }
+        }
 
-            // OrderBy (stable), not List.Sort (unstable) - two different
-            // unknown currency ids both fall back to the same generic
-            // "Currency" display name (CurrencyDisplayResolver), and an
-            // unstable sort could reorder that tied pair nondeterministically
-            // run to run.
-            section.Rows.AddRange(currencyRows.OrderBy(r => r.Label, StringComparer.Ordinal));
+        /// <summary>
+        /// The barter half of the non-coin table. CurrencyOwnedQuantity
+        /// stays NULL on every row: the module reads a wallet, not an
+        /// inventory count for an arbitrary item, so "Have" is genuinely
+        /// unknown here and must render as unknown rather than as zero -
+        /// which is also why CurrencyFullyCovered stays false.
+        /// </summary>
+        private static void AddBarterItemCostRows(
+            List<PlanRowViewModel> currencyRows, CraftingPlanResult result)
+        {
+            if (result.Plan.BarterItemCosts == null || result.Plan.BarterItemCosts.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var bc in result.Plan.BarterItemCosts)
+            {
+                currencyRows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.CurrencyCost,
+                    IsBarterItemCost = true,
+                    ItemId = bc.ItemId,
+                    Label = ResolveName(bc.ItemId, result.ItemMetadata),
+                    Quantity = ClampToInt(bc.Amount),
+                    IconUrl = ResolveIconUrl(bc.ItemId, result.ItemMetadata),
+                    Rarity = ResolveRarity(bc.ItemId, result.ItemMetadata),
+                });
+            }
+        }
+
+        /// <summary>
+        /// PlanViewModel.NonCoinCostTotals, projected from the non-coin
+        /// table rows BuildCurrencyTableRows just put in the Total Cost
+        /// section rather than re-aggregated from the plan - one
+        /// aggregation, so the plan-level figure and the table a reader
+        /// checks it against cannot drift apart. Null (not empty) when the
+        /// plan spends nothing but coin.
+        /// </summary>
+        private static IReadOnlyList<CurrencyAmountViewModel> BuildNonCoinCostTotals(
+            PlanSectionViewModel summarySection)
+        {
+            List<CurrencyAmountViewModel> totals = null;
+            foreach (var row in summarySection.Rows)
+            {
+                if (row.RowType != PlanRowType.CurrencyCost)
+                {
+                    continue;
+                }
+
+                if (totals == null)
+                {
+                    totals = new List<CurrencyAmountViewModel>();
+                }
+
+                totals.Add(new CurrencyAmountViewModel
+                {
+                    Amount = row.Quantity,
+                    Name = row.Label,
+                    IconUrl = row.IconUrl,
+
+                    // Clamped/raw exactly as CurrencyAmountViewModel's own
+                    // two fields define them; both stay null on a barter
+                    // row, whose holding is unknown rather than zero.
+                    OwnedQuantity = row.CurrencyOwnedQuantity.HasValue
+                        ? Math.Min(row.CurrencyOwnedQuantity.Value, row.Quantity)
+                        : (int?)null,
+                    RawOwnedQuantity = row.CurrencyOwnedQuantity,
+                });
+            }
+
+            return totals;
         }
 
         /// <summary>
