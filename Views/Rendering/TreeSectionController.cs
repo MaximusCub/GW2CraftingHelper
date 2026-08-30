@@ -444,7 +444,7 @@ namespace TaimisToolbench.Views.Rendering
                         w, 0, 0, TreePillColumnWidth, headerCostColumnWidth, TreeRightMargin);
 
                 _treeHeaderRelayout = ColumnHeaderRowRenderer.CreateColumnHeaderRow(
-                    treeFlow, panelWidth, "Item", TreeRowShapePlanner.NameColumnOffset, CostHeaderText, _sink,
+                    treeFlow, panelWidth, "Item", PlanRelayoutMath.TableLeftHeaderX, CostHeaderText, _sink,
                     middleLabel: SourceHeaderText,
                     middleXForWidth: w =>
                     {

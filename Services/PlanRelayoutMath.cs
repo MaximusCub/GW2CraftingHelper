@@ -94,6 +94,22 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// The x every plan table's left-hand header word sits on - an
+        /// alias for <see cref="ShoppingColumnMath.NameX"/>, which owns the
+        /// arithmetic and which Used Materials and Required Recipes
+        /// duplicate as their own NameX.
+        /// <para>
+        /// Named here because the Recipe Tree cannot derive it: its rows
+        /// carry a caret column before the icon, so its own depth-0 name
+        /// rule (TreeRowShapePlanner.NameColumnOffset) is 8px further
+        /// right, and anchoring "Item" there put the tree's header 8px
+        /// right of the identically-worded header on the table directly
+        /// beneath it. A reader sees the two words, not the two grids.
+        /// </para>
+        /// </summary>
+        public const int TableLeftHeaderX = ShoppingColumnMath.NameX;
+
+        /// <summary>
         /// Width of the recipe tree's decision-pill column, the
         /// pillColumnWidth every tree caller passes
         /// <see cref="ComputeTreeColumnEdges"/>. Lives here, next to the
