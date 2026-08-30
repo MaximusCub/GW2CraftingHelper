@@ -204,39 +204,49 @@ with the renames in this branch applied.
 
 ### What changed on this branch
 
-Label only, plus comment corrections. No valuation was added or removed:
-both 3600 figures are correct (section 5) and removing id 39's entry would
-also remove its Settings row, taking away the user's ability to see and
-clear a default that is still applied to every solve.
+**The relabelling described in the first version of this section was
+superseded by an owner ruling on the same day: a currency retired from the
+game is removed from the module outright rather than relabelled.** The
+evidence above is what carries that ruling - section 6 measured zero cost
+lines paying currency 39 in `ref/vendor_offers.json`, and no account has
+been able to hold one since 2022-07-19, so the row could not tip a solve and
+a Settings row for it could only offer to clear a default that never
+applied. The 110 cost lines paying item 86094 were all one merchant's, and
+`w5-deadvendors` excludes that merchant, leaving the item form equally
+inert.
 
 | file | change |
 |---|---|
-| `Models/Gw2Constants.cs` | id 39 renamed to `"Gaeting Crystal (historical)"` |
-| `Models/BarterItemDecisionDefaults.cs` | item 86094 renamed to `"Gaeting Crystal (historical)"`; the false "three forms cannot disagree" comment replaced with the 86094/39 pairing |
-| `Models/CurrencyDecisionDefaults.cs` | comment at `{ 39, 3600 }` records the retirement and points here |
-| `tests/.../BarterItemDecisionDefaultsTests.cs` | the same false claim, restated in a test comment, corrected |
-| `Services/CurrencyTooltipFacts.cs`, `Views/Rendering/ItemIconTooltip.cs` | the same false claim, restated in two doc comments, corrected |
+| `Models/CurrencyDecisionDefaults.cs` | `{ 39, 3600 }` removed; a comment records that the drop is a deliberate divergence from gw2efficiency |
+| `Models/Gw2Constants.cs` | id 39 removed; `{ 77, "Gaeting Crystal" }` added - the live currency that 82 cost lines charge and that the module could not name |
+| `Models/BarterItemDecisionDefaults.cs` | item 86094 removed |
+| `Services/CurrencyTooltipFacts.cs`, `Views/Rendering/ItemIconTooltip.cs`, `.github/workflows/tests.yml` | the false "86094 is currencies 39 AND 77" claim, restated in three places, replaced with the live pairing (currency 77 / item 104026) |
+| `docs/ARCHITECTURE.md` section 8.3 | the one home for the rolling-currency rule and the reason id 39 is absent from an otherwise-faithful import |
+| `docs/research/gw2e-currency-decision-prices.md` | section 3c records id 39 as the single row deliberately not imported |
+| `tests/.../BarterItemDecisionDefaultsTests.cs`, `tests/.../CurrencyDecisionDefaultsTests.cs`, `tests/.../Gw2ConstantsCurrencyNamesTests.cs` | the pins follow: both retired forms assert absent, id 77's name is pinned against the live API |
 
-"Gaeting Crystal (historical)" is not invented: it is the exact title of the
-wiki page for both id 39 and item 86094. Anywhere a resolved name is turned
-into a wiki URL through `WikiLinkBuilder`, that now lands on the retired
-currency's page rather than the current one's; the Settings grid itself
-builds no wiki links, so this is a side benefit, not the reason for the
-rename.
-
-The rename intentionally leaves currency 39 and item 86094 sharing a label.
-They ARE one good in two id spaces (section 4), they render in two different
-Settings sections, and that pairing predates this branch. The collision the
-owner reported - two *different* goods under one name - is gone.
+A persisted user override for currency 39 or item 86094 is not orphaned by
+the removal: `CurrencyValuation.WithDefaults` seeds its candidate set from
+the persisted keys as well as the curated ones, so a stored value still
+loads and still applies. It simply loses its Settings row, and it can no
+longer reach a solve, because nothing is priced in either id.
 
 ### Merge note for whoever lands `w5-currvals`
 
-Currency 77's valuation entry lives on the unmerged branch `w5-currvals`
-(commit 6ce6fe3), which this branch cannot see. That commit also rewrites
-the comment on the `{ 39, 3600 }` line in `CurrencyDecisionDefaults.cs`, and
-so does this branch, so **that one line will conflict**. Take this branch's
-text. `w5-currvals` also adds `{ 77, "Gaeting Crystal" }` to
-`Gw2Constants.KnownCurrencyNames`; leave that name alone - id 77 is the live
-currency and owns the plain name. Its inline comment there reads "Gaeting
-Crystal (Janthir Wilds raids)", which section 3 shows is already stale
-in-game; "current expansion's raid currency" is the accurate description.
+`w5-currvals` (commit 6ce6fe3) touches both of the same lines this branch
+does, so both will conflict, and in both cases the resolution is to keep
+this branch's removal:
+
+- `CurrencyDecisionDefaults.cs`: `w5-currvals` rewrites the `{ 39, 3600 }`
+  comment and adds `{ 77, 3600 }`. Keep its id 77 entry; drop its id 39
+  line. Its comment there, "Gaeting Crystal (Janthir Wilds raids)", is
+  already stale in-game (section 3) - "the current expansion's raid
+  currency" is accurate.
+- `Gw2Constants.cs`: both branches add `{ 77, "Gaeting Crystal" }` with the
+  same string. Keep one copy. **A merge that lands both copies is a crash,
+  not a lint problem** - a duplicate key in a `Dictionary` initialiser
+  throws `ArgumentException` from the static constructor, which takes the
+  module down at load. `w5-currvals`'s comment on that entry says id 39 and
+  id 77 "both carry 3600 in `CurrencyDecisionDefaults`, so the two
+  identically-labelled Settings rows are interchangeable"; after this branch
+  there is no id 39 row at all, so that sentence must go with it.
