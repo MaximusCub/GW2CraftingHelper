@@ -155,6 +155,7 @@
     <Compile Include="Services\SummarySectionLayoutMath.cs" />
     <Compile Include="Services\TreeCostColumnMath.cs" />
     <Compile Include="Services\TreeCostColumnFloor.cs" />
+    <Compile Include="Services\TreePillColumnMath.cs" />
     <Compile Include="Services\TreePillRunLayout.cs" />
     <Compile Include="Services\TreeRowPillHitTest.cs" />
     <Compile Include="Services\TextWrapMath.cs" />
