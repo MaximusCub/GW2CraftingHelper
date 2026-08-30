@@ -89,9 +89,11 @@ identical on both sides. Rollbacks in the modules directory:
 `TaimisToolbench.bhm.rollback-pre-wave7` (the wave-5/6 build),
 `.rollback-pre-wave6`, `.rollback-pre-wave2`.
 
-The owner does not review PRs (stated 2026-08-30): green CI is the merge gate,
-the agent merges and deploys directly. PR #238 was the last posted-for-review
-PR. The wave-7 items (W1-W7, W9) are SHIPPED and await in-game confirmation to
+The owner does not review PRs (stated 2026-08-30): the agent merges and
+deploys directly so the owner can test. THE GATE is the owner's review and
+acceptance of the functionality - green CI is only the floor that qualifies a
+build for that testing, never the acceptance itself. PR #238 was the last
+posted-for-review PR. The wave-7 items (W1-W7, W9) are SHIPPED and await in-game confirmation to
 become DONE; W3/W10/W11 are queued; W8 (currency-vs-item table mixing) is an
 open discussion. Worktrees were cleaned to master only on owner order
 2026-08-30 (the merged w6-* branches survive on origin).

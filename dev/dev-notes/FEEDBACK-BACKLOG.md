@@ -9,9 +9,12 @@ not survive a session and nothing forced a re-read.
 
 An item becomes DONE only when the OWNER has explicitly confirmed it working.
 A merged PR makes an item SHIPPED (PR #n) - a distinct state, not DONE.
-Before reporting a wave complete, diff this file against what shipped and
-state any OPEN/SHIPPED-unconfirmed item explicitly rather than silently
-carrying it. An owner report of breakage reopens a shipped item.
+Merging and deploying are delivery for the owner's acceptance testing, not
+acceptance itself: green CI is the floor that qualifies a build for that
+testing, never the gate. Before reporting a wave complete, diff this file
+against what shipped and state any OPEN/SHIPPED-unconfirmed item explicitly
+rather than silently carrying it. An owner report of breakage reopens a
+shipped item.
 
 Status: OPEN | IN PROGRESS (branch) | SHIPPED (PR #n) - owner confirmation
 pending | DONE (owner-confirmed, PR #n) | RULED OUT (reason)
