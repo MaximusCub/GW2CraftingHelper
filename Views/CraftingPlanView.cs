@@ -56,9 +56,12 @@ namespace TaimisToolbench.Views
         /// scrolling content panel's default 0. Blish paints a container's
         /// children in ZIndex order, so the strip's own opaque pixels cover
         /// whatever leaks past the viewport's top edge. A cover, not the
-        /// cutoff: the cutoff is ClipCutoff's re-asserted line, and this
-        /// stays because it costs nothing and still covers the containers
-        /// that do not yet re-assert it.
+        /// cutoff: the cutoff is ClipCutoff's re-asserted line, and every
+        /// container inside the viewport now re-asserts it. It stays as
+        /// defence in depth, because nothing can catch a plain Panel added
+        /// inside the viewport later - the repo invariants bar a test from
+        /// referencing UI code - and because SlipBudget is measured at the
+        /// four known GW2 UI Sizes rather than proved for a fifth.
         /// </summary>
         private const int TopStripZIndex = 1;
 

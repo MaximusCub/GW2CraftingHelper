@@ -499,7 +499,7 @@ namespace TaimisToolbench.Views.Rendering
             {
                 if (i > 0)
                 {
-                    var rootDivider = new Panel()
+                    var rootDivider = new ClippedPanel()
                     {
                         Size = new Point(panelWidth, PlanContentHeightMath.MultiRootDividerHeight),
                         Parent = treeFlow,
@@ -1046,7 +1046,7 @@ namespace TaimisToolbench.Views.Rendering
             int indent = shape.Indent;
             bool hasChildren = shape.HasChildren;
 
-            var rowPanel = new Panel()
+            var rowPanel = new ClippedPanel()
             {
                 Size = new Point(panelWidth, TreeRowHeight),
                 BackgroundColor = Color.Transparent,
@@ -1100,7 +1100,7 @@ namespace TaimisToolbench.Views.Rendering
             Panel iconScrim = null;
             if (dimmed)
             {
-                iconScrim = new Panel()
+                iconScrim = new ClippedPanel()
                 {
                     Size = new Point(TreeRowShapePlanner.IconSize, TreeRowShapePlanner.IconSize),
                     Location = new Point(
@@ -1359,7 +1359,7 @@ namespace TaimisToolbench.Views.Rendering
                 // initial call, or the caret handler below) finalizes the
                 // real height via RefreshTreeContainerHeights before
                 // control returns to PreserveScrollAcross's caller.
-                childFlow = new FlowPanel()
+                childFlow = new ClippedFlowPanel()
                 {
                     Size = new Point(panelWidth, 0),
                     FlowDirection = ControlFlowDirection.SingleTopToBottom,
@@ -2412,14 +2412,14 @@ namespace TaimisToolbench.Views.Rendering
             int x, int pillY, int labelY, Color borderColor, Color fillColor, Color textColor,
             out Panel inner, out Label label)
         {
-            var outer = new Panel()
+            var outer = new ClippedPanel()
             {
                 Size = new Point(pillWidth, PillHeight),
                 Location = new Point(x, pillY),
                 BackgroundColor = borderColor,
                 Parent = rowPanel,
             };
-            inner = new Panel()
+            inner = new ClippedPanel()
             {
                 Size = new Point(pillWidth - 2, PillHeight - 2),
                 Location = new Point(1, 1),

@@ -2190,8 +2190,23 @@ padding.
 
 Coverage is per-container by construction: a plain `Panel` left in the
 chain re-opens the accumulation below itself, which is why the swap is a
-sweep rather than a single site, and why the strip's `TopStripZIndex`
-cover stays until the sweep is complete.
+sweep rather than a single site. The sweep is now complete - the recipe
+tree's own per-depth containers in `Views/Rendering/TreeSectionController.cs`
+(the section's root divider, each row panel, the dimming icon scrim, the
+recursive child flow, and the two panels of a decision pill) were the last
+sites, and they are the ones that made the reach depth-dependent: a tree row
+at depth d sat under about 2d plain containers, one row panel and one child
+flow per level.
+
+`TopStripZIndex` nonetheless stays. It is not load-bearing for this defect
+any more, but it costs one integer per strip control at build time, and it
+is the only thing standing between a plain `Panel` added inside the viewport
+by a later change and the owner's original report. Nothing else can catch
+that: the repo invariants bar a test from referencing UI code, so the
+guarantee has no executable guard at the call sites - only
+`ClipCutoffMathTests` on the arithmetic. `SlipBudget` is likewise a
+measurement over the four GW2 UI Sizes that exist today, not a proof for a
+fifth.
 
 ### V.27 `PlanHeaderRenderer`: the three things that used to compete
 
