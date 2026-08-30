@@ -708,8 +708,17 @@ namespace TaimisToolbench.Views
                 Parent = _coinPanel,
             };
 
-            // Scrollable content
-            _contentPanel = new FlowPanel()
+            // Scrollable content. StickyClipAuthorityFlowPanel, not FlowPanel: the
+            // viewport publishes the line its sticky host re-derives each frame - the
+            // pinned band's bottom edge while a band is pinned, the ordinary viewport
+            // top when none is - and every container built inside it re-asserts that
+            // line, which is what keeps scrolled rows out of the pinned band
+            // (Views/Rendering/ClipCutoff.cs; arithmetic in docs/ARCHITECTURE.md
+            // section V.26.1). The vendor's default ZIndex is 5, so the host's
+            // ZIndex-1 clip paints first and paint order alone leaves the band
+            // overdrawn; the scissor is what protects it. The delegate reads the
+            // field lazily, so the host created just below is the one it sees.
+            _contentPanel = new StickyClipAuthorityFlowPanel(() => _stickyHeaders?.PinnedBandBottom)
             {
                 Size = new Point(w, buildPanel.ContentRegion.Height - TopRegionHeight),
                 Location = new Point(0, ContentY),
@@ -1911,7 +1920,11 @@ namespace TaimisToolbench.Views
             int gridWidth = SnapshotItemGridLayout.ComputeGridWidth(_contentPanel.Width);
             int columnWidth = SnapshotItemGridLayout.ComputeColumnWidth(gridWidth);
 
-            _resultGridPanel = new Panel()
+            // ClippedPanel, not Panel: inside the viewport every container
+            // must re-assert the published cutoff (Views/Rendering/ClipCutoff.cs),
+            // or everything below this panel inherits an edge one round trip
+            // further up instead.
+            _resultGridPanel = new ClippedPanel()
             {
                 Size = new Point(gridWidth, 0),
                 Parent = _contentPanel,
@@ -2149,7 +2162,9 @@ namespace TaimisToolbench.Views
                     HeaderBands.Font, SectionChrome.AmountHeaderTitle),
             };
 
-            chrome.TitlePanel = new Panel()
+            // ClippedPanel so the title re-asserts the viewport's cutoff like
+            // every container inside it (Views/Rendering/ClipCutoff.cs).
+            chrome.TitlePanel = new ClippedPanel()
             {
                 Size = new Point(0, SectionTitleBandHeight),
                 Parent = _resultGridPanel,
@@ -2163,7 +2178,7 @@ namespace TaimisToolbench.Views
                 Location = new Point(0, SectionTitleTextY),
                 Parent = chrome.TitlePanel,
             };
-            chrome.TitleDivider = new Panel()
+            chrome.TitleDivider = new ClippedPanel()
             {
                 Size = new Point(0, 2),
                 Location = new Point(0, SectionTitleBandHeight - 3),
@@ -2432,7 +2447,8 @@ namespace TaimisToolbench.Views
 
         private void CreateItemRow(SnapshotSearchRow row, int columnWidth, SectionChrome chrome)
         {
-            var rowPanel = new Panel()
+            // ClippedPanel: rows re-assert the viewport's published cutoff.
+            var rowPanel = new ClippedPanel()
             {
                 Size = new Point(columnWidth, ItemRowHeight),
                 Parent = _resultGridPanel,
@@ -2585,7 +2601,8 @@ namespace TaimisToolbench.Views
 
         private void CreateWalletRow(SnapshotWalletEntry entry, int columnWidth, SectionChrome chrome)
         {
-            var rowPanel = new Panel()
+            // ClippedPanel: rows re-assert the viewport's published cutoff.
+            var rowPanel = new ClippedPanel()
             {
                 Size = new Point(columnWidth, WalletRowHeight),
                 Parent = _resultGridPanel,
