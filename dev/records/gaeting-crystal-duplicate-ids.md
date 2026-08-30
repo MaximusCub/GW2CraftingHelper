@@ -121,15 +121,17 @@ This corrects a claim that was in the source before this branch.
 third is a different good whose item form, 104026, this module does not
 carry at all.
 
-### 5. Vendor-offer counts in `ref/vendor_offers.json` (59,414 offers)
+### 5. Vendor-offer counts in `ref/vendor_offers.json` (59,244 offers)
 
-Measured 2026-08-29 over the shipped corpus:
+Re-measured 2026-08-29 against the corpus at commit `93ca2cc`, after
+`w5-deadvendors` landed its exclusion. These are as-of figures, not
+constants: every one of them moves the next time the corpus is rebuilt.
 
 | cost line | offers | of which on a `/historical` merchant | live |
 |---|---|---|---|
 | currency 39 | **0** | - | **0** |
 | currency 77 | 82 | 80 | **2** |
-| item 86094 | 110 | 0 | 110 (but see below) |
+| item 86094 | **0** | - | **0** |
 | item 104026 | 0 | - | 0 |
 
 - **Currency 39 is charged by zero offers of any kind.** Independent
@@ -147,19 +149,20 @@ Measured 2026-08-29 over the shipped corpus:
   two values agreeing is a coincidence of both being pegged to the same
   shard, not evidence that the ids are the same thing.
 
-**Separate data defect found while counting, not fixed here.** All 110
-offers charging item 86094 come from one merchant, `Scholar Glenna (Gaeting
-Crystal)`, which the corpus carries with no `/historical` suffix and which
-the module therefore treats as live. Its wiki page
+**Separate data defect found while counting, since fixed.** The first
+measurement of this section, over a 59,414-offer corpus, found 110 offers
+charging item 86094, all from one merchant, `Scholar Glenna (Gaeting
+Crystal)`, which that corpus carried with no `/historical` suffix and which
+the module therefore treated as live. Its wiki page
 (<https://wiki.guildwars2.com/wiki/Scholar_Glenna_(Gaeting_Crystal)>) opens
 "This page lists the items formerly available from Scholar Glenna ... The
 following offers were removed and replaced with equivalent offers", and its
-infobox carries `status = historical`. The SMW scrape misses it because the
+infobox carries `status = historical`. The SMW scrape missed it because the
 page marks itself historical in the infobox rather than in the page title,
 which is exactly the gap `ref/vendor_offer_exclusions.json` exists to cover
-(`tools/VendorOfferUpdater/Program.cs`, step 5c). 110 dead offers over 10
-output items are being ranked as purchasable. Recommend a follow-up on the
-vendor-data branch; out of scope for a research task.
+(`tools/VendorOfferUpdater/Program.cs`, step 5c). `w5-deadvendors` added
+that exclusion; the merchant and its 110 dead offers are gone from the
+corpus, which is why the row above now reads zero.
 
 ### 6. `/v2/account/wallet` semantics
 

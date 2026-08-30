@@ -123,7 +123,7 @@ namespace TaimisToolbench.Models
             { 30, 3770 },    // PvP League Ticket: League Vendor sells 10 Shard of Glory for 1 (TP sell 377 each).
             { 66, 197 },     // Ancient Coin: Chin-Hwa sells Recipe: Harrier's Monastery Shoes for 5 (TP sell 987).
             { 76, 125 },     // Ursus Oblige: Maw of the Volcano sells Potent Standard Sharpening Stone for 7 + 120c (TP sell 995).
-            { 77, 3600 },    // Gaeting Crystal, the current expansion's raid currency: its vendors sell 1 Magnetite Shard for 1, and charge what currency 28 charges.
+            { 77, 3600 },    // Gaeting Crystal, the current expansion's raid currency: its only live exchange sells 1 Magnetite Shard for 1, and its historical tables charged what 28 now charges.
             { 82, 135 },     // Testimony of Castoran Heroics: 1 for 1 with Testimony of Desert and Jade Heroics (36, 65) at the Notary.
         };
 

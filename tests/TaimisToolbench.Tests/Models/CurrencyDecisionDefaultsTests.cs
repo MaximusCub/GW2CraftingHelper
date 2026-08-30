@@ -116,6 +116,26 @@ namespace TaimisToolbench.Tests.Models
             Assert.Equal(desert, castoran);
         }
 
+        // Gaeting Crystal is derived FROM Magnetite Shard: the only live
+        // exchange priced in 77 sells 1 Magnetite Shard for 1 crystal,
+        // uncapped, so 77 is wrong the moment 28 moves. Pins the equality,
+        // not the number. Deliberately NOT a shared constant, and the value
+        // pin above stays: 28 sits in the vendored gw2efficiency block and
+        // 77 in the derived-here block, which the source file keeps apart,
+        // and docs/ARCHITECTURE.md section 8.3 makes 77 a snapshot of one
+        // expansion that is due re-derivation when the next ships. A hard
+        // peg would carry a future change to 28 into 77 with nobody
+        // re-deriving it; the value pin forces that re-derivation to be a
+        // deliberate edit, and this assertion catches silent drift.
+        [Fact]
+        public void GaetingCrystal_MatchesTheMagnetiteShardItBuys()
+        {
+            Assert.True(CurrencyDecisionDefaults.TryGetDefault(28, out long magnetiteShard));
+            Assert.True(CurrencyDecisionDefaults.TryGetDefault(77, out long gaetingCrystal));
+
+            Assert.Equal(magnetiteShard, gaetingCrystal);
+        }
+
         // Two branches each adding a { 77, ... } row is how a duplicate key
         // reaches a Dictionary collection initialiser: it compiles, then
         // throws ArgumentException from the static constructor, taking the

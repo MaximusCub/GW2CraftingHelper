@@ -356,7 +356,7 @@ tests/TaimisToolbench.Tests/Helpers/TooltipContentPlainText.cs                  
 tests/TaimisToolbench.Tests/Helpers/VendorOfferBuilders.cs                              123
 tests/TaimisToolbench.Tests/Models/AccountSnapshotSerializationTests.cs                 107
 tests/TaimisToolbench.Tests/Models/BarterItemDecisionDefaultsTests.cs                   145
-tests/TaimisToolbench.Tests/Models/CurrencyDecisionDefaultsTests.cs                     135
+tests/TaimisToolbench.Tests/Models/CurrencyDecisionDefaultsTests.cs                     155
 tests/TaimisToolbench.Tests/Models/CurrencyValuationTests.cs                            305
 tests/TaimisToolbench.Tests/Models/Gw2ConstantsCurrencyNamesTests.cs                    192
 tests/TaimisToolbench.Tests/Models/HomesteadEfficiencyTiersTests.cs                     97
