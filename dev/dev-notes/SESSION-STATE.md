@@ -196,3 +196,39 @@ documented on the wiki as stale. **Verify the 1:1 vendor claim before building
 anything on it.** A CI assertion that exactly one live currency is named "Gaeting
 Crystal" would turn the next transition from silent staleness into a loud failure
 with no runtime behaviour at all.
+
+## Wiki rate limiting: we tripped it, and how to not do it again
+
+On 2026-08-29 the GW2 wiki began injecting "An automated filter has identified
+this page view as potentially automated" into rendered page views for this
+household's IP. Measured: the block page is served with **HTTP 200** and is
+within one byte of the real article's size (151,933 vs 151,934), because the
+warning is injected INTO the article rather than replacing it. Checking the
+status code and `Content-Length` therefore says nothing; three wrong conclusions
+were drawn in a row from exactly that. **Grep the body for "potentially
+automated" before declaring wiki access healthy.**
+
+Scope, measured: it affects `/wiki/<Page>` rendered views. `api.php` was still
+serving real content (`action=parse` returned the correct wikitext) while the
+rendered path was blocked. The wiki's own headers show nginx + Varnish with
+`vary: Accept-Encoding, Cookie`; a cookie-less request is a cache hit and a
+cookie-bearing one passes through, but BOTH carried the warning, so the cache is
+a red herring.
+
+The cause was almost certainly this session: `tools/VendorOfferUpdater`,
+`tools/MysticForgeSeeder`, the dead-vendor sweep, the Gaeting research and a
+number of ad-hoc `curl` calls all hit the wiki within a few hours, and the
+ad-hoc ones sent curl's default User-Agent.
+
+**Rules for future wiki work:**
+- Use the tools' own throttles (`--delay`, `--max-requests`) and never raise them
+  to go faster. `MysticForgeSeeder`'s 200-request default exists for this reason.
+- Every ad-hoc request gets a real User-Agent identifying the project, the same
+  way `WikiRecipeClient` sets `TaimisToolbench-MysticForgeSeeder/1.0`.
+- Prefer `api.php` over scraping rendered pages, and prefer one batched SMW query
+  over many page fetches.
+- Never run two wiki-touching agents concurrently. Several ran in parallel here.
+- The "report this error" link in the warning points at **English Wikipedia** and
+  is useless: it is Wikipedia's boilerplate left in, the projects share no
+  administrators, and its preloaded title makes the reporter declare themselves a
+  long-term abuser. The real venue is the GW2 wiki's own admin noticeboard.
