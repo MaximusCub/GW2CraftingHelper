@@ -35,6 +35,8 @@ namespace TaimisToolbench.Tests.Services
     public class MysticForgeSeedStalenessTests
     {
         private const int GiftOfRays = 107040;
+        // Only for the hand-built in-memory fixtures below; the shipped
+        // seed's own id for this recipe is read from the seed, never pinned.
         private const int GiftOfRaysRecipe = -1587;
         private const int SeedBuild = 205505;
         private const int CurrentBuild = 205780;
@@ -199,7 +201,15 @@ namespace TaimisToolbench.Tests.Services
                     .ToDictionary(c => c.ItemId, c => c);
 
                 Assert.Equal(CraftingDecision.Craft, children[GiftOfRays].Decision);
-                Assert.Equal(GiftOfRaysRecipe, children[GiftOfRays].RecipeId);
+
+                // The shipped forge block renumbers on every
+                // tools/MysticForgeSeeder run, so what matters is that the
+                // solver picked a recipe the seed itself lists for Gift of
+                // Rays, not which id that recipe happens to carry today.
+                Assert.NotNull(children[GiftOfRays].RecipeId);
+                Assert.Contains(
+                    children[GiftOfRays].RecipeId.Value,
+                    seed.TryGetSearch(GiftOfRays));
 
                 foreach (int giftId in new[] { GiftOfTheSurvivors, GiftOfThePeople, GiftOfTheHylek })
                 {
