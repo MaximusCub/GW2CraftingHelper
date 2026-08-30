@@ -89,7 +89,7 @@ Services/AchievementBitDedupPrePass.cs                                          
 Services/AcquisitionHintService.cs                                                       75
 Services/BoundedConcurrency.cs                                                           51
 Services/ClickSoundVolume.cs                                                             90
-Services/CoinSegmentMath.cs                                                             203
+Services/CoinSegmentMath.cs                                                             226
 Services/ColumnBoardLayout.cs                                                           130
 Services/CompetencyOpportunityCalculator.cs                                              83
 Services/CompositeRecipeApiClient.cs                                                     84
@@ -286,7 +286,7 @@ Views/ModalDialog.cs                                                            
 Views/PlanHistoryTabContent.cs                                                          1424
 Views/RankerTabContent.cs                                                               3014
 Views/Rendering/ClickSound.cs                                                            197
-Views/Rendering/CoinCurrencyRenderer.cs                                                  607
+Views/Rendering/CoinCurrencyRenderer.cs                                                  647
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              206
 Views/Rendering/CraftStepsSectionRenderer.cs                                             264
 Views/Rendering/DisciplinesSectionRenderer.cs                                           288
@@ -367,7 +367,7 @@ tests/TaimisToolbench.Tests/Services/BoundedConcurrencyTests.cs                 
 tests/TaimisToolbench.Tests/Services/ClickSoundVolumeTests.cs                         131
 tests/TaimisToolbench.Tests/Services/ClipTopSlipSimulationTests.cs                    158
 tests/TaimisToolbench.Tests/Services/CoinFormattingTests.cs                           211
-tests/TaimisToolbench.Tests/Services/CoinSegmentMathTests.cs                          319
+tests/TaimisToolbench.Tests/Services/CoinSegmentMathTests.cs                          367
 tests/TaimisToolbench.Tests/Services/ColumnBoardLayoutTests.cs                        193
 tests/TaimisToolbench.Tests/Services/CompetencyOpportunityCalculatorTests.cs          205
 tests/TaimisToolbench.Tests/Services/CompositeRecipeApiClientTests.cs                 221
