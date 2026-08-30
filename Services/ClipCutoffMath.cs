@@ -6,29 +6,19 @@ namespace TaimisToolbench.Services
     /// The arithmetic behind the scrolling viewport's hard top cutoff
     /// (Blish-free, unit-testable).
     /// <para>
-    /// Blish HUD 1.3.0 rebuilds every child's clip rectangle from the
-    /// PHYSICAL scissor: <c>Control.Draw</c> writes
-    /// <c>Intersect(scissor, AbsoluteBounds).ScaleBy(uiScale)</c> into
-    /// <c>GraphicsDevice.ScissorRectangle</c>, and <c>Container.Paint</c> -
-    /// which is <c>sealed</c> - reads it back and unscales it with
-    /// <c>ScaleBy(1f / uiScale)</c> before handing it to
-    /// <c>PaintChildren</c>. <c>ScaleBy</c> floors the origin after a
-    /// float32 multiply, so that round trip is
-    /// <c>floor(floor(y*s)/s) &lt;= y</c>: the clip's top edge can only ever
-    /// RISE, never fall back. <c>PaintChildren</c> re-intersects with the
-    /// container's own content region, which re-clamps the edge only when
-    /// that container's own top is BELOW the drifted clip - false for every
-    /// ancestor of a row scrolled out of view. The error is therefore in the
-    /// PROPAGATION, and it accumulates once per nested container.
+    /// Blish 1.3.0 rebuilds a child's clip from the PHYSICAL scissor, and
+    /// <c>ScaleBy</c> floors the origin after a float32 multiply, so the
+    /// round trip is <c>floor(floor(y*s)/s) &lt;= y</c>: a clip's top edge
+    /// can only ever RISE. The error is in the PROPAGATION and accumulates
+    /// once per nested container.
     /// </para>
     /// <para>
-    /// <see cref="SlipBudget"/> is what that propagation can lose across ONE
-    /// container, at any screen position and at every GW2 UI Size. A viewport
-    /// that re-asserts an absolute cutoff line at every container it owns
-    /// therefore bounds the whole subtree's reach at
-    /// <c>cutoff - SlipBudget</c> no matter how deep the content nests - the
-    /// property <c>ClipCutoffMathTests</c> proves, and the reason the fix is
-    /// a re-asserted line rather than a gap sized against nesting depth.
+    /// <see cref="SlipBudget"/> bounds what ONE container can lose, so a
+    /// viewport re-asserting an absolute line at every container it owns
+    /// bounds the whole subtree's reach at <c>cutoff - SlipBudget</c>
+    /// whatever the nesting depth - the property
+    /// <c>ClipCutoffMathTests</c> proves. Derivation and the measured
+    /// per-scale numbers: docs/ARCHITECTURE.md section V.26.1.
     /// </para>
     /// </summary>
     internal static class ClipCutoffMath

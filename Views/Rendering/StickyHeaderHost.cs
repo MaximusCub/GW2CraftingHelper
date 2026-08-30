@@ -13,14 +13,12 @@ namespace TaimisToolbench.Views.Rendering
     /// primitive: a control inside a scrolling Container moves with it, and
     /// a Container clips its children to its own bounds and nothing else.
     /// <para>
-    /// So a pinned band is RE-PARENTED - out of the scrolling content and
-    /// into a clip Panel that is a sibling of the scroll region, sized to
-    /// exactly the slice of the band that should show. One band, not a copy:
-    /// the hover washes, the click cells and the tooltips are the ones the
-    /// table already built, so a pinned header sorts exactly like the header
-    /// it is. The clip is what supplies the top-edge cut Blish will not,
-    /// and it is never bigger than what it shows, so it captures the mouse
-    /// over the band and nowhere else.
+    /// So a pinned band is RE-PARENTED into a clip Panel that is a sibling
+    /// of the scroll region, sized to the slice that should show. One band,
+    /// not a copy: the hover washes, click cells and tooltips are the ones
+    /// the table already built, so a pinned header sorts like the header it
+    /// is. The clip supplies the top-edge cut Blish will not, and is never
+    /// bigger than what it shows.
     /// </para>
     /// <para>
     /// Placement is <see cref="StickyHeaderLayout"/>'s; everything here is

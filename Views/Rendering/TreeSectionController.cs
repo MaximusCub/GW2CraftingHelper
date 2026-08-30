@@ -1908,23 +1908,19 @@ namespace TaimisToolbench.Views.Rendering
         /// hit-test. The list is REFILLED rather than replaced so an in-place
         /// refresh can rebuild a row's pills without invalidating that closure.
         /// <para>
-        /// The column is as wide as the widest row in the tree needs, within
-        /// what the panel can spare (Services/TreePillColumnMath) - but a
-        /// realistic run can still exceed it (a measured "HAVE n/m NEEDED"
-        /// run reaches 436px), and the row has no wrap or second line. So
-        /// ComputePillFit decides what is left: all pills at normal
-        /// padding, else all tightened, else as many tightened pills as fit
-        /// alongside a trailing "+N" pill.
+        /// The column is as wide as the widest row needs within what the
+        /// panel can spare (Services/TreePillColumnMath), but a realistic
+        /// run can exceed it (a measured "HAVE n/m NEEDED" run reaches
+        /// 436px) and the row has no second line. ComputePillFit then picks
+        /// normal padding, else tightened, else as many tightened pills as
+        /// fit beside a trailing "+N".
         /// </para>
         /// <para>
-        /// The budget is width-INVARIANT for the life of the plan:
-        /// maxRightEdge - pillColX is handle.PillColumnWidth less the
-        /// trailing clearance at every panel width, because both endpoints
-        /// move together and the column's own width is settled once per
-        /// render. That is why the fit is resolved at build time and the
-        /// resize closure only repositions.
+        /// The budget is width-INVARIANT for the plan's life: both endpoints
+        /// move together and the column settles once per render, which is why
+        /// the fit is resolved at build time and resize only repositions.
+        /// docs/ARCHITECTURE.md section V.33.
         /// </para>
-        /// docs/ARCHITECTURE.md, "Views: relocated design narrative".
         /// </summary>
         private void RenderDecisionPills(
             TreeRowHandle handle, CraftingTreeNode node, int pillColX, int pillY, bool dimmed)
@@ -2264,14 +2260,6 @@ namespace TaimisToolbench.Views.Rendering
             }
         }
 
-        /// <summary>
-        /// The slot the IGNORE toggle is drawn into. Both of its states
-        /// draw the same mark, so the slot is the same rectangle either
-        /// side of a click by construction rather than by taking the wider
-        /// of two words - still asked of
-        /// <see cref="TreePillRunLayout.ReservedSlotWidth"/>, which is
-        /// where that invariant is stated and tested.
-        /// </summary>
         /// <summary>
         /// One pill's slot width. The IGNORE toggle answers from its own
         /// reserved slot whatever position it lands in, so a run that ever

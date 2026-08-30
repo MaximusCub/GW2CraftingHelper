@@ -11,17 +11,12 @@ namespace TaimisToolbench.Services
     /// <para>
     /// GEOMETRY, not hover state, and that is the whole point. Blish
     /// recomputes <c>Control.MouseOver</c> only when the mouse POSITION
-    /// changes between two frames (Views/Rendering/HoverChainResync), so
-    /// every pill built under a stationary cursor reads as un-hovered until
-    /// the user moves the mouse. Ignoring a node WITH CHILDREN re-solves it
-    /// to a leaf, which changes the row set, so the in-place refresh cannot
-    /// take that click and the whole plan is rebuilt - and the resync that
-    /// follows hit-tests rows whose FlowPanel has not laid them out yet, so
-    /// it can only set MouseOver on the wrong row. A hover-based guard then
-    /// answered "no pill here" and the row expanded the node instead of
-    /// toggling the ignore. Asking where the pills ARE cannot go stale that
-    /// way: the coordinates are read at click time, by which point the
-    /// layout the click was dispatched against is the one on screen.
+    /// changes between frames (Views/Rendering/HoverChainResync), so a
+    /// control built under a stationary cursor reads as un-hovered, and a
+    /// control rebuilt by the click itself has no <c>Location</c> yet when
+    /// the resync runs. A hover-based guard therefore answered "no pill
+    /// here" and expanded the node instead of toggling the ignore.
+    /// Coordinates read at click time cannot go stale that way.
     /// </para>
     /// </summary>
     internal static class TreeRowPillHitTest

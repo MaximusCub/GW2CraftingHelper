@@ -388,18 +388,14 @@ namespace TaimisToolbench.Services
         /// segments right-align into sub-columns whose edges are not known
         /// until every row has been measured.
         /// <para>
-        /// The column lays rows out in two regimes and they do not share an
+        /// The column lays rows out in two regimes that do not share an
         /// extent: a row with no currency ink collapses the shared currency
-        /// band for itself (<see cref="ComputeRowEdges"/>), so every coin
-        /// row starts a whole band-plus-gap to the RIGHT of where a mixed
-        /// coin+currency row starts. Taking the max over both put the
-        /// header over an extent no coin row ever reaches - measured on a
-        /// plan with a 96px currency band, one such row moved the header
-        /// 43px left of the centre of every coin row's ink, which is the
-        /// reported "still not centred". A header sits over ONE extent and
-        /// a single outlier row must not be it, so the regime with more
-        /// rows in it wins; a tie goes to the coin-only regime, which is
-        /// the one the shared sub-columns are laid out for.
+        /// band for itself (<see cref="ComputeRowEdges"/>), so coin rows
+        /// start a band-plus-gap RIGHT of mixed rows. Taking the max put
+        /// the header over an extent no coin row reaches - measured at 43px
+        /// off centre with a 96px band. A header sits over ONE extent, so
+        /// the regime with more rows wins; a tie goes to coin-only, which
+        /// the shared sub-columns are laid out for.
         /// </para>
         /// </summary>
         private static int WidestRowRun(CostColumnWidths widths, ScanAccumulator acc)

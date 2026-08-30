@@ -104,19 +104,15 @@ namespace TaimisToolbench.Views.Rendering
                     fill = border * 0.15f;
                     break;
                 case PillKind.Ignore:
-                    // The module's one two-state TOGGLE, and since the
-                    // control stopped carrying a word (it draws
-                    // UiGlyphs.RemoveMark in both states) its state has to
-                    // be legible from the chrome alone. Raised vs.
-                    // pressed, the toolbar-toggle vocabulary: OFF is an
-                    // outlined key - crisp grey ring, no fill, matching the
-                    // clickable Available pill and never Selected's green
-                    // - and ON is that key pushed in, filled solid with the
-                    // amber the ring used to draw at #9C7327 (4.29:1
-                    // against white) and edged in a darker one so the lit
-                    // top edge a raised key shows is gone. The mark itself
-                    // inverts with the surface it sits on - see
-                    // <see cref="GlyphColor"/>.
+                    // The one two-state TOGGLE, and it draws the same mark
+                    // (UiGlyphs.RemoveMark) either way, so its state has to
+                    // be legible from the chrome alone. Raised vs. pressed:
+                    // OFF is an outlined key - grey ring, no fill, matching
+                    // the clickable Available pill and never Selected's
+                    // green - and ON is that key pushed in, filled with the
+                    // amber the ring used to draw at #9C7327 (4.29:1 on
+                    // white) and edged darker so the lit top edge is gone.
+                    // The mark inverts with its surface - see GlyphColor.
                     border = isIgnoreActive ? new Color(94, 69, 23) : new Color(138, 138, 138); // #5E4517 / #8A8A8A
                     fill = isIgnoreActive ? new Color(156, 115, 39) : Color.Transparent; // #9C7327
                     break;

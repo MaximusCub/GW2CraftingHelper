@@ -19,9 +19,8 @@ namespace TaimisToolbench.Views.Rendering
     /// own hover, which Blish would resolve in preference to the frame's.
     /// </para>
     /// <para>
-    /// The base is <see cref="ClippedPanel"/>, not <c>Panel</c>: an icon
-    /// frame is built inside the scrolling viewport, so it has to re-assert
-    /// the cutoff like every other container there.
+    /// Based on <see cref="ClippedPanel"/> because an icon frame is built
+    /// inside the scrolling viewport and must re-assert its cutoff.
     /// </para>
     /// </summary>
     internal sealed class OutlineFramePanel : ClippedPanel

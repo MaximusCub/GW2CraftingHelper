@@ -9,24 +9,18 @@ namespace TaimisToolbench.Services
     /// (Blish-free, unit-testable) - the twin of TreeCostColumnMath for the
     /// column on the other side of the name.
     /// <para>
-    /// The column was a flat <see cref="PlanRelayoutMath.TreePillColumnWidth"/>
-    /// at every panel width, so a row whose pills did not fit in it showed a
-    /// "+N" chip however much room the window had. On a wide window with
-    /// short names that is a lie: the name column flexes and absorbs every
-    /// pixel the pills were denied. Reported on an Obsidian Heavy
-    /// Breastplate plan, where rows carrying a HAVE annotation alongside
-    /// their source pills chipped at panel widths with hundreds of pixels
-    /// stranded in the name column.
-    /// </para>
-    /// <para>
-    /// So the column is data-derived, exactly as the cost column already is
+    /// The width is data-derived, as the cost column's already is
     /// (TreeSectionController.EffectiveCostColumnWidth): the widest run any
     /// row needs, floored at the fixed width so nothing narrows, and capped
     /// by <see cref="Affordable"/> so the name column cannot be starved.
-    /// Like the cost column's, the result must be held as a one-way floor
-    /// for the life of a plan - see TreeCostColumnFloor for why a column
-    /// edge that narrows under a click slides every pill out from under the
-    /// cursor.
+    /// A flat width chipped "+N" on rows the window had room for, because
+    /// the name column flexes and absorbs what the pills were denied.
+    /// </para>
+    /// <para>
+    /// INVARIANT: the result is held as a one-way floor for the life of a
+    /// plan - see TreeCostColumnFloor for why an edge that narrows under a
+    /// click slides every pill out from under the cursor.
+    /// docs/ARCHITECTURE.md section V.33.
     /// </para>
     /// </summary>
     internal static class TreePillColumnMath

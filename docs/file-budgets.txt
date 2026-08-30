@@ -104,10 +104,10 @@ Services/CurrencyTooltipComposer.cs                                             
 Services/CurrencyTooltipFacts.cs                                                         80
 Services/CurrencyValuationSerializer.cs                                                 221
 Services/DailyCooldownItemService.cs                                                     77
-Services/DecisionPillPlanner.cs                                                         440
+Services/DecisionPillPlanner.cs                                                         441
 Services/Diagnostics/PlanPhaseTimingSummary.cs                                          215
 Services/Diagnostics/PlanTimingAnalyzer.cs                                              100
-Services/DialogLayoutMath.cs                                                            388
+Services/DialogLayoutMath.cs                                                            408
 Services/DisciplinesColumnMath.cs                                                       148
 Services/ExcessCraftOutputCalculator.cs                                                 158
 Services/FirstLoadSnapshotGate.cs                                                        86
@@ -143,7 +143,7 @@ Services/ItemStatTooltipComposer.cs                                             
 Services/JsonSeedReader.cs                                                               46
 Services/LogGutterLayout.cs                                                             147
 Services/LogLineFormat.cs                                                               137
-Services/LogRowLayout.cs                                                                 78
+Services/LogRowLayout.cs                                                                123
 Services/LogToolbarLayout.cs                                                            109
 Services/LogViewFloor.cs                                                                 29
 Services/ModuleLog.cs                                                                   642
@@ -160,7 +160,7 @@ Services/PanelChromeMath.cs                                                     
 Services/PhaseOrdinalGuard.cs                                                            40
 Services/PillSubduingEvaluator.cs                                                       280
 Services/PillSubduingTooltipBuilder.cs                                                  101
-Services/PillTooltipTextComposer.cs                                                     224
+Services/PillTooltipTextComposer.cs                                                     232
 Services/PlanContentHeightMath.cs                                                       495
 Services/PlanHistoryBlobStore.cs                                                        216
 Services/PlanHistoryDedupKey.cs                                                         104
@@ -170,7 +170,7 @@ Services/PlanHistoryRowLayout.cs                                                
 Services/PlanHistoryStore.cs                                                            155
 Services/PlanHistoryTableSorter.cs                                                      103
 Services/PlanPhaseEvent.cs                                                               73
-Services/PlanRelayoutMath.cs                                                            429
+Services/PlanRelayoutMath.cs                                                            450
 Services/PlanResultBuilder.cs                                                           375
 Services/PlanSolver.cs                                                                 2304
 Services/PlanStore.cs                                                                   219
@@ -216,7 +216,7 @@ Services/ScrollMath.cs                                                          
 Services/SeasonalOfferFilter.cs                                                         107
 Services/SeasonalVendorTipCalculator.cs                                                 136
 Services/SellSideEconomics.cs                                                           406
-Services/SettingsCurrencyGridLayout.cs                                                  326
+Services/SettingsCurrencyGridLayout.cs                                                  372
 Services/SettingsFormLayout.cs                                                          174
 Services/SettingsInputParser.cs                                                         239
 Services/SettingsSaveBarLayout.cs                                                        80
@@ -258,7 +258,7 @@ Services/TopRegionLayoutMath.cs                                                 
 Services/TradingPostMath.cs                                                              57
 Services/TradingPostService.cs                                                          359
 Services/TreeChipStripLayout.cs                                                         202
-Services/TreeCostColumnMath.cs                                                          542
+Services/TreeCostColumnMath.cs                                                          575
 Services/TreeRowIdentity.cs                                                              94
 Services/TreeRowShapePlanner.cs                                                         133
 Services/TreeRowTooltipComposer.cs                                                      243
@@ -281,13 +281,13 @@ Views/CraftingPlanView.cs                                                       
 Views/FocusRelease.cs                                                                   159
 Views/ItemInputRowStrip.cs                                                              465
 Views/ItemRowState.cs                                                                    39
-Views/LogTabContent.cs                                                                 1436
+Views/LogTabContent.cs                                                                 1538
 Views/MainThreadMarshal.cs                                                              141
-Views/MainView.cs                                                                       2812
+Views/MainView.cs                                                                       2813
 Views/DialogWindow.cs                                                                   84
 Views/ModalBackdrop.cs                                                                  132
-Views/ModalDialog.cs                                                                    379
-Views/PlanHistoryTabContent.cs                                                          1480
+Views/ModalDialog.cs                                                                    389
+Views/PlanHistoryTabContent.cs                                                          1487
 Views/RankerTabContent.cs                                                               3014
 Views/Rendering/ClickSound.cs                                                           197
 Views/Rendering/CoinCurrencyRenderer.cs                                                 647
@@ -306,8 +306,8 @@ Views/Rendering/IconNameRowHelpers.cs                                           
 Views/Rendering/InlineSpinner.cs                                                         65
 Views/Rendering/LabelHelpers.cs                                                         273
 Views/Rendering/NotesSectionRenderer.cs                                                 222
-Views/Rendering/OutlineFramePanel.cs                                                     55
-Views/Rendering/PillColors.cs                                                           125
+Views/Rendering/OutlineFramePanel.cs                                                     59
+Views/Rendering/PillColors.cs                                                           151
 Views/Rendering/PlanHeaderRenderer.cs                                                   322
 Views/Rendering/PressFeedback.cs                                                        118
 Views/Rendering/RankerReadinessColors.cs                                                 99
@@ -325,14 +325,14 @@ Views/Rendering/StickyHeaderHost.cs                                             
 Views/Rendering/SummarySectionRenderer.cs                                               1041
 Views/Rendering/TextRowRenderer.cs                                                       36
 Views/Rendering/TooltipFacility.cs                                                      288
-Views/Rendering/TreeSectionController.cs                                                2268
+Views/Rendering/TreeSectionController.cs                                                2453
 Views/Rendering/TreeToolbarCommands.cs                                                   81
 Views/Rendering/UiFonts.cs                                                              248
 Views/Rendering/GlyphFont.cs                                                            123
 Views/Rendering/UiMetrics.cs                                                            60
 Views/Rendering/UsedMaterialsSectionRenderer.cs                                         222
 Views/ResizableTabbedWindow.cs                                                          250
-Views/SettingsTabContent.cs                                                             2874
+Views/SettingsTabContent.cs                                                             2936
 Views/SuggestionPanel.cs                                                                 504
 Views/ViewAdapter.cs                                                                    261
 tests/TaimisToolbench.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                     122
@@ -402,7 +402,7 @@ tests/TaimisToolbench.Tests/Services/CurrencyValuationSerializerTests.cs        
 tests/TaimisToolbench.Tests/Services/DailyCooldownItemServiceTests.cs                 209
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerSubduingTests.cs              187
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerTests.cs                     1036
-tests/TaimisToolbench.Tests/Services/DialogLayoutMathTests.cs                           381
+tests/TaimisToolbench.Tests/Services/DialogLayoutMathTests.cs                           417
 tests/TaimisToolbench.Tests/Services/DisciplinesColumnMathTests.cs                      177
 tests/TaimisToolbench.Tests/Services/ExcessCraftOutputCalculatorTests.cs              345
 tests/TaimisToolbench.Tests/Services/FirstLoadSnapshotGateTests.cs                    153
@@ -432,7 +432,7 @@ tests/TaimisToolbench.Tests/Services/ItemStatTooltipComposerTests.cs            
 tests/TaimisToolbench.Tests/Services/LayoutConstantCollisionTests.cs                   81
 tests/TaimisToolbench.Tests/Services/LogGutterLayoutTests.cs                          188
 tests/TaimisToolbench.Tests/Services/LogLineFormatTests.cs                            156
-tests/TaimisToolbench.Tests/Services/LogRowLayoutTests.cs                             117
+tests/TaimisToolbench.Tests/Services/LogRowLayoutTests.cs                             161
 tests/TaimisToolbench.Tests/Services/LogToolbarLayoutTests.cs                         168
 tests/TaimisToolbench.Tests/Services/LogViewFloorTests.cs                              49
 tests/TaimisToolbench.Tests/Services/ModuleLogStoreTests.cs                           309
@@ -449,7 +449,7 @@ tests/TaimisToolbench.Tests/Services/PanelChromeMathTests.cs                    
 tests/TaimisToolbench.Tests/Services/PhaseOrdinalGuardTests.cs                         46
 tests/TaimisToolbench.Tests/Services/PillSubduingEvaluatorTests.cs                    357
 tests/TaimisToolbench.Tests/Services/PillSubduingTooltipBuilderTests.cs               130
-tests/TaimisToolbench.Tests/Services/PillTooltipTextComposerTests.cs                  284
+tests/TaimisToolbench.Tests/Services/PillTooltipTextComposerTests.cs                  306
 tests/TaimisToolbench.Tests/Services/PlanCompatibilityFixtureTests.cs                 371
 tests/TaimisToolbench.Tests/Services/PlanContentHeightMathTests.cs                    604
 tests/TaimisToolbench.Tests/Services/PlanHistoryBlobStoreTests.cs                     324
@@ -460,7 +460,7 @@ tests/TaimisToolbench.Tests/Services/PlanHistoryRowLayoutTests.cs               
 tests/TaimisToolbench.Tests/Services/PlanHistoryStoreTests.cs                         323
 tests/TaimisToolbench.Tests/Services/PlanHistoryTableSorterTests.cs                   177
 tests/TaimisToolbench.Tests/Services/PlanPhaseTimingSummaryTests.cs                   201
-tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                         746
+tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                         763
 tests/TaimisToolbench.Tests/Services/PlanResultBuilderTests.cs                       1103
 tests/TaimisToolbench.Tests/Services/PlanRootIgnoreTests.cs                           412
 tests/TaimisToolbench.Tests/Services/PlanSolverBarterItemValuationTests.cs            425
@@ -536,7 +536,7 @@ tests/TaimisToolbench.Tests/Services/ScrollMathTests.cs                         
 tests/TaimisToolbench.Tests/Services/SeasonalOfferFilterTests.cs                       86
 tests/TaimisToolbench.Tests/Services/SeasonalVendorTipCalculatorTests.cs              237
 tests/TaimisToolbench.Tests/Services/SellSideEconomicsTests.cs                        246
-tests/TaimisToolbench.Tests/Services/SettingsCurrencyGridLayoutTests.cs               595
+tests/TaimisToolbench.Tests/Services/SettingsCurrencyGridLayoutTests.cs               666
 tests/TaimisToolbench.Tests/Services/SettingsFormLayoutTests.cs                       268
 tests/TaimisToolbench.Tests/Services/SettingsInputParserTests.cs                      338
 tests/TaimisToolbench.Tests/Services/SettingsSaveBarLayoutTests.cs                    117
@@ -576,7 +576,7 @@ tests/TaimisToolbench.Tests/Services/TopRegionLayoutMathTests.cs                
 tests/TaimisToolbench.Tests/Services/TradingPostMathTests.cs                           70
 tests/TaimisToolbench.Tests/Services/TradingPostServiceTests.cs                       507
 tests/TaimisToolbench.Tests/Services/TreeChipStripLayoutTests.cs                      283
-tests/TaimisToolbench.Tests/Services/TreeCostColumnMathTests.cs                         600
+tests/TaimisToolbench.Tests/Services/TreeCostColumnMathTests.cs                         657
 tests/TaimisToolbench.Tests/Services/TreeRowIdentityTests.cs                          246
 tests/TaimisToolbench.Tests/Services/TreeRowShapeGoldenTests.cs                       145
 tests/TaimisToolbench.Tests/Services/TreeRowTooltipComposerTests.cs                   538
