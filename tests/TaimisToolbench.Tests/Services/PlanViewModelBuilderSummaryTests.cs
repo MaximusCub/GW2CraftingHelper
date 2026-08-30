@@ -344,12 +344,12 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void CostBand_NonZeroCostWithAnUnpricedNode_IsNotMarked()
+        public void CostBand_NonZeroCostWithAnUnpricedNode_IsMarkedAndDisclosed()
         {
-            // Scope guard: partial pricing under a real nonzero total is
-            // pre-existing behavior with its own (unchanged) shape - the
-            // marker claims "these totals are a floor because a term is
-            // zero", which is only the zero-total plan's fact.
+            // The disclosure used to be gated on TotalCoinCost == 0, so a
+            // priced plan carrying an item nothing could cost showed its
+            // total as if it were the whole answer. A nonzero total is
+            // exactly where a reader mistakes it for one.
             var result = MakeResult(totalCoinCost: 500);
             result.CraftingTree = UnpricedChildTree();
 
@@ -358,11 +358,31 @@ namespace TaimisToolbench.Tests.Services
 
             Assert.All(
                 rows.Where(r => r.RowType == PlanRowType.CostFormulaTile),
-                t => Assert.DoesNotContain(PlanViewModelBuilder.UnpricedTileMarker, t.Label));
-            Assert.DoesNotContain(
+                t => Assert.Contains(PlanViewModelBuilder.UnpricedTileMarker, t.Label));
+            Assert.Contains(
                 rows,
                 r => r.RowType == PlanRowType.SummaryFootnote
                     && r.Label == PlanViewModelBuilder.UnpricedFootnoteText);
+        }
+
+        [Fact]
+        public void CostBand_NonZeroCostWithAnUnpricedNode_KeepsTheProfitBand()
+        {
+            // Only the ZERO-total case suppresses the profit band (with
+            // materials at 0 the "profit" would be the whole sale price).
+            // Widening the floor disclosure must not widen that.
+            var result = MakeResult(totalCoinCost: 500);
+            result.CraftingTree = UnpricedChildTree();
+            result.NetSaleValue = 900;
+
+            var vm = _builder.Build(result);
+            var rows = vm.Sections[0].Rows;
+
+            Assert.Equal(3, rows.Count(r => r.RowType == PlanRowType.ProfitFormulaTile));
+            Assert.DoesNotContain(
+                rows,
+                r => r.RowType == PlanRowType.SummaryFootnote
+                    && r.Label == PlanViewModelBuilder.ProfitSuppressedFootnoteText);
         }
 
         [Fact]

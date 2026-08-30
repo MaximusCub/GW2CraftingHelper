@@ -195,6 +195,17 @@ namespace TaimisToolbench.Models
         // offer cap in O(1) instead of scanning the list per row. Null
         // when the plan has no timegated items at all.
         public IReadOnlyDictionary<int, TimegatedItem> VendorCapsByItemId { get; set; }
+
+        // The whole plan's NON-COIN price, beside the coin total the Total
+        // Cost section's tiles show: one entry per wallet currency and per
+        // barter item, display-ready, in the order that section's non-coin
+        // table lists them - and projected from those very rows, so the
+        // two cannot disagree. Reported BESIDE the coin figure, never
+        // folded into it: the module holds no currency-to-gold rate and
+        // must not invent one. Null (not empty) when the plan costs
+        // nothing but coin - the common case, which must add no chrome.
+        // Derivation: docs/ARCHITECTURE.md section 7.5.
+        public IReadOnlyList<CurrencyAmountViewModel> NonCoinCostTotals { get; set; }
     }
 
     /// <summary>
@@ -288,7 +299,8 @@ namespace TaimisToolbench.Models
         public PlanRowType RowType { get; set; }
 
         // The row's ITEM id, for the item stat tooltip only, and 0 on
-        // every row whose numeric id is not an item id. PlanStep.ItemId is
+        // every row whose numeric id is not an item id - which a
+        // barter-item CurrencyCost row's is. PlanStep.ItemId is
         // one numeric slot shared by three id spaces (items, wallet
         // currencies, guild upgrades - see CraftingDecision), and id 24 is
         // BOTH a real item and the currency "Pristine Fractal Relics", so
@@ -386,6 +398,17 @@ namespace TaimisToolbench.Models
         // "unknown" must never render as "covered". Only ever set on
         // CurrencyCost rows.
         public bool CurrencyFullyCovered { get; set; }
+
+        // True on the CurrencyCost rows that are a BARTER ITEM rather than
+        // a wallet currency - an untradeable vendor token whose units are
+        // the price (CraftingPlan.BarterItemCosts). ItemId is then a real
+        // item id and Rarity is populated, so the renderer frames and
+        // hovers the row as an ITEM; CurrencyOwnedQuantity,
+        // CurrencyNeededQuantity and CurrencyDescription are all null on
+        // one, because the module reads a wallet and /v2/currencies,
+        // neither of which knows anything about an item. False on every
+        // other row.
+        public bool IsBarterItemCost { get; set; }
 
         // User-mandated mouseover
         // tooltips: the exact-meaning tooltip text for a CostFormulaTile/
