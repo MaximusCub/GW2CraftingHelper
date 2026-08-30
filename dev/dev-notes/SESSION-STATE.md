@@ -82,12 +82,19 @@ was an agent's report repeated without checking the primary.
 
 ## Deployed
 
-The owner's live install runs the **wave-5 + wave-6 build**, deployed
-2026-08-29 21:21 from `master` at the merge of PRs #233, #235 and #236, Release
-x64, md5 `40e06c0e414b5a06476978a3c7cb2646` verified identical on both sides.
+The owner's live install runs the **wave-7 build**, deployed 2026-08-30 10:39
+from `master` at the merge of PR #238 (`36f21e0`, the wave-7 field-test fixes
+W1-W7 + W9), Release x64, md5 `d5f37973050e118aa3a4746647ea6bc7` verified
+identical on both sides. Rollbacks in the modules directory:
+`TaimisToolbench.bhm.rollback-pre-wave7` (the wave-5/6 build),
+`.rollback-pre-wave6`, `.rollback-pre-wave2`.
 
-Rollbacks in the modules directory: `TaimisToolbench.bhm.rollback-pre-wave6`
-(the wave-2 build) and `TaimisToolbench.bhm.rollback-pre-wave2`.
+The owner does not review PRs (stated 2026-08-30): green CI is the merge gate,
+the agent merges and deploys directly. PR #238 was the last posted-for-review
+PR. The wave-7 items (W1-W7, W9) are SHIPPED and await in-game confirmation to
+become DONE; W3/W10/W11 are queued; W8 (currency-vs-item table mixing) is an
+open discussion. Worktrees were cleaned to master only on owner order
+2026-08-30 (the merged w6-* branches survive on origin).
 
 **Blish HUD holds a lock on the loaded .bhm**, so a deploy fails with
 `Permission denied` while it runs. Blish must be closed first; GW2 itself does
@@ -270,8 +277,8 @@ Read this section first. Everything above is history and evidence.
 
 ## What is true right now
 
-- **`master` is green** and carries PRs #233, #235, #236 and #237. Suite:
-  4092 + 238 + 3 = **4333**. Build is 0 warnings.
+- **`master` is green** and carries PRs #233 through #238. Suite:
+  4109 + 238 + 3 = **4350**. Build is 0 warnings.
 - **The owner's live install runs this build** (deployed 2026-08-29 21:21,
   Release x64, checksum verified). Rollbacks beside it:
   `TaimisToolbench.bhm.rollback-pre-wave6` (the wave-2 build) and
