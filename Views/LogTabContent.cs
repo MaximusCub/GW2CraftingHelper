@@ -175,10 +175,20 @@ namespace TaimisToolbench.Views
             internal string FullMessage;
             internal string FullLine;
 
+            // Physical lines the message wrapped to, and the width it
+            // wrapped at. The row's height is a function of the first; the
+            // second is the memo that keeps a scroll or a vertical-only
+            // resize from re-wrapping anything. 1 and -1 until first fitted.
+            internal int MessageLineCount = 1;
+            internal int WrappedMessageWidth = -1;
+
+            // True when the line cap dropped text, so the row owes the full
+            // line a tooltip even though nothing was ellipsized sideways.
+            internal bool MessageTruncated;
+
             // What LogRowLayout.KeepsFitting reads; -1 until first fitted.
             internal int FittedTimeWidth = -1;
             internal int FittedTagWidth = -1;
-            internal int FittedMessageWidth = -1;
         }
 
         // The "Clear View" floor must not be a plain instance field
@@ -727,10 +737,22 @@ namespace TaimisToolbench.Views
                 RaiseTagHighWaterMark(item.Entry.Tag);
             }
 
+            // Suspended for the reason RefitEveryRow is: a row's Panel is
+            // parented at the single-line height and re-seated to whatever
+            // its wrapped message needs, and an unsuspended re-seat reflows
+            // every sibling already in the panel.
             var metrics = MeasureRowMetrics();
-            foreach (var item in result.Filtered)
+            _contentPanel.SuspendLayout();
+            try
             {
-                CreateRow(item.Entry, item.Line, item.AbsoluteIndex, metrics);
+                foreach (var item in result.Filtered)
+                {
+                    CreateRow(item.Entry, item.Line, item.AbsoluteIndex, metrics);
+                }
+            }
+            finally
+            {
+                _contentPanel.ResumeLayout(false);
             }
 
             _hasRenderedAnyRow = result.Filtered.Count > 0;
@@ -831,10 +853,18 @@ namespace TaimisToolbench.Views
             // Measured once per pass, not per row - see MeasureRowMetrics.
             var metrics = MeasureRowMetrics();
 
-            foreach (var item in admitted)
+            _contentPanel.SuspendLayout();
+            try
             {
-                CreateRow(item.Entry, item.Line, item.AbsoluteIndex, metrics);
-                appendedAny = true;
+                foreach (var item in admitted)
+                {
+                    CreateRow(item.Entry, item.Line, item.AbsoluteIndex, metrics);
+                    appendedAny = true;
+                }
+            }
+            finally
+            {
+                _contentPanel.ResumeLayout(false);
             }
 
             while (_renderedRows.Count > 0 && _renderedRows.Peek().AbsoluteIndex < startIndex)
@@ -894,7 +924,17 @@ namespace TaimisToolbench.Views
         {
             internal BitmapFont Font;
             internal int RowWidth;
-            internal int RowHeight;
+
+            /// <summary>Height of a row whose message fits on one line -
+            /// what every row was before the message column wrapped.</summary>
+            internal int SingleLineHeight;
+
+            /// <summary>Pen advance between two lines of one wrapped
+            /// message, which is the font's own line height rather than the
+            /// row height: the row's descender clearance is counted once,
+            /// at its bottom.</summary>
+            internal int LineAdvance;
+
             internal LogGutterLayout.Bands Bands;
         }
 
@@ -999,6 +1039,7 @@ namespace TaimisToolbench.Views
                 _messageHeaderLabel.Location = new Point(bands.MessageX, PlanContentHeightMath.ColumnHeaderLabelY);
             }
 
+            int singleLineHeight = Measure(font, "Ag").Height + 2;
             return new RowMetrics
             {
                 Font = font,
@@ -1006,7 +1047,8 @@ namespace TaimisToolbench.Views
                 // +2 so a descender cannot touch the next row's ascender;
                 // the panel clips its children, so a row shorter than its
                 // own text would cut the text off rather than overflow.
-                RowHeight = Measure(font, "Ag").Height + 2,
+                SingleLineHeight = singleLineHeight,
+                LineAdvance = font.LineHeight > 0 ? font.LineHeight : singleLineHeight,
                 Bands = bands,
             };
         }
@@ -1135,16 +1177,23 @@ namespace TaimisToolbench.Views
             row.Panel = new Panel
             {
                 // Sized before it is parented so the flow panel does not
-                // see a zero-sized child first.
-                Size = new Point(metrics.RowWidth, metrics.RowHeight),
+                // see a zero-sized child first. ApplyRowLayout re-seats it
+                // to the height the wrapped message needs.
+                Size = new Point(metrics.RowWidth, metrics.SingleLineHeight),
                 Parent = _contentPanel,
             };
 
+            // VerticalAlignment is pinned on all three rather than left at
+            // Blish's default, which this module does not control: a row
+            // whose message wrapped is taller than one line, and a centred
+            // timestamp would then float down the side of its own message
+            // instead of naming its first line.
             row.TimeLabel = new Label
             {
                 Font = UiFonts.Body,
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
+                VerticalAlignment = VerticalAlignment.Top,
                 TextColor = levelColor * PrefixDimFactor,
                 Parent = row.Panel,
             };
@@ -1154,6 +1203,7 @@ namespace TaimisToolbench.Views
                 Font = UiFonts.Body,
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
+                VerticalAlignment = VerticalAlignment.Top,
                 TextColor = levelColor * PrefixDimFactor,
                 Parent = row.Panel,
             };
@@ -1163,6 +1213,7 @@ namespace TaimisToolbench.Views
                 Font = UiFonts.Body,
                 AutoSizeWidth = false,
                 AutoSizeHeight = false,
+                VerticalAlignment = VerticalAlignment.Top,
                 TextColor = levelColor,
                 Parent = row.Panel,
             };
@@ -1178,33 +1229,53 @@ namespace TaimisToolbench.Views
         /// </summary>
         /// <param name="measureText">
         /// False on the live half of a resize drag: columns take their new x
-        /// and width, the three EllipsizeToWidth calls wait for the settle
-        /// pass. VISIBLE COST: for up to one settle window a narrowing
-        /// column clips against the row Panel rather than showing "...".
+        /// and width, the two EllipsizeToWidth calls and the message wrap
+        /// wait for the settle pass. VISIBLE COST: for up to one settle
+        /// window a narrowing column clips against the row Panel rather than
+        /// showing "...", and a row keeps the height its previous wrap
+        /// needed.
         /// </param>
         private static void ApplyRowLayout(LogRow row, RowMetrics metrics, bool measureText)
         {
             var bands = metrics.Bands;
 
-            row.Panel.Size = new Point(metrics.RowWidth, metrics.RowHeight);
-            row.TimeLabel.Location = new Point(bands.TimeX, 0);
-            row.TimeLabel.Size = new Point(bands.TimeWidth, metrics.RowHeight);
-            row.TagLabel.Location = new Point(bands.TagX, 0);
-            row.TagLabel.Size = new Point(bands.TagWidth, metrics.RowHeight);
-            row.MessageLabel.Location = new Point(bands.MessageX, 0);
-            row.MessageLabel.Size = new Point(bands.MessageWidth, metrics.RowHeight);
-
-            if (!measureText)
+            // Text first: the row's HEIGHT is a function of how many lines
+            // the message wrapped to, so the sizes below cannot be assigned
+            // until the wrap has run.
+            if (measureText)
             {
-                return;
+                FitRowText(row, metrics, bands);
             }
 
+            int rowHeight = LogRowLayout.RowHeight(
+                row.MessageLineCount, metrics.SingleLineHeight, metrics.LineAdvance);
+
+            row.Panel.Size = new Point(metrics.RowWidth, rowHeight);
+
+            // The prefix columns keep the single-line box they have always
+            // had, so a wrapped message grows the row DOWNWARD from a
+            // timestamp that stays put.
+            row.TimeLabel.Location = new Point(bands.TimeX, 0);
+            row.TimeLabel.Size = new Point(bands.TimeWidth, metrics.SingleLineHeight);
+            row.TagLabel.Location = new Point(bands.TagX, 0);
+            row.TagLabel.Size = new Point(bands.TagWidth, metrics.SingleLineHeight);
+            row.MessageLabel.Location = new Point(bands.MessageX, 0);
+            row.MessageLabel.Size = new Point(bands.MessageWidth, rowHeight);
+        }
+
+        /// <summary>
+        /// Fits one row's three columns to the bands: the two prefix columns
+        /// ellipsize, and the message WRAPS - see
+        /// <see cref="WrapMessage"/>. Leaves the row's line count and
+        /// tooltip current for <see cref="ApplyRowLayout"/> to size against.
+        /// </summary>
+        private static void FitRowText(LogRow row, RowMetrics metrics, LogGutterLayout.Bands bands)
+        {
             string timeText = FitColumn(
                 metrics.Font, row.FullTime, row.TimeLabel, bands.TimeWidth, ref row.FittedTimeWidth);
             string tagText = FitColumn(
                 metrics.Font, row.FullTag, row.TagLabel, bands.TagWidth, ref row.FittedTagWidth);
-            string messageText = FitColumn(
-                metrics.Font, row.FullMessage, row.MessageLabel, bands.MessageWidth, ref row.FittedMessageWidth);
+            string messageText = WrapMessage(metrics.Font, row, bands.MessageWidth);
 
             // Assigning Label.Text invalidates layout, so only assign when
             // the displayed string actually changed - the same gate
@@ -1225,18 +1296,19 @@ namespace TaimisToolbench.Views
                 row.MessageLabel.Text = messageText;
             }
 
-            // The tooltip is the only indication that a row is not showing
-            // everything, so it carries the WHOLE line (both columns) the
-            // moment either one had to shorten - the same "ellipsize +
-            // tooltip" contract every truncatable row in this module uses.
-            // Blish resolves a tooltip on the control under the mouse and
-            // does not bubble to the parent, so both Labels need it as well
-            // as the row Panel - the swallowed-hover class already fixed in
+            // The whole line, prefix included, on one hover, for any row
+            // that could not be read in a single pass: a shortened prefix
+            // column, a message the line cap dropped text from, or a
+            // message that needed a second line. Blish resolves a tooltip on
+            // the control under the mouse and does not bubble to the parent,
+            // so all three Labels need it as well as the row Panel - the
+            // swallowed-hover class already fixed in
             // ShoppingListSectionRenderer (KNOWN-ISSUES #57).
             bool shortened =
                 !string.Equals(timeText, row.FullTime, StringComparison.Ordinal) ||
                 !string.Equals(tagText, row.FullTag, StringComparison.Ordinal) ||
-                !string.Equals(messageText, row.FullMessage, StringComparison.Ordinal);
+                row.MessageTruncated ||
+                row.MessageLineCount > 1;
             //
             // FullLine is stored already wrapped (see CreateRow), so this
             // per-render guard still compares like with like and the
@@ -1251,6 +1323,48 @@ namespace TaimisToolbench.Views
                 TooltipFacility.ApplyPlain(row.TagLabel, tooltip);
                 TooltipFacility.ApplyPlain(row.MessageLabel, tooltip);
             }
+        }
+
+        /// <summary>
+        /// The message column's text: WRAPPED to the column's width, not
+        /// ellipsized to it, so a long entry stays readable in place instead
+        /// of ending in "...". Records the line count the row's height is
+        /// derived from and the width that wrap belongs to.
+        /// <para>
+        /// The memo is exact width equality, not
+        /// <see cref="LogRowLayout.KeepsFitting"/>'s narrowing-only
+        /// asymmetry: widening a wrapped column changes its answer too, by
+        /// pulling a word back up a line. Scrolling touches neither, so it
+        /// re-wraps nothing.
+        /// </para>
+        /// </summary>
+        private static string WrapMessage(BitmapFont font, LogRow row, int width)
+        {
+            if (row.WrappedMessageWidth == width)
+            {
+                return row.MessageLabel.Text;
+            }
+
+            row.WrappedMessageWidth = width;
+            string full = row.FullMessage ?? "";
+
+            // Nearly every entry is one line that already fits, and the full
+            // wrap spends a measurement per word to reach that same answer.
+            // MeasureString reports a multi-line string's WIDEST line, so a
+            // hard break has to be excluded from the fast path by hand.
+            if (full.IndexOf('\n') < 0 && full.IndexOf('\r') < 0
+                && Measure(font, full).Width <= width)
+            {
+                row.MessageLineCount = 1;
+                row.MessageTruncated = false;
+                return full;
+            }
+
+            var wrapped = TextWrapMath.Wrap(
+                full, width, width, LabelHelpers.MeasureWith(font), LogRowLayout.MaxMessageLines);
+            row.MessageLineCount = wrapped.Lines.Count;
+            row.MessageTruncated = wrapped.Truncated;
+            return string.Join("\n", wrapped.Lines);
         }
 
         /// <summary>
@@ -1305,9 +1419,10 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// The trailing half of a resize: the ellipses the live pass left at
-        /// the previous width. Re-measures its metrics rather than carrying
-        /// the live pass's, so a rebuild in between is absorbed as IsLive
+        /// The trailing half of a resize: the ellipses and the message wraps
+        /// the live pass left at the previous width, and the row heights
+        /// those wraps set. Re-measures its metrics rather than carrying the
+        /// live pass's, so a rebuild in between is absorbed as IsLive
         /// absorbs a teardown.
         /// </summary>
         private void RefitRowTextAfterResizeSettle()

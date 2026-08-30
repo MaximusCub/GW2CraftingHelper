@@ -1598,10 +1598,27 @@ one-way dependency section 5 above states.
 ### V.5 `LogTabContent`: the three-column row split, and the follow poll
 
 `LogRow` splits each entry into four controls (panel plus three labels)
-where the previous shape used three, and pays one more `EllipsizeToWidth`
-per row per refit. Both are bounded by the ring cap (2000) and by what the
-filter admits, the refit loop is `SuspendLayout`-wrapped, and on a resize
-the ellipsize half runs once per drag rather than once per drag event.
+where the previous shape used three, and pays one more fit per row per
+refit. Both are bounded by the ring cap (2000) and by what the filter
+admits, every loop that writes a row's size is `SuspendLayout`-wrapped, and
+on a resize the fitting half runs once per drag rather than once per drag
+event.
+
+The message column WRAPS rather than ellipsizing, so a row's height is a
+function of its own text and the rows are not on a fixed pitch - the flow
+panel positions each by its own height, and `LogRowLayout.RowHeight` is the
+one place that height is derived. Three things follow. The wrap is capped
+at `LogRowLayout.MaxMessageLines` so one pasted stack trace cannot own the
+viewport, with the tail ellipsized into the last line. The per-row memo is
+exact width equality rather than the narrowing-only asymmetry an ellipsized
+column gets, because widening a wrapped column changes its answer too;
+scrolling changes no width and so re-wraps nothing. And a resize settle can
+now change the panel's total content height, which Blish's `Scrollbar`
+answers by zeroing the scroll position a frame later (KNOWN-ISSUES #55) -
+accepted, not defended against, on the same grounds `MainView` accepts it
+below: this tab carries no scroll-restore machinery, an append already
+moves the same height every time one arrives, and the snap costs one drag
+rather than one frame.
 
 One divergence is accepted rather than fixed: timestamps do not align
 pixel-for-pixel between an `[INFO]` row and a `[DEBUG]` one, because the
