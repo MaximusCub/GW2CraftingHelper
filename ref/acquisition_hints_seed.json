@@ -72,6 +72,41 @@
       "badge": "ACHIEVEMENT",
       "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_the_Hylek",
       "lastVerified": "2026-08-24"
+    },
+    {
+      "itemId": 46733,
+      "hint": "Rewarded by open-world content: gathering nodes, world boss chests (3-30 ore), and reward-track loot boxes such as the WvW Hero Weapon Box, which gives 50. No vendor sells it; the wiki's only seller was the Battle Historian, removed in the June 2017 Competitive Feature Pack. Account bound; not tradable; no recipe.",
+      "badge": "WORLD",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Dragonite_Ore",
+      "lastVerified": "2026-08-29"
+    },
+    {
+      "itemId": 46735,
+      "hint": "Awarded by chests rather than vendors: any open-world, jumping puzzle or mini-dungeon chest gives 2-9 (level 80 in most cases), dungeon explorable paths give 20 for each of the first two completions per day, and Cracked Fractal Encryptions 15 or 50. No vendor sells it; the wiki's only seller was the Battle Historian, removed in the June 2017 Competitive Feature Pack. Account bound; not tradable; no recipe.",
+      "badge": "CHESTS",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Empyreal_Fragment",
+      "lastVerified": "2026-08-29"
+    },
+    {
+      "itemId": 43244,
+      "hint": "No longer obtainable: the wiki marks the item discontinued, and its only seller was the Battle Historian, removed in the June 2017 Competitive Feature Pack. Copies already held still upgrade Hero's weapons to Mistforged Hero's weapons in the Mystic Forge. Account bound; not tradable; no recipe.",
+      "badge": "REMOVED",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_Heroes",
+      "lastVerified": "2026-08-29"
+    },
+    {
+      "itemId": 64283,
+      "hint": "Chosen from the Hero Weapon Box, the final reward of the WvW Hero Weapon Reward Track, or from a WvW Exclusives Choice Chest. The skirmish merchants stock most Hero's weapons but not this one; its only wiki vendor was the Battle Historian, removed in the June 2017 Competitive Feature Pack. Account bound; not tradable; no recipe.",
+      "badge": "WVW",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Hero_Weapon_Box",
+      "lastVerified": "2026-08-29"
+    },
+    {
+      "itemId": 64285,
+      "hint": "Chosen from the Hero Weapon Box, the final reward of the WvW Hero Weapon Reward Track, or from a WvW Exclusives Choice Chest. The skirmish merchants stock most Hero's weapons but not this one; its only wiki vendor was the Battle Historian, removed in the June 2017 Competitive Feature Pack. Account bound; not tradable; no recipe.",
+      "badge": "WVW",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Hero_Weapon_Box",
+      "lastVerified": "2026-08-29"
     }
   ]
 }
