@@ -49,7 +49,7 @@ Status: OPEN | IN PROGRESS (branch) | DONE (PR #n) | RULED OUT (reason)
 | V3 | Settings: "Copper per unit" header not centred over the content below it. | IN PROGRESS (`w6-polish`) |
 | V4 | Crafting Ranker X buttons should match the size scale of the X control in the top corner of the GW2 Trading Post window. | IN PROGRESS (`w6-icons`) - 28 -> 24px, the floor the 16px glyph allows. Owner eyeball needed; no TP capture exists to measure against. |
 | V7 | Clear Overrides dialog: "Ignore marks are kept" should be centred under the text above it. | IN PROGRESS (`w6-polish`) - `ModalDialog` centred the block, not the lines. |
-| V8 | Log tab: long lines run off the edge. They should wrap, with the full detail available on hover. | IN PROGRESS (`w6-polish`) - wrapping shipped with variable row heights. NOTE: the agent could not reproduce the overrun itself (the column already ellipsized). If it persists after the next build, the cause is upstream of the message fit. |
+| V8 | Log tab: a long line runs out of space and cannot be read without the tooltip, which is dumb. It should WRAP instead. (Owner's words. An earlier version of this row paraphrased it as "runs off the edge", which is a different claim and sent an agent looking for an overrun that was never reported.) | IN PROGRESS (`w6-polish`) - wrapping shipped with variable row heights; the tooltip is now a supplement, not the only way to read a line. |
 
 ## Research
 

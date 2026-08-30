@@ -126,6 +126,12 @@ never another agent's summary.
 - **"The icon sits off-centre because the line box and the digit ink disagree."**
   For Menomonia they agree within 1px at every face in the ramp. The seat was
   simply 0.
+- **"Log tab: long lines run off the edge."** The owner never said that. He said
+  a long line runs out of space and cannot be read without the tooltip, which is
+  dumb, so it should wrap. The paraphrase became a brief, and an agent spent
+  effort failing to reproduce an overrun nobody had reported. **The owner's own
+  words are the primary source for owner feedback; quote them into the backlog
+  rather than summarising them.**
 
 ## Hazards worth remembering
 
