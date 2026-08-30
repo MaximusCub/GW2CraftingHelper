@@ -1311,7 +1311,7 @@ won, never win one it should have lost.
 | 30 | PvP League Ticket | 3770 | League Vendor sells 10 Shard of Glory for 1 ticket, uncapped; Shard of Glory sells at 377c against 1.2M listings. |
 | 66 | Ancient Coin | 197 | Chin-Hwa sells `Recipe: Harrier's Monastery Shoes` for 5, uncapped; TP sell 987c over 2,010 listings. The same vendor's other recipes imply 40-197, and Leivas' Antique Summoning Stone (10 coins, TP sell 13,792c) implies 1,379 but is capped at one per week. |
 | 76 | Ursus Oblige | 125 | Maw of the Volcano sells Potent Standard Sharpening Stone for 7 plus 120c, uncapped; TP sell 995c over 8,798 listings. Its other low-coin routes there imply 87-125. |
-| 77 | Gaeting Crystal (Janthir Wilds raids) | 3600 | Its vendors sell one Magnetite Shard for one crystal, and price every other offer at exactly the count and coin that the Path of Fire raid vendor charges in Magnetite Shards (currency 28, 3600), which currency 39 and barter item 86094 already carry. |
+| 77 | Gaeting Crystal, the current expansion's raid currency | 3600 | Its vendors sell one Magnetite Shard for one crystal, and price every other offer at exactly the count and coin that the Path of Fire raid vendor charges in Magnetite Shards (currency 28, 3600). |
 | 82 | Testimony of Castoran Heroics | 135 | At the Notary of Heroics the same items cost the same counts in Castoran, Desert (36) or Jade (65) Heroics, at 1, 6, 10, 100, 250 and 500. Both siblings are 135 upstream, so any other figure would contradict the block above. Corroborated independently: 6 buy a Siege Golem Blueprint, TP sell 791c, giving 132. |
 
 Currencies left deliberately unvalued, with the reason each resists a
@@ -1348,6 +1348,32 @@ single defensible figure:
   for the same 2 units of Red, Green (3500) or Blue (300) Prophet Shard, so
   inheriting a sibling would mean choosing between two upstream values that
   are already 12x apart.
+
+**Rolling raid currencies, and the one row dropped from upstream.** The
+live API gives two wallet currencies the same name, "Gaeting Crystal".
+Currency 39 is the Path of Fire one: it was retired on 2022-07-19, every
+held balance force-converted into Magnetite Shards (currency 28), and no
+account has been able to hold one since. It is absent from
+`CurrencyDecisionDefaults` even though gw2efficiency's upstream table
+values it at 3600 - a deliberate divergence, not drift, annotated at the
+row in the research notes above. Its item form, item 86094, is absent from
+`BarterItemDecisionDefaults` for the same reason. Nothing in
+`ref/vendor_offers.json` charges currency 39 at all, and every offer that
+charges item 86094 belongs to one merchant the wiki marks historical,
+`Scholar Glenna (Gaeting Crystal)`.
+
+Currency 77 is the live one, and it is a *rolling* currency rather than a
+stable one. Each expansion its vendors are switched over to Magnetite
+Shards and every held balance is converted, but the id itself carries the
+role forward instead of being replaced the way 39 was: id 77's own
+`/v2/currencies` description still names Janthir Wilds while the wiki
+records the current content as Castora and flags the description as stale.
+So what a Gaeting Crystal buys - and therefore what one is worth - has a
+shelf life of one expansion. Any hardcoded valuation for id 77 is a
+snapshot of one expansion, not a constant, and is due a re-derivation
+whenever the next one ships. Measured evidence for all of the above,
+including the API and wiki captures:
+`dev/records/gaeting-crystal-duplicate-ids.md`.
 
 The barter table has no upstream to adapt - gw2efficiency values wallet
 currencies only - so each entry is derived here under a single stated

@@ -95,13 +95,6 @@ namespace TaimisToolbench.Models
             { 46682, new BarterItemDefault("Crystalline Ore", 3600) },
             { 70718, new BarterItemDefault("Tenebrous Crystal", 3600) },
             { 76254, new BarterItemDefault("Shimmering Crystal", 3600) },
-
-            // Not a vendor route: item 86094 and wallet currencies 39 and
-            // 77 are all named "Gaeting Crystal" on /v2/items and
-            // /v2/currencies - the same in-game good in item and wallet
-            // form. Carried at currency 39's own CurrencyDecisionDefaults
-            // value so the two forms cannot disagree.
-            { 86094, new BarterItemDefault("Gaeting Crystal", 3600) },
         };
 
         /// <summary>

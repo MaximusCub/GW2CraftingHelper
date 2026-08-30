@@ -95,7 +95,8 @@ namespace TaimisToolbench.Models
             { 34, 9 },       // Trade Contract
             { 35, 720 },     // Elegy Mosaic
             { 36, 135 },     // Testimony of Desert Heroics
-            { 39, 3600 },    // Gaeting Crystal (upstream valued id 39 only; id 77 shares its name and is valued below)
+            // Upstream values id 39 (Gaeting Crystal); it is dropped here on
+            // purpose - retired in-game. docs/ARCHITECTURE.md section 8.3.
             { 45, 50 },      // Volatile Magic
             { 50, 25 },      // Festival Token
             { 53, 3500 },    // Green Prophet Shard
@@ -124,7 +125,7 @@ namespace TaimisToolbench.Models
             { 30, 3770 },    // PvP League Ticket: League Vendor sells 10 Shard of Glory for 1 (TP sell 377 each).
             { 66, 197 },     // Ancient Coin: Chin-Hwa sells Recipe: Harrier's Monastery Shoes for 5 (TP sell 987).
             { 76, 125 },     // Ursus Oblige: Maw of the Volcano sells Potent Standard Sharpening Stone for 7 + 120c (TP sell 995).
-            { 77, 3600 },    // Gaeting Crystal (Janthir Wilds raids): its vendors sell 1 Magnetite Shard for 1, and charge what currency 28 charges.
+            { 77, 3600 },    // Gaeting Crystal, the current expansion's raid currency: its vendors sell 1 Magnetite Shard for 1, and charge what currency 28 charges.
             { 82, 135 },     // Testimony of Castoran Heroics: 1 for 1 with Testimony of Desert and Jade Heroics (36, 65) at the Notary.
         };
 

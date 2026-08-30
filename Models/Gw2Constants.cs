@@ -127,7 +127,6 @@ namespace TaimisToolbench.Models
             { 34, "Trade Contracts" },
             { 35, "Elegy Mosaic" },
             { 36, "Testimony of Desert Heroics" },
-            { 39, "Gaeting Crystal" },
             { 45, "Volatile Magic" },
             { 47, "Racing Medallions" },
             { 49, "Mistborn Keys" },
@@ -148,11 +147,8 @@ namespace TaimisToolbench.Models
             { 68, "Imperial Favor" },
             { 69, "Tales of Dungeon Delving" },
             { 76, "Ursus Oblige" },
-            // The live API gives ids 39 and 77 the same name: they are two
-            // distinct wallet currencies (Path of Fire raids and Janthir
-            // Wilds raids respectively) that the game calls the same thing.
-            // Both carry 3600 in CurrencyDecisionDefaults, so the two
-            // identically-labelled Settings rows are interchangeable.
+            // The live API also names retired currency 39 "Gaeting Crystal";
+            // 77 is the live one. docs/ARCHITECTURE.md section 8.3.
             { 77, "Gaeting Crystal" },
             { 78, "Fine Rift Essence" },
             { 79, "Rare Rift Essence" },

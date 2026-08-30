@@ -1,3 +1,4 @@
+using System.Linq;
 using TaimisToolbench.Models;
 using Xunit;
 
@@ -5,9 +6,10 @@ namespace TaimisToolbench.Tests.Models
 {
     // CurrencyDecisionDefaults is a static
     // curated table, not a service - these tests pin its structural
-    // invariants (no coin-keyed entry, no entry for the currencies
-    // deliberately left blank, and the values a second table would
-    // otherwise contradict) rather than mirroring every entry.
+    // invariants (no coin-keyed entry, no entry for the currencies the
+    // maintainer explicitly decided must stay blank, and the values a
+    // second table would otherwise contradict) rather than mirroring every
+    // one of its entries.
     public class CurrencyDecisionDefaultsTests
     {
         [Fact]
@@ -59,6 +61,19 @@ namespace TaimisToolbench.Tests.Models
             Assert.False(CurrencyDecisionDefaults.TryGetDefault(currencyId, out _));
         }
 
+        // Unlike the ids above, gw2efficiency DOES value id 39 (at 3600):
+        // this is the one upstream row the module drops on purpose, so the
+        // gap reads as a divergence and not as drift. The currency was
+        // retired in-game 2022-07-19 and force-converted to Magnetite
+        // Shards, so no account can hold one and no offer charges one.
+        // docs/ARCHITECTURE.md section 8.3.
+        [Fact]
+        public void TryGetDefault_RetiredGaetingCrystal_ReturnsFalse()
+        {
+            Assert.False(CurrencyDecisionDefaults.TryGetDefault(39, out long copperPerUnit));
+            Assert.Equal(0, copperPerUnit);
+        }
+
         // Ids gw2efficiency's own table marks `undefined` (it assigns them
         // no decision value at all) that this repository has not
         // independently derived a value for either.
@@ -78,7 +93,7 @@ namespace TaimisToolbench.Tests.Models
         [InlineData(30, 3770)] // PvP League Ticket
         [InlineData(66, 197)] // Ancient Coin
         [InlineData(76, 125)] // Ursus Oblige
-        [InlineData(77, 3600)] // Gaeting Crystal (Janthir Wilds raids)
+        [InlineData(77, 3600)] // Gaeting Crystal, the live id
         [InlineData(82, 135)] // Testimony of Castoran Heroics
         public void TryGetDefault_DerivedHereEntries_ReturnExpectedValue(int currencyId, long expected)
         {
@@ -101,20 +116,20 @@ namespace TaimisToolbench.Tests.Models
             Assert.Equal(desert, castoran);
         }
 
-        // The live API has two distinct wallet currencies named "Gaeting
-        // Crystal" (39, Path of Fire raids; 77, Janthir Wilds raids) plus
-        // an item form, 86094, which BarterItemDecisionDefaults already
-        // pins to currency 39. All three are the same in-game good, so a
-        // plan must never price one differently from another.
+        // Two branches each adding a { 77, ... } row is how a duplicate key
+        // reaches a Dictionary collection initialiser: it compiles, then
+        // throws ArgumentException from the static constructor, taking the
+        // module down at load. Enumerating the table here forces that
+        // constructor, so a duplicate fails this test as a
+        // TypeInitializationException before any assertion runs. The
+        // retired id 39 is pinned absent alongside it because the merge
+        // that could duplicate 77 is the same one that could resurrect 39.
         [Fact]
-        public void BothGaetingCrystalCurrencies_CarryTheSameValue()
+        public void DefaultCopperPerUnit_CarriesGaetingCrystalOnceAndOnlyTheLiveId()
         {
-            Assert.True(CurrencyDecisionDefaults.TryGetDefault(39, out long pathOfFire));
-            Assert.True(CurrencyDecisionDefaults.TryGetDefault(77, out long janthirWilds));
-            Assert.True(BarterItemDecisionDefaults.TryGetDefault(86094, out long itemForm));
-
-            Assert.Equal(pathOfFire, janthirWilds);
-            Assert.Equal(pathOfFire, itemForm);
+            Assert.Equal(1, CurrencyDecisionDefaults.DefaultCopperPerUnit.Count(entry => entry.Key == 77));
+            Assert.Equal(0, CurrencyDecisionDefaults.DefaultCopperPerUnit.Count(entry => entry.Key == 39));
+            Assert.Equal(3600, CurrencyDecisionDefaults.DefaultCopperPerUnit[77]);
         }
     }
 }

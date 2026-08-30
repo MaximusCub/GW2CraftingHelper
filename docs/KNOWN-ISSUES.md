@@ -1331,3 +1331,6 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **The Battle Historian: a removed WvW vendor pricing legendary materials at zero (2026-08-29)** - gate not required (dev-tool and data change; verified by a byte-identical round trip and a `--diff-summary` showing 49 removed and nothing else touched).
   Cited as: w5-deadvendors.
   `dev/records/w5-deadvendors.md`
+- **Two "Gaeting Crystal" currency ids: one is retired (2026-08-29)** - gate not required (retired currency 39 and item 86094 removed, live currency 77 named; answers FEEDBACK-BACKLOG R1).
+  Cited as: gaeting-crystal-duplicate-ids.
+  `dev/records/gaeting-crystal-duplicate-ids.md`
