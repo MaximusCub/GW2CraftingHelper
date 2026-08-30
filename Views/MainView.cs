@@ -316,6 +316,12 @@ namespace TaimisToolbench.Views
         // enough to render a message instead.
         private Panel _resultGridPanel;
 
+        // Pins whichever run's column-header band the reader is currently
+        // scrolling through to the top of the result viewport. Rebuilt with
+        // the tab panel it overlays; the bands it moves are the ones the
+        // chromes below build, not copies (Views/Rendering/StickyHeaderHost).
+        private StickyHeaderHost _stickyHeaders;
+
         // Null for a run with no rows: the section is absent, not empty.
         private SectionChrome _itemChrome;
         private SectionChrome _walletChrome;
@@ -710,6 +716,10 @@ namespace TaimisToolbench.Views
                 CanScroll = true,
                 Parent = buildPanel,
             };
+
+            // After the content panel, and on the tab panel rather than
+            // inside it: the clip a pinned band is drawn in must not scroll.
+            _stickyHeaders = new StickyHeaderHost(buildPanel, _contentPanel);
 
             // Subscribe to resize
             buildPanel.Resized += OnPanelResized;
@@ -1768,6 +1778,11 @@ namespace TaimisToolbench.Views
             _walletChrome = null;
             _lastRowLayoutWidth = _contentPanel.Width;
 
+            // BEFORE the disposal loop: a pinned band is not a child of the
+            // content panel, so untracking it - which puts it back in the
+            // grid panel - is what lets the loop below dispose it at all.
+            _stickyHeaders?.Clear();
+
             foreach (var child in _contentPanel.Children.ToArray())
             {
                 child.Dispose();
@@ -1938,6 +1953,9 @@ namespace TaimisToolbench.Views
                 _walletChrome.ReapplyOrder();
             }
 
+            TrackStickyHeaders(_itemChrome);
+            TrackStickyHeaders(_walletChrome);
+
             // Places the cells the two loops just created and gives the grid
             // panel its height. refitText: false - every cell was built at
             // this same columnWidth, and re-ellipsizing each label a second
@@ -2037,6 +2055,18 @@ namespace TaimisToolbench.Views
             /// <summary>Widest amount this run renders - see
             /// MeasureWidestAmount.</summary>
             public int WidestAmount;
+
+            /// <summary>
+            /// Where this run's header band sits inside the grid panel, and
+            /// how far the run's rows reach past it, as
+            /// <see cref="LayoutResultGrid"/> last placed them. Read live by
+            /// the sticky host, which owns the band's Location while the
+            /// band is pinned.
+            /// </summary>
+            public bool Present;
+            public int GridWidth;
+            public int HeaderY;
+            public int TableBottom;
 
             /// <summary>Width the Amount column reserves: the widest amount
             /// floored at its header BLOCK, which includes the persistent
@@ -2193,6 +2223,12 @@ namespace TaimisToolbench.Views
                 return;
             }
 
+            chrome.Present = section.Present;
+            chrome.GridWidth = gridWidth;
+            chrome.HeaderY = section.HeaderY;
+            chrome.TableBottom = section.HeaderY
+                + PlanContentHeightMath.ColumnHeaderRowHeight + section.Grid.Height;
+
             chrome.TitlePanel.Visible = section.Present;
             chrome.HeaderPanel.Visible = section.Present;
             if (!section.Present)
@@ -2204,7 +2240,14 @@ namespace TaimisToolbench.Views
             chrome.TitlePanel.Size = new Point(gridWidth, SectionTitleBandHeight);
             chrome.TitleDivider.Size = new Point(gridWidth, 2);
 
-            chrome.HeaderPanel.Location = new Point(0, section.HeaderY);
+            // Not while pinned: the sticky host owns the band's Location
+            // then, and writing the in-grid y over it would drop the band
+            // back down the viewport for a frame on every resize tick.
+            if (chrome.HeaderPanel.Parent == _resultGridPanel)
+            {
+                chrome.HeaderPanel.Location = new Point(0, section.HeaderY);
+            }
+
             chrome.HeaderPanel.Size = new Point(gridWidth, PlanContentHeightMath.ColumnHeaderRowHeight);
 
             int columnCount = section.Grid.ColumnCount;
@@ -2281,6 +2324,25 @@ namespace TaimisToolbench.Views
             }
 
             chrome.CellPlan.Sync(gridWidth);
+        }
+
+        /// <summary>
+        /// Hands one run's header band to the sticky host. The geometry is a
+        /// live read of the chrome, not a snapshot: a resize moves every one
+        /// of these while a band may be pinned.
+        /// </summary>
+        private void TrackStickyHeaders(SectionChrome chrome)
+        {
+            if (chrome == null || _stickyHeaders == null)
+            {
+                return;
+            }
+
+            _stickyHeaders.Track(
+                chrome.HeaderPanel, _resultGridPanel,
+                () => new StickyHeaderHost.BandGeometry(
+                    chrome.Present, 0, chrome.HeaderY, chrome.GridWidth,
+                    PlanContentHeightMath.ColumnHeaderRowHeight, chrome.TableBottom));
         }
 
         private static SortableHeaderBlock CreateHeaderBlock(

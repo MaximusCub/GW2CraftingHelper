@@ -243,6 +243,7 @@ Services/StaticItemSearchProvider.cs                                            
 Services/StatusStore.cs                                                                  73
 Services/StatusText.cs                                                                  286
 Services/StatusUpdateGuard.cs                                                            38
+Services/StickyHeaderLayout.cs                                                           117
 Services/SummarySectionLayoutMath.cs                                                    656
 Services/TableSortState.cs                                                              99
 Services/UiGlyphs.cs                                                                    124
@@ -280,7 +281,7 @@ Views/ItemInputRowStrip.cs                                                      
 Views/ItemRowState.cs                                                                    39
 Views/LogTabContent.cs                                                                 1436
 Views/MainThreadMarshal.cs                                                              141
-Views/MainView.cs                                                                       2770
+Views/MainView.cs                                                                       2812
 Views/DialogWindow.cs                                                                   84
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    379
@@ -317,6 +318,7 @@ Views/Rendering/SortIndicator.cs                                                
 Views/Rendering/SortableHeaderBlock.cs                                                  108
 Views/Rendering/SortableHeaderCells.cs                                                  249
 Views/Rendering/SortableHeaderLabel.cs                                                   38
+Views/Rendering/StickyHeaderHost.cs                                                      294
 Views/Rendering/SummarySectionRenderer.cs                                               1041
 Views/Rendering/TextRowRenderer.cs                                                       36
 Views/Rendering/TooltipFacility.cs                                                      288
@@ -555,6 +557,7 @@ tests/TaimisToolbench.Tests/Services/SourceFilterFlowLayoutTests.cs             
 tests/TaimisToolbench.Tests/Services/StatusStoreTests.cs                              116
 tests/TaimisToolbench.Tests/Services/StatusTextTests.cs                               345
 tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                         33
+tests/TaimisToolbench.Tests/Services/StickyHeaderLayoutTests.cs                        221
 tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                  1112
 tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                           198
 tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                      332
