@@ -82,8 +82,16 @@ was an agent's report repeated without checking the primary.
 
 ## Deployed
 
-The owner's live install runs the wave-2 build (2026-08-29 18:34). None of
-wave 5 or 6 is deployed. Rollback copy: `TaimisToolbench.bhm.rollback-pre-wave2`.
+The owner's live install runs the **wave-5 + wave-6 build**, deployed
+2026-08-29 21:21 from `master` at the merge of PRs #233, #235 and #236, Release
+x64, md5 `40e06c0e414b5a06476978a3c7cb2646` verified identical on both sides.
+
+Rollbacks in the modules directory: `TaimisToolbench.bhm.rollback-pre-wave6`
+(the wave-2 build) and `TaimisToolbench.bhm.rollback-pre-wave2`.
+
+**Blish HUD holds a lock on the loaded .bhm**, so a deploy fails with
+`Permission denied` while it runs. Blish must be closed first; GW2 itself does
+not need to be.
 
 
 ## Wave 5 integration, as of 2026-08-29
@@ -232,3 +240,25 @@ ad-hoc ones sent curl's default User-Agent.
   is useless: it is Wikipedia's boilerplate left in, the projects share no
   administrators, and its preloaded title makes the reporter declare themselves a
   long-term abuser. The real venue is the GW2 wiki's own admin noticeboard.
+
+
+## Field test issued 2026-08-29
+
+A 20-item list covering all sixteen wave-6 items plus the four user-visible
+wave-5 data fixes was handed to the owner. Items nobody can settle without the
+game, called out as highest value:
+
+- **B2** clicking IGNORE repeatedly on a node WITH CHILDREN (leaves always worked,
+  which is why PR #232 looked fixed).
+- **B3** at UI Size **Large** - integer scale means zero clip slip, so a leak
+  there falsifies the diagnosis rather than just failing.
+- **The mouse wheel over a pinned Snapshot header strip** - the clip is a sibling
+  of the scroll panel and no Blish-free test can cover input dispatch.
+- **V4** the 24px X buttons, though these were measured off the owner's own
+  screenshot rather than guessed.
+- **#17** the Obsidian vendor route, which should now be craft cost plus the
+  10-ectoplasm fee rather than ~2g95s.
+
+Owner rulings taken this session: **F1 parks at the Snapshot tab** for validation
+rather than being extended to the plan tab now; the Gaeting 1:1 question is to be
+settled by research without him.
