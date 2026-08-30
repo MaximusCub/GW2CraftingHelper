@@ -426,9 +426,9 @@ namespace MysticForgeSeeder
         /// </para>
         /// <para>
         /// Matching is on recipe content, not on id: ids renumber on every
-        /// run. Content-identical recipes all take the override - two rows
-        /// that consume and produce the same things must price the same, or
-        /// the solver just picks the un-overridden one.
+        /// run, so an id is the one thing about a regenerated recipe that
+        /// carries nothing forward. Run after the content dedup above, so
+        /// one override can only ever land on one recipe.
         /// </para>
         /// </summary>
         private static void CarryForwardHandAuthoredOverrides(
