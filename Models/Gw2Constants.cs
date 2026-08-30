@@ -142,13 +142,22 @@ namespace TaimisToolbench.Models
             { 63, "Astral Acclaim" },
             { 64, "Jade Sliver" },
             { 65, "Testimony of Jade Heroics" },
+            { 66, "Ancient Coins" },
             { 67, "Canach Coins" },
             // Live name is the singular "Imperial Favor".
             { 68, "Imperial Favor" },
             { 69, "Tales of Dungeon Delving" },
+            { 76, "Ursus Oblige" },
+            // The live API gives ids 39 and 77 the same name: they are two
+            // distinct wallet currencies (Path of Fire raids and Janthir
+            // Wilds raids respectively) that the game calls the same thing.
+            // Both carry 3600 in CurrencyDecisionDefaults, so the two
+            // identically-labelled Settings rows are interchangeable.
+            { 77, "Gaeting Crystal" },
             { 78, "Fine Rift Essence" },
             { 79, "Rare Rift Essence" },
             { 80, "Masterwork Rift Essence" },
+            { 82, "Testimony of Castoran Heroics" },
         };
 
         public static string ResolveCurrencyName(int currencyId)

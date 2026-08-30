@@ -1230,15 +1230,72 @@ and item 39 are unrelated things - so a single int-keyed map would answer
 the wrong question for one of them. `Models/CurrencyValuation.cs` holds
 the user's own overrides and clears over the top of both.
 
-The currency table is adapted from gw2efficiency's
+The currency table's first block is adapted from gw2efficiency's
 `CURRENCY_DECISION_PRICES` (`@gw2efficiency/recipe-calculation`,
 `src/static/currencyDecisionPrices.ts`, MIT, Copyright (c) 2016
 queicherius / David Reess). Shipping it as defaults is an explicit,
 one-time waiver of the repo's "do not invent data" rule for that table
-only: every value is sourced and attributed to the upstream MIT package
-rather than invented, and the permission notice the licence requires is
-reproduced verbatim in the source file itself. Research notes live in
+only: every value in that block is sourced and attributed to the upstream
+MIT package rather than invented, and the permission notice the licence
+requires is reproduced verbatim in the source file itself. Research notes live in
 [`docs/research/gw2e-currency-decision-prices.md`](research/gw2e-currency-decision-prices.md).
+
+gw2efficiency's table stops at id 70 and never gained a row for the
+Secrets of the Obscure, Janthir Wilds or Visions of Eternity currencies,
+so a second block in the same file carries values derived here. Its rule:
+the most coin one unit converts into through an **uncapped** vendor offer
+in `ref/vendor_offers.json` whose cost is that currency plus at most a
+minor coin component, priced at the live trading-post sell listing; or,
+where the game sells the same goods at the same counts for an
+already-valued sibling currency, that sibling's value. Capped offers are
+excluded for the same reason the barter table only counts repeatable
+exchanges: a weekly-capped conversion cannot absorb a stock of the
+currency, so it does not price the marginal unit. Erring high is the safe
+direction: an over-valued currency can lose a comparison it should have
+won, never win one it should have lost.
+
+| id | Currency | Value | Derivation (prices fetched 2026-08-29) |
+|---|---|---|---|
+| 30 | PvP League Ticket | 3770 | League Vendor sells 10 Shard of Glory for 1 ticket, uncapped; Shard of Glory sells at 377c against 1.2M listings. |
+| 66 | Ancient Coin | 197 | Chin-Hwa sells `Recipe: Harrier's Monastery Shoes` for 5, uncapped; TP sell 987c over 2,010 listings. The same vendor's other recipes imply 40-197, and Leivas' Antique Summoning Stone (10 coins, TP sell 13,792c) implies 1,379 but is capped at one per week. |
+| 76 | Ursus Oblige | 125 | Maw of the Volcano sells Potent Standard Sharpening Stone for 7 plus 120c, uncapped; TP sell 995c over 8,798 listings. Its other low-coin routes there imply 87-125. |
+| 77 | Gaeting Crystal (Janthir Wilds raids) | 3600 | Its vendors sell one Magnetite Shard for one crystal, and price every other offer at exactly the count and coin that the Path of Fire raid vendor charges in Magnetite Shards (currency 28, 3600), which currency 39 and barter item 86094 already carry. |
+| 82 | Testimony of Castoran Heroics | 135 | At the Notary of Heroics the same items cost the same counts in Castoran, Desert (36) or Jade (65) Heroics, at 1, 6, 10, 100, 250 and 500. Both siblings are 135 upstream, so any other figure would contradict the block above. Corroborated independently: 6 buy a Siege Golem Blueprint, TP sell 791c, giving 132. |
+
+Currencies left deliberately unvalued, with the reason each resists a
+single defensible figure:
+
+- **63 Astral Acclaim** (127 offers). Settled by
+  [`dev/proposals/research-aa-spending-consensus.md`](../dev/proposals/research-aa-spending-consensus.md):
+  Wizard's Vault deal quality varies per item and per price tier, so one
+  implied rate misrepresents a supply curve as a point. The successor idea
+  is a ranked deal table, not a table row.
+- **72 Static Charge, 73 Pinch of Stardust, 75 Calcified Gasp** (161
+  offers). The Wizard's Tower and Gobbler converters sell one catalogue for
+  25 units of *any* map currency, so these are 1:1 with currencies the
+  block above values at 9 (Trade Contract), 70 (Ley Line Crystal), 310
+  (Tyrian Defense Seal) and 320 (Imperial Favor). Inheriting a sibling
+  gives a 35x spread with no way to choose, and none of the three has a
+  trading-post-tradable output to anchor on.
+- **78/79/80 Rift Essences** (111 offers). Their only cross-currency anchor
+  prices all three tiers identically, which contradicts the tiering; no
+  route ends in a tradable item.
+- **70 Legendary Insight** (148 offers) and **58 War Supplies** (114
+  offers). Marked `undefined` upstream, and no vendor route turns either
+  into anything tradable.
+- **81 Antiquated Ducat, 83 Aether-Rich Sap** (54 offers). Visions of
+  Eternity map currencies with no tradable output and no cross-currency
+  offer anywhere in the seed.
+- **47 Racing Medallion** (35 offers). Its two anchors are a 16c bottle of
+  wine and a single-listing 400 gold cosmetic, 333x apart with nothing
+  liquid between them.
+- **59 Unstable Fractal Essence** (29 offers), **46 PvP Tournament
+  Voucher** (14), **52 Red Prophet Shard** (9), **54 Blue Prophet Crystal**
+  (5). Low impact, and no uncapped anchor. Red Prophet Shard is the
+  instructive one: the three Eye of the North Emissaries sell the same item
+  for the same 2 units of Red, Green (3500) or Blue (300) Prophet Shard, so
+  inheriting a sibling would mean choosing between two upstream values that
+  are already 12x apart.
 
 The barter table has no upstream to adapt - gw2efficiency values wallet
 currencies only - so each entry is derived here under a single stated

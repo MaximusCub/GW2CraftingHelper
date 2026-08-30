@@ -1,10 +1,14 @@
 /*
- * The default table below is adapted from @gw2efficiency/recipe-calculation,
+ * The first block of the default table below - the one headed "Adapted
+ * from gw2efficiency" - is adapted from @gw2efficiency/recipe-calculation,
  * src/static/currencyDecisionPrices.ts -
  * https://github.com/gw2efficiency/recipe-calculation
  * License: MIT, Copyright (c) 2016 queicherius (David Reess).
  * The MIT permission notice is reproduced verbatim below, as the license
- * requires for substantial portions of the work.
+ * requires for substantial portions of the work. The second block,
+ * "Derived here", is this repository's own work under its own stated rule
+ * and carries no upstream claim; nothing outside the first block is
+ * gw2efficiency's.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -31,20 +35,23 @@ namespace TaimisToolbench.Models
 {
     /// <summary>
     /// Curated default DECISION-ONLY currency valuations (copper per unit),
-    /// adapted from gw2efficiency's CURRENCY_DECISION_PRICES table so the
-    /// module ships usable comparison values out of the box. Every key is the
-    /// official GW2 wallet currency id, cross-checked against the live API.
-    /// An entry gw2e's own table marks `undefined` is simply absent here,
-    /// matching gw2e exactly - a currency with no entry stays unvalued rather
-    /// than gaining an invented rate.
+    /// so the module ships usable comparison values out of the box. Every key
+    /// is the official GW2 wallet currency id, cross-checked against the live
+    /// API. The table has two provenance blocks, kept apart below and never
+    /// interleaved: values adapted from gw2efficiency's
+    /// CURRENCY_DECISION_PRICES, and values derived here under the rule
+    /// stated on that block. A currency in neither block stays unvalued
+    /// rather than gaining an invented rate; docs/ARCHITECTURE.md section 8.3
+    /// lists which currencies are deliberately unvalued and why.
     /// <para>
     /// DECISION-ONLY: a value here may tip a comparison but must never be
     /// folded into any displayed gold total. See
     /// CurrencyValuation.TryGetEffectiveCopperValue for the
     /// user-override/cleared/default precedence. Shipping this curated table
     /// is a one-time waiver of the repo's "do not invent data" rule for this
-    /// table only - every value is sourced and attributed upstream, under the
-    /// licence at the top of this file.
+    /// table only - every value is either sourced and attributed upstream,
+    /// under the licence at the top of this file, or derived from live GW2
+    /// API data by the rule the second block states.
     /// Derivation: docs/ARCHITECTURE.md section 8.3.
     /// </para>
     /// </summary>
@@ -52,6 +59,12 @@ namespace TaimisToolbench.Models
     {
         public static readonly IReadOnlyDictionary<int, long> DefaultCopperPerUnit = new Dictionary<int, long>
         {
+            // Adapted from gw2efficiency - every entry down to id 69 is
+            // theirs, under the licence at the top of this file. Their table
+            // stops at id 70 and marks some ids inside this range
+            // `undefined`; an `undefined` id is simply absent from this
+            // block, and appears below only if this repository derived a
+            // value for it independently.
             { 2, 1 },        // Karma
             { 3, 3500 },     // Laurel
             { 4, 3000 },     // Gem
@@ -82,7 +95,7 @@ namespace TaimisToolbench.Models
             { 34, 9 },       // Trade Contract
             { 35, 720 },     // Elegy Mosaic
             { 36, 135 },     // Testimony of Desert Heroics
-            { 39, 3600 },    // Gaeting Crystal (id 39 only - a second, newer id 77 postdates gw2e's table)
+            { 39, 3600 },    // Gaeting Crystal (upstream valued id 39 only; id 77 shares its name and is valued below)
             { 45, 50 },      // Volatile Magic
             { 50, 25 },      // Festival Token
             { 53, 3500 },    // Green Prophet Shard
@@ -95,14 +108,31 @@ namespace TaimisToolbench.Models
             { 67, 35 },      // Canach Coins
             { 68, 320 },     // Imperial Favor
             { 69, 32 },       // Tales of Dungeon Delving
+
+            // Derived here, NOT gw2efficiency's work: no upstream row exists
+            // for any of these. One rule, applied per entry: the most coin a
+            // unit converts into through an UNCAPPED vendor offer whose cost
+            // is this currency (plus at most a minor coin component), priced
+            // at the live trading-post sell listing - or, where the game
+            // itself sells the same goods at the same counts for an
+            // already-valued sibling currency, that sibling's value.
+            // Trading-post figures are snapshots (api.guildwars2.com,
+            // 2026-08-29), so they age; the sibling figures do not. Erring
+            // high is the safe direction here: an over-valued currency can
+            // lose a comparison it should have won, never win one it should
+            // have lost. Per-entry working: docs/ARCHITECTURE.md section 8.3.
+            { 30, 3770 },    // PvP League Ticket: League Vendor sells 10 Shard of Glory for 1 (TP sell 377 each).
+            { 66, 197 },     // Ancient Coin: Chin-Hwa sells Recipe: Harrier's Monastery Shoes for 5 (TP sell 987).
+            { 76, 125 },     // Ursus Oblige: Maw of the Volcano sells Potent Standard Sharpening Stone for 7 + 120c (TP sell 995).
+            { 77, 3600 },    // Gaeting Crystal (Janthir Wilds raids): its vendors sell 1 Magnetite Shard for 1, and charge what currency 28 charges.
+            { 82, 135 },     // Testimony of Castoran Heroics: 1 for 1 with Testimony of Desert and Jade Heroics (36, 65) at the Notary.
         };
 
         /// <summary>
-        /// Looks up the default copper-per-unit value gw2efficiency assigns
+        /// Looks up the curated default copper-per-unit value of
         /// <paramref name="currencyId"/>. Returns false for the coin
-        /// currency id, any id gw2e's own table marks `undefined`, and any
-        /// id absent from gw2e's table entirely (it stops at id 70) -
-        /// exactly the same "no value" outcome for all three cases, matching
+        /// currency id and for any currency neither block above values -
+        /// the same "no value" outcome either way, matching
         /// CurrencyValuation.TryGetCopperValue's own no-value contract.
         /// </summary>
         public static bool TryGetDefault(int currencyId, out long copperPerUnit)
