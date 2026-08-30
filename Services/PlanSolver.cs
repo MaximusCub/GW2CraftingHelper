@@ -600,6 +600,12 @@ namespace TaimisToolbench.Services
             // Pass 2: collect steps and currency costs following pass-1 decisions
             var stepMap = new Dictionary<(int, AcquisitionSource, int), PlanStep>();
             var currencyMap = new Dictionary<int, long>();
+
+            // The barter twin of currencyMap, keyed by ITEM id - a
+            // different id space that collides numerically with the
+            // currency ids above, which is why it is a second map and
+            // never a shared one (Models/BarterItemCost.cs).
+            var barterItemMap = new Dictionary<int, long>();
             var craftOrder = new Dictionary<(int, int), int>();
             var vendorBatchTracking = new Dictionary<(int, AcquisitionSource, int), VendorBatchSolver.VendorBatchState>();
             var vendorOccurrences = new Dictionary<(int, AcquisitionSource, int), List<(int NodeId, int Quantity)>>();
@@ -620,7 +626,8 @@ namespace TaimisToolbench.Services
             // several already-per-occurrence-ceil'd costs; also folds the
             // (now-correct) vendor currency costs into currencyMap and
             // collects any post-solve "timegated" (cap-exceeded) notices.
-            var timegatedItems = _vendorBatchSolver.FinalizeVendorBatches(stepMap, vendorBatchTracking, currencyMap);
+            var timegatedItems = _vendorBatchSolver.FinalizeVendorBatches(
+                stepMap, vendorBatchTracking, currencyMap, barterItemMap);
 
             // Pass 2c: FinalizeVendorBatches only corrects the merged
             // PlanStep/currencyMap view, never `memo` - which is what the
@@ -821,6 +828,12 @@ namespace TaimisToolbench.Services
                 currencyCosts.Add(new CurrencyCost { CurrencyId = kvp.Key, Amount = checked(kvp.Value) });
             }
 
+            var barterItemCosts = new List<BarterItemCost>(barterItemMap.Count);
+            foreach (var kvp in barterItemMap)
+            {
+                barterItemCosts.Add(new BarterItemCost { ItemId = kvp.Key, Amount = kvp.Value });
+            }
+
             var plan = new CraftingPlan
             {
                 TargetItemId = tree.Id,
@@ -828,6 +841,7 @@ namespace TaimisToolbench.Services
                 Steps = steps,
                 TotalCoinCost = totalCoinCost,
                 CurrencyCosts = currencyCosts,
+                BarterItemCosts = barterItemCosts,
                 TimegatedItems = timegatedItems,
             };
 
@@ -1958,6 +1972,8 @@ namespace TaimisToolbench.Services
                 {
                     existing.VendorCurrencyCosts = _vendorBatchSolver.MergeVendorCurrencyCosts(
                         existing.VendorCurrencyCosts, decision.VendorCurrencyCosts);
+                    existing.VendorBarterItemCosts = _vendorBatchSolver.MergeVendorBarterItemCosts(
+                        existing.VendorBarterItemCosts, decision.VendorItemCosts);
 
                     // One-way ratchet, like the batch Conflict flag above:
                     // the merged step's coin figure is incomplete as soon
@@ -1985,6 +2001,9 @@ namespace TaimisToolbench.Services
                     RecipeId = decision.RecipeId,
                     VendorCurrencyCosts = decision.Source == AcquisitionSource.BuyFromVendor
                         ? _vendorBatchSolver.MergeVendorCurrencyCosts(null, decision.VendorCurrencyCosts)
+                        : null,
+                    VendorBarterItemCosts = decision.Source == AcquisitionSource.BuyFromVendor
+                        ? _vendorBatchSolver.MergeVendorBarterItemCosts(null, decision.VendorItemCosts)
                         : null,
                     VendorHasBarterItemCost = decision.Source == AcquisitionSource.BuyFromVendor &&
                         HasBarterItemCost(decision),

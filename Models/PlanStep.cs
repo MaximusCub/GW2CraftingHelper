@@ -42,10 +42,21 @@ namespace TaimisToolbench.Models
         // price, whose units are the cost. UnitCost/TotalCost then do NOT
         // represent this step's whole cost, exactly as they do not when
         // VendorCurrencyCosts is non-empty: any consumer treating a coin
-        // figure as complete must check both. The barter quantities
-        // themselves are not carried here - they reach the display through
-        // the tree's synthesized cost-component leaves
-        // (CraftingTreeBuilder.BuildVendorCostComponentLeaves).
+        // figure as complete must check both.
         public bool VendorHasBarterItemCost { get; set; }
+
+        // The barter quantities behind VendorHasBarterItemCost:
+        // Item-typed CostLines (Id is an ITEM id, never a currency id)
+        // aggregated to this step's Quantity, exactly as
+        // VendorCurrencyCosts is. Null for every non-vendor step and for a
+        // vendor step whose winning offer takes no barter. Re-derived from
+        // the winning offer's batch shape by
+        // VendorBatchSolver.FinalizeVendorBatches on every step whose
+        // occurrences agreed on that offer; a step whose occurrences
+        // disagreed keeps the sum of their per-occurrence ceils, and so
+        // overcounts by exactly as much as its own TotalCost does. Either
+        // way this - never the pre-merge decision lines - is what
+        // CraftingPlan.BarterItemCosts is summed from.
+        public List<CostLine> VendorBarterItemCosts { get; set; }
     }
 }
