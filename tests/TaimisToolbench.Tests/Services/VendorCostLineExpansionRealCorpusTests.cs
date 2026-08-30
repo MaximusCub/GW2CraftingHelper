@@ -254,13 +254,16 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public async Task TheSolveTerminates_OverACostLineGraphThatHasCycles()
         {
-            // 86094 and 91232 buy each other, among at least twelve cycles in
-            // the shipped offer data. Expansion walks that graph, so "it
-            // finishes" is the property under test - and it must finish with
-            // a real answer, not by having given up on the whole plan.
-            var f = await BuildAsync(86094, 1);
+            // Crystalline Ore (46682) and Tenebrous Crystal (70718) buy each
+            // other at the Heart of Maguuma bulk exchanges - six live
+            // merchants each way - and the shipped corpus holds 23 such
+            // two-item cycles inside 10 cyclic components. Expansion walks
+            // that graph, so "it finishes" is the property under test, and
+            // it must finish with a real answer rather than by having given
+            // up on the whole plan.
+            var f = await BuildAsync(46682, 1);
             Assert.NotNull(f.Subtrees);
-            Assert.True(f.Subtrees.ByItemId.ContainsKey(91232), "the cycle's other half must have been expanded");
+            Assert.True(f.Subtrees.ByItemId.ContainsKey(70718), "the cycle's other half must have been expanded");
 
             var result = Solve(f);
 

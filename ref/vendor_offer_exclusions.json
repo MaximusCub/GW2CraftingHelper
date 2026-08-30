@@ -15,6 +15,12 @@
       "reason": "The NPC itself is gone, so the refusal is vendor-wide rather than per item: the wiki page carries 'status = Historical' (SMW 'Is historical = t', Category:Historical NPCs) and states the Battle Historian was replaced by the Skirmish Supervisor in the June 2017 Competitive Feature Pack. Its live successor is already in this dataset under 'Skirmish Supervisor' with 418 rows. All 49 scraped rows were priced in WvW Tournament Claim Tickets (item 66352), whose own page carries 'status = discontinued': the tournaments that awarded it last ran in 2014, the reward chests are discontinued, and consuming a held ticket now converts it to a WvW Skirmish Claim Ticket. That ticket has no coin valuation here, so every one of those rows ranked as free and undercut the real route for Dragonite Ore, Empyreal Fragment and Obsidian Shard.",
       "sourceUrl": "https://wiki.guildwars2.com/wiki/Battle_Historian",
       "verified": "2026-08-29"
+    },
+    {
+      "merchantName": "Scholar Glenna (Gaeting Crystal)",
+      "reason": "A parenthesised variant page, not the live merchant: 'Scholar Glenna' is current and sells for Magnetite Shards in every raid, while 'Scholar Glenna (Gaeting Crystal)' carries 'status = historical' (SMW 'Is historical = t') and opens 'This page lists the items formerly available from Scholar Glenna ... The following offers were removed and replaced with equivalent offers.' The replacements are already in this dataset as the per-raid pages 'Scholar Glenna (Hall of Chains)', '(Mythwright Gambit)' and '(The Key of Ahdashim)', which is where these 121 rows' three locations point. The 2022-07-19 patch note is explicit on both halves: 'Gaeting Crystals have been retired and players will automatically have any Gaeting Crystals in their possession exchanged for an equal amount of Magnetite Shards' and 'Merchants who previously traded items for Gaeting Crystals now accept Magnetite Shards in their place.' The currency and the offers went in the same update.",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Scholar_Glenna_(Gaeting_Crystal)",
+      "verified": "2026-08-29"
     }
   ]
 }

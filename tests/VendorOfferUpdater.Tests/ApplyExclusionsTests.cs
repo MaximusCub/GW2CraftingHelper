@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using VendorOfferUpdater;
 using VendorOfferUpdater.Models;
 using Xunit;
@@ -135,13 +136,20 @@ namespace VendorOfferUpdater.Tests
             {
                 MakeOffer("Battle Historian", 46733),
                 MakeOffer("Battle Master", 19678),
+                // A merchant whose wiki page has a live primary article
+                // AND a historical parenthesised variant: only the exact
+                // refused name goes, or the live raid vendor goes with it.
+                MakeOffer("Scholar Glenna (Gaeting Crystal)", 86094),
+                MakeOffer("Scholar Glenna (Hall of Chains)", 86094),
                 MakeOffer("Skirmish Supervisor", 46733),
             };
 
             int removed = Program.ApplyExclusions(ref offers, RepoRefDirectory());
 
-            Assert.Equal(2, removed);
-            Assert.Equal("Skirmish Supervisor", Assert.Single(offers).MerchantName);
+            Assert.Equal(3, removed);
+            Assert.Equal(
+                new[] { "Scholar Glenna (Hall of Chains)", "Skirmish Supervisor" },
+                offers.Select(o => o.MerchantName).OrderBy(n => n).ToArray());
         }
 
         // Walks to the shipped list itself rather than to a ".git" marker,
