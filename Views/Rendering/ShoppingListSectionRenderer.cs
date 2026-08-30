@@ -407,7 +407,7 @@ namespace TaimisToolbench.Views.Rendering
         {
             var edges = scan.EdgesFor(panelWidth);
             const int rowHeight = PlanContentHeightMath.ShoppingRowHeight;
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+            var rowPanel = new ClippedPanel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
             var font = UiFonts.Body;
 

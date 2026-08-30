@@ -138,6 +138,7 @@
     <Compile Include="Services\TradingPostMath.cs" />
     <Compile Include="Services\FirstLoadSnapshotGate.cs" />
     <Compile Include="Services\ScrollAnchorMath.cs" />
+    <Compile Include="Services\ClipCutoffMath.cs" />
     <Compile Include="Services\ScrollMath.cs" />
     <Compile Include="Services\WheelDeltaSanitizer.cs" />
     <Compile Include="Services\ShoppingColumnMath.cs" />
@@ -270,6 +271,7 @@
     <Compile Include="Views\Rendering\PlanHeaderRenderer.cs" />
     <Compile Include="Views\Rendering\PressFeedback.cs" />
     <Compile Include="Views\Rendering\ClickSound.cs" />
+    <Compile Include="Views\Rendering\ClipCutoff.cs" />
     <Compile Include="Views\Rendering\FeedbackButton.cs" />
     <Compile Include="Views\Rendering\PillColors.cs" />
     <Compile Include="Views\Rendering\HoverChainResync.cs" />

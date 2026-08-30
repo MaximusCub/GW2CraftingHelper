@@ -123,7 +123,7 @@ namespace TaimisToolbench.Views.Rendering
             int iconSize, int borderThickness, string plainText)
         {
             int frameSize = iconSize + borderThickness * 2;
-            var frame = new Panel()
+            var frame = new ClippedPanel()
             {
                 Size = new Point(frameSize, frameSize),
                 Location = new Point(x, y),
@@ -157,14 +157,14 @@ namespace TaimisToolbench.Views.Rendering
             // alarming red error texture - a data gap is not a failure.
             bool missing = string.IsNullOrEmpty(iconUrl);
             Panel icon = missing
-                ? new Panel()
+                ? new ClippedPanel()
                 {
                     Size = new Point(size, size),
                     Location = new Point(x, y),
                     BackgroundColor = new Color(45, 45, 45),
                     Parent = parent,
                 }
-                : new Panel()
+                : new ClippedPanel()
                 {
                     Size = new Point(size, size),
                     Location = new Point(x, y),
@@ -225,7 +225,7 @@ namespace TaimisToolbench.Views.Rendering
         internal static Panel CreateAssetIcon(
             Panel parent, int assetId, int x, int y, int size, string tooltipText)
         {
-            var icon = new Panel()
+            var icon = new ClippedPanel()
             {
                 Size = new Point(size, size),
                 Location = new Point(x, y),

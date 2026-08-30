@@ -144,7 +144,7 @@ namespace TaimisToolbench.Views.Rendering
             int maxQtyWidth, bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.UsedMaterialRowHeight;
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+            var rowPanel = new ClippedPanel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
             int qtyRightEdge = PlanRelayoutMath.PinnedRightEdge(panelWidth);
             var font = UiFonts.Body;

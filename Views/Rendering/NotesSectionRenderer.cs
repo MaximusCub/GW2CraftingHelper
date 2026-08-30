@@ -110,7 +110,7 @@ namespace TaimisToolbench.Views.Rendering
 
             for (int i = 0; i < lineCount; i++)
             {
-                var linePanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+                var linePanel = new ClippedPanel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
                 var label = LabelHelpers.WithDescenderClearance(new Label()
                 {
                     Text = wrapped.Lines[i],

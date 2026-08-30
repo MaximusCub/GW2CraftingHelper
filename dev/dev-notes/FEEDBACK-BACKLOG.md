@@ -27,9 +27,9 @@ Status: OPEN | IN PROGRESS (branch) | DONE (PR #n) | RULED OUT (reason)
 
 | id | Item | Status |
 |----|------|--------|
-| B1 | Toggling a node between CRAFT and VENDOR repopulates the Total Cost currency table, moving the scroll position; sometimes it grows enough to push the whole Recipe Tree section off the viewport. Repro: Obsidian Heavy Breastplate, collapse the breastplate node, toggle back and forth. | OPEN |
+| B1 | Toggling a node between CRAFT and VENDOR repopulates the Total Cost currency table, moving the scroll position; sometimes it grows enough to push the whole Recipe Tree section off the viewport. Repro: Obsidian Heavy Breastplate, collapse the breastplate node, toggle back and forth. | IN PROGRESS (w6-viewport) |
 | B2 | **REGRESSION - still broken.** Clicking IGNORE repeatedly without moving the mouse eventually expands/collapses the node instead of toggling IGNORE. Two causes were fixed in PR #232 (pill membership, cost-column re-derivation); a third remains. | OPEN |
-| B3 | Tree content still overdraws the pinned header when scrolled. Owner's question, which must be answered not deflected: "why aren't we just positioning the viewport lower so this can never happen?" | OPEN |
+| B3 | Tree content still overdraws the pinned header when scrolled. Owner's question, which must be answered not deflected: "why aren't we just positioning the viewport lower so this can never happen?" | IN PROGRESS (w6-viewport) - cutoff mechanism landed and swept through every container the branch owns; `Views/Rendering/TreeSectionController.cs` still builds its per-depth row/child containers as plain `Panel`/`FlowPanel` and must use `ClippedPanel`/`ClippedFlowPanel` before the guarantee holds for tree rows. |
 
 ## Layout and dynamic sizing
 

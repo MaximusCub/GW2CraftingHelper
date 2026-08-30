@@ -52,7 +52,7 @@ namespace TaimisToolbench.Views.Rendering
         /// </summary>
         internal void Render(FlowPanel contentPanel, int panelWidth)
         {
-            var topGap = new Panel()
+            var topGap = new ClippedPanel()
             {
                 Size = new Point(panelWidth, EmptyPlanTopGap),
                 Parent = contentPanel,

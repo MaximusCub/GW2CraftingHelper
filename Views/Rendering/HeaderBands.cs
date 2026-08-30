@@ -117,7 +117,7 @@ namespace TaimisToolbench.Views.Rendering
 
         private static Panel Band(Container parent, int width, int height, int x, int y)
         {
-            return new Panel()
+            return new ClippedPanel()
             {
                 Size = new Point(width, height),
                 Location = new Point(x, y),
