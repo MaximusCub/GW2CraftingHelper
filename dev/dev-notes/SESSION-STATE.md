@@ -280,47 +280,86 @@ Read this section first. Everything above is history and evidence.
 ## What is true right now
 
 - **`master` is green** and carries PRs #233 through #238. Suite:
-  4109 + 238 + 3 = **4350**. Build is 0 warnings.
-- **The owner's live install runs this build** (deployed 2026-08-29 21:21,
-  Release x64, checksum verified). Rollbacks beside it:
-  `TaimisToolbench.bhm.rollback-pre-wave6` (the wave-2 build) and
-  `.rollback-pre-wave2`.
-- **PR #237 is merged.** It pinned currency 77 to currency 28 as an equality
-  rather than a duplicated literal, and corrected two false claims in our own
-  prose. **There are ZERO open PRs.** Suite is now 4092 + 238 + 3 = **4333**.
-- **The deployed .bhm predates #237 and that is fine.** #237 changed a test, two
-  comments, a doc and a record - **no runtime code**. The installed build is
-  behaviourally identical to `master`, so do NOT redeploy on account of it.
-- **Worktrees are down to 7** from 30. Only `master` plus the six wave-6 branches
-  remain; they are kept ONLY as a way back to an individual fix if the field test
-  turns one up. Prune them once the owner confirms the build behaves.
+  4109 + 238 + 3 = **4350**. Build is 0 warnings. **PR #238 (wave-7
+  field-test fixes, W1-W7 + W9) is MERGED AND DEPLOYED** (2026-08-30 10:39,
+  md5 `d5f37973050e118aa3a4746647ea6bc7` verified; the deploy section above
+  has details). Rollbacks beside the live file: `.rollback-pre-wave7` (the
+  wave-5/6 build), `.rollback-pre-wave6`, `.rollback-pre-wave2`.
+- **The owner does not review PRs and does not want them posted**: green CI
+  qualifies a build, the agent merges and deploys so the owner can test.
+  THE GATE is the owner's review and acceptance of the functionality
+  (his correction 2026-08-30; see also dev/dev-notes/FEEDBACK-BACKLOG.md's
+  rule section - SHIPPED vs DONE).
+- **Worktrees are CLEANED to master only** on owner order 2026-08-30; the
+  merged `w6-*`/`wave6-ui` branches survive on origin if a surgical look
+  back is ever needed. A stray agent-harness worktree (`vivid-fjord`) and
+  its `.gitignore` entries were removed the same day.
+
+## Owner away 2026-08-30 for a few days - validations deferred
+
+The owner left before validating wave-7 in game. When he returns, hand him
+this checklist (all SHIPPED in PR #238, awaiting his verdict to become DONE;
+verbatim findings and evidence live in dev/dev-notes/FEEDBACK-BACKLOG.md
+W1-W9):
+
+1. **Snapshot tab (W7 + F1)**: scroll Items and Currencies - no row text
+   ghosting through the pinned header; header pins/unpins correctly; wheel
+   over a pinned header still scrolls. Known trade: a row under the band can
+   lose ~2px of top at some scroll phases - should read invisible.
+2. **Plan tab (W9, W4, W5, B2 retest)**: no gap between the "Plan updated"
+   rule and the first scrolled row; X buttons black-glyph on the standard
+   face with Best Path's hover/press animation, sized near the close button;
+   ignored state = amber plate, dimmed rows inert; rapid IGNORE clicks on a
+   node WITH children do not expand/collapse or drop clicks; Obsidian Heavy
+   Breastplate "1x Obsidian Shard" shows full pills, no "+1" with room to
+   spare; "+N" still appears at true minimum width.
+3. **W1**: Settings valuation grid keeps currency borders; icons beside
+   digits (plan totals, Shopping List Each/Total, Snapshot header, Ranker)
+   are frame-less, coin-style.
+4. **W2**: sort glyphs clearly detached from labels on all sorted tables.
+5. **W6**: Clear Overrides confirm title centered.
+6. **Regression sweep**: CRAFT/VENDOR toggle does not throw the scroll (B1,
+   owner-confirmed); overrides survive load; nothing paints above separator
+   lines.
+
+Queued behind his return: **W3** (Recipe Tree sticky headers - the owner
+validated the Snapshot mechanism modulo the overdraw, which W7 fixed; build
+after he re-validates Snapshot), **W10** (header labels left-align over the
+full column incl. icon gutters, all tables) and **W11** (icon seat per his
+in-game references, blocked on W1 which this deploy carries) - both are
+unblocked file-wise and dispatch on his word. **W8** (currency-vs-item
+mixing in the Total Cost table) is an open DISCUSSION, archaeology recorded
+in its backlog row (ARCHITECTURE 7.5, the one-list-no-drift rule, the
+Legendary Rune measurement, the tension with the Prerequisites ruling).
+**V7** has never been explicitly confirmed. Nothing is startable without
+him: his standing rule is that his findings decide the next wave.
 
 ## The one thing blocking everything
 
-**The owner is field testing and has not reported back.** A 20-item list was
-issued (see "Field test issued" above). Nothing else should start until his
-findings land, because his findings decide what wave 7 is.
+**The owner is away; in-game validation of wave-7 is deferred** (stated
+2026-08-30, back in a few days). Until his verdicts land: W1/W2/W4/W5/W6/W7/W9
+stay SHIPPED-pending, W3/W10/W11 stay queued, and no new wave starts.
 
-The five items nothing offline can settle: B2 clicking IGNORE repeatedly on a
-node WITH CHILDREN; B3 at UI Size **Large**; the mouse wheel over a pinned
-Snapshot header strip; V4's 24px buttons; and #17, the Obsidian vendor route.
+## Known-open, in priority order, for when the owner returns
 
-## Known-open, in priority order, for when the field test lands
-
-1. Whatever the field test turns up. It outranks everything below.
-2. **F1 is deliberately incomplete.** Sticky headers are wired on the Snapshot tab
-   only; the owner ruled "park it at snapshot tab to validate for now". The plan
-   tab needs a fixed-height spacer per band first, because its bands are
-   `FlowPanel` children and removing one reflows every section below. The full
-   recipe is in `dev/dev-notes/FEEDBACK-BACKLOG.md`. **Do not build this until the
-   owner says the Snapshot behaviour is what he wanted.**
-3. **v0.3.0 tagging.** Deferred by the owner pending in-game validation. The field
-   test is what unblocks it.
-4. `TreeRowPillHitTest` now also answers a checkbox question, so its pill-specific
+1. His wave-7 validation checklist (see "Owner away" above). Verdicts convert
+   W1/W2/W4/W5/W6/W7/W9 to DONE or reopen items.
+2. **W3, W10, W11** - queued, dispatch on his word (W3 after he re-validates
+   Snapshot post-W7; the recipe for the plan-tab adoption is in
+   `dev/dev-notes/FEEDBACK-BACKLOG.md`). The old F1 park ruling was
+   conditionally lifted 2026-08-30: he validated the Snapshot mechanism
+   modulo the overdraw, which W7 fixes.
+3. **W8 discussion** - whether the Total Cost table should mix currencies and
+   barter items; archaeology recorded in its backlog row.
+4. **v0.3.0 tagging.** Deferred by the owner pending in-game validation.
+5. `TreeRowPillHitTest` now also answers a checkbox question, so its pill-specific
    name is misleading. Renaming churns a 248-line test suite; the owner has not
    reviewed it yet.
-5. NUX, the in-module first-run experience. Spec at `/mnt/c/Dev/Blish/nux/spec.md`,
+6. NUX, the in-module first-run experience. Spec at `/mnt/c/Dev/Blish/nux/spec.md`,
    outside the repo. Last unbuilt item from the original roadmap.
+7. Sweep candidates from wave-7: `PillColors.GlyphColor` is production-unused;
+   `TreeRowPillHitTestTests` mirrors the view's pill assembly and should
+   share one source of truth.
 
 Deferred by decision, **do not re-propose**: i18n until the feature set is locked;
 the missing content-width cap (filed in `docs/KNOWN-ISSUES.md` under DEFERRED).
