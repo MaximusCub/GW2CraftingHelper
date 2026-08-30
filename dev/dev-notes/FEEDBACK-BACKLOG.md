@@ -44,10 +44,10 @@ Status: OPEN | IN PROGRESS (branch) | DONE (PR #n) | RULED OUT (reason)
 
 | id | Item | Status |
 |----|------|--------|
-| V1 | Currency icon is not vertically centred against the numeric digits of the amount text beside it. | OPEN |
-| V2 | **Regression from PR #232.** Currency icons were given a grey BACKGROUND. Only a gentle grey BORDER was asked for; the fill was never requested and the background was previously transparent. | OPEN |
+| V1 | Currency icon is not vertically centred against the numeric digits of the amount text beside it. | IN PROGRESS (w6-icons) |
+| V2 | **Regression from PR #232.** Currency icons were given a grey BACKGROUND. Only a gentle grey BORDER was asked for; the fill was never requested and the background was previously transparent. | IN PROGRESS (w6-icons) |
 | V3 | Settings: "Copper per unit" header not centred over the content below it. | OPEN |
-| V4 | Crafting Ranker X buttons should match the size scale of the X control in the top corner of the GW2 Trading Post window. | OPEN |
+| V4 | Crafting Ranker X buttons should match the size scale of the X control in the top corner of the GW2 Trading Post window. | IN PROGRESS (w6-icons) |
 | V7 | Clear Overrides dialog: "Ignore marks are kept" should be centred under the text above it. | OPEN |
 | V8 | Log tab: long lines run off the edge. They should wrap, with the full detail available on hover. | OPEN |
 
