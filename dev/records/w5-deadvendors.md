@@ -96,11 +96,96 @@ hinted-items-that-also-have-offers is unchanged at {105804, 106712,
 working: its comment says an eleventh row is "exactly the edit that
 should stop and read this test".
 
-### The finding that outlives this branch: 3,938 offers from 118 removed vendors
+## A second removed vendor: Scholar Glenna (Gaeting Crystal)
 
-**The Battle Historian is one of 118.** Two wiki-authoritative lists were
-pulled and intersected with the shipped data rather than pattern-matching
-on names:
+The same defect, one page over, and it shows why the merchant NAME is
+worth reading. `Scholar Glenna` is live - she sells for Magnetite Shards
+in every raid, and this dataset carries her current inventory as the
+per-raid pages `Scholar Glenna (Hall of Chains)` (22 rows), `(Mythwright
+Gambit)` (48) and `(The Key of Ahdashim)` (65). `Scholar Glenna (Gaeting
+Crystal)` is a different page: `status = historical`, `Is historical = t`,
+opening "This page lists the items formerly available from Scholar Glenna
+... The following offers were removed and replaced with equivalent
+offers." The three locations on its rows are exactly the three raids whose
+live pages already ship.
+
+The 2022-07-19 patch note covers both halves at once: "Gaeting Crystals
+have been retired and players will automatically have any Gaeting Crystals
+in their possession exchanged for an equal amount of Magnetite Shards" and
+"Merchants who previously traded items for Gaeting Crystals now accept
+Magnetite Shards in their place."
+
+**Measured, and the brief's figure was low.** The report that reached this
+branch said 110 offers over 10 output items. The merchant holds **121**
+rows over **112** distinct output items: 110 charge the retired crystal
+plus coin, 10 more are the buy-back rows that PAY 40 crystals for a raid
+miniature, and 1 sells Legendary Divination for a Legendary Insight. A
+merchant-wide refusal takes all 121, which is correct - the page says the
+whole inventory was replaced, not part of it. 59,365 -> 59,244,
+`--diff-summary` reporting 121 removed and nothing else touched.
+
+**Two items lose their only route, and both deserve to.** Everything else
+on that page is still sold by the live per-raid Glenna pages.
+
+- **Legendary Divination (88485)** - itself `status = discontinued`,
+  "Replaced by Legendary Insights with the July 19, 2022 game update", and
+  `[[Sells item::Legendary Divination]]` returns the retired page alone.
+  Still SPENT at 10 live offers in this dataset, which is the shape the
+  sweep warned about: an item can be a live cost and a dead output at the
+  same time.
+- **Gaeting Crystal, the item form (86094)** - `Gaeting Crystal
+  (historical)`, "Replaced by Magnetite Shards with the July 19, 2022 game
+  update".
+
+Both get a `REMOVED` hint, so the plan says what happened instead of
+showing a bare UNKNOWN.
+
+**A test rested on those rows, and it took the interesting part with
+it.** `VendorCostLineExpansionRealCorpusTests.TheSolveTerminates_
+OverACostLineGraphThatHasCycles` used items 86094 and 91232 as its cycle:
+the retired page both charged crystals for a raid weapon and paid 40
+crystals for a raid miniature, which is a genuine two-item loop in the
+cost-line graph. Removing the merchant removed the loop, and the test went
+red on `BuildAsync(86094, 1)` returning nothing to expand. It was NOT
+deleted or weakened: it now builds from Crystalline Ore (46682) and
+asserts Tenebrous Crystal (70718) was expanded, a pair that six live Heart
+of Maguuma bulk-exchange merchants sell for each other in both directions,
+none of them historical. Measured over the corpus as it now stands: 23
+two-item cycles inside 10 cyclic components, so the property has plenty of
+real data left to hold against.
+
+Worth noting why the old cycle disappeared rather than moved: the live
+successors sell item 91232 for coin plus **currency 28**, Magnetite
+Shards. A wallet currency is not an Item cost line, so the replacement
+offers cannot form a cost-line cycle at all - the loop was an artifact of
+the retired item-form currency, exactly as the patch note describes.
+
+**No live vendor charges the retired crystal.** All 110 offers that paid
+in item 86094 were this merchant's own; after the exclusion the corpus
+contains zero cost lines in that item and zero offers producing it. That
+was worth checking rather than assuming, since a live vendor still
+charging a currency retired in 2022 would have been a bigger finding than
+the dead vendor itself.
+
+**One thing this turned up that is NOT mine to fix.**
+`Models/BarterItemDecisionDefaults.cs` values item 86094 at 3600 copper,
+with a comment that item 86094 and wallet currencies 39 and 77 "are all
+named 'Gaeting Crystal' on /v2/items and /v2/currencies - the same
+in-game good in item and wallet form". The live API disagrees: currency 39
+is "Earned from bosses and events inside Path of Fire raids" (the retired
+one) and currency 77 is "Earned from bosses and events inside Janthir
+Wilds raids" (the current one). They are two different currencies sharing
+a name, and the item is the retired one. Left alone deliberately -
+`Models/CurrencyDecisionDefaults.cs` is another branch's file and the two
+values are coupled by that comment. The exclusion does defuse it for now:
+after this change NO offer in the dataset charges item 86094, so the
+valuation has nothing left to price.
+
+### The finding that outlives this branch: 3,817 offers from 116 removed vendors
+
+**The two vendors this branch refused were 2 of 118.** Two
+wiki-authoritative lists were pulled and intersected with the shipped data
+rather than pattern-matching on names:
 
 ```
 # every NPC page the wiki marks historical (659 pages)
@@ -120,22 +205,34 @@ https://wiki.guildwars2.com/api.php?action=ask&format=json&query=
     [[Sells item::Dragonite Ore]]|?Has vendor
 ```
 
-- **118 merchants in `ref/vendor_offers.json` are Historical NPCs**,
-  holding 3,987 offers before this change and **3,938 after**, across
-  1,910 distinct output items. Largest: Black Lion Voucher Dealer (273),
-  Weapon Master (NPC) (171), Weapon Trader (171), Merchant (WvW
-  weaponsmith) (171), Zakka Hideslicer (157). Every one of those rows can
-  be picked by the solver today, and any priced in an unvalued token
-  ranks as free, which is the exact defect this branch fixed for one
-  vendor out of 118.
-- **The exclusion list cannot absorb this and should not try.** 3,938
+- **118 merchants in `ref/vendor_offers.json` were Historical NPCs**,
+  holding 3,987 offers. This branch refused two of them, leaving **116
+  merchants and 3,817 offers across 1,798 distinct output items**.
+  Largest survivors: Black Lion Voucher Dealer (273), Weapon Master (NPC)
+  (171), Weapon Trader (171), Merchant (WvW weaponsmith) (171), Zakka
+  Hideslicer (157). Every one of those rows can be picked by the solver
+  today, and any priced in an unvalued token ranks as free, which is the
+  exact defect this branch fixed for two vendors out of 118.
+- **The exclusion list cannot absorb this and should not try.** 3,817
   hand-written entries is not a hand-verified list; the file's own header
   says keep it small, and each entry is supposed to be a claim somebody
   checked.
-- **Nor is a blanket filter safe as it stands: 621 output items have
+- **Nor is a blanket filter safe as it stands: 619 output items have
   offers ONLY from a historical NPC.** Dropping the class wholesale would
-  strand every one of them the way the Battle Historian stranded five,
-  and five was small enough to research by hand in an afternoon.
+  strand every one of them the way these two exclusions stranded seven,
+  and seven was small enough to research by hand in an afternoon.
+- **A sub-shape that is cheap to find today: the parenthesised variant.**
+  Both `Scholar Glenna` and `Scholar Glenna (Gaeting Crystal)` exist as
+  wiki pages, and our corpus already carries the disambiguator in the
+  merchant string, so this kind is detectable by NAME before the scrape
+  learns to read any infobox. Same for the `/historical` subpage suffix:
+  30 merchant strings carry it over 3,650 rows (1,332 for `Black Lion
+  Weapons Specialist/historical`, 1,113 for `Gem Store/historical`), and
+  another 12 strings over 291 rows carry a `(historical)` parenthesis.
+  Neither pattern is proof on its own - `Priory Historian (bandit crest
+  collector)` has "Historian" in its name, 37 rows, and is NOT in
+  Category:Historical NPCs - so treat a name match as a candidate list to
+  check against `Is historical`, never as the filter itself.
 - **The fix, for whoever picks this up.** `WikiSmwClient`'s vendor query
   asks for `[[Sells item::+]]` subobjects and never looks at the parent
   page. `Is historical` is available on the parent (`Has vendor.Is
@@ -188,6 +285,8 @@ pin all of it, one of them against the real shipped `ref/` file.
 
 Gate: not required - dev-tool and data change, no rendering path touched.
 Module 3,971, RecipeSeeder 3, VendorOfferUpdater 238 (4,212 total, from a
-4,208 baseline plus the four new tests), all green, and the byte-identical
-round trip of the untouched dataset through the tool's own serializer is
-the verification a desktop gate could not add.
+4,208 baseline plus the four new tests), all green. Two exclusions, 170
+offers removed, seven acquisition hints added. The byte-identical round
+trip of the untouched dataset through the tool's own serializer, run again
+before the second exclusion, is the verification a desktop gate could not
+add.
