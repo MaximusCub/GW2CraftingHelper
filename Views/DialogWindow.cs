@@ -80,5 +80,27 @@ namespace TaimisToolbench.Views
         {
             return new Rectangle(ContentInsetX, ContentInsetY, contentWidth, contentHeight);
         }
+
+        /// <summary>
+        /// Window y of the content region's top edge. ConstructWindow
+        /// (decompiled 1.3.0) lands it at the requested contentRegion.Y
+        /// (ContentInsetY) plus STANDARD_TITLEBAR_HEIGHT (40) less the 11px
+        /// STANDARD_TITLEBAR_VERTICAL_OFFSET floor it clamps the window's
+        /// top padding to - the same 64px <see cref="ChromeHeight"/>'s
+        /// arithmetic already counts.
+        /// </summary>
+        internal const int ContentTopY = ContentInsetY + 40 - 11;
+
+        /// <summary>
+        /// The content-relative Location a child of this window needs for
+        /// its top-left to land at a window-relative point: Blish positions
+        /// every child off the parent's ContentRegion origin, which this
+        /// window parks at (ContentInsetX, <see cref="ContentTopY"/>).
+        /// Nothing outside this class may assume that origin.
+        /// </summary>
+        internal Point ContentLocationFor(Point windowPoint)
+        {
+            return new Point(windowPoint.X - ContentInsetX, windowPoint.Y - ContentTopY);
+        }
     }
 }

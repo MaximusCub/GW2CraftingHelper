@@ -31,10 +31,13 @@ namespace TaimisToolbench.Views.Rendering
         private static readonly Logger Logger = Logger.GetLogger<StickyHeaderHost>();
 
         /// <summary>
-        /// Above the scrolling panel it overlays. Blish paints a container's
-        /// children in ZIndex order, and the clip is a SIBLING of that
-        /// panel: without this it would draw underneath whatever the panel
-        /// scrolls past it.
+        /// Deliberately BELOW the scrolling panel's own: the vendor's default
+        /// <c>Control</c> ZIndex is 5, so this clip paints first and scrolled
+        /// rows would overdraw a pinned band - the viewport's published
+        /// cutoff (Views/Rendering/ClipCutoff.cs) is what keeps the band
+        /// clean, not paint order. The low value is load-bearing for input:
+        /// the hit test walks children by ZIndex descending, so a wheel over
+        /// the pinned band falls through to the scrolling panel behind it.
         /// </summary>
         private const int ClipZIndex = 1;
 
@@ -79,6 +82,17 @@ namespace TaimisToolbench.Views.Rendering
         private readonly Container _parent;
         private readonly Container _scrollRegion;
         private readonly List<Entry> _entries = new List<Entry>();
+
+        // The absolute y of the lowest pinned band's bottom edge, from the
+        // most recent frame's placement. The two runs share one scroll, and
+        // at most one band can pin at a time: StickyHeaderLayout never pins
+        // a band whose table's last row has passed the viewport top, and the
+        // section chrome between the runs keeps the lower band below the
+        // upper table's bottom. The max keeps the rule the viewport's cutoff
+        // implements literal - the lowest pinned edge - so a future layout
+        // that did pin two would still clip the shared content at the lower
+        // band and keep both clean.
+        private int? _pinnedBottom;
 
         /// <summary>Set by the ticker's own failure path; see there.</summary>
         private bool _stopped;
@@ -132,6 +146,7 @@ namespace TaimisToolbench.Views.Rendering
         /// left orphaned in a clip that is about to go away.</summary>
         internal void Clear()
         {
+            _pinnedBottom = null;
             foreach (var entry in _entries)
             {
                 Unpin(entry, entry.Geometry());
@@ -142,10 +157,24 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
+        /// The absolute y of the lowest pinned band's bottom edge as of the
+        /// most recent frame's placement, or null when none is pinned. The
+        /// viewport's authority reads this at paint time: the ticker's update
+        /// and the paint walk are the same main thread with update first, so
+        /// the value is the frame's own. Held rather than reset when the
+        /// ticker's failure path has stopped updates - the frozen placement
+        /// keeps protecting the frozen band.
+        /// </summary>
+        internal int? PinnedBandBottom => _pinnedBottom;
+
+        /// <summary>
         /// One frame's placement for every tracked band. Reads positions and
         /// writes at most a Location and a Size per band, so the common case
         /// - nothing pinned, nothing moved - costs a handful of rectangle
-        /// reads.
+        /// reads. Also folds the pinned bands' bottom edges into
+        /// <see cref="PinnedBandBottom"/> for the viewport's paint-time
+        /// cutoff; the early returns below leave the last computed value
+        /// standing.
         /// </summary>
         internal void Update()
         {
@@ -163,20 +192,28 @@ namespace TaimisToolbench.Views.Rendering
             int originX = parentBounds.X + parentRegion.X;
             int originY = parentBounds.Y + parentRegion.Y;
 
+            _pinnedBottom = null;
             for (int i = 0; i < _entries.Count; i++)
             {
-                Place(_entries[i], viewportTop, viewport.Height, originX, originY);
+                int? bottom = Place(_entries[i], viewportTop, viewport.Height, originX, originY);
+                if (bottom.HasValue
+                    && (!_pinnedBottom.HasValue || bottom.Value > _pinnedBottom.Value))
+                {
+                    _pinnedBottom = bottom;
+                }
             }
         }
 
-        private static void Place(
+        /// <summary>The absolute y of the pinned band's bottom edge, or null
+        /// when nothing is pinned this frame.</summary>
+        private static int? Place(
             Entry entry, int viewportTop, int viewportHeight, int originX, int originY)
         {
             var geometry = entry.Geometry();
             if (!geometry.Present || entry.Home.Parent == null)
             {
                 Unpin(entry, geometry);
-                return;
+                return null;
             }
 
             // The home container's own absolute position already carries the
@@ -194,7 +231,7 @@ namespace TaimisToolbench.Views.Rendering
             if (!placement.Pinned)
             {
                 Unpin(entry, geometry);
-                return;
+                return null;
             }
 
             int clipX = homeBounds.X + homeRegion.X + geometry.X;
@@ -223,6 +260,11 @@ namespace TaimisToolbench.Views.Rendering
             }
 
             entry.Clip.Visible = true;
+
+            // The published line rides the band's live bottom edge - the
+            // clip's own bottom, which the push-out already keeps glued to
+            // its table as the last row scrolls the band away.
+            return viewportTop + placement.ClipY + placement.VisibleHeight;
         }
 
         /// <summary>Puts a band back where its own layout wants it. The

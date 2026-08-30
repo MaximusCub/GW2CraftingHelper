@@ -40,12 +40,13 @@ namespace TaimisToolbench.Tests.Services
             // one equality is what puts all of them on the bar tier.
             Assert.Equal(CurrencyIconTiers.WalletBarIconSize, CoinSegmentMath.CoinIconSize);
 
-            // The currency half of such a run is FRAMED (the module's grey
-            // currency border) and the coin half is not, but the framed box
-            // is the measured window either way: the art is inset inside it.
-            // That equality is what let the border go on without moving a
-            // single segment advance - CoinIconSize is a term in the
-            // minimum-window-width derivation.
+            // The currency half of such a run is frame-less now too (owner
+            // ruling: beside digits it is a symbol, like the coins, not a
+            // subject) but draws at the same measured window the framed
+            // square used to occupy. That equality is what let the border
+            // go on, and come off, without moving a single segment
+            // advance - CoinIconSize is a term in the minimum-window-width
+            // derivation.
             Assert.Equal(
                 CoinSegmentMath.CoinIconSize,
                 ItemIconTiers.FrameSize(ItemIconTier.CurrencyBarRun));

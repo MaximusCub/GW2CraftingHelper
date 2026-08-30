@@ -87,11 +87,11 @@ namespace TaimisToolbench.Services
         /// Narrowest column a cell fits in. Below twice this the grid falls
         /// back to a single column rather than clipping the name line.
         /// <para>
-        /// 582px - the cell's whole width, term by term: the icon column,
+        /// 586px - the cell's whole width, term by term: the icon column,
         /// a 45-character name, the gap before the Amount column, that
         /// column's own floor, and the cell's right pad. Two columns fit
         /// inside the 1252px grid the 1378px window minimum leaves (626px
-        /// each) and a third only once the window reaches 1872px.
+        /// each) and a third only once the window reaches 1884px.
         /// </para>
         /// </summary>
         public const int SnapshotMinColumnWidth =

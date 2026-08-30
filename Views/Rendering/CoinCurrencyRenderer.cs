@@ -389,9 +389,11 @@ namespace TaimisToolbench.Views.Rendering
                 // name text anywhere in this cell (unlike SummarySectionRenderer.
                 // CreateCurrencyRow, which prints the name as a label before
                 // the icon) - a hover tooltip is the only way to identify it.
-                // Framed at the bar tier, whose art is inset inside the
-                // measured 16px box, so this segment's advance below is the
-                // number it always was.
+                // Frame-less at the bar tier: beside the digits this icon is
+                // a currency symbol in the coin denominations' role, and
+                // they take no border (IconFrameGeometry.CurrencyIsFramed).
+                // It still occupies the measured 16px window, so this
+                // segment's advance below is the number it always was.
                 var icon = IconControls.CreateCurrencyIcon(
                     parent, seg.IconUrl, x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap,
                     y + iconYOffset, ItemIconTier.CurrencyBarRun, seg.Name);

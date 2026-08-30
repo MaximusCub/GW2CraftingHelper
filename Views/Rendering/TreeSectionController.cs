@@ -160,8 +160,10 @@ namespace TaimisToolbench.Views.Rendering
             /// The SAME instance for the row's whole life. The row's click
             /// guard closes over it to ask whether a pill is under the
             /// cursor, so a refresh must refill it, never replace it.
+            /// Holds Controls, not Panels: the IGNORE toggle is the module's
+            /// FeedbackButton, not a pill panel.
             /// </summary>
-            internal readonly List<Panel> Pills = new List<Panel>();
+            internal readonly List<Control> Pills = new List<Control>();
 
             /// <summary>
             /// Each pill's x measured from the pill column's own left edge,
@@ -249,6 +251,14 @@ namespace TaimisToolbench.Views.Rendering
         private int _pillColumnWidth = PlanRelayoutMath.TreePillColumnWidth;
         private int _planPillColumnFloor = PlanRelayoutMath.TreePillColumnWidth;
 
+        // How much of THIS render's pill column was claimed from the cost
+        // column's reserve above what its rows draw
+        // (TreePillColumnMath.RightClaim). EffectiveCostColumnWidth hands
+        // the claim back out of the cost column's reserved width, which is
+        // what extends the pills toward the cost ink without moving
+        // PillColX; zero whenever the column is at its floor.
+        private int _pillColumnCostClaim;
+
         // This render's Recipe Tree section header - the element
         // CollapseAll re-anchors the viewport to.
         private Panel _treeHeaderPanel;
@@ -294,6 +304,7 @@ namespace TaimisToolbench.Views.Rendering
             _treeHeaderRelayout = null;
             _costColumnWidths = TreeCostColumnMath.CostColumnWidths.Empty;
             _pillColumnWidth = PlanRelayoutMath.TreePillColumnWidth;
+            _pillColumnCostClaim = 0;
 
             // Withdrawn with the render pass that published them: the tree
             // actions operate on the controls this reset is about to
@@ -323,6 +334,7 @@ namespace TaimisToolbench.Views.Rendering
             // fact and is cleared with it.
             _planCostColumnFloor = TreeCostColumnMath.CostColumnWidths.Empty;
             _planPillColumnFloor = PlanRelayoutMath.TreePillColumnWidth;
+            _pillColumnCostClaim = 0;
             _sourceHeaderInkWidth = 0;
             _lastResult = result;
         }
@@ -408,8 +420,11 @@ namespace TaimisToolbench.Views.Rendering
 
             // Second data-derived column, after the cost one because it
             // spends what the cost column leaves - see
-            // ScannedPillColumnWidth.
-            _pillColumnWidth = ScannedPillColumnWidth(_treeRoots, panelWidth);
+            // ScannedPillColumnWidth. The claim is what it spent of the
+            // cost column's own slack, which EffectiveCostColumnWidth
+            // hands back below.
+            _pillColumnWidth = ScannedPillColumnWidth(_treeRoots, panelWidth, out int pillCostClaim);
+            _pillColumnCostClaim = pillCostClaim;
             _planPillColumnFloor = _pillColumnWidth;
 
             // Parenthesised count, like every other countable section
@@ -867,15 +882,21 @@ namespace TaimisToolbench.Views.Rendering
         /// <summary>
         /// Width the cost column actually needs this render: its fixed
         /// floor, or the pre-scanned sub-columns' real total when a tree
-        /// full of multi-gold (or currency-priced) values needs more. The
-        /// column's RIGHT edge never moves, so widening it only pushes the
-        /// decision pills and the name budget left - which is the point:
-        /// before, a wide cost run silently overprinted the pills.
+        /// full of multi-gold (or currency-priced) values needs more - less
+        /// whatever slack the decision-pill column claimed from that floor
+        /// (ScannedPillColumnWidth's out claim, never below the sub-columns'
+        /// total). The column's RIGHT edge never moves, so narrowing it
+        /// only lets the pills and their ink closer to values that are
+        /// right-aligned anyway; widening it pushes the decision pills and
+        /// the name budget left - which is the point: before, a wide cost
+        /// run silently overprinted the pills.
         /// </summary>
         private int EffectiveCostColumnWidth()
         {
             int scanned = TreeCostColumnMath.TotalWidth(_costColumnWidths);
-            return scanned > TreeCostColumnWidth ? scanned : TreeCostColumnWidth;
+            int reserve = scanned > TreeCostColumnWidth ? scanned : TreeCostColumnWidth;
+            int effective = reserve - _pillColumnCostClaim;
+            return effective > scanned ? effective : scanned;
         }
 
         /// <summary>
@@ -917,22 +938,24 @@ namespace TaimisToolbench.Views.Rendering
         /// Blish-bound half of the pill-column scan: the walk and the
         /// arithmetic live in TreePillColumnMath, this supplies the
         /// measurements they cannot make. Answers the width to reserve
-        /// this render - the widest full run any row in the tree needs,
-        /// floored at PlanRelayoutMath.TreePillColumnWidth, capped so the
-        /// name column keeps everything it holds at the module's minimum
-        /// window width plus half of every pixel past it, and floored
-        /// again at what this plan has already reserved so an ignore
-        /// cannot narrow the column mid-plan.
+        /// this render: the widest full run any row needs, floored at
+        /// PlanRelayoutMath.TreePillColumnWidth and at what this plan has
+        /// already reserved (an ignore cannot narrow the column mid-plan),
+        /// capped at the space actually available between the two
+        /// neighbours' minimums - TreePillColumnMath.Affordable's whole
+        /// surplus past the module's minimum window leftward, plus this
+        /// cost column's reserve above its content rightward.
         /// <para>
-        /// Reads the CURRENT panel width once, at build time, and the rows
-        /// then carry it: the pill fit stays width-invariant, so a resize
-        /// drag repositions and re-ellipsizes without refitting, exactly
-        /// as it did when the column was a constant. Narrowing the window
-        /// afterwards ellipsizes names harder rather than moving pills -
-        /// the same trade the data-derived COST column has always made.
+        /// <paramref name="costClaim"/> is how much came from that
+        /// rightward direction: EffectiveCostColumnWidth nets it out of
+        /// the cost column's reserved width, extending the pills toward
+        /// the cost ink without moving PillColX, any cost value or any
+        /// name budget. An out parameter, not a field write, because
+        /// TryRefreshInPlace asks this method as a pure gate question.
         /// </para>
         /// </summary>
-        private int ScannedPillColumnWidth(IReadOnlyList<CraftingTreeNode> roots, int panelWidth)
+        private int ScannedPillColumnWidth(
+            IReadOnlyList<CraftingTreeNode> roots, int panelWidth, out int costClaim)
         {
             var font = UiFonts.Caption;
             var plan = _host.CurrentPlan;
@@ -973,20 +996,44 @@ namespace TaimisToolbench.Views.Rendering
                     leading, PillGap, anchored ? toggleSlot : 0);
             });
 
+            // The cost column's reserve above what its rows actually draw
+            // is the room toward the currency column: reserve minus
+            // TotalWidth, never negative, and fresh off _costColumnWidths
+            // rather than EffectiveCostColumnWidth because the latter
+            // already nets out the PREVIOUS render's claim.
+            int costTotal = TreeCostColumnMath.TotalWidth(_costColumnWidths);
+            int costSlack = TreeCostColumnWidth - costTotal;
+            if (costSlack < 0)
+            {
+                costSlack = 0;
+            }
+
             // A panel width of 0 is the "no content panel" answer
             // (CraftingPlanView.GetCurrentPanelWidth); it must not be read
             // as a window with no surplus, which would pin the column to
             // its floor for the rest of the plan.
+            int surplus = panelWidth
+                - WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth);
             int affordable = panelWidth > 0
                 ? TreePillColumnMath.Affordable(
                     panelWidth,
                     PlanRelayoutMath.TreePillColumnWidth,
-                    WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth))
+                    WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth),
+                    costSlack)
                 : _planPillColumnFloor;
 
             int width = TreePillColumnMath.ColumnWidth(
                 required, PlanRelayoutMath.TreePillColumnWidth, affordable);
-            return width > _planPillColumnFloor ? width : _planPillColumnFloor;
+            width = width > _planPillColumnFloor ? width : _planPillColumnFloor;
+
+            costClaim = panelWidth > 0
+                ? TreePillColumnMath.RightClaim(
+                    width,
+                    PlanRelayoutMath.TreePillColumnWidth,
+                    surplus,
+                    costSlack)
+                : 0;
+            return width;
         }
 
         /// <summary>
@@ -1605,7 +1652,7 @@ namespace TaimisToolbench.Views.Rendering
             // Same gate for the pill column, and for the same reason: the
             // rows this refresh preserves were placed against the width
             // already on screen.
-            if (ScannedPillColumnWidth(newRoots, _host.PanelWidth) != _pillColumnWidth)
+            if (ScannedPillColumnWidth(newRoots, _host.PanelWidth, out _) != _pillColumnWidth)
             {
                 return false;
             }
@@ -1879,7 +1926,7 @@ namespace TaimisToolbench.Views.Rendering
         /// uses to pick a header cell out of its band.
         /// </para>
         /// </summary>
-        private static bool CursorOverPill(Panel rowPanel, List<Panel> pillPanels)
+        private static bool CursorOverPill(Control rowPanel, List<Control> pillPanels)
         {
             if (rowPanel == null || pillPanels == null)
             {
@@ -1982,7 +2029,7 @@ namespace TaimisToolbench.Views.Rendering
                     anchoredIndex,
                     TreePillRunLayout.AnchoredSlotX(maxRightEdge, anchoredWidth),
                     anchoredWidth,
-                    IgnoreGlyphWidth()));
+                    0));
             }
 
             // Right edge of this row's INK, which the "Source" header
@@ -2005,43 +2052,74 @@ namespace TaimisToolbench.Views.Rendering
 
                 PillColors.GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
 
-                // The IGNORE toggle draws a mark, not a word - see
-                // IgnoreGlyphText - so it takes the glyph face, its own
-                // line-box offset, and a colour that inverts with the key
-                // under it.
                 bool isToggle = spec.Kind == PillKind.Ignore;
-                var pillFont = isToggle ? IgnoreGlyphFont() : font;
-                string pillText = isToggle ? IgnoreGlyphText() : spec.Text;
-                int labelY = isToggle ? GlyphPillLabelY : PillLabelY;
-
-                // White, not borderColor: Selected/Available fills expose the
-                // border hue behind the label, so border-colored text has zero
-                // contrast against its own backdrop.
-                Color textColor = isToggle
-                    ? PillColors.GlyphColor(node.IsIgnored, dimmed)
-                    : Color.White;
-                // Chrome (UNKNOWN/UNRECOGNIZED/CURRENCY/GUILD UPGRADE/the
-                // sole-source badge) reads one tier below a pill you can
-                // act on, matching the recessed ring PillColors gives it.
-                if (PillColors.IsNonInteractiveChrome(spec.Kind))
+                Control outer;
+                Panel inner = null;
+                Label label = null;
+                FeedbackButton toggle = null;
+                if (isToggle)
                 {
-                    textColor *= PillColors.NonInteractiveTextAlpha;
-                }
+                    // The toggle is the module's real button, not a pill
+                    // panel: Blish's own face atlas, border art, hover sweep
+                    // and press feedback come from FeedbackButton, which is
+                    // a StandardButton. Its size is the row-action square
+                    // (Services/GlyphButtonMetrics), and it fills its slot
+                    // exactly so the anchored rectangle below IS the hit
+                    // target in both states. The black mark on the parchment
+                    // face is the button's own enabled ink; SetGlyph pairs
+                    // the mark with the one face that can draw it.
+                    toggle = new FeedbackButton
+                    {
+                        Size = new Point(placement.Width, PillHeight),
+                        Location = new Point(placement.X, pillY),
+                        Parent = rowPanel,
+                    };
+                    toggle.SetGlyph(UiGlyphs.RemoveMark);
+                    if (node.IsIgnored)
+                    {
+                        toggle.PlateTint = fillColor;
+                    }
 
-                if (dimmed)
+                    if (dimmed)
+                    {
+                        // The whole control washes, not the colors: Opacity
+                        // multiplies into every DrawOnCtrl call, so the
+                        // plate, border and mark dim together and the state
+                        // contrast inside the button survives.
+                        toggle.Opacity = PillColors.DimmedPillFactor;
+                    }
+
+                    outer = toggle;
+                }
+                else
                 {
-                    // PillColors.DimmedPillFactor, not the 0.35 this row's
-                    // name/quantity/cost use - see that constant's own doc
-                    // comment for why a pill needs a higher floor than the
-                    // text around it.
-                    borderColor *= PillColors.DimmedPillFactor;
-                    fillColor *= PillColors.DimmedPillFactor;
-                    textColor *= PillColors.DimmedPillFactor;
-                }
+                    // White, not borderColor: Selected/Available fills expose the
+                    // border hue behind the label, so border-colored text has zero
+                    // contrast against its own backdrop.
+                    Color textColor = Color.White;
+                    // Chrome (UNKNOWN/UNRECOGNIZED/CURRENCY/GUILD UPGRADE/the
+                    // sole-source badge) reads one tier below a pill you can
+                    // act on, matching the recessed ring PillColors gives it.
+                    if (PillColors.IsNonInteractiveChrome(spec.Kind))
+                    {
+                        textColor *= PillColors.NonInteractiveTextAlpha;
+                    }
 
-                var outer = CreatePillPanel(
-                    rowPanel, pillText, pillFont, pillWidth, textWidth, placement.X, pillY, labelY,
-                    borderColor, fillColor, textColor, out Panel inner, out Label label);
+                    if (dimmed)
+                    {
+                        // PillColors.DimmedPillFactor, not the 0.35 this row's
+                        // name/quantity/cost use - see that constant's own doc
+                        // comment for why a pill needs a higher floor than the
+                        // text around it.
+                        borderColor *= PillColors.DimmedPillFactor;
+                        fillColor *= PillColors.DimmedPillFactor;
+                        textColor *= PillColors.DimmedPillFactor;
+                    }
+
+                    outer = CreatePillPanel(
+                        rowPanel, spec.Text, font, pillWidth, textWidth, placement.X, pillY, PillLabelY,
+                        borderColor, fillColor, textColor, out inner, out label);
+                }
 
                 // The dimmed-only difference between this and the two flags
                 // below is exactly what the dead-click tooltip at the
@@ -2049,6 +2127,16 @@ namespace TaimisToolbench.Views.Rendering
                 bool clickableWhenActive = DecisionPillPlanner.IsInteractive(spec);
                 bool interactive = !dimmed && spec.Source.HasValue && _resolveOverridesSync != null;
                 bool ignoreInteractive = !dimmed && spec.Kind == PillKind.Ignore && _resolveOverridesSync != null;
+
+                // The pill went inert on a dimmed row by never being wired;
+                // a button is born armed, so Enabled is the switch: Blish
+                // gates Click on it and PressFeedback.Wire checks it before
+                // dimming or sounding. The hover sweep still plays, which is
+                // the behaviour the disabled Generate button already has.
+                if (toggle != null && !ignoreInteractive)
+                {
+                    toggle.Enabled = false;
+                }
 
                 // Built outside the interactive arm below: a decisively-
                 // losing pill owes the reader its "why it loses" text
@@ -2107,10 +2195,18 @@ namespace TaimisToolbench.Views.Rendering
 
                         ApplyOverridesAndResolve();
                     };
-                    Color restingBorder = borderColor;
-                    outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
-                    outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
-                    PressFeedback.Wire(outer);
+
+                    // The toggle's press and hover are already its own: the
+                    // FeedbackButton constructor wired PressFeedback, and the
+                    // hover sweep is Blish's OnMouseEntered tween. Only the
+                    // pill needs this hand-rolled wash-and-restore pair.
+                    if (!isToggle)
+                    {
+                        Color restingBorder = borderColor;
+                        outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
+                        outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
+                        PressFeedback.Wire(outer);
+                    }
                 }
 
                 // Appends the value-detail
@@ -2180,8 +2276,15 @@ namespace TaimisToolbench.Views.Rendering
                 if (!pillContent.IsEmpty)
                 {
                     TooltipFacility.ApplyRich(outer, pillContent);
-                    TooltipFacility.ApplyRich(inner, pillContent);
-                    TooltipFacility.ApplyRich(label, pillContent);
+                    if (inner != null)
+                    {
+                        // The toggle has no children to fan out to; a pill's
+                        // inner fill and label cover almost the whole pill,
+                        // so a tooltip on outer alone is swallowed by
+                        // whichever child is under the cursor.
+                        TooltipFacility.ApplyRich(inner, pillContent);
+                        TooltipFacility.ApplyRich(label, pillContent);
+                    }
                 }
 
                 pillPanels.Add(outer);
@@ -2240,9 +2343,9 @@ namespace TaimisToolbench.Views.Rendering
         /// <summary>
         /// One pill's resolved geometry: which spec it draws, where it
         /// sits, and how wide its slot and its text are. Text width is
-        /// carried separately because the anchored IGNORE slot is wider
-        /// than the text currently in it (Services/TreePillRunLayout), so
-        /// the label cannot be centred from the slot's padding alone.
+        /// carried separately because a pill's slot includes padding the
+        /// label must not count; the IGNORE toggle carries none, since
+        /// its FeedbackButton centres its own mark.
         /// </summary>
         private readonly struct PillPlacement
         {
@@ -2280,52 +2383,26 @@ namespace TaimisToolbench.Views.Rendering
                 : measureText(spec.Text) + PillPadding;
         }
 
-        private static int ReservedIgnorePillWidth()
-        {
-            int mark = IgnoreGlyphWidth();
-            return TreePillRunLayout.ReservedSlotWidth(mark, mark, PillPadding);
-        }
-
         /// <summary>
-        /// The IGNORE toggle's face: a remove mark rather than a word, so
-        /// the control needs no translating and its two states cannot
-        /// differ in width. State is carried by the key it is drawn into -
-        /// outlined when off, filled and darker-edged when on
-        /// (PillColors) - and named in words only by the tooltip
-        /// (PillTooltipTextComposer), which is the one place the reader
-        /// can ask.
+        /// The IGNORE toggle's slot width, which is the button itself: a
+        /// FeedbackButton at the module's row-action square
+        /// (Services/GlyphButtonMetrics), the compact close-key scale the
+        /// field report benchmarked it against. Nothing is padded on top of
+        /// the button's edge, because padding outside a filled button is a
+        /// dead strip the row's expand/collapse click would answer - the
+        /// exact mis-hit the anchored slot exists to prevent.
         /// <para>
-        /// Same degraded path FeedbackButton.SetGlyph takes: an install
-        /// whose ref/glyphs.fnt did not load falls back to the ASCII the
-        /// mark stands in for, because a codepoint with no region draws
-        /// nothing AND advances nothing.
+        /// The slot is state-independent by construction: the button draws
+        /// the same mark raised or filled (FeedbackButton.PlateTint), so
+        /// ignoring an item re-renders the toggle at the same rectangle it
+        /// was clicked in (Services/TreePillRunLayout).
         /// </para>
         /// </summary>
-        private static string IgnoreGlyphText()
+        private static int ReservedIgnorePillWidth()
         {
-            return UiFonts.GlyphsAvailable
-                ? UiGlyphs.RemoveMark
-                : UiGlyphs.AsciiFallback(UiGlyphs.RemoveMark);
+            return GlyphButtonMetrics.RowActionSize;
         }
 
-        private static BitmapFont IgnoreGlyphFont()
-        {
-            return UiFonts.GlyphsAvailable ? UiFonts.Glyphs : UiFonts.Caption;
-        }
-
-        private static int IgnoreGlyphWidth()
-        {
-            return (int)Math.Ceiling(IgnoreGlyphFont().MeasureString(IgnoreGlyphText()).Width);
-        }
-
-        /// <summary>
-        /// Label y inside the pill's inset fill panel for the glyph face,
-        /// whose 24px line box is the pill's whole height: the mark's own
-        /// ink sits 3px down that box (ref/glyphs.fnt), and the inset panel
-        /// is PillHeight - 2 tall, so 0 centres the 16px mark in it. The
-        /// text faces keep <see cref="PillLabelY"/>.
-        /// </summary>
-        private const int GlyphPillLabelY = 0;
         private const int PillLabelY = 2;
 
         /// <summary>

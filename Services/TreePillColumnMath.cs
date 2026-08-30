@@ -11,10 +11,10 @@ namespace TaimisToolbench.Services
     /// <para>
     /// The width is data-derived, as the cost column's already is
     /// (TreeSectionController.EffectiveCostColumnWidth): the widest run any
-    /// row needs, floored at the fixed width so nothing narrows, and capped
-    /// by <see cref="Affordable"/> so the name column cannot be starved.
-    /// A flat width chipped "+N" on rows the window had room for, because
-    /// the name column flexes and absorbs what the pills were denied.
+    /// row needs, floored so nothing narrows, and capped by
+    /// <see cref="Affordable"/> at the space actually available between
+    /// the column's two neighbours' minimums. A flat width chipped "+N"
+    /// on rows the window had room for; so did half-the-surplus.
     /// </para>
     /// <para>
     /// INVARIANT: the result is held as a one-way floor for the life of a
@@ -70,26 +70,56 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// The most the pill column may claim at this panel width: its
-        /// fixed floor, plus half of whatever the window has beyond the
-        /// module's minimum.
+        /// fixed floor, plus the whole surplus the window has beyond the
+        /// module's minimum (leftward), plus the cost column's
+        /// <paramref name="rightSlack"/> - its reserve above what its rows
+        /// actually draw (rightward).
         /// <para>
-        /// At the minimum width the column cannot grow at all, so every
-        /// pinned deep-row budget the minimum was derived from
-        /// (docs/research/minimum-window-width.md) is untouched. Above it
-        /// the two flexible things - the pills' unmet need and the name
-        /// column - split the surplus, so widening the window can never
-        /// leave the name column narrower than it was one pixel earlier.
-        /// Half rather than all of it because the name column is what the
-        /// extra width is normally FOR; the pills only take from that share
-        /// what they can actually use, since
-        /// <see cref="ColumnWidth"/> never returns more than the widest row
-        /// asked for.
+        /// Each direction stops at that side's own minimum. Leftward, the
+        /// name column keeps the budget it holds at the minimum window -
+        /// the budgets docs/research/minimum-window-width.md was derived
+        /// from - so at or below that minimum the surplus term is zero and
+        /// no leftward growth is possible. Rightward, the cost column keeps
+        /// TreeCostColumnMath.TotalWidth, and the claim swaps its reserve
+        /// for pill width one-for-one (<see cref="RightClaim"/>), so
+        /// PillColX - and with it every name budget - holds wherever the
+        /// unclaimed layout put it. Widening the window can therefore
+        /// never leave the name column narrower than one pixel earlier.
         /// </para>
         /// </summary>
-        public static int Affordable(int panelWidth, int floorWidth, int minimumPanelWidth)
+        public static int Affordable(
+            int panelWidth, int floorWidth, int minimumPanelWidth, int rightSlack)
         {
             int surplus = panelWidth - minimumPanelWidth;
-            return surplus > 0 ? floorWidth + (surplus / 2) : floorWidth;
+            if (surplus < 0)
+            {
+                surplus = 0;
+            }
+
+            return floorWidth + surplus + (rightSlack > 0 ? rightSlack : 0);
+        }
+
+        /// <summary>
+        /// How much of <paramref name="columnWidth"/> came from the cost
+        /// column's side: everything beyond the floor and the panel's
+        /// whole surplus, clamped to <paramref name="rightSlack"/> - the
+        /// reserve the cost column holds above what its rows draw. The
+        /// caller shrinks the cost column's reserved width by the answer
+        /// (never below TotalWidth), which is what extends the pill
+        /// column's right edge toward the cost ink without moving
+        /// PillColX, the cost values or any name budget.
+        /// </summary>
+        public static int RightClaim(
+            int columnWidth, int floorWidth, int surplus, int rightSlack)
+        {
+            int claim = columnWidth - floorWidth - (surplus > 0 ? surplus : 0);
+            if (claim < 0)
+            {
+                claim = 0;
+            }
+
+            int slack = rightSlack > 0 ? rightSlack : 0;
+            return claim > slack ? slack : claim;
         }
 
         /// <summary>

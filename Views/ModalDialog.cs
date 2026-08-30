@@ -13,6 +13,10 @@ namespace TaimisToolbench.Views
     {
         private const string WindowId = "TaimisToolbench_ModalDialog_c4f19a";
 
+        // Every caller shares this one dialog, and every one of them is
+        // confirming or acknowledging something - the word the window ships.
+        private const string TitleText = "Confirm";
+
         // Sizing, arrangement and every clamp: Services/DialogLayoutMath,
         // which is measured against the message and the button labels this
         // Show was handed. Nothing here is a geometry constant any more.
@@ -53,7 +57,12 @@ namespace TaimisToolbench.Views
             {
                 BackgroundColor = new Color(30, 30, 30),
                 Parent = GameService.Graphics.SpriteScreen,
-                Title = "Confirm",
+                // Blank on purpose: Blish paints WindowBase2's own Title
+                // left-aligned at a fixed indent with no alignment control
+                // (decompiled 1.3.0, PaintTitleText), so the centered title
+                // this dialog ships is drawn by ShowCore instead - it
+                // renders TitleText as a Label of its own.
+                Title = string.Empty,
                 Id = WindowId,
                 TopMost = true,
             };
@@ -145,13 +154,14 @@ namespace TaimisToolbench.Views
             var buttonMeasure = LabelHelpers.MeasureWith(UiFonts.Caption);
             int lineHeight = font.LineHeight > 0 ? font.LineHeight : 1;
             string cancelLabel = string.IsNullOrEmpty(cancelText) ? "Cancel" : cancelText;
+            int titleWidth = LabelHelpers.MeasureWith(UiFonts.Display)(TitleText);
 
             var screen = GameService.Graphics.SpriteScreen;
             var layout = DialogLayoutMath.Measure(
                 new[] { message ?? "" },
                 measure,
                 lineHeight,
-                LabelHelpers.MeasureWith(UiFonts.Display)(_window.Title),
+                titleWidth,
                 buttonMeasure(confirmText ?? ""),
                 acknowledgeOnly ? -1 : buttonMeasure(cancelLabel),
                 DialogLayoutMath.MaxContentWidth(screen.Width, DialogWindow.ChromeWidth),
@@ -160,6 +170,28 @@ namespace TaimisToolbench.Views
             // Before the children: they are placed against the region this
             // call establishes.
             _window.Resize(layout.ContentWidth, layout.ContentHeight);
+
+            // The window's title, drawn by us because Blish paints its own
+            // left-aligned at a fixed indent with no alignment control
+            // (decompiled 1.3.0, PaintTitleText). Same face, the same
+            // line-box top Blish used and the same ColonialWhite it paints
+            // in, so the centred word reads exactly where the left-aligned
+            // one did, only moved. ClipsBounds off: the seat is above the
+            // content region, and Container.PaintChildren scissors a
+            // clipping child to that region.
+            var title = new Label()
+            {
+                Text = TitleText,
+                Font = UiFonts.Display,
+                TextColor = ContentService.Colors.ColonialWhite,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                ClipsBounds = false,
+            };
+            title.Location = _window.ContentLocationFor(new Point(
+                DialogLayoutMath.TitleX(_window.Width, title.Width),
+                DialogLayoutMath.TitleLineY));
+            title.Parent = _window;
 
             // One Label per physical line, each centred on the content box.
             // A single multi-line Label centres only the BLOCK: Blish paints

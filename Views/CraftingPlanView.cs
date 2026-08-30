@@ -61,7 +61,10 @@ namespace TaimisToolbench.Views
         /// defence in depth, because nothing can catch a plain Panel added
         /// inside the viewport later - the repo invariants bar a test from
         /// referencing UI code - and because SlipBudget is measured at the
-        /// four known GW2 UI Sizes rather than proved for a fifth.
+        /// four known GW2 UI Sizes rather than proved for a fifth. Since
+        /// the viewport's top edge sits on the separator rule itself, this
+        /// cover also carries real pixels at the sub-unity UI Sizes, where
+        /// the cutoff's SlipBudget lands inside the rule's own 2px.
         /// </summary>
         private const int TopStripZIndex = 1;
 
@@ -2177,11 +2180,13 @@ namespace TaimisToolbench.Views
             // Scrollable content area - full width so scrollbar sits at the window edge.
             // Children use (Width - RightEdgePadding) to keep content clear of the scrollbar.
             // ClipAuthorityFlowPanel, not FlowPanel: this panel's top edge
-            // is the horizontal line nothing below the pinned strip may
-            // paint above, and it is the only control that can publish that
-            // line for its own subtree - see Views/Rendering/ClipCutoff.cs
-            // and Services/ClipCutoffMath.cs. Every container built inside
-            // it re-asserts the line, which is what makes the cutoff
+            // is the separator rule itself (layout.ContentY == SeparatorY),
+            // so the cutoff lands on the rule's bottom edge and rows clip
+            // flush against it - TopRegionLayoutMath.SeparatorToContentGap.
+            // It is the only control that can publish that line for its own
+            // subtree - see Views/Rendering/ClipCutoff.cs and
+            // Services/ClipCutoffMath.cs. Every container built inside it
+            // re-asserts the line, which is what makes the cutoff
             // independent of how deep the recipe tree nests.
             _contentPanel = new ClipAuthorityFlowPanel()
             {

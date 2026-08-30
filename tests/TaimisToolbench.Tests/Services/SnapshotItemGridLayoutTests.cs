@@ -45,11 +45,12 @@ namespace TaimisToolbench.Tests.Services
                 + WindowSizing.WindowToTabPanelChrome;
 
             // Re-pinned when the Amount header gained its persistent sort
-            // indicator (AmountColumnFloor 95, was 79): the wider column
-            // moves the thresholds right, and the two-column floor still
-            // clears the enforced window minimum.
-            Assert.Equal(1290, windowForTwoColumns);
-            Assert.Equal(1872, windowForThreeColumns);
+            // indicator (AmountColumnFloor 95, was 79), and again when the
+            // indicator's gap doubled (floor 99): the wider column moves
+            // the thresholds right, and the two-column floor still clears
+            // the enforced window minimum.
+            Assert.Equal(1298, windowForTwoColumns);
+            Assert.Equal(1884, windowForThreeColumns);
 
             // The enforced minimum sits between them, which is the whole
             // claim: every client that can hold the minimum is at least
@@ -152,12 +153,12 @@ namespace TaimisToolbench.Tests.Services
         [InlineData(0, 1)]
         [InlineData(-100, 1)]
         [InlineData(1, 1)]
-        [InlineData(581, 1)]
-        [InlineData(1163, 1)]
-        [InlineData(1164, 2)]
-        [InlineData(1745, 2)]
-        [InlineData(1746, 3)]
-        [InlineData(2910, 5)]
+        [InlineData(585, 1)]
+        [InlineData(1171, 1)]
+        [InlineData(1172, 2)]
+        [InlineData(1757, 2)]
+        [InlineData(1758, 3)]
+        [InlineData(2930, 5)]
         public void ComputeColumnCount_AddsAColumnPerWholeMinColumnWidth(int gridWidth, int expected)
         {
             Assert.Equal(expected, SnapshotItemGridLayout.ComputeColumnCount(gridWidth));

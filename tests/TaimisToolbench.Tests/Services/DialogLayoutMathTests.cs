@@ -413,5 +413,49 @@ namespace TaimisToolbench.Tests.Services
                 Assert.Equal((500 - lineWidth) / 2, DialogLayoutMath.LineX(500, lineWidth));
             }
         }
+
+        // --- The self-drawn title ---
+        [Fact]
+        public void TitleX_CentresOverTheWindowWidth()
+        {
+            Assert.Equal(200, DialogLayoutMath.TitleX(500, 100));
+            Assert.Equal(45, DialogLayoutMath.TitleX(500, 410));
+        }
+
+        [Fact]
+        public void TitleX_AtTheTitleFloor_LandsOnTheIndentBlishUsed()
+        {
+            // At the width Measure() floors a titled dialog at, the centred
+            // title starts exactly at the 80px indent the fixed left-aligned
+            // title drew at and ends exactly TitleRightReserve short of the
+            // right edge - so centring neither gains nor loses exit-button
+            // clearance, whatever the title measures.
+            int titleWidth = 120;
+            int flooredWindow = DialogLayoutMath.TitleTextIndent + titleWidth
+                + DialogLayoutMath.TitleRightReserve;
+
+            Assert.Equal(
+                DialogLayoutMath.TitleTextIndent,
+                DialogLayoutMath.TitleX(flooredWindow, titleWidth));
+        }
+
+        [Fact]
+        public void TitleX_PinsAnOverwideTitleLeftRatherThanOverhangingBothWays()
+        {
+            Assert.Equal(0, DialogLayoutMath.TitleX(100, 300));
+            Assert.Equal(0, DialogLayoutMath.TitleX(0, 40));
+            Assert.Equal(0, DialogLayoutMath.TitleX(-50, 40));
+        }
+
+        [Fact]
+        public void TitleLineY_IsTheLineBoxTopBlishPaintsItsOwnTitleAt()
+        {
+            // Decompiled 1.3.0: PaintTitleText's destination rectangle
+            // starts at TitleBarBounds.Y (0) less the 11px offset the
+            // title-bar textures sit at. A self-drawn title seating
+            // anywhere else reads at a different height than the built-in
+            // one did.
+            Assert.Equal(-11, DialogLayoutMath.TitleLineY);
+        }
     }
 }

@@ -9,6 +9,14 @@ namespace TaimisToolbench.Tests.Services
     /// icon a filled frame plate, and the mostly-transparent currency art let
     /// it through as a grey BACKGROUND nobody asked for. The border must be a
     /// ring, so the assertions below are about what is NOT painted.
+    /// <para>
+    /// Since the owner's context ruling the ring is also CONTEXT-bound:
+    /// only the list tier draws one - the bar tier's inline symbol takes no
+    /// frame at all, exactly like the coin icons beside it - so the ring
+    /// assertion pins the list tier's 32px window alone, and
+    /// <see cref="IconFrameGeometry.CurrencyIsFramed"/> is what the context
+    /// assertions pin.
+    /// </para>
     /// </summary>
     public class IconFrameGeometryTests
     {
@@ -32,20 +40,43 @@ namespace TaimisToolbench.Tests.Services
             return painted;
         }
 
-        [Theory]
-        [InlineData(CurrencyIconTiers.WalletBarIconSize)]
-        [InlineData(CurrencyIconTiers.WalletListIconSize)]
-        public void ACurrencyFrame_PaintsTheRingAndNothingInsideIt(int frameSize)
+        [Fact]
+        public void TheSettingsAndWalletContexts_KeepTheCurrencyBorder()
         {
-            const int Thickness = ItemIconTiers.FrameBorder;
-            var painted = PaintedPixels(frameSize, frameSize, Thickness);
+            // A list-row icon is a row's subject: the Settings valuation
+            // grid, the Snapshot wallet rows, the plan Summary's currency
+            // table and the Ranker's shortfall list all read it as an icon.
+            Assert.True(IconFrameGeometry.CurrencyIsFramed(ItemIconTier.CurrencyListRow));
+        }
+
+        [Fact]
+        public void TheInlineSymbolContext_TakesNoFrameLikeTheCoins()
+        {
+            // Beside digits the icon is a unit symbol in the gold/silver/
+            // copper coins' role, and the coins carry no border at all.
+            Assert.False(IconFrameGeometry.CurrencyIsFramed(ItemIconTier.CurrencyBarRun));
+        }
+
+        [Fact]
+        public void ACurrencyFrameOnANonCurrencyTier_IsAProgrammingError()
+        {
+            Assert.Throws<System.ArgumentOutOfRangeException>(
+                () => IconFrameGeometry.CurrencyIsFramed(ItemIconTier.BagSlot));
+        }
+
+        [Fact]
+        public void AListTierCurrencyFrame_PaintsTheRingAndNothingInsideIt()
+        {
+            const int frameSize = CurrencyIconTiers.WalletListIconSize;
+            const int thickness = ItemIconTiers.FrameBorder;
+            var painted = PaintedPixels(frameSize, frameSize, thickness);
 
             for (int x = 0; x < frameSize; x++)
             {
                 for (int y = 0; y < frameSize; y++)
                 {
-                    bool onRing = x < Thickness || y < Thickness
-                        || x >= frameSize - Thickness || y >= frameSize - Thickness;
+                    bool onRing = x < thickness || y < thickness
+                        || x >= frameSize - thickness || y >= frameSize - thickness;
                     Assert.Equal(onRing, painted.Contains((x, y)));
                 }
             }
@@ -53,7 +84,7 @@ namespace TaimisToolbench.Tests.Services
             // The whole point, stated as a number: the art's own square is
             // untouched, so whatever transparency it carries shows the row
             // behind it rather than a plate.
-            int art = frameSize - (2 * Thickness);
+            int art = frameSize - (2 * thickness);
             Assert.Equal((frameSize * frameSize) - (art * art), painted.Count);
         }
 

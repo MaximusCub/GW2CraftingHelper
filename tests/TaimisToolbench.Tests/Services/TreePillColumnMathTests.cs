@@ -11,6 +11,13 @@ namespace TaimisToolbench.Tests.Services
     /// hundreds of pixels sat unused in the name column beside it, because
     /// the column was a flat 256px at every window width.
     /// <para>
+    /// The follow-up report on the same plan: even the derived column
+    /// chipped the "1x Obsidian Shard" row, because the cap let the pills
+    /// claim only HALF the panel's surplus. The cap is now the space
+    /// actually available between the two neighbours' minimums (Affordable);
+    /// RightClaim says how much came from the cost side.
+    /// </para>
+    /// <para>
     /// Everything here is the production arithmetic. The pill widths are
     /// the real ones the renderer measures, at the Caption face calibrated
     /// from the module's own recorded measurement (docs/ARCHITECTURE.md:
@@ -90,14 +97,14 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(0, TreePillColumnMath.RequiredWidth(new List<int>(), Gap, 0));
         }
 
-        // --- Affordable: the name column's protection ---
+        // --- Affordable: the space between the two neighbours' minimums ---
         [Fact]
         public void Affordable_AtTheModulesMinimumWindow_IsExactlyTheFloor()
         {
             Assert.Equal(
                 PlanRelayoutMath.TreePillColumnWidth,
                 TreePillColumnMath.Affordable(
-                    MinPanel(), PlanRelayoutMath.TreePillColumnWidth, MinPanel()));
+                    MinPanel(), PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 0));
         }
 
         [Fact]
@@ -110,37 +117,122 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(
                 PlanRelayoutMath.TreePillColumnWidth,
                 TreePillColumnMath.Affordable(
-                    600, PlanRelayoutMath.TreePillColumnWidth, MinPanel()));
+                    600, PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 0));
         }
 
+        /// <summary>
+        /// The W5 correction: the WHOLE surplus past the module's minimum
+        /// is the status column's to claim leftward. The name column keeps
+        /// the budget it holds at the minimum window - the budgets
+        /// docs/research/minimum-window-width.md was derived from - and
+        /// that budget is the item side's minimum, not a half share of
+        /// every new pixel.
+        /// </summary>
         [Fact]
-        public void Affordable_GrowsByHalfTheSurplus_LeavingTheOtherHalfToTheName()
+        public void Affordable_TheWholeSurplusPastTheMinimum_IsTheStatusColumnsToClaim()
         {
             int panel = MinPanel() + 400;
 
             Assert.Equal(
-                PlanRelayoutMath.TreePillColumnWidth + 200,
+                PlanRelayoutMath.TreePillColumnWidth + 400,
                 TreePillColumnMath.Affordable(
-                    panel, PlanRelayoutMath.TreePillColumnWidth, MinPanel()));
+                    panel, PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 0));
+        }
+
+        /// <summary>
+        /// The other direction the field report names: the cost column's
+        /// reserve above what its rows actually draw is slack every row
+        /// leaves empty, so the status column may claim it rightward. A
+        /// negative slack (content already wider than the reserve's floor)
+        /// is no room at all.
+        /// </summary>
+        [Fact]
+        public void Affordable_TheCostColumnsSlackAboveItsContent_IsClaimableTowardIt()
+        {
+            int panel = MinPanel() + 400;
+
+            Assert.Equal(
+                PlanRelayoutMath.TreePillColumnWidth + 445,
+                TreePillColumnMath.Affordable(
+                    panel, PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 45));
+            Assert.Equal(
+                PlanRelayoutMath.TreePillColumnWidth + 400,
+                TreePillColumnMath.Affordable(
+                    panel, PlanRelayoutMath.TreePillColumnWidth, MinPanel(), -45));
+        }
+
+        /// <summary>
+        /// At the minimum window the surplus term is zero - no leftward
+        /// growth, so nothing the minimum was derived from moves. The cost
+        /// side's slack is the one exception, and it moves nothing the
+        /// minimum depends on either: the claim swaps cost reserve for
+        /// pill width one-for-one (RightClaim), so PillColX - and with it
+        /// every name budget - holds exactly where the flat floor put it.
+        /// </summary>
+        [Fact]
+        public void Affordable_AtTheMinimum_OnlyTheCostColumnsSlackAddsAnything()
+        {
+            Assert.Equal(
+                PlanRelayoutMath.TreePillColumnWidth + 45,
+                TreePillColumnMath.Affordable(
+                    MinPanel(), PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 45));
         }
 
         /// <summary>
         /// The property that makes the split safe at every width: widening
         /// the window can never leave the name column narrower than it was
-        /// one pixel earlier, because the pill column takes at most half of
-        /// each new pixel.
+        /// one pixel earlier, with a cost-side slack fixed - the surplus
+        /// and the slack reach the pills only while the cap binds, and
+        /// every pixel past that goes to the name.
         /// </summary>
         [Fact]
         public void Affordable_WideningTheWindow_NeverNarrowsWhatIsLeftForTheName()
         {
+            const int costSlack = 45;
             int previous = int.MinValue;
             for (int panel = MinPanel(); panel < MinPanel() + 600; panel++)
             {
                 int left = panel - TreePillColumnMath.Affordable(
-                    panel, PlanRelayoutMath.TreePillColumnWidth, MinPanel());
+                    panel, PlanRelayoutMath.TreePillColumnWidth, MinPanel(), costSlack);
                 Assert.True(left >= previous, "the name column lost width as the window grew");
                 previous = left;
             }
+        }
+
+        // --- RightClaim: how much of the column came from the cost side ---
+        [Fact]
+        public void RightClaim_WithinTheSurplus_TakesNothingFromTheCostColumn()
+        {
+            Assert.Equal(0, TreePillColumnMath.RightClaim(256 + 50, 256, 50, 45));
+        }
+
+        [Fact]
+        public void RightClaim_TheExcessOverTheSurplus_ComesFromTheCostColumn()
+        {
+            Assert.Equal(20, TreePillColumnMath.RightClaim(256 + 50 + 20, 256, 50, 45));
+        }
+
+        /// <summary>
+        /// The claim stops at the slack: the cost column keeps what its
+        /// rows actually draw (TreeCostColumnMath.TotalWidth), which is
+        /// the whole point of "within each side's minimum".
+        /// </summary>
+        [Fact]
+        public void RightClaim_NeverBeyondTheSlack_TheCostColumnKeepsItsContent()
+        {
+            Assert.Equal(45, TreePillColumnMath.RightClaim(256 + 50 + 90, 256, 50, 45));
+        }
+
+        [Fact]
+        public void RightClaim_DegenerateInputs_ClaimNothingOrStopAtTheSlack()
+        {
+            // A column at or below the floor claims nothing, whatever the
+            // surplus says; a negative surplus is no surplus; a negative
+            // slack is no room toward the cost column.
+            Assert.Equal(0, TreePillColumnMath.RightClaim(200, 256, 50, 45));
+            Assert.Equal(45, TreePillColumnMath.RightClaim(326, 256, -5, 45));
+            Assert.Equal(0, TreePillColumnMath.RightClaim(326, 256, 50, -45));
+            Assert.Equal(0, TreePillColumnMath.RightClaim(326, 256, -5, -45));
         }
 
         // --- ColumnWidth ---
@@ -221,12 +313,14 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(1, chipped.HiddenCount);
 
             // A 1920px window: 1794px of panel, 542 of them past the
-            // module's minimum, of which the pills may claim half.
+            // module's minimum, all of them the pills' to claim - the run
+            // needs 286, well inside the space between the neighbours.
             int panel = WindowSizing.TabPanelWidthFor(1920);
             int column = TreePillColumnMath.ColumnWidth(
                 TreePillColumnMath.RequiredWidth(run, Gap, slot),
                 PlanRelayoutMath.TreePillColumnWidth,
-                TreePillColumnMath.Affordable(panel, PlanRelayoutMath.TreePillColumnWidth, MinPanel()));
+                TreePillColumnMath.Affordable(
+                    panel, PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 0));
 
             var whole = Fit(run, slot, column);
             Assert.Equal(3, whole.VisibleCount);
@@ -236,8 +330,10 @@ namespace TaimisToolbench.Tests.Services
 
         /// <summary>
         /// And at the minimum window the same row degrades exactly as it
-        /// always did - the column cannot grow there, so nothing the
-        /// minimum was derived from moves.
+        /// always did - with no surplus and a cost column already at or
+        /// above its floor there is genuinely no room on either side, so
+        /// the column cannot grow and nothing the minimum was derived
+        /// from moves.
         /// </summary>
         [Fact]
         public void AtTheMinimumWindow_TheColumnIsStillTheFlatFloor()
@@ -249,10 +345,205 @@ namespace TaimisToolbench.Tests.Services
                 TreePillColumnMath.RequiredWidth(run, Gap, slot),
                 PlanRelayoutMath.TreePillColumnWidth,
                 TreePillColumnMath.Affordable(
-                    MinPanel(), PlanRelayoutMath.TreePillColumnWidth, MinPanel()));
+                    MinPanel(), PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 0));
 
             Assert.Equal(PlanRelayoutMath.TreePillColumnWidth, column);
             Assert.Equal(1, Fit(run, slot, column).HiddenCount);
+        }
+
+        // --- The W5 report: the 1x Obsidian Shard row, again ---
+
+        // The plan the field report is about, as two nodes: a
+        // currency-priced purchase whose three-pill run is the widest
+        // status text in the tree, and the short "1x Obsidian Shard" row
+        // (two sources, an ownership annotation, the toggle) beside it,
+        // which lost its third pill to a "+1" chip on windows with room
+        // to spare on both sides of the column.
+        private const int ChestNodeId = 1;
+        private const int ShardNodeId = 2;
+
+        private static List<CraftingTreeNode> OwnerPlanNodes()
+        {
+            return new List<CraftingTreeNode>
+            {
+                Node(ChestNodeId),
+                Node(ShardNodeId),
+            };
+        }
+
+        private static List<int> ShardRun()
+        {
+            return Run("CRAFT", "VENDOR", "HAVE 12/50 NEEDED");
+        }
+
+        /// <summary>The tree's widest measured run, the way
+        /// TreeSectionController.ScannedPillColumnWidth derives it.</summary>
+        private static int ScannedRequired(IReadOnlyList<CraftingTreeNode> roots)
+        {
+            int chest = TreePillColumnMath.RequiredWidth(
+                Run("CURRENCY", "GUILD UPGRADE", "HAVE 125/500 TOTAL"), Gap, ToggleSlot());
+            int shard = TreePillColumnMath.RequiredWidth(ShardRun(), Gap, ToggleSlot());
+
+            return TreePillColumnMath.Scan(roots, node =>
+                node.NodeId == ChestNodeId ? chest : shard);
+        }
+
+        /// <summary>The depth-8 row's name origin: indent 24 a level plus
+        /// the caret, icon and name columns (PlanRelayoutMathTests's
+        /// TreeNameX).</summary>
+        private static int OwnerNameX()
+        {
+            return 8 * 24 + 58;
+        }
+
+        /// <summary>
+        /// The leftward half of the owner's rule: with no cost-side slack,
+        /// the short row fits whole - no chip, no tightened padding - as
+        /// soon as the measured run fits the surplus, and while it claims
+        /// the pill column's left edge, and so every name budget, holds
+        /// exactly where the minimum window put it.
+        /// </summary>
+        [Fact]
+        public void TheOwnersShortRow_FitsWhole_WhenTheSurplusFitsTheRun()
+        {
+            var roots = OwnerPlanNodes();
+            int required = ScannedRequired(roots);
+
+            var atMinimum = PlanRelayoutMath.ComputeTreeColumnEdges(
+                MinPanel(), OwnerNameX(), 0, PlanRelayoutMath.TreePillColumnWidth, 150, 8);
+
+            int panel = MinPanel() + 63;
+            int affordable = TreePillColumnMath.Affordable(
+                panel, PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 0);
+            int column = TreePillColumnMath.ColumnWidth(
+                required, PlanRelayoutMath.TreePillColumnWidth, affordable);
+            int claim = TreePillColumnMath.RightClaim(
+                column, PlanRelayoutMath.TreePillColumnWidth, panel - MinPanel(), 0);
+            Assert.Equal(0, claim);
+
+            var fit = Fit(ShardRun(), ToggleSlot(), column);
+            Assert.Equal(3, fit.VisibleCount);
+            Assert.Equal(0, fit.HiddenCount);
+            Assert.Equal(0, fit.WidthReduction);
+
+            var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
+                panel, OwnerNameX(), 0, column, 150, 8);
+            Assert.Equal(atMinimum.PillColX, edges.PillColX);
+            Assert.Equal(atMinimum.NameMaxWidth, edges.NameMaxWidth);
+        }
+
+        /// <summary>
+        /// The rightward half: on a narrower window whose surplus alone
+        /// does not fit the run, the cost column's reserve above its
+        /// content (150 reserved, 130 its rows draw) is the room the
+        /// report points at, and claiming it leaves PillColX - every name
+        /// budget with it - exactly where it was.
+        /// </summary>
+        [Fact]
+        public void TheOwnersShortRow_FitsWhole_WhenTheRoomComesFromTheCostColumnsSlack()
+        {
+            var roots = OwnerPlanNodes();
+            int required = ScannedRequired(roots);
+
+            var atMinimum = PlanRelayoutMath.ComputeTreeColumnEdges(
+                MinPanel(), OwnerNameX(), 0, PlanRelayoutMath.TreePillColumnWidth, 150, 8);
+
+            int panel = MinPanel() + 43;
+            int costSlack = 20;
+            int affordable = TreePillColumnMath.Affordable(
+                panel, PlanRelayoutMath.TreePillColumnWidth, MinPanel(), costSlack);
+            int column = TreePillColumnMath.ColumnWidth(
+                required, PlanRelayoutMath.TreePillColumnWidth, affordable);
+            int claim = TreePillColumnMath.RightClaim(
+                column, PlanRelayoutMath.TreePillColumnWidth, panel - MinPanel(), costSlack);
+            Assert.Equal(costSlack, claim);
+
+            var fit = Fit(ShardRun(), ToggleSlot(), column);
+            Assert.Equal(3, fit.VisibleCount);
+            Assert.Equal(0, fit.HiddenCount);
+            Assert.Equal(0, fit.WidthReduction);
+
+            var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
+                panel, OwnerNameX(), 0, column, 150 - claim, 8);
+            Assert.Equal(atMinimum.PillColX, edges.PillColX);
+            Assert.Equal(atMinimum.NameMaxWidth, edges.NameMaxWidth);
+        }
+
+        /// <summary>
+        /// Once every run is satisfied the claims stop - ColumnWidth never
+        /// returns more than the widest row asked for - and every further
+        /// pixel goes to the name column, where the extra width was
+        /// normally FOR.
+        /// </summary>
+        [Fact]
+        public void OnceTheRunsAreSatisfied_EveryFurtherPixelGoesToTheNameColumn()
+        {
+            int required = ScannedRequired(OwnerPlanNodes());
+
+            int column = TreePillColumnMath.ColumnWidth(
+                required, PlanRelayoutMath.TreePillColumnWidth,
+                TreePillColumnMath.Affordable(
+                    MinPanel() + 400, PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 0));
+
+            Assert.Equal(required, column);
+
+            var atMinimum = PlanRelayoutMath.ComputeTreeColumnEdges(
+                MinPanel(), OwnerNameX(), 0, PlanRelayoutMath.TreePillColumnWidth, 150, 8);
+            var satisfied = PlanRelayoutMath.ComputeTreeColumnEdges(
+                MinPanel() + 400, OwnerNameX(), 0, column, 150, 8);
+
+            Assert.True(satisfied.NameMaxWidth > atMinimum.NameMaxWidth);
+        }
+
+        /// <summary>
+        /// The legitimate no-room case: at the module's minimum window,
+        /// with no surplus and a cost column already at its floor, the
+        /// short row's third pill is genuinely unfittable and the "+1"
+        /// chip - with its "No room to show" tooltip - is where it belongs.
+        /// </summary>
+        [Fact]
+        public void AtTheMinimumWindow_WithNoRoomOnEitherSide_TheShortRowStillChips()
+        {
+            int required = ScannedRequired(OwnerPlanNodes());
+
+            int affordable = TreePillColumnMath.Affordable(
+                MinPanel(), PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 0);
+            int column = TreePillColumnMath.ColumnWidth(
+                required, PlanRelayoutMath.TreePillColumnWidth, affordable);
+
+            Assert.Equal(PlanRelayoutMath.TreePillColumnWidth, column);
+
+            var fit = Fit(ShardRun(), ToggleSlot(), column);
+            Assert.Equal(2, fit.VisibleCount);
+            Assert.Equal(1, fit.HiddenCount);
+            Assert.Equal(Cap("+1") + TightPadding, fit.OverflowPillWidth);
+        }
+
+        /// <summary>
+        /// The one place a chip is not owed at the minimum: a cost column
+        /// narrower than its floor leaves slack the claim may take, and
+        /// that claim moves no edge the minimum was derived from - the row
+        /// fits, tightened, exactly as a surplus of its own would have
+        /// let it.
+        /// </summary>
+        [Fact]
+        public void AtTheMinimumWindow_TheCostColumnsSlackStillFitsTheRow_Tightened()
+        {
+            int required = ScannedRequired(OwnerPlanNodes());
+
+            int affordable = TreePillColumnMath.Affordable(
+                MinPanel(), PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 45);
+            int column = TreePillColumnMath.ColumnWidth(
+                required, PlanRelayoutMath.TreePillColumnWidth, affordable);
+
+            int claim = TreePillColumnMath.RightClaim(
+                column, PlanRelayoutMath.TreePillColumnWidth, 0, 45);
+            Assert.Equal(45, claim);
+
+            var fit = Fit(ShardRun(), ToggleSlot(), column);
+            Assert.Equal(3, fit.VisibleCount);
+            Assert.Equal(0, fit.HiddenCount);
+            Assert.Equal(Padding - TightPadding, fit.WidthReduction);
         }
 
         private static PlanRelayoutMath.PillFitPlan Fit(List<int> run, int slot, int columnWidth)

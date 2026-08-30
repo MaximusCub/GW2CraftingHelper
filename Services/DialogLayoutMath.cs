@@ -122,6 +122,33 @@ namespace TaimisToolbench.Services
         public const int TitleRightReserve = 80;
 
         /// <summary>
+        /// Window y of the title's line box. Decompiled 1.3.0:
+        /// PaintTitleText draws the built-in title into
+        /// <c>_leftTitleBarDrawBounds.OffsetBy(TitleTextIndent, 0)</c>,
+        /// whose Y is TitleBarBounds.Y (0) less the 11px offset the
+        /// title-bar textures sit at, so the glyphs render from y -11 down.
+        /// A dialog that draws its own title seats it here to read at the
+        /// same height the built-in one did.
+        /// </summary>
+        public const int TitleLineY = -11;
+
+        /// <summary>
+        /// X that centres a title of <paramref name="titleWidth"/> over a
+        /// window of <paramref name="windowWidth"/>, pinned left rather
+        /// than overhanging when the title outmeasures the window. The
+        /// measure-time floor (<see cref="TitleTextIndent"/> + titleWidth +
+        /// <see cref="TitleRightReserve"/>) makes the centred form exact:
+        /// at that width the centred title starts at the same 80px indent
+        /// the fixed one drew at and ends 80px short of the right edge, so
+        /// centring cannot reach the exit button the reserve protects.
+        /// </summary>
+        public static int TitleX(int windowWidth, int titleWidth)
+        {
+            int x = (Math.Max(0, windowWidth) - Math.Max(0, titleWidth)) / 2;
+            return x > 0 ? x : 0;
+        }
+
+        /// <summary>
         /// X of ONE physical line of the body, centred in the content box.
         /// The body's lines are placed one control each rather than as a
         /// single multi-line label: a label centres its whole BLOCK, and the

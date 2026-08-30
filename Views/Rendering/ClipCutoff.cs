@@ -1,3 +1,4 @@
+using System;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -108,6 +109,53 @@ namespace TaimisToolbench.Views.Rendering
         public override void Draw(SpriteBatch spriteBatch, Rectangle drawBounds, Rectangle scissor)
         {
             int previous = ClipCutoff.Enter(ClipCutoffMath.CutoffTopFor(AbsoluteBounds.Y));
+            try
+            {
+                base.Draw(spriteBatch, drawBounds, scissor);
+            }
+            finally
+            {
+                ClipCutoff.Exit(previous);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A scrolling viewport whose published line comes from its sticky header
+    /// host instead of from its own top edge alone: while a band is pinned
+    /// the line rides that band's live bottom edge, and when none is it is
+    /// the ordinary viewport top, as <see cref="ClipAuthorityFlowPanel"/>
+    /// derives it.
+    /// <para>
+    /// Paint order cannot keep the band clean: the vendor's default
+    /// <c>ZIndex</c> is 5 (<c>Control._zIndex = 5</c> in the decompiled Blish
+    /// 1.3.0 binary), so the host's ZIndex-1 clip paints first and the
+    /// viewport's whole subtree overdraws the pinned band. A scissor bound is
+    /// order-independent - the line bites during the content's own walk -
+    /// and the re-assertion arithmetic that makes it hold is
+    /// docs/ARCHITECTURE.md section V.26.1's, via
+    /// <see cref="ClipCutoffMath.CutoffTopFor"/>.
+    /// </para>
+    /// </summary>
+    internal sealed class StickyClipAuthorityFlowPanel : FlowPanel
+    {
+        private readonly Func<int?> _pinnedBandBottom;
+
+        /// <summary>
+        /// <paramref name="pinnedBandBottom"/> is read once per paint, on the
+        /// paint thread; a null return means no band is pinned. It may hand
+        /// back null for as long as the host itself does not exist yet.
+        /// </summary>
+        internal StickyClipAuthorityFlowPanel(Func<int?> pinnedBandBottom)
+        {
+            _pinnedBandBottom = pinnedBandBottom ?? throw new ArgumentNullException(nameof(pinnedBandBottom));
+        }
+
+        public override void Draw(SpriteBatch spriteBatch, Rectangle drawBounds, Rectangle scissor)
+        {
+            int? pinned = _pinnedBandBottom();
+            int edge = pinned ?? AbsoluteBounds.Y;
+            int previous = ClipCutoff.Enter(ClipCutoffMath.CutoffTopFor(edge));
             try
             {
                 base.Draw(spriteBatch, drawBounds, scissor);
