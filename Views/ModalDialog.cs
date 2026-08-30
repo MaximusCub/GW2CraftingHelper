@@ -161,27 +161,37 @@ namespace TaimisToolbench.Views
             // call establishes.
             _window.Resize(layout.ContentWidth, layout.ContentHeight);
 
-            // Auto-size BOTH axes and parent last - ApiAccessDialog's
-            // proven AddWrappedLine shape. A fixed Width with
-            // AutoSizeHeight takes Blish's stale-layout-pass measure and
-            // clipped the second wrapped line mid-glyph (gate capture
-            // gA6w). The block centers by its measured width instead.
+            // One Label per physical line, each centred on the content box.
+            // A single multi-line Label centres only the BLOCK: Blish paints
+            // the whole string in one DrawString and the pen returns to the
+            // block's own left edge at every newline, so every line after
+            // the first sat left-aligned under the one above it whatever
+            // alignment the Label carried.
+            //
+            // Auto-size BOTH axes and parent last - ApiAccessDialog's proven
+            // AddWrappedLine shape. A fixed Width with AutoSizeHeight takes
+            // Blish's stale-layout-pass measure and clipped the second
+            // wrapped line mid-glyph (gate capture gA6w). Each line centers
+            // by its own measured width instead.
             var block = layout.Blocks[0];
-            var messageLabel = new Label()
+            for (int i = 0; i < block.Lines.Count; i++)
             {
-                Text = string.Join("\n", block.Lines),
-                Font = font,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-            };
-            messageLabel.Location = new Point(
-                Math.Max(0, (layout.ContentWidth - messageLabel.Width) / 2),
-                block.Y);
-            messageLabel.Parent = _window;
+                var lineLabel = new Label()
+                {
+                    Text = block.Lines[i],
+                    Font = font,
+                    AutoSizeWidth = true,
+                    AutoSizeHeight = true,
+                };
+                lineLabel.Location = new Point(
+                    DialogLayoutMath.LineX(layout.ContentWidth, lineLabel.Width),
+                    block.Y + (i * lineHeight));
+                lineLabel.Parent = _window;
 
-            // Only when text was actually dropped - a tooltip repeating the
-            // visible sentence is noise.
-            TooltipFacility.ApplyPlain(messageLabel, block.Truncated ? message : null);
+                // Only when text was actually dropped - a tooltip repeating
+                // the visible sentence is noise.
+                TooltipFacility.ApplyPlain(lineLabel, block.Truncated ? message : null);
+            }
 
             var confirmBtn = new FeedbackButton()
             {

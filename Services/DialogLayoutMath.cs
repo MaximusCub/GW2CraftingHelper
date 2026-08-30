@@ -121,6 +121,26 @@ namespace TaimisToolbench.Services
         /// </summary>
         public const int TitleRightReserve = 80;
 
+        /// <summary>
+        /// X of ONE physical line of the body, centred in the content box.
+        /// The body's lines are placed one control each rather than as a
+        /// single multi-line label: a label centres its whole BLOCK, and the
+        /// pen returns to that block's own left edge at every newline, so
+        /// every line after the first reads as left-aligned under the one
+        /// above it - the defect this exists to remove.
+        /// <para>
+        /// A line wider than the box pins to its left edge rather than
+        /// overhanging both sides, which is what
+        /// <see cref="Measure"/>'s own width clamp can leave when the screen
+        /// refuses the width the message wanted.
+        /// </para>
+        /// </summary>
+        public static int LineX(int contentWidth, int lineWidth)
+        {
+            int x = (contentWidth - lineWidth) / 2;
+            return x > 0 ? x : 0;
+        }
+
         /// <summary>One rendered paragraph: its physical lines and its top edge.</summary>
         public sealed class MessageBlock
         {
