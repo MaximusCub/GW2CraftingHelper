@@ -1486,6 +1486,22 @@ namespace TaimisToolbench.Views
 
             bool diagEnabled = ScrollDiagEnabled;
 
+            // Refresh the scrollbar's cached _scrollbarPercent against the
+            // content mutate() just built, BEFORE writing the restore ratio.
+            // Scrollbar.ScrollDistance's setter calls Invalidate(), which
+            // reaches RecalculateLayout synchronously; that method compares
+            // the cached percent against a freshly measured one and, on any
+            // difference, assigns ScrollDistance = 0 - inside our own
+            // assignment statement. A rebuild that changed the content
+            // height (the Total Cost currency table gaining or losing rows
+            // on a re-solve is the reported case) changes that percent, so
+            // without this call the restore defeats itself and the view
+            // lands at the top. Panel.UpdateScrollbar does not refresh it
+            // for us: it only writes the scrollbar's Height/Top/Right, and
+            // a content rebuild leaves all three at their previous values,
+            // so SetProperty short-circuits and no layout pass runs.
+            scrollbar.RecalculateLayout();
+
             int contentHeight = MeasureContentHeight(capturedPanel);
             float ratio = ScrollMath.RatioForOffset(savedOffset, contentHeight, capturedPanel.Height);
             float before = scrollbar.ScrollDistance;
@@ -2941,14 +2957,12 @@ namespace TaimisToolbench.Views
             // the restore write immediately below is the one that actually
             // sticks: _scrollbarPercent is stable by then, so ScrollDistance's
             // own cascading RecalculateLayout finds no further change to
-            // react to. (A rebuild does not need this: PreserveScrollAcross's
-            // mutate() churns through many of _contentPanel's own direct
-            // children - each write reaching Panel.UpdateContentRegionBounds
-            // - which already forces this same stale-to-fresh transition
-            // organically before ApplySavedScrollSynchronously's write runs.
-            // A pure height-only resize tick has no such churn: ReplayRelayout
-            // does not even run when only height changed, since it is gated
-            // on widthChanged.)
+            // react to. The rebuild path needs the same call for the same
+            // reason and makes it in ApplySavedScrollSynchronously: a child
+            // move or resize reaches Panel.UpdateContentRegionBounds, but
+            // that only re-writes the scrollbar's Height/Top/Right, and a
+            // rebuild leaves all three unchanged, so SetProperty
+            // short-circuits and the percent stays stale.
             scrollbar.RecalculateLayout();
 
             int contentHeight = MeasureContentHeight(_contentPanel);
