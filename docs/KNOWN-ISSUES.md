@@ -1328,3 +1328,6 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Barter-item valuation: the vendor offers the solver was throwing away (2026-08-28)** - gate NOT RUN (no live session available on this branch).
   Cited as: barter-item-valuation.
   `dev/records/barter-item-valuation.md`
+- **Two "Gaeting Crystal" currency ids: one is retired (2026-08-29)** - gate not required (label and comment change; answers FEEDBACK-BACKLOG R1).
+  Cited as: gaeting-crystal-duplicate-ids.
+  `dev/records/gaeting-crystal-duplicate-ids.md`
