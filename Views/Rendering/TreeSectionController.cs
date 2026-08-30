@@ -1306,7 +1306,7 @@ namespace TaimisToolbench.Views.Rendering
                 {
                     // Pills have their own click actions; do not also treat
                     // a pill click as an expand/collapse toggle.
-                    if (AnyPillHovered(handle.Pills))
+                    if (CursorOverPill(rowPanel, handle.Pills))
                     {
                         return;
                     }
@@ -1346,7 +1346,7 @@ namespace TaimisToolbench.Views.Rendering
                 // Same pill guard as toggleHandler, for the same reason: a
                 // press on a pill reaches this row panel too, and the row
                 // must not answer a click it is about to ignore.
-                PressFeedback.Wire(rowPanel, () => AnyPillHovered(handle.Pills));
+                PressFeedback.Wire(rowPanel, () => CursorOverPill(rowPanel, handle.Pills));
                 rowPanel.Click += toggleHandler;
             }
 
@@ -1764,18 +1764,38 @@ namespace TaimisToolbench.Views.Rendering
         /// Container.TriggerMouseInput raises the container's own events
         /// before walking its children), so both the row's click handler and
         /// its press feedback have to defer to the pill under the cursor.
+        /// <para>
+        /// Answered from the pills' own rectangles against the live cursor
+        /// (Services/TreeRowPillHitTest), NOT from Control.MouseOver, which
+        /// is frozen against whatever the hover chain last resolved and is
+        /// therefore wrong for every control this module builds under a
+        /// stationary cursor. RelativeMousePosition is derived from the
+        /// row's live AbsoluteBounds, so it reads the same layout the click
+        /// was dispatched against - the pattern SortableHeaderCells already
+        /// uses to pick a header cell out of its band.
+        /// </para>
         /// </summary>
-        private static bool AnyPillHovered(List<Panel> pillPanels)
+        private static bool CursorOverPill(Panel rowPanel, List<Panel> pillPanels)
         {
-            foreach (var pill in pillPanels)
+            if (rowPanel == null || pillPanels == null)
             {
-                if (pill.MouseOver)
-                {
-                    return true;
-                }
+                return false;
             }
 
-            return false;
+            // Collected rather than tested in place, so the ONE fold over a
+            // row's pills is the one the tests drive. Read live off the
+            // controls: the resize pass moves them, so a list built once
+            // and kept would be stale at the first drag tick. One small
+            // list per PRESS - a user gesture, not a frame.
+            var boxes = new List<TreeRowPillHitTest.PillBox>(pillPanels.Count);
+            foreach (var pill in pillPanels)
+            {
+                boxes.Add(new TreeRowPillHitTest.PillBox(
+                    pill.Location.X, pill.Location.Y, pill.Width, pill.Height));
+            }
+
+            var cursor = rowPanel.RelativeMousePosition;
+            return TreeRowPillHitTest.AnyCovers(boxes, cursor.X, cursor.Y);
         }
 
         /// <summary>

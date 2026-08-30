@@ -1948,9 +1948,23 @@ frozen hover chain: a decision pill re-solves and rebuilds its own row, a sort
 header re-renders the table it labels, a caret rebuilds the subtree under it.
 The replacement control lands under a stationary cursor with
 `MouseOver == false` and no `MouseEntered` fired, so the pill the user is
-pointing at reads as un-hovered until they jiggle the mouse - and this
-module's own `AnyPillHovered` guard, which asks the same question, answers
-wrongly in the meantime.
+pointing at reads as un-hovered until they jiggle the mouse.
+
+What this type is NOT is a way to answer "is a pill under the cursor". That
+question used to be asked of `Control.MouseOver` too, and the resync was what
+kept the answer honest - which held only while the resync's own hit test was
+honest. It is not, on a full rebuild: a freshly created row is added to its
+`FlowPanel` with no `Location` of its own, and Blish defers
+`FlowPanel.RecalculateLayout` to the next draw, so at the instant the click
+handler calls the resync every new row still sits at its container's origin.
+The resync then sets `MouseOver` on whichever row won the sibling tiebreak
+there, the pill genuinely under the cursor never gets it, and the row's
+expand/collapse handler - which defers to that flag - answered the NEXT click
+by expanding the node. `Services/TreeRowPillHitTest` removes the dependency
+rather than trying to make the flag correct: the guard reads the pills'
+rectangles against `RelativeMousePosition`, which is derived from live
+`AbsoluteBounds` at click time and cannot be stale in that window. The resync
+stays for what it does fix - the visible hover WASH on a rebuilt control.
 
 A LOST click is a different, also-measured mechanism, and this section is the
 one place it is stated. `MouseHandler` buffers exactly ONE pending mouse event
