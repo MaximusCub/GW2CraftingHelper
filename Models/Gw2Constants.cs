@@ -22,7 +22,7 @@ namespace TaimisToolbench.Models
         /// "recipe" (whose Ingredients are the N selected items' own real
         /// trees, each already carrying its own requested amount as its
         /// ingredient quantity - gw2e's mechanism verbatim). Distinct from
-        /// both real recipe ids (positive) and the small negative synthetic
+        /// both real recipe ids (positive) and the negative synthetic
         /// ids ref/mystic_forge_recipes.json assigns to Mystic Forge
         /// recipes (moot in practice - the wrapper's own step is never
         /// collected into a plan at all, see PlanSolver.Collect - but kept

@@ -28,6 +28,13 @@ namespace TaimisToolbench.RecipeSeeder
         // currency-ingredient-era recipe from the seed files it writes.
         private const string SchemaVersion = "2026-08-15";
 
+        // The least negative id tools/MysticForgeSeeder assigns; see that
+        // tool's RecipeIdBase for why the two producers of negative-id
+        // recipes have to stay in disjoint halves of the id space. Duplicated
+        // rather than shared because MysticForgeSeeder is a standalone net8
+        // project with no reference to this one or to the module.
+        private const int MysticForgeRecipeIdBase = -100000;
+
         private static int Main(string[] args)
         {
             return MainAsync(args).GetAwaiter().GetResult();
@@ -507,6 +514,26 @@ namespace TaimisToolbench.RecipeSeeder
                         int id = idProp.GetInt32();
                         if (id >= 0)
                         {
+                            continue;
+                        }
+
+                        // Step 5a below carries forward every negative-id
+                        // row of the seed this run is about to overwrite,
+                        // but only where the id is still free - so a forge
+                        // row landing on a hand-authored id replaces it
+                        // rather than colliding with it. The two producers
+                        // own disjoint halves of the negative id space
+                        // (MysticForgeSeeder.RecipeIdBase states the
+                        // partition); refuse the row instead of silently
+                        // eating whatever it lands on.
+                        if (id > MysticForgeRecipeIdBase)
+                        {
+                            Console.Error.WriteLine(
+                                $"Warning: skipping mystic forge recipe {id} -" +
+                                " it sits in the hand-authored half of the" +
+                                " negative id space and would overwrite a row" +
+                                " no generator can rebuild. Re-run" +
+                                " tools/MysticForgeSeeder to renumber the block.");
                             continue;
                         }
 
