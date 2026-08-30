@@ -34,19 +34,6 @@ namespace TaimisToolbench.Services
     internal sealed class TableSortState<TColumn>
         where TColumn : struct
     {
-        /// <summary>
-        /// The sort markers, from the module's own shipped glyph font. A
-        /// matched pair: same ink, one mirrored, same advance, same seat on
-        /// the cap band. The ASCII pair they replaced was not - "^" is a
-        /// circumflex accent sitting near the cap line and "v" is a lowercase
-        /// letter on the x-height, 3px apart vertically and 4px apart in
-        /// height, because Menomonia has no symmetric up/down glyphs at all.
-        /// See Services/UiGlyphs, and Views/Rendering/SortableHeaderLabel for
-        /// what happens if the font did not load.
-        /// </summary>
-        public const string AscendingIndicator = UiGlyphs.SortAscending;
-        public const string DescendingIndicator = UiGlyphs.SortDescending;
-
         private static readonly EqualityComparer<TColumn> ColumnComparer = EqualityComparer<TColumn>.Default;
 
         /// <summary>
@@ -97,18 +84,16 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// The marker a header for <paramref name="column"/> should carry -
-        /// empty string for every inactive column, so an unsorted table
-        /// shows no indicator at all.
+        /// The direction a header for <paramref name="column"/> should draw:
+        /// this table's direction on the active column, and
+        /// <see cref="TableSortDirection.None"/> on every other one - which
+        /// is the REST state a sortable header shows, not the absence of a
+        /// header. See <see cref="SortIndicatorLayout"/> for what each of
+        /// the three draws.
         /// </summary>
-        public string IndicatorFor(TColumn column)
+        public TableSortDirection DirectionFor(TColumn column)
         {
-            if (!IsActive(column))
-            {
-                return string.Empty;
-            }
-
-            return Direction == TableSortDirection.Ascending ? AscendingIndicator : DescendingIndicator;
+            return IsActive(column) ? Direction : TableSortDirection.None;
         }
     }
 }
