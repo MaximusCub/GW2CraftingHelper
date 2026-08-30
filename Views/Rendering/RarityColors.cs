@@ -109,16 +109,31 @@ namespace TaimisToolbench.Views.Rendering
     internal readonly struct ItemIconFrame
     {
         private readonly Color _color;
+        private readonly bool _outline;
 
-        private ItemIconFrame(Color color)
+        private ItemIconFrame(Color color, bool outline)
         {
             _color = color;
+            _outline = outline;
         }
 
         /// <summary>The frame colour to paint.</summary>
         internal Color Color
         {
             get { return _color; }
+        }
+
+        /// <summary>
+        /// Whether the frame is a border RING rather than a filled plate
+        /// with the art laid on top. True only for
+        /// <see cref="Currency"/>: currency art is mostly transparent, so a
+        /// plate behind it shows through as a background the field reported
+        /// as a defect. Item art is a full-bleed bag-slot square and hides
+        /// the plate, so the item frames keep it.
+        /// </summary>
+        internal bool IsOutline
+        {
+            get { return _outline; }
         }
 
         /// <summary>
@@ -130,7 +145,7 @@ namespace TaimisToolbench.Views.Rendering
         /// </summary>
         internal static ItemIconFrame ForRarity(string resolvedRarity)
         {
-            return new ItemIconFrame(RarityColors.GetRarityBorderColor(resolvedRarity));
+            return new ItemIconFrame(RarityColors.GetRarityBorderColor(resolvedRarity), outline: false);
         }
 
         /// <summary>
@@ -141,7 +156,7 @@ namespace TaimisToolbench.Views.Rendering
         /// </summary>
         internal static ItemIconFrame UnknownRarity()
         {
-            return new ItemIconFrame(RarityColors.GetRarityBorderColor(null));
+            return new ItemIconFrame(RarityColors.GetRarityBorderColor(null), outline: false);
         }
 
         /// <summary>
@@ -149,11 +164,12 @@ namespace TaimisToolbench.Views.Rendering
         /// denomination. Not the unknown-rarity frame: the call site is on
         /// record that nothing is missing, and it gets the module's one
         /// currency frame (<see cref="RarityColors.GetCurrencyBorderColor"/>)
-        /// rather than a per-surface grey.
+        /// rather than a per-surface grey, painted as a border RING rather
+        /// than as a plate - see <see cref="IsOutline"/>.
         /// </summary>
         internal static ItemIconFrame Currency()
         {
-            return new ItemIconFrame(RarityColors.GetCurrencyBorderColor());
+            return new ItemIconFrame(RarityColors.GetCurrencyBorderColor(), outline: true);
         }
 
         /// <summary>
@@ -163,7 +179,7 @@ namespace TaimisToolbench.Views.Rendering
         /// </summary>
         internal static ItemIconFrame Explicit(Color color)
         {
-            return new ItemIconFrame(color);
+            return new ItemIconFrame(color, outline: false);
         }
     }
 }

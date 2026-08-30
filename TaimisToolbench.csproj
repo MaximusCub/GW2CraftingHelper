@@ -106,6 +106,7 @@
     <Compile Include="Services\PlanHistoryBlobStore.cs" />
     <Compile Include="Services\PlanHistoryDedupKey.cs" />
     <Compile Include="Services\PlanHistoryRetention.cs" />
+    <Compile Include="Services\PlanHistoryTableSorter.cs" />
     <Compile Include="Services\PlanHistoryRowLayout.cs" />
     <Compile Include="Services\PlanHistoryItemIds.cs" />
     <Compile Include="Services\PlanHistoryLabels.cs" />
@@ -115,6 +116,7 @@
     <Compile Include="Services\PlanStructuralValidator.cs" />
     <Compile Include="Services\StatusStore.cs" />
     <Compile Include="Services\StatusText.cs" />
+    <Compile Include="Services\StickyHeaderLayout.cs" />
     <Compile Include="Models\RecipeNode.cs" />
     <Compile Include="Models\RecipeOption.cs" />
     <Compile Include="Services\IRecipeApiClient.cs" />
@@ -138,11 +140,13 @@
     <Compile Include="Services\TradingPostMath.cs" />
     <Compile Include="Services\FirstLoadSnapshotGate.cs" />
     <Compile Include="Services\ScrollAnchorMath.cs" />
+    <Compile Include="Services\ClipCutoffMath.cs" />
     <Compile Include="Services\ScrollMath.cs" />
     <Compile Include="Services\WheelDeltaSanitizer.cs" />
     <Compile Include="Services\ShoppingColumnMath.cs" />
     <Compile Include="Services\DisciplinesColumnMath.cs" />
     <Compile Include="Services\RecipesColumnMath.cs" />
+    <Compile Include="Services\SortIndicatorLayout.cs" />
     <Compile Include="Services\TableSortState.cs" />
     <Compile Include="Services\UiGlyphs.cs" />
     <Compile Include="Services\GlyphFontDescriptor.cs" />
@@ -155,7 +159,9 @@
     <Compile Include="Services\SummarySectionLayoutMath.cs" />
     <Compile Include="Services\TreeCostColumnMath.cs" />
     <Compile Include="Services\TreeCostColumnFloor.cs" />
+    <Compile Include="Services\TreePillColumnMath.cs" />
     <Compile Include="Services\TreePillRunLayout.cs" />
+    <Compile Include="Services\TreeRowPillHitTest.cs" />
     <Compile Include="Services\TextWrapMath.cs" />
     <Compile Include="Services\MultiItemHeaderLayout.cs" />
     <Compile Include="Services\MultiItemHeaderTooltipComposer.cs" />
@@ -207,6 +213,8 @@
     <Compile Include="Models\SeasonalVendorTip.cs" />
     <Compile Include="Services\IItemApiClient.cs" />
     <Compile Include="Services\CurrencyIconTiers.cs" />
+    <Compile Include="Services\GlyphButtonMetrics.cs" />
+    <Compile Include="Services\IconFrameGeometry.cs" />
     <Compile Include="Services\ItemIconTiers.cs" />
     <Compile Include="Services\ItemMetadataService.cs" />
     <Compile Include="Services\ItemRarityResolution.cs" />
@@ -257,6 +265,7 @@
     <Compile Include="Views\Rendering\RarityColors.cs" />
     <Compile Include="Views\Rendering\InlineSpinner.cs" />
     <Compile Include="Views\Rendering\IconControls.cs" />
+    <Compile Include="Views\Rendering\OutlineFramePanel.cs" />
     <Compile Include="Views\Rendering\ItemIconTooltip.cs" />
     <Compile Include="Views\Rendering\ItemStatWarmer.cs" />
     <Compile Include="Views\Rendering\LabelHelpers.cs" />
@@ -271,6 +280,7 @@
     <Compile Include="Views\Rendering\PlanHeaderRenderer.cs" />
     <Compile Include="Views\Rendering\PressFeedback.cs" />
     <Compile Include="Views\Rendering\ClickSound.cs" />
+    <Compile Include="Views\Rendering\ClipCutoff.cs" />
     <Compile Include="Views\Rendering\FeedbackButton.cs" />
     <Compile Include="Views\Rendering\PillColors.cs" />
     <Compile Include="Views\Rendering\HoverChainResync.cs" />
@@ -279,7 +289,10 @@
     <Compile Include="Views\Rendering\ShoppingListSectionRenderer.cs" />
     <Compile Include="Views\Rendering\HeaderBands.cs" />
     <Compile Include="Views\Rendering\SortableHeaderLabel.cs" />
+    <Compile Include="Views\Rendering\SortIndicator.cs" />
+    <Compile Include="Views\Rendering\SortableHeaderBlock.cs" />
     <Compile Include="Views\Rendering\SortableHeaderCells.cs" />
+    <Compile Include="Views\Rendering\StickyHeaderHost.cs" />
     <Compile Include="Views\Rendering\HeaderCellPlan.cs" />
     <Compile Include="Views\Rendering\UiFonts.cs" />
     <Compile Include="Views\Rendering\GlyphFont.cs" />

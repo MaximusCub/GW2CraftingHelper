@@ -45,6 +45,7 @@ namespace TaimisToolbench.Views.Rendering
         {
             internal Panel Wash;
             internal Label Label;
+            internal Label Indicator;
             internal Color RestingTextColor;
             internal Action OnClick;
             internal int X;
@@ -67,14 +68,21 @@ namespace TaimisToolbench.Views.Rendering
             internal readonly int X;
             internal readonly int Width;
             internal readonly Label Label;
+
+            /// <summary>The column's sort indicator, or null on a column
+            /// that carries none - an inert header, or one whose caller has
+            /// not adopted the persistent mark yet.</summary>
+            internal readonly Label Indicator;
+
             internal readonly Action OnClick;
 
-            internal Column(int x, int width, Label label, Action onClick)
+            internal Column(int x, int width, Label label, Action onClick, Label indicator)
             {
                 X = x;
                 Width = width;
                 Label = label;
                 OnClick = onClick;
+                Indicator = indicator;
             }
         }
 
@@ -136,7 +144,7 @@ namespace TaimisToolbench.Views.Rendering
                 {
                     _cells.Add(new Cell
                     {
-                        Wash = new Panel()
+                        Wash = new ClippedPanel()
                         {
                             BackgroundColor = Color.Transparent,
                             // Blish draws children in ZIndex order, and a
@@ -149,6 +157,7 @@ namespace TaimisToolbench.Views.Rendering
 
                 var cell = _cells[i];
                 cell.Label = columns[i].Label;
+                cell.Indicator = columns[i].Indicator;
                 cell.RestingTextColor = HeaderBands.LabelColor;
                 cell.OnClick = columns[i].OnClick;
                 cell.X = columns[i].X;
@@ -172,6 +181,7 @@ namespace TaimisToolbench.Views.Rendering
                 _cells[i].Width = 0;
                 _cells[i].OnClick = null;
                 _cells[i].Label = null;
+                _cells[i].Indicator = null;
             }
 
             // The cell under a stationary cursor may have moved, or gone.
@@ -220,9 +230,18 @@ namespace TaimisToolbench.Views.Rendering
                     ? (_held ? PressedWash : HoverWash)
                     : Color.Transparent;
 
+                // The indicator takes the same tint as the word it sits
+                // beside; its OPACITY is the sort state and is not touched
+                // here (see SortIndicator).
+                var tint = active ? HoverTextColor : cell.RestingTextColor;
                 if (cell.Label != null)
                 {
-                    cell.Label.TextColor = active ? HoverTextColor : cell.RestingTextColor;
+                    cell.Label.TextColor = tint;
+                }
+
+                if (cell.Indicator != null)
+                {
+                    cell.Indicator.TextColor = tint;
                 }
             }
         }

@@ -81,10 +81,11 @@ namespace TaimisToolbench.Views.Rendering
             // count) is identical sorted or not.
             var rows = PlanTableSorter.Sort(section.Rows, _sortState);
 
-            string amountHeaderText =
-                SortableHeaderLabel.Decorate("Amount", _sortState.IndicatorFor(PlanTableColumn.Amount));
-            int maxQtyWidth =
-                (int)System.Math.Ceiling(HeaderBands.Font.MeasureString(amountHeaderText).Width);
+            // The band is floored at the header BLOCK - word plus the
+            // indicator slot beside it - which is fixed in every sort state,
+            // so a click never re-flows the column it was aimed at.
+            int amountHeaderWidth = SortIndicator.BlockWidthFor(HeaderBands.Font, "Amount");
+            int maxQtyWidth = amountHeaderWidth;
             foreach (var row in rows)
             {
                 int qtyWidth = (int)System.Math.Ceiling(font.MeasureString($"{row.Quantity}x").Width);
@@ -105,14 +106,14 @@ namespace TaimisToolbench.Views.Rendering
             // rightLabelXForWidth, though: the WORD centres on the
             // quantities, not on the panel's right margin
             // (JustifiedColumnTracks.CenteredOverContent).
-            int amountHeaderWidth =
-                (int)System.Math.Ceiling(HeaderBands.Font.MeasureString(amountHeaderText).Width);
             ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                 contentFlow, panelWidth,
-                SortableHeaderLabel.Decorate("Item", _sortState.IndicatorFor(PlanTableColumn.Item)), NameX,
-                amountHeaderText, _sink,
+                "Item", NameX,
+                "Amount", _sink,
                 onLeftClick: () => SortBy(PlanTableColumn.Item),
                 onRightClick: () => SortBy(PlanTableColumn.Amount),
+                leftSort: _sortState.DirectionFor(PlanTableColumn.Item),
+                rightSort: _sortState.DirectionFor(PlanTableColumn.Amount),
                 // The quantities pin to the table's own edge, so a header
                 // wider than the widest of them has nowhere to centre and
                 // right-aligns on that edge - the bound a room never yields.
@@ -144,7 +145,7 @@ namespace TaimisToolbench.Views.Rendering
             int maxQtyWidth, bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.UsedMaterialRowHeight;
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+            var rowPanel = new ClippedPanel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
             int qtyRightEdge = PlanRelayoutMath.PinnedRightEdge(panelWidth);
             var font = UiFonts.Body;

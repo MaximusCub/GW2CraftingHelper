@@ -335,6 +335,22 @@ contest safe rather than janky:
   changing first - so a user scrolling during a live restore is never
   contested.
 
+**Why the restore refreshes the scrollbar first:** Blish's `Scrollbar`
+caches `_scrollbarPercent` (viewport height over content height) and
+refreshes it only inside its own `RecalculateLayout`, which also assigns
+`ScrollDistance = 0` whenever that percent has moved. `ScrollDistance`'s
+setter calls `Invalidate()`, and `Invalidate` reaches `RecalculateLayout`
+SYNCHRONOUSLY - so a restore written while the cache is stale resets itself
+to zero inside its own assignment statement. A rebuild leaves the cache
+stale: `Panel.UpdateContentRegionBounds` only re-writes the scrollbar's
+`Height`/`Top`/`Right`, all three unchanged by a content rebuild, so
+`SetProperty` short-circuits and no layout pass runs. Both restore paths
+(`ApplySavedScrollSynchronously` and `PreserveScrollAcrossResize`)
+therefore call `scrollbar.RecalculateLayout()` first, letting the expected
+reset happen while nothing is riding on it. This is the field-reported
+"toggle a decision and the view jumps to the top": the currency table
+gaining or losing rows is precisely a content-height change.
+
 **Why the correction is computed in pixel space:**
 `Services/ScrollMath.ApplyPixelDelta` converts a scrollbar ratio to pixels,
 applies the delta, and converts back, rather than working in ratio space
@@ -1752,10 +1768,27 @@ one-way dependency section 5 above states.
 ### V.5 `LogTabContent`: the three-column row split, and the follow poll
 
 `LogRow` splits each entry into four controls (panel plus three labels)
-where the previous shape used three, and pays one more `EllipsizeToWidth`
-per row per refit. Both are bounded by the ring cap (2000) and by what the
-filter admits, the refit loop is `SuspendLayout`-wrapped, and on a resize
-the ellipsize half runs once per drag rather than once per drag event.
+where the previous shape used three, and pays one more fit per row per
+refit. Both are bounded by the ring cap (2000) and by what the filter
+admits, every loop that writes a row's size is `SuspendLayout`-wrapped, and
+on a resize the fitting half runs once per drag rather than once per drag
+event.
+
+The message column WRAPS rather than ellipsizing, so a row's height is a
+function of its own text and the rows are not on a fixed pitch - the flow
+panel positions each by its own height, and `LogRowLayout.RowHeight` is the
+one place that height is derived. Three things follow. The wrap is capped
+at `LogRowLayout.MaxMessageLines` so one pasted stack trace cannot own the
+viewport, with the tail ellipsized into the last line. The per-row memo is
+exact width equality rather than the narrowing-only asymmetry an ellipsized
+column gets, because widening a wrapped column changes its answer too;
+scrolling changes no width and so re-wraps nothing. And a resize settle can
+now change the panel's total content height, which Blish's `Scrollbar`
+answers by zeroing the scroll position a frame later (KNOWN-ISSUES #55) -
+accepted, not defended against, on the same grounds `MainView` accepts it
+below: this tab carries no scroll-restore machinery, an append already
+moves the same height every time one arrives, and the snap costs one drag
+rather than one frame.
 
 One divergence is accepted rather than fixed: timestamps do not align
 pixel-for-pixel between an `[INFO]` row and a `[DEBUG]` one, because the
@@ -2102,9 +2135,23 @@ frozen hover chain: a decision pill re-solves and rebuilds its own row, a sort
 header re-renders the table it labels, a caret rebuilds the subtree under it.
 The replacement control lands under a stationary cursor with
 `MouseOver == false` and no `MouseEntered` fired, so the pill the user is
-pointing at reads as un-hovered until they jiggle the mouse - and this
-module's own `AnyPillHovered` guard, which asks the same question, answers
-wrongly in the meantime.
+pointing at reads as un-hovered until they jiggle the mouse.
+
+What this type is NOT is a way to answer "is a pill under the cursor". That
+question used to be asked of `Control.MouseOver` too, and the resync was what
+kept the answer honest - which held only while the resync's own hit test was
+honest. It is not, on a full rebuild: a freshly created row is added to its
+`FlowPanel` with no `Location` of its own, and Blish defers
+`FlowPanel.RecalculateLayout` to the next draw, so at the instant the click
+handler calls the resync every new row still sits at its container's origin.
+The resync then sets `MouseOver` on whichever row won the sibling tiebreak
+there, the pill genuinely under the cursor never gets it, and the row's
+expand/collapse handler - which defers to that flag - answered the NEXT click
+by expanding the node. `Services/TreeRowPillHitTest` removes the dependency
+rather than trying to make the flag correct: the guard reads the pills'
+rectangles against `RelativeMousePosition`, which is derived from live
+`AbsoluteBounds` at click time and cannot be stale in that window. The resync
+stays for what it does fix - the visible hover WASH on a rebuilt control.
 
 A LOST click is a different, also-measured mechanism, and this section is the
 one place it is stated. `MouseHandler` buffers exactly ONE pending mouse event
@@ -2252,6 +2299,69 @@ growing a box by 2 would push its glyphs down by 1 while an unswept sibling on
 the same row stayed put, and a ragged baseline inside one sentence ("Craft 12x
 " plus an item name) is worse than the clip the sweep fixes.
 
+### V.26.1 `ClipCutoff`: the viewport's hard top edge
+
+The same round trip V.26 analyses at a row divider's BOTTOM edge is what
+lets scrolled content paint over the plan tab's pinned top strip, and the
+answer there is different because the edge is different. `Container.Paint`
+is `sealed`: it reads `GraphicsDevice.ScissorRectangle` back, unscales it
+with `ScaleBy(1f / uiScale)`, and hands the result to `PaintChildren`,
+which re-intersects it with the container's own content region. That
+re-intersection re-clamps the top edge only when the container's own top is
+BELOW the inherited clip - false for every ancestor of a row scrolled out
+of view - so the `floor(floor(y*s)/s) <= y` loss accumulates once per
+nested container and grows with recipe-tree depth. Measured at UI Size
+Small: 2, 3, 4, 5, 7, 8, 9, 10 logical pixels at depths 1 through 8, and
+still climbing at 64.
+
+Three things follow, and the third is the fix.
+
+- **A gap cannot be the fix.** Any inset sized against "the deepest
+  realistic tree" is a guess about content, and the module does not bound
+  recipe depth. `ClipTopSlipSimulationTests` keeps that measurement, and
+  keeps it labelled as the defect.
+- **Positioning the viewport lower does not prevent it either.** The
+  leaked pixels are drawn relative to the viewport's top edge, so they move
+  down with it; a gap only changes what they land on.
+- **One line, re-asserted at every container, does.** `Control.Draw` is
+  `public virtual`, and it is the one seam the vendor leaves open.
+  `Views/Rendering/ClipCutoff.cs` publishes an absolute logical y for the
+  duration of the viewport's own paint (`ClipAuthorityFlowPanel`), and
+  `ClippedPanel`/`ClippedFlowPanel` clamp the clip they were handed back to
+  it before the vendor code uses it. A container that re-asserts the line
+  hands its children an edge that has drifted at most ONE round trip, so
+  the reach stops accumulating: it is `cutoff - SlipBudget`, at depth 1 and
+  at depth 64 alike. `Services/ClipCutoffMath.cs` owns the arithmetic and
+  the budget - 2 logical pixels, the worst single round trip across all
+  four GW2 UI Sizes - and `ClipCutoffMathTests` proves the bound without
+  mentioning depth.
+
+The line is set one budget BELOW the viewport's top edge, so what a
+descendant can reach is the edge itself and not a pixel above it. That
+spends the viewport's top 2 logical pixels rather than 2 pixels of the
+strip above it, and at rest they fall inside the plan header's own icon
+padding.
+
+Coverage is per-container by construction: a plain `Panel` left in the
+chain re-opens the accumulation below itself, which is why the swap is a
+sweep rather than a single site. The sweep is now complete - the recipe
+tree's own per-depth containers in `Views/Rendering/TreeSectionController.cs`
+(the section's root divider, each row panel, the dimming icon scrim, the
+recursive child flow, and the two panels of a decision pill) were the last
+sites, and they are the ones that made the reach depth-dependent: a tree row
+at depth d sat under about 2d plain containers, one row panel and one child
+flow per level.
+
+`TopStripZIndex` nonetheless stays. It is not load-bearing for this defect
+any more, but it costs one integer per strip control at build time, and it
+is the only thing standing between a plain `Panel` added inside the viewport
+by a later change and the owner's original report. Nothing else can catch
+that: the repo invariants bar a test from referencing UI code, so the
+guarantee has no executable guard at the call sites - only
+`ClipCutoffMathTests` on the arithmetic. `SlipBudget` is likewise a
+measurement over the four GW2 UI Sizes that exist today, not a proof for a
+fifth.
+
 ### V.27 `PlanHeaderRenderer`: the three things that used to compete
 
 The header block was CENTRED while everything under it was left-aligned, so
@@ -2383,13 +2493,33 @@ reported "rapid IGNORE toggling drops clicks". Ignoring a LEAF material - the
 common case, and the one the field report is about - passes the gate.
 
 The pill column's budget is exceeded because `DecisionPillPlanner.AppendOwnershipPills`
-unconditionally adds an "IGNORE" pill, plus "USING N OWNED" when applicable, to
+unconditionally adds an ignore toggle, plus "USING N OWNED" when applicable, to
 every ordinary node, on top of its 1-3 source pills. The row cannot grow to
 absorb them: `TreeRowHeight` is a fixed per-row height shared by every
 layout/scroll-height calculation in that file, so there is no wrap and no
 second line. Before `ComputePillFit`, trailing pills were simply dropped with
 nothing on the row to say they had existed - which is what the "+N" pill now
 says.
+
+The column itself is no longer flat, because a "+N" chip on a window with
+hundreds of unused pixels in the name column beside it is a lie the reader
+cannot act on. `Services/TreePillColumnMath` derives its width the way
+`EffectiveCostColumnWidth` already derives the cost column's: the widest full
+run any row in the tree needs, floored at
+`PlanRelayoutMath.TreePillColumnWidth` and capped at that floor plus half of
+whatever the panel has beyond the module's minimum width. The half is what
+makes the split safe at every width - widening the window can never leave the
+name column narrower than it was one pixel earlier, and at the minimum width
+the column cannot grow at all, so every deep-row budget
+`docs/research/minimum-window-width.md` derives is untouched. Measured on the
+reported Obsidian Heavy Breastplate rows at a 1920px window: a
+CRAFT/TP/HAVE-annotation row went from two pills and a "+1" chip, tightened,
+to all three at full padding, and the column took 82px of the 1314px the
+depth-0 name column held.
+
+Like the cost column's, the result is held as a one-way floor for the life of
+a plan (`TreeCostColumnFloor` says why a column edge that narrows under a
+click is a bug), and `TryRefreshInPlace` declines when it moves.
 
 That "+N" pill is deliberately not wired to a popup offering the hidden
 options. The hidden pills are almost always the trailing annotation and the

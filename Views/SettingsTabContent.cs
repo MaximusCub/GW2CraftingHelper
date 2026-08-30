@@ -1926,6 +1926,70 @@ namespace TaimisToolbench.Views
             LayoutCurrencyGridHeader();
         }
 
+        private const string NameHeaderText = "Currency or item";
+        private const string UnitHeaderText = "Copper per unit";
+
+        // Both memos are of compile-time strings in fonts that never change
+        // at runtime, and both are read on every resize tick.
+        private int _unitHeaderWidth;
+        private int _widestCurrencyTagWidth;
+
+        private int UnitHeaderWidth()
+        {
+            if (_unitHeaderWidth <= 0)
+            {
+                _unitHeaderWidth = LabelHelpers.MeasureWith(HeaderBands.Font)(UnitHeaderText);
+            }
+
+            return _unitHeaderWidth;
+        }
+
+        /// <summary>
+        /// Widest string the cell's one tag slot can ink, over both curated
+        /// defaults tables - what
+        /// SettingsCurrencyGridLayout.UnitHeaderX centres the unit header
+        /// over the right-hand end of.
+        /// <para>
+        /// Derived from the shipped tables rather than from the rows'
+        /// CURRENT text: the tag follows what the user types and ticks, and
+        /// a header re-centred on that would move while it was being read.
+        /// The two families measured here are the widest the slot shows -
+        /// see SettingsCurrencyGridLayout.CellTagWidth.
+        /// </para>
+        /// </summary>
+        private int WidestCurrencyTagWidth()
+        {
+            if (_widestCurrencyTagWidth > 0)
+            {
+                return _widestCurrencyTagWidth;
+            }
+
+            var measure = LabelHelpers.MeasureWith(UiFonts.Body);
+            int widest = 0;
+            foreach (long value in AllCuratedDefaults())
+            {
+                string amount = value.ToString(CultureInfo.InvariantCulture);
+                widest = Math.Max(widest, measure("default " + amount));
+                widest = Math.Max(widest, measure("was " + amount));
+            }
+
+            _widestCurrencyTagWidth = widest;
+            return widest;
+        }
+
+        private static IEnumerable<long> AllCuratedDefaults()
+        {
+            foreach (var kvp in CurrencyDecisionDefaults.DefaultCopperPerUnit)
+            {
+                yield return kvp.Value;
+            }
+
+            foreach (var kvp in BarterItemDecisionDefaults.Defaults)
+            {
+                yield return kvp.Value.CopperPerUnit;
+            }
+        }
+
         private Label CreateCurrencyHeaderLabel(string text)
         {
             return new Label()
@@ -1955,11 +2019,12 @@ namespace TaimisToolbench.Views
             // is cheaper to hide than to rebuild on the next resize tick.
             while (_currencyHeaderNames.Count < columnCount)
             {
-                _currencyHeaderNames.Add(CreateCurrencyHeaderLabel("Currency or item"));
-                _currencyHeaderUnits.Add(CreateCurrencyHeaderLabel("Copper per unit"));
+                _currencyHeaderNames.Add(CreateCurrencyHeaderLabel(NameHeaderText));
+                _currencyHeaderUnits.Add(CreateCurrencyHeaderLabel(UnitHeaderText));
             }
 
-            int unitX = SettingsCurrencyGridLayout.CellInputX(columnWidth);
+            int unitX = SettingsCurrencyGridLayout.UnitHeaderX(
+                columnWidth, UnitHeaderWidth(), WidestCurrencyTagWidth());
             for (int i = 0; i < _currencyHeaderNames.Count; i++)
             {
                 bool visible = i < columnCount;

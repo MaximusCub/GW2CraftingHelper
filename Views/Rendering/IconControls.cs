@@ -55,7 +55,7 @@ namespace TaimisToolbench.Views.Rendering
             ItemIconTier tier, ItemIconTooltip tooltip)
         {
             return CreateFramedIcon(
-                parent, iconUrl, frame.Color, x, y,
+                parent, iconUrl, frame, x, y,
                 ItemIconTiers.ArtSize(tier), ItemIconTiers.BorderThickness(tier), tooltip);
         }
 
@@ -73,7 +73,7 @@ namespace TaimisToolbench.Views.Rendering
             int iconSize, int borderThickness, ItemIconTooltip tooltip)
         {
             return CreateFramedIcon(
-                parent, iconUrl, RarityColors.GetRarityBorderColor(rarity), x, y,
+                parent, iconUrl, ItemIconFrame.ForRarity(rarity), x, y,
                 iconSize, borderThickness, tooltip);
         }
 
@@ -96,43 +96,51 @@ namespace TaimisToolbench.Views.Rendering
         internal static Panel CreateCurrencyIcon(
             Panel parent, string iconUrl, int x, int y, ItemIconTier tier, string tooltipText)
         {
-            return CreateFramePlate(
-                parent, iconUrl, ItemIconFrame.Currency().Color, x, y,
+            return CreateFrame(
+                parent, iconUrl, ItemIconFrame.Currency(), x, y,
                 ItemIconTiers.ArtSize(tier), ItemIconTiers.BorderThickness(tier), tooltipText);
         }
 
         private static Panel CreateFramedIcon(
-            Panel parent, string iconUrl, Color frameColor, int x, int y,
+            Panel parent, string iconUrl, ItemIconFrame frame, int x, int y,
             int iconSize, int borderThickness, ItemIconTooltip tooltip)
         {
-            var frame = CreateFramePlate(
-                parent, iconUrl, frameColor, x, y, iconSize, borderThickness, tooltip.PlainText);
+            var panel = CreateFrame(
+                parent, iconUrl, frame, x, y, iconSize, borderThickness, tooltip.PlainText);
 
             // The rich half goes on last and on the whole tree, over the
             // plain notes just written: a builder that composes nothing
             // keeps them as its fallback (TooltipFacility.Register).
-            tooltip.StampOnIconTree(frame);
-            return frame;
+            tooltip.StampOnIconTree(panel);
+            return panel;
         }
 
-        /// <summary>The frame plate and its art, with the plain half of the
+        /// <summary>The frame and its art, with the plain half of the
         /// hover on both - an unstamped frame is a hole in the icon's hover,
         /// and it resolves from the SAME rule the square gets.</summary>
-        private static Panel CreateFramePlate(
-            Panel parent, string iconUrl, Color frameColor, int x, int y,
+        private static Panel CreateFrame(
+            Panel parent, string iconUrl, ItemIconFrame frame, int x, int y,
             int iconSize, int borderThickness, string plainText)
         {
             int frameSize = iconSize + borderThickness * 2;
-            var frame = new Panel()
-            {
-                Size = new Point(frameSize, frameSize),
-                Location = new Point(x, y),
-                BackgroundColor = frameColor,
-                Parent = parent,
-            };
-            CreateUnframedIcon(frame, iconUrl, borderThickness, borderThickness, iconSize, plainText);
-            TooltipFacility.ApplyPlain(frame, ResolveTooltip(iconUrl, plainText));
-            return frame;
+            // A PLATE for an item, a border RING for a currency. Which one
+            // is the frame's own statement (ItemIconFrame.IsOutline), not
+            // this method's, so no call site can pick the wrong shape for
+            // the colour it asked for.
+            Panel panel = frame.IsOutline
+                ? new OutlineFramePanel()
+                {
+                    BorderColor = frame.Color,
+                    BorderThickness = borderThickness,
+                }
+                : new ClippedPanel() { BackgroundColor = frame.Color };
+            panel.Size = new Point(frameSize, frameSize);
+            panel.Location = new Point(x, y);
+            panel.Parent = parent;
+
+            CreateUnframedIcon(panel, iconUrl, borderThickness, borderThickness, iconSize, plainText);
+            TooltipFacility.ApplyPlain(panel, ResolveTooltip(iconUrl, plainText));
+            return panel;
         }
 
         // What a missing icon says instead of an item name. Assigned only
@@ -157,14 +165,14 @@ namespace TaimisToolbench.Views.Rendering
             // alarming red error texture - a data gap is not a failure.
             bool missing = string.IsNullOrEmpty(iconUrl);
             Panel icon = missing
-                ? new Panel()
+                ? new ClippedPanel()
                 {
                     Size = new Point(size, size),
                     Location = new Point(x, y),
                     BackgroundColor = new Color(45, 45, 45),
                     Parent = parent,
                 }
-                : new Panel()
+                : new ClippedPanel()
                 {
                     Size = new Point(size, size),
                     Location = new Point(x, y),
@@ -225,7 +233,7 @@ namespace TaimisToolbench.Views.Rendering
         internal static Panel CreateAssetIcon(
             Panel parent, int assetId, int x, int y, int size, string tooltipText)
         {
-            var icon = new Panel()
+            var icon = new ClippedPanel()
             {
                 Size = new Point(size, size),
                 Location = new Point(x, y),

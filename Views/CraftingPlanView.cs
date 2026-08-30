@@ -54,15 +54,14 @@ namespace TaimisToolbench.Views
         /// <summary>
         /// ZIndex every control of the pinned top strip carries, above the
         /// scrolling content panel's default 0. Blish paints a container's
-        /// children in ZIndex order, and this is not decoration: content
-        /// scrolled ABOVE the viewport paints a few pixels into the strip,
-        /// growing with tree depth, because Container.Paint unscales the
-        /// physical scissor back to logical space for its children and
-        /// floor(floor(y*s)/s) is less than or equal to y - so every
-        /// nesting level can move the propagated clip's top edge up and
-        /// none can move it back down. docs/ARCHITECTURE.md section V.26
-        /// is where that inequality is transcribed from the decompiled
-        /// binary; ClipTopSlipSimulationTests runs it.
+        /// children in ZIndex order, so the strip's own opaque pixels cover
+        /// whatever leaks past the viewport's top edge. A cover, not the
+        /// cutoff: the cutoff is ClipCutoff's re-asserted line, and every
+        /// container inside the viewport now re-asserts it. It stays as
+        /// defence in depth, because nothing can catch a plain Panel added
+        /// inside the viewport later - the repo invariants bar a test from
+        /// referencing UI code - and because SlipBudget is measured at the
+        /// four known GW2 UI Sizes rather than proved for a fifth.
         /// </summary>
         private const int TopStripZIndex = 1;
 
@@ -1486,6 +1485,16 @@ namespace TaimisToolbench.Views
 
             bool diagEnabled = ScrollDiagEnabled;
 
+            // Required before the write below, not defensive: writing
+            // ScrollDistance while the scrollbar's cached _scrollbarPercent
+            // is stale makes the write reset itself to zero inside its own
+            // statement, and a rebuild that changed the content height -
+            // the Total Cost currency table gaining rows on a re-solve -
+            // is exactly when the percent is stale. Same call and same
+            // reason as PreserveScrollAcrossResize, whose doc comment
+            // carries the derivation; docs/ARCHITECTURE.md section 3.
+            scrollbar.RecalculateLayout();
+
             int contentHeight = MeasureContentHeight(capturedPanel);
             float ratio = ScrollMath.RatioForOffset(savedOffset, contentHeight, capturedPanel.Height);
             float before = scrollbar.ScrollDistance;
@@ -2167,7 +2176,14 @@ namespace TaimisToolbench.Views
 
             // Scrollable content area - full width so scrollbar sits at the window edge.
             // Children use (Width - RightEdgePadding) to keep content clear of the scrollbar.
-            _contentPanel = new FlowPanel()
+            // ClipAuthorityFlowPanel, not FlowPanel: this panel's top edge
+            // is the horizontal line nothing below the pinned strip may
+            // paint above, and it is the only control that can publish that
+            // line for its own subtree - see Views/Rendering/ClipCutoff.cs
+            // and Services/ClipCutoffMath.cs. Every container built inside
+            // it re-asserts the line, which is what makes the cutoff
+            // independent of how deep the recipe tree nests.
+            _contentPanel = new ClipAuthorityFlowPanel()
             {
                 Size = new Point(w, buildPanel.ContentRegion.Height - layout.TopRegionHeight),
                 Location = new Point(0, layout.ContentY),
@@ -2941,14 +2957,12 @@ namespace TaimisToolbench.Views
             // the restore write immediately below is the one that actually
             // sticks: _scrollbarPercent is stable by then, so ScrollDistance's
             // own cascading RecalculateLayout finds no further change to
-            // react to. (A rebuild does not need this: PreserveScrollAcross's
-            // mutate() churns through many of _contentPanel's own direct
-            // children - each write reaching Panel.UpdateContentRegionBounds
-            // - which already forces this same stale-to-fresh transition
-            // organically before ApplySavedScrollSynchronously's write runs.
-            // A pure height-only resize tick has no such churn: ReplayRelayout
-            // does not even run when only height changed, since it is gated
-            // on widthChanged.)
+            // react to. The rebuild path needs the same call for the same
+            // reason and makes it in ApplySavedScrollSynchronously: a child
+            // move or resize reaches Panel.UpdateContentRegionBounds, but
+            // that only re-writes the scrollbar's Height/Top/Right, and a
+            // rebuild leaves all three unchanged, so SetProperty
+            // short-circuits and the percent stays stale.
             scrollbar.RecalculateLayout();
 
             int contentHeight = MeasureContentHeight(_contentPanel);
@@ -4309,7 +4323,7 @@ namespace TaimisToolbench.Views
             new PlanHeaderRenderer(this, _getItemStatBlock).Render(vm, _contentPanel, panelWidth);
 
             // Separator under header
-            var headerSeparator = new Panel()
+            var headerSeparator = new ClippedPanel()
             {
                 Size = new Point(panelWidth, 2),
                 BackgroundColor = new Color(180, 180, 180),
@@ -4484,7 +4498,7 @@ namespace TaimisToolbench.Views
         {
             // Consistent top gap before every section (including the tree),
             // so sections do not sit flush against whatever preceded them.
-            var topGap = new Panel()
+            var topGap = new ClippedPanel()
             {
                 Size = new Point(panelWidth, SectionSpacing),
                 Parent = _contentPanel,
@@ -4494,7 +4508,7 @@ namespace TaimisToolbench.Views
                 ? userExpanded
                 : defaultExpanded;
 
-            var headerPanel = new Panel()
+            var headerPanel = new ClippedPanel()
             {
                 Size = new Point(panelWidth, SectionHeaderRowHeight),
                 BackgroundColor = Color.Transparent,
@@ -4560,7 +4574,7 @@ namespace TaimisToolbench.Views
             // buys is the 2px between the title's lowest ink and this
             // rule's top - the arithmetic is in PlanContentHeightMath,
             // beside the constants.
-            var headerDivider = new Panel()
+            var headerDivider = new ClippedPanel()
             {
                 Size = new Point(panelWidth, 2),
                 Location = new Point(0, SectionHeaderRowHeight - 3),
@@ -4578,7 +4592,7 @@ namespace TaimisToolbench.Views
             // RenderTreeNode's own root call) sets the true height in the
             // same call; nothing observes this FlowPanel's height between
             // construction and that set.
-            var contentFlow = new FlowPanel()
+            var contentFlow = new ClippedFlowPanel()
             {
                 Size = new Point(panelWidth, 0),
                 FlowDirection = ControlFlowDirection.SingleTopToBottom,
@@ -4794,6 +4808,28 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
+        /// Whether the cursor is over the section header's checkbox, from
+        /// the checkbox's own live rectangle rather than
+        /// <c>Control.MouseOver</c>. Toggling it rebuilds the whole plan,
+        /// so the control this asks about is a different instance on every
+        /// click and the hover chain has not resolved to it - the same
+        /// staleness Services/TreeRowPillHitTest was written for, and the
+        /// same half-open convention answers it.
+        /// </summary>
+        private static bool CursorOverCheckbox(Checkbox checkbox)
+        {
+            if (checkbox == null)
+            {
+                return false;
+            }
+
+            var cursor = checkbox.RelativeMousePosition;
+            return TreeRowPillHitTest.Covers(
+                new TreeRowPillHitTest.PillBox(0, 0, checkbox.Width, checkbox.Height),
+                cursor.X, cursor.Y);
+        }
+
+        /// <summary>
         /// Required Recipes' own CreateCollapsibleSection variant.
         /// section.Rows is guaranteed non-empty here (the builder only adds
         /// this section when a non-Mystic-Forge recipe survives its filter), so
@@ -4805,9 +4841,9 @@ namespace TaimisToolbench.Views
         /// <para>
         /// pressStartedOnCheckbox must be declared BEFORE CreateSectionHeader
         /// runs: the click-to-toggle wiring captures the suppressToggle closure
-        /// by reference and reads the checkbox's MouseOver lazily at click
-        /// time, well after the checkbox itself exists below, so a click
-        /// landing on the checkbox never also collapses the section.
+        /// by reference and resolves the checkbox lazily at click time, well
+        /// after the checkbox itself exists below, so a click landing on the
+        /// checkbox never also collapses the section.
         /// </para>
         /// Toggling re-renders through RenderPlan(_currentPlan), the same full
         /// rebuild path a pill click and a fresh Generate use.
@@ -4821,17 +4857,17 @@ namespace TaimisToolbench.Views
 
             // suppressToggle reads the press-time flag (a click that began
             // off the checkbox still toggles the section); the press
-            // feedback has to read MouseOver live instead, because it runs
-            // during the very press that sets that flag and would otherwise
-            // see the previous press's value. The checkbox is built below,
-            // after the header it parents to - both predicates are only ever
-            // called from a mouse event, long after that.
+            // feedback has to hit-test live instead, because it runs during
+            // the very press that sets that flag and would otherwise see the
+            // previous press's value. The checkbox is built below, after the
+            // header it parents to - both predicates are only ever called
+            // from a mouse event, long after that.
             Checkbox hideUnlockedCheckbox = null;
             bool pressStartedOnCheckbox = false;
             var header = CreateSectionHeader(
                 headerTitle, section.SectionType, panelWidth, section.IsDefaultExpanded,
                 () => pressStartedOnCheckbox,
-                () => hideUnlockedCheckbox != null && hideUnlockedCheckbox.MouseOver);
+                () => CursorOverCheckbox(hideUnlockedCheckbox));
             var headerPanel = header.HeaderPanel;
             var contentFlow = header.ContentFlow;
 
@@ -4851,7 +4887,7 @@ namespace TaimisToolbench.Views
 
             headerPanel.LeftMouseButtonPressed += (_, __) =>
             {
-                pressStartedOnCheckbox = hideUnlockedCheckbox.MouseOver;
+                pressStartedOnCheckbox = CursorOverCheckbox(hideUnlockedCheckbox);
             };
 
             hideUnlockedCheckbox.CheckedChanged += (_, e) =>

@@ -69,20 +69,29 @@ namespace TaimisToolbench.Services
         /// the same 12px the plan's name columns keep.</summary>
         public const int CellAmountGap = 12;
 
-        /// <summary>Width the Amount column is assumed to want in the
-        /// minimum-column derivation. MEASURED: "Amount" is 79px at 20-bold,
-        /// and a run with wider digits ellipsizes a little earlier.</summary>
-        public const int AmountColumnFloor = 79;
+        /// <summary>
+        /// Width the Amount column is assumed to want in the minimum-column
+        /// derivation. MEASURED: "Amount" is 79px at 20-bold, and a run with
+        /// wider digits ellipsizes a little earlier.
+        /// <para>
+        /// Plus the persistent sort indicator this header now carries at all
+        /// times: <see cref="SortIndicatorLayout.Gap"/> and a slot sized for
+        /// the wider of the pair. 12, not the shipped pair's 9 xadvance
+        /// (ref/glyphs.fnt), because a corrupt install degrades to Menomonia
+        /// "^"/"v" at 20-bold and the column may not shrink under it.
+        /// </para>
+        /// </summary>
+        public const int AmountColumnFloor = 79 + SortIndicatorLayout.Gap + 12;
 
         /// <summary>
         /// Narrowest column a cell fits in. Below twice this the grid falls
         /// back to a single column rather than clipping the name line.
         /// <para>
-        /// 544px - the cell's whole width, term by term: the icon column,
+        /// 582px - the cell's whole width, term by term: the icon column,
         /// a 45-character name, the gap before the Amount column, that
         /// column's own floor, and the cell's right pad. Two columns fit
         /// inside the 1252px grid the 1378px window minimum leaves (626px
-        /// each) and a third only once the window reaches 1758px.
+        /// each) and a third only once the window reaches 1872px.
         /// </para>
         /// </summary>
         public const int SnapshotMinColumnWidth =

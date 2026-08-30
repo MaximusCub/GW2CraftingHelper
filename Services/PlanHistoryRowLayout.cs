@@ -106,7 +106,12 @@ namespace TaimisToolbench.Services
         /// </summary>
         public const int ActionButtonWidth = 156;
 
-        public const int IconButtonWidth = 28;
+        /// <summary>
+        /// The delete X, which is the SAME control the Ranker's rows carry
+        /// (Services/GlyphButtonMetrics) and must not be a second size of
+        /// it. Square, so this is its height too.
+        /// </summary>
+        public const int IconButtonWidth = GlyphButtonMetrics.RowActionSize;
 
         /// <summary>
         /// Band for the pin toggle, which is a Blish Checkbox and not a

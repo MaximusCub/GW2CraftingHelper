@@ -25,6 +25,7 @@ namespace TaimisToolbench.Views.Rendering
         private readonly int[] _widths;
         private readonly int[] _boundaries;
         private readonly Action[] _onClick;
+        private readonly Label[] _indicators;
         private readonly HeaderCellMath.LabelExtent[] _extents;
         private readonly HeaderCellMath.CellRange[] _ranges;
         private readonly SortableHeaderCells.Column[] _columns;
@@ -36,6 +37,7 @@ namespace TaimisToolbench.Views.Rendering
             _widths = new int[count];
             _boundaries = new int[count];
             _onClick = new Action[count];
+            _indicators = new Label[count];
             _extents = new HeaderCellMath.LabelExtent[count];
             _ranges = new HeaderCellMath.CellRange[count];
             _columns = new SortableHeaderCells.Column[count];
@@ -48,15 +50,22 @@ namespace TaimisToolbench.Views.Rendering
 
         internal int Count => _labels.Length;
 
-        /// <summary>One column, left to right. A null
-        /// <paramref name="onClick"/> is an inert header (the Recipe Tree's
-        /// "Source"): it still divides the band, so its neighbours cannot
-        /// claim its pixels, but it washes and answers nothing.</summary>
-        internal void Set(int index, Label label, int width, Action onClick)
+        /// <summary>
+        /// One column, left to right. A null <paramref name="onClick"/> is
+        /// an inert header (the Recipe Tree's "Source"): it still divides
+        /// the band, so its neighbours cannot claim its pixels, but it
+        /// washes and answers nothing.
+        /// <paramref name="width"/> is the header BLOCK's - its word plus
+        /// the sort indicator's reserved slot - so the split is the same in
+        /// every sort state. <paramref name="indicator"/> is that mark's own
+        /// control, which the cell tints alongside the word.
+        /// </summary>
+        internal void Set(int index, Label label, int width, Action onClick, Label indicator = null)
         {
             _labels[index] = label;
             _widths[index] = width;
             _onClick[index] = onClick;
+            _indicators[index] = indicator;
         }
 
         /// <summary>Where this column really ends, for a caller that
@@ -81,7 +90,7 @@ namespace TaimisToolbench.Views.Rendering
             for (int i = 0; i < _labels.Length; i++)
             {
                 _columns[i] = new SortableHeaderCells.Column(
-                    _ranges[i].X, _ranges[i].Width, _labels[i], _onClick[i]);
+                    _ranges[i].X, _ranges[i].Width, _labels[i], _onClick[i], _indicators[i]);
             }
 
             _cells.Sync(_columns);

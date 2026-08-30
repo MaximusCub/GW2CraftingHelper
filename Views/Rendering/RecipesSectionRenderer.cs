@@ -202,7 +202,7 @@ namespace TaimisToolbench.Views.Rendering
             const int rowHeight = PlanContentHeightMath.RecipeRowHeight;
             var edges = scan.EdgesFor(panelWidth);
 
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+            var rowPanel = new ClippedPanel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
             // A context action
             // (right-click), not a visible icon - the row already packs an

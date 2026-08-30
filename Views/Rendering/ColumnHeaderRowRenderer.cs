@@ -61,10 +61,10 @@ namespace TaimisToolbench.Views.Rendering
     // onLeftClick/onRightClick turn those two labels into sort controls
     // for the one caller that has a sortable table (Used Materials).
     // Omitted everywhere else, which leaves the label inert exactly as
-    // before. The label text a sortable caller passes already carries its
-    // sort indicator (SortableHeaderLabel.Decorate), so the right label's
-    // x-tracking below - which right-aligns off the control's own Width -
-    // accounts for the indicator without knowing about it.
+    // before. leftSort/rightSort seat that column's persistent sort
+    // indicator (Views/Rendering/SortIndicator) beside the word; the
+    // label's own x-tracking below right-aligns off the measured BLOCK
+    // width, which is the same in all three sort states.
     // The registered relayout closure is also RETURNED, for the one caller
     // that has to re-run the header's placement between resizes: the
     // Recipe Tree's "Source" header centres over the ink its decision
@@ -77,17 +77,15 @@ namespace TaimisToolbench.Views.Rendering
             FlowPanel parent, int panelWidth, string leftLabel, int leftX, string rightLabel, ISectionRelayoutSink sink,
             string middleLabel = null, int middleX = 0, Func<int, int> middleXForWidth = null,
             Func<int, int> rightXForWidth = null, Action onLeftClick = null, Action onRightClick = null,
-            Func<int, int> leftColumnEndForWidth = null, Func<int, int> rightLabelXForWidth = null)
+            Func<int, int> leftColumnEndForWidth = null, Func<int, int> rightLabelXForWidth = null,
+            TableSortDirection? leftSort = null, TableSortDirection? rightSort = null)
         {
             var rowPanel = HeaderBands.CreateColumnHeaderBand(
                 parent, BandWidth(rightXForWidth, panelWidth));
             var font = HeaderBands.Font;
-            var leftLabelControl = LabelHelpers.WithDescenderClearance(new Label()
-            {
-                Text = leftLabel, Font = font, TextColor = HeaderBands.LabelColor,
-                AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(leftX, HeaderBands.LabelY), Parent = rowPanel,
-            });
+            var leftBlock = SortableHeaderBlock.Create(
+                rowPanel, font, HeaderBands.LabelColor, HeaderBands.LabelY, leftLabel, leftSort);
+            leftBlock.MoveTo(leftX);
             Label middleLabelControl = null;
             if (!string.IsNullOrEmpty(middleLabel))
             {
@@ -101,31 +99,23 @@ namespace TaimisToolbench.Views.Rendering
                 });
             }
 
-            var rightLabelControl = rightLabelXForWidth != null
-                ? LabelHelpers.WithDescenderClearance(new Label()
-                {
-                    Text = rightLabel ?? "", Font = font, TextColor = HeaderBands.LabelColor,
-                    AutoSizeWidth = true, AutoSizeHeight = true,
-                    Location = new Point(rightLabelXForWidth(panelWidth), HeaderBands.LabelY),
-                    Parent = rowPanel,
-                })
-                : LabelHelpers.CreateRightAlignedLabel(
-                    rowPanel, rightLabel, font, HeaderBands.LabelColor,
-                    rightXForWidth != null
-                        ? rightXForWidth(panelWidth)
-                        : panelWidth - PlanRelayoutMath.TableRightMargin,
-                    HeaderBands.LabelY);
+            var rightBlock = SortableHeaderBlock.Create(
+                rowPanel, font, HeaderBands.LabelColor, HeaderBands.LabelY, rightLabel, rightSort);
+            rightBlock.MoveTo(
+                RightLabelX(panelWidth, rightXForWidth, rightLabelXForWidth, rightBlock.Width));
 
             // The hit area is the whole cell (SortableHeaderCells); the
             // labels only carry the note, which they would swallow.
             if (onLeftClick != null)
             {
-                SortableHeaderLabel.MarkSortable(leftLabelControl);
+                SortableHeaderLabel.MarkSortable(leftBlock.Title);
+                SortableHeaderLabel.MarkSortable(leftBlock.IndicatorLabel);
             }
 
             if (onRightClick != null)
             {
-                SortableHeaderLabel.MarkSortable(rightLabelControl);
+                SortableHeaderLabel.MarkSortable(rightBlock.Title);
+                SortableHeaderLabel.MarkSortable(rightBlock.IndicatorLabel);
             }
 
             // Everything the split needs that does NOT move with the panel
@@ -133,13 +123,15 @@ namespace TaimisToolbench.Views.Rendering
             // a string nor allocates.
             var plan = new HeaderCellPlan(
                 middleLabelControl == null ? 2 : 3, new SortableHeaderCells(rowPanel));
-            plan.Set(0, leftLabelControl, Measure(font, leftLabel), onLeftClick);
+            plan.Set(0, leftBlock.Title, leftBlock.Width, onLeftClick, leftBlock.IndicatorLabel);
             if (middleLabelControl != null)
             {
                 plan.Set(1, middleLabelControl, Measure(font, middleLabel), null);
             }
 
-            plan.Set(plan.Count - 1, rightLabelControl, Measure(font, rightLabel), onRightClick);
+            plan.Set(
+                plan.Count - 1, rightBlock.Title, rightBlock.Width, onRightClick,
+                rightBlock.IndicatorLabel);
             if (leftColumnEndForWidth != null)
             {
                 plan.SetBoundary(0, leftColumnEndForWidth(panelWidth));
@@ -150,12 +142,8 @@ namespace TaimisToolbench.Views.Rendering
             Action<int> relayout = w =>
             {
                 rowPanel.Size = new Point(BandWidth(rightXForWidth, w), HeaderBands.RowHeight);
-                int rightEdge = rightXForWidth != null ? rightXForWidth(w) : w - PlanRelayoutMath.TableRightMargin;
-                rightLabelControl.Location = new Point(
-                    rightLabelXForWidth != null
-                        ? rightLabelXForWidth(w)
-                        : PlanRelayoutMath.RightAlignedX(rightEdge, rightLabelControl.Width),
-                    HeaderBands.LabelY);
+                rightBlock.MoveTo(
+                    RightLabelX(w, rightXForWidth, rightLabelXForWidth, rightBlock.Width));
                 if (middleLabelControl != null && middleXForWidth != null)
                 {
                     middleLabelControl.Location = new Point(middleXForWidth(w), HeaderBands.LabelY);
@@ -171,6 +159,26 @@ namespace TaimisToolbench.Views.Rendering
             };
             sink.AddRelayout(relayout);
             return relayout;
+        }
+
+        /// <summary>
+        /// Left edge of the right header BLOCK - its word plus any indicator
+        /// - so a sortable header right-aligns on the same edge its cells do
+        /// rather than hanging its indicator past it.
+        /// </summary>
+        private static int RightLabelX(
+            int panelWidth, Func<int, int> rightXForWidth, Func<int, int> rightLabelXForWidth,
+            int blockWidth)
+        {
+            if (rightLabelXForWidth != null)
+            {
+                return rightLabelXForWidth(panelWidth);
+            }
+
+            int rightEdge = rightXForWidth != null
+                ? rightXForWidth(panelWidth)
+                : panelWidth - PlanRelayoutMath.TableRightMargin;
+            return PlanRelayoutMath.RightAlignedX(rightEdge, blockWidth);
         }
 
         /// <summary>Measured from the string, not read off the control: a

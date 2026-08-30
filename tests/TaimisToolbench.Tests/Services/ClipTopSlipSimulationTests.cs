@@ -1,12 +1,12 @@
-using System;
 using TaimisToolbench.Services;
 using Xunit;
 
 namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
-    /// Why the pinned top strip is painted OVER the scrolling content panel
-    /// rather than under it, executable.
+    /// What the pinned top strip's paint order was covering for, executable:
+    /// the clip's top edge rising once per nested container, measured by
+    /// depth and by GW2 UI Size.
     /// <para>
     /// The model is the same transcription of the decompiled Blish HUD 1.3.0
     /// paint pipeline that RowDividerScissorSimulationTests runs, applied to
@@ -14,6 +14,11 @@ namespace TaimisToolbench.Tests.Services
     /// this one needs its TOP. docs/ARCHITECTURE.md section V.26 records
     /// both the transcription and the rule that a model must reproduce
     /// measured behaviour before it is trusted.
+    /// </para>
+    /// <para>
+    /// These numbers are the DEFECT, not the fix. What bounds it is
+    /// ClipCutoffMath's re-asserted line, proved depth-independently in
+    /// ClipCutoffMathTests.
     /// </para>
     /// </summary>
     public class ClipTopSlipSimulationTests
@@ -34,26 +39,17 @@ namespace TaimisToolbench.Tests.Services
         private const int PhaseSweep = 1200;
 
         /// <summary>
-        /// RectangleExtension.ScaleBy for one edge: a float32 multiply, then
-        /// floor. Origins floor and extents ceil in the binary; only the
-        /// origin matters here.
-        /// </summary>
-        private static int ScaleEdge(int edge, float scale)
-        {
-            return (int)Math.Floor(edge * scale);
-        }
-
-        /// <summary>
-        /// One container's contribution: Control.Draw scales the clip to
-        /// physical space, Container.Paint unscales it back to logical for
-        /// the children. The Intersect with the container's own bounds is
-        /// absent on purpose - it re-clamps only when the container's top is
-        /// BELOW the clip, and a row scrolled above the viewport is exactly
-        /// the case where every ancestor's top is above it.
+        /// One container's contribution, from the production model
+        /// (Services/ClipCutoffMath.cs) rather than a copy of it: Control.Draw
+        /// scales the clip to physical space, Container.Paint unscales it back
+        /// to logical for the children. The Intersect with the container's own
+        /// bounds is absent on purpose - it re-clamps only when the container's
+        /// top is BELOW the clip, and a row scrolled above the viewport is
+        /// exactly the case where every ancestor's top is above it.
         /// </summary>
         private static int PropagateClipTop(int clipTop, float scale)
         {
-            return ScaleEdge(ScaleEdge(clipTop, scale), 1f / scale);
+            return ClipCutoffMath.PropagateClipTop(clipTop, scale);
         }
 
         /// <summary>
@@ -129,12 +125,13 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void NoFixedGapInTheStripCanBeWideEnough()
         {
-            // The reason the fix is paint order and not a taller strip. A
-            // tree row sits inside one container per depth level plus the
-            // section, the content panel and the tab's own panels, so the
-            // slip a plan can produce is bounded only by how deep its
-            // recipe tree goes - and the strip's whole separator-to-content
-            // gap is already outrun by a shallow one.
+            // Why the fix is a re-asserted cutoff line and not a taller
+            // strip. A tree row sits inside one container per depth level
+            // plus the section, the content panel and the tab's own panels,
+            // so an UNCLAMPED slip is bounded only by how deep the recipe
+            // tree goes - and the strip's whole separator-to-content gap is
+            // already outrun by a shallow one. Sizing a gap against a
+            // "deepest realistic tree" would be a guess, not a guarantee.
             int gap = TopRegionLayoutMath.SeparatorToContentGap;
 
             Assert.True(

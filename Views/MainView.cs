@@ -161,7 +161,8 @@ namespace TaimisToolbench.Views
         private const int SearchToFilterGapY = 3;
         // Caption-driven, not icon-driven: the block holds the caption
         // label's own line box beside an inline coin run drawn at y=2. The
-        // run is the wallet BAR tier (2 + 16 = 18), so the icons clear this
+        // run is the wallet BAR tier, seated on the digits' ink two pixels
+        // into its line box (2 + 2 + 16 = 20), so the icons clear this
         // height with room to spare; it is the caption that sets it.
         private const int CoinHeight = 24;
         private const int SectionGapY = 4;
@@ -315,6 +316,12 @@ namespace TaimisToolbench.Views
         // Null until the first rebuild, and whenever the result set is empty
         // enough to render a message instead.
         private Panel _resultGridPanel;
+
+        // Pins whichever run's column-header band the reader is currently
+        // scrolling through to the top of the result viewport. Rebuilt with
+        // the tab panel it overlays; the bands it moves are the ones the
+        // chromes below build, not copies (Views/Rendering/StickyHeaderHost).
+        private StickyHeaderHost _stickyHeaders;
 
         // Null for a run with no rows: the section is absent, not empty.
         private SectionChrome _itemChrome;
@@ -710,6 +717,10 @@ namespace TaimisToolbench.Views
                 CanScroll = true,
                 Parent = buildPanel,
             };
+
+            // After the content panel, and on the tab panel rather than
+            // inside it: the clip a pinned band is drawn in must not scroll.
+            _stickyHeaders = new StickyHeaderHost(buildPanel, _contentPanel);
 
             // Subscribe to resize
             buildPanel.Resized += OnPanelResized;
@@ -1768,6 +1779,11 @@ namespace TaimisToolbench.Views
             _walletChrome = null;
             _lastRowLayoutWidth = _contentPanel.Width;
 
+            // BEFORE the disposal loop: a pinned band is not a child of the
+            // content panel, so untracking it - which puts it back in the
+            // grid panel - is what lets the loop below dispose it at all.
+            _stickyHeaders?.Clear();
+
             foreach (var child in _contentPanel.Children.ToArray())
             {
                 child.Dispose();
@@ -1938,6 +1954,9 @@ namespace TaimisToolbench.Views
                 _walletChrome.ReapplyOrder();
             }
 
+            TrackStickyHeaders(_itemChrome);
+            TrackStickyHeaders(_walletChrome);
+
             // Places the cells the two loops just created and gives the grid
             // panel its height. refitText: false - every cell was built at
             // this same columnWidth, and re-ellipsizing each label a second
@@ -2038,13 +2057,29 @@ namespace TaimisToolbench.Views
             /// MeasureWidestAmount.</summary>
             public int WidestAmount;
 
+            /// <summary>
+            /// Where this run's header band sits inside the grid panel, and
+            /// how far the run's rows reach past it, as
+            /// <see cref="LayoutResultGrid"/> last placed them. Read live by
+            /// the sticky host, which owns the band's Location while the
+            /// band is pinned.
+            /// </summary>
+            public bool Present;
+            public int GridWidth;
+            public int HeaderY;
+            public int TableBottom;
+
             /// <summary>Width the Amount column reserves: the widest amount
-            /// floored at its header label. Read live by every cell's re-fit
-            /// closure - the sort indicator moves the floor.</summary>
+            /// floored at its header BLOCK, which includes the persistent
+            /// sort indicator's slot. Read live by every cell's re-fit
+            /// closure; a sort click cannot move it.</summary>
             public int AmountBand;
 
-            public readonly List<Label> NameHeaders = new List<Label>();
-            public readonly List<Label> AmountHeaders = new List<Label>();
+            public readonly List<SortableHeaderBlock> NameHeaders =
+                new List<SortableHeaderBlock>();
+
+            public readonly List<SortableHeaderBlock> AmountHeaders =
+                new List<SortableHeaderBlock>();
 
             /// <summary>Cycles this run's sort and re-places its cells.</summary>
             public Action<SnapshotTableColumn> SortBy;
@@ -2068,38 +2103,30 @@ namespace TaimisToolbench.Views
             public HeaderCellPlan CellPlan;
             public int PlanColumns;
 
-            /// <summary>Header text, and everything measured from it. Fixed
-            /// between sort clicks - the indicator is the only part that
-            /// moves - so a re-layout measures no string.</summary>
-            public string NameText;
-            public string AmountText;
+            /// <summary>Width of each header BLOCK - its word plus the sort
+            /// indicator's reserved slot. Fixed for the life of the chrome,
+            /// so a re-layout measures no string and a sort click moves no
+            /// column.</summary>
             public int NameWidth;
             public int AmountWidth;
 
             /// <summary>
-            /// Re-resolves both header labels against the sort state and
-            /// re-floors the Amount band on the new label width. The cell
-            /// plan caches those widths, so it is dropped, not patched.
+            /// Points both runs' indicators at the current sort state and
+            /// re-floors the Amount band. The band moves only when
+            /// <see cref="WidestAmount"/> does: header widths no longer
+            /// depend on which column is sorted.
             /// </summary>
             public void RefreshHeaders()
             {
-                var font = HeaderBands.Font;
-                NameText = SortableHeaderLabel.Decorate(
-                    NameTitle, Sort.IndicatorFor(SnapshotTableColumn.Name));
-                AmountText = SortableHeaderLabel.Decorate(
-                    AmountHeaderTitle, Sort.IndicatorFor(SnapshotTableColumn.Amount));
-                NameWidth = (int)Math.Ceiling(font.MeasureString(NameText).Width);
-                AmountWidth = (int)Math.Ceiling(font.MeasureString(AmountText).Width);
                 AmountBand = SnapshotItemGridLayout.CellAmountBandWidth(WidestAmount, AmountWidth);
 
+                var nameDirection = Sort.DirectionFor(SnapshotTableColumn.Name);
+                var amountDirection = Sort.DirectionFor(SnapshotTableColumn.Amount);
                 for (int i = 0; i < NameHeaders.Count; i++)
                 {
-                    NameHeaders[i].Text = NameText;
-                    AmountHeaders[i].Text = AmountText;
+                    NameHeaders[i].SetDirection(nameDirection);
+                    AmountHeaders[i].SetDirection(amountDirection);
                 }
-
-                CellPlan = null;
-                PlanColumns = 0;
             }
 
             public const string AmountHeaderTitle = "Amount";
@@ -2113,7 +2140,14 @@ namespace TaimisToolbench.Views
         private SectionChrome CreateSectionChrome(
             string title, string nameTitle, TableSortState<SnapshotTableColumn> sort)
         {
-            var chrome = new SectionChrome { NameTitle = nameTitle, Sort = sort };
+            var chrome = new SectionChrome
+            {
+                NameTitle = nameTitle,
+                Sort = sort,
+                NameWidth = SortIndicator.BlockWidthFor(HeaderBands.Font, nameTitle),
+                AmountWidth = SortIndicator.BlockWidthFor(
+                    HeaderBands.Font, SectionChrome.AmountHeaderTitle),
+            };
 
             chrome.TitlePanel = new Panel()
             {
@@ -2168,14 +2202,15 @@ namespace TaimisToolbench.Views
 
             chrome.Sort.Cycle(column);
 
-            // The indicator changes the label's width, which floors the
-            // Amount band - the only reason a click re-ellipsizes.
-            int bandBefore = chrome.AmountBand;
+            // No refit: the indicator's slot is reserved in every sort
+            // state, so a click changes an opacity and a glyph and leaves
+            // every column edge - and so every ellipsis - exactly where it
+            // was (Services/SortIndicatorLayout).
             chrome.RefreshHeaders();
 
             chrome.ReapplyOrder();
 
-            LayoutResultGrid(refitText: chrome.AmountBand != bandBefore);
+            LayoutResultGrid(refitText: false);
         }
 
         /// <summary>Places one run's chrome against the grid it labels.
@@ -2189,6 +2224,12 @@ namespace TaimisToolbench.Views
                 return;
             }
 
+            chrome.Present = section.Present;
+            chrome.GridWidth = gridWidth;
+            chrome.HeaderY = section.HeaderY;
+            chrome.TableBottom = section.HeaderY
+                + PlanContentHeightMath.ColumnHeaderRowHeight + section.Grid.Height;
+
             chrome.TitlePanel.Visible = section.Present;
             chrome.HeaderPanel.Visible = section.Present;
             if (!section.Present)
@@ -2200,7 +2241,14 @@ namespace TaimisToolbench.Views
             chrome.TitlePanel.Size = new Point(gridWidth, SectionTitleBandHeight);
             chrome.TitleDivider.Size = new Point(gridWidth, 2);
 
-            chrome.HeaderPanel.Location = new Point(0, section.HeaderY);
+            // Not while pinned: the sticky host owns the band's Location
+            // then, and writing the in-grid y over it would drop the band
+            // back down the viewport for a frame on every resize tick.
+            if (chrome.HeaderPanel.Parent == _resultGridPanel)
+            {
+                chrome.HeaderPanel.Location = new Point(0, section.HeaderY);
+            }
+
             chrome.HeaderPanel.Size = new Point(gridWidth, PlanContentHeightMath.ColumnHeaderRowHeight);
 
             int columnCount = section.Grid.ColumnCount;
@@ -2208,15 +2256,18 @@ namespace TaimisToolbench.Views
 
             while (chrome.NameHeaders.Count < columnCount)
             {
-                chrome.NameHeaders.Add(CreateHeaderLabel(chrome, chrome.NameText));
-                chrome.AmountHeaders.Add(CreateHeaderLabel(chrome, chrome.AmountText));
+                chrome.NameHeaders.Add(
+                    CreateHeaderBlock(chrome, chrome.NameTitle, SnapshotTableColumn.Name));
+                chrome.AmountHeaders.Add(
+                    CreateHeaderBlock(
+                        chrome, SectionChrome.AmountHeaderTitle, SnapshotTableColumn.Amount));
             }
 
             for (int i = 0; i < chrome.NameHeaders.Count; i++)
             {
                 bool used = i < columnCount;
-                chrome.NameHeaders[i].Visible = used;
-                chrome.AmountHeaders[i].Visible = used;
+                chrome.NameHeaders[i].SetVisible(used);
+                chrome.AmountHeaders[i].SetVisible(used);
                 if (!used)
                 {
                     continue;
@@ -2226,9 +2277,8 @@ namespace TaimisToolbench.Views
                 int amountX =
                     SnapshotItemGridLayout.CellAmountRightEdge(columnWidth) - chrome.AmountWidth;
 
-                chrome.NameHeaders[i].Location =
-                    new Point(columnX + SnapshotItemGridLayout.CellTextX, PlanContentHeightMath.ColumnHeaderLabelY);
-                chrome.AmountHeaders[i].Location = new Point(columnX + amountX, PlanContentHeightMath.ColumnHeaderLabelY);
+                chrome.NameHeaders[i].MoveTo(columnX + SnapshotItemGridLayout.CellTextX);
+                chrome.AmountHeaders[i].MoveTo(columnX + amountX);
             }
 
             SyncHeaderCells(chrome, columnCount, columnWidth, gridWidth);
@@ -2254,9 +2304,12 @@ namespace TaimisToolbench.Views
                 chrome.CellPlan = new HeaderCellPlan(columnCount * 2, chrome.Cells);
                 for (int i = 0; i < columnCount; i++)
                 {
-                    chrome.CellPlan.Set(i * 2, chrome.NameHeaders[i], chrome.NameWidth, chrome.SortByName);
                     chrome.CellPlan.Set(
-                        (i * 2) + 1, chrome.AmountHeaders[i], chrome.AmountWidth, chrome.SortByAmount);
+                        i * 2, chrome.NameHeaders[i].Title, chrome.NameWidth, chrome.SortByName,
+                        chrome.NameHeaders[i].IndicatorLabel);
+                    chrome.CellPlan.Set(
+                        (i * 2) + 1, chrome.AmountHeaders[i].Title, chrome.AmountWidth,
+                        chrome.SortByAmount, chrome.AmountHeaders[i].IndicatorLabel);
                 }
 
                 chrome.PlanColumns = columnCount;
@@ -2274,22 +2327,37 @@ namespace TaimisToolbench.Views
             chrome.CellPlan.Sync(gridWidth);
         }
 
-        private static Label CreateHeaderLabel(SectionChrome chrome, string text)
+        /// <summary>
+        /// Hands one run's header band to the sticky host. The geometry is a
+        /// live read of the chrome, not a snapshot: a resize moves every one
+        /// of these while a band may be pinned.
+        /// </summary>
+        private void TrackStickyHeaders(SectionChrome chrome)
         {
-            var label = LabelHelpers.WithDescenderClearance(new Label()
+            if (chrome == null || _stickyHeaders == null)
             {
-                Font = HeaderBands.Font,
-                Text = text,
-                TextColor = HeaderBands.LabelColor,
-                AutoSizeWidth = true,
-                AutoSizeHeight = true,
-                Parent = chrome.HeaderPanel,
-            });
+                return;
+            }
 
-            // The hit area is the whole cell (SortableHeaderCells); the
-            // label carries only the note, which it would swallow.
-            SortableHeaderLabel.MarkSortable(label);
-            return label;
+            _stickyHeaders.Track(
+                chrome.HeaderPanel, _resultGridPanel,
+                () => new StickyHeaderHost.BandGeometry(
+                    chrome.Present, 0, chrome.HeaderY, chrome.GridWidth,
+                    PlanContentHeightMath.ColumnHeaderRowHeight, chrome.TableBottom));
+        }
+
+        private static SortableHeaderBlock CreateHeaderBlock(
+            SectionChrome chrome, string title, SnapshotTableColumn column)
+        {
+            var block = SortableHeaderBlock.Create(
+                chrome.HeaderPanel, HeaderBands.Font, HeaderBands.LabelColor,
+                PlanContentHeightMath.ColumnHeaderLabelY, title, chrome.Sort.DirectionFor(column));
+
+            // The hit area is the whole cell (SortableHeaderCells); these
+            // carry only the note, which they would swallow.
+            SortableHeaderLabel.MarkSortable(block.Title);
+            SortableHeaderLabel.MarkSortable(block.IndicatorLabel);
+            return block;
         }
 
         /// <summary>

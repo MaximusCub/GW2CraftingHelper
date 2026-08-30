@@ -730,6 +730,54 @@ jobs:
           print('Every item icon names its tier and its hover.')
           PY
 
+      - name: A currency icon's frame is a border, not a background
+        shell: bash
+        run: |
+          # It shipped once: PR #232 gave every currency icon a filled frame
+          # plate, and currency art is mostly transparent, so the plate drew
+          # as a grey BACKGROUND. Only "a gentle grey border" was ever asked
+          # for. Item icons keep the plate - their full-bleed bag-slot art
+          # hides it - so the guard is that a fill is reachable ONLY on the
+          # branch where ItemIconFrame.IsOutline is false, and that the
+          # outline frame itself paints no background at all.
+          # IconFrameGeometryTests pins what the ring covers; this pins that
+          # nothing paints under it.
+          python3 - <<'PY'
+          import sys
+
+          src = open('Views/Rendering/IconControls.cs', encoding='utf-8').read()
+          fail = []
+
+          parts = src.split('private static Panel CreateFrame(', 1)
+          if len(parts) != 2:
+              fail.append('IconControls has no CreateFrame - the frame builder was renamed.')
+          else:
+              body = parts[1].split('\n        }', 1)[0]
+              fills = body.count('BackgroundColor')
+              if fills != 1:
+                  fail.append(
+                      'CreateFrame assigns a background %d times; exactly one - the '
+                      'item plate - is allowed. A second is how the currency fill '
+                      'came back.' % fills)
+              if 'frame.IsOutline' not in body:
+                  fail.append('CreateFrame no longer branches on ItemIconFrame.IsOutline.')
+              if 'OutlineFramePanel' not in body:
+                  fail.append('CreateFrame no longer draws the currency border as a ring.')
+
+          ring = open('Views/Rendering/OutlineFramePanel.cs', encoding='utf-8').read()
+          if 'BackgroundColor' in ring:
+              fail.append('OutlineFramePanel paints a background; it exists not to.')
+
+          if 'internal bool IsOutline' not in open(
+                  'Views/Rendering/RarityColors.cs', encoding='utf-8').read():
+              fail.append('ItemIconFrame no longer states whether its frame is a ring.')
+
+          if fail:
+              print('\n'.join(fail))
+              sys.exit(1)
+          print('The currency frame is still a ring with nothing painted inside it.')
+          PY
+
       - name: Module source cites no out-of-repo spec sections
         shell: bash
         run: |

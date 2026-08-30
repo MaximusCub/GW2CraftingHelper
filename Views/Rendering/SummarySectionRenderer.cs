@@ -236,7 +236,7 @@ namespace TaimisToolbench.Views.Rendering
             bool lone = tileCount == 1;
             var geometry = PlanRelayoutMath.ComputeCostTileGeometry(panelWidth, tileCount, totalMargin, minTileWidth);
 
-            var rowPanel = new Panel()
+            var rowPanel = new ClippedPanel()
             {
                 Size = new Point(panelWidth, rowHeight),
                 Parent = parent,
@@ -262,7 +262,6 @@ namespace TaimisToolbench.Views.Rendering
             int noteHeight = (int)System.Math.Ceiling(noteFont.MeasureString("0").Height);
 
             int amountHeight = AmountBlockHeight(amountFont);
-            int iconYOffset = (amountHeight - CoinSegmentMath.CoinIconSize) / 2;
 
             // One amountY for the whole band, hung the SAME
             // label-to-value gap under the caption in both bands (the
@@ -352,7 +351,7 @@ namespace TaimisToolbench.Views.Rendering
                 var segmentHandle = CoinCurrencyRenderer.LayoutCoinSegments(
                     host, segments,
                     TileContentX(boxed, hostWidth, lone, tileX, geometry.TileWidth, segmentsWidth),
-                    amountY - hostTop, amountFont, 1f, iconYOffset);
+                    amountY - hostTop, amountFont);
 
                 // Built after the amount because it hangs UNDER it: the
                 // disclosure is a footnote on this tile's number, not a
@@ -517,7 +516,7 @@ namespace TaimisToolbench.Views.Rendering
         private static Panel CreateHighlightBox(
             Panel parent, int x, int y, int width, int height)
         {
-            var box = new Panel()
+            var box = new ClippedPanel()
             {
                 Size = new Point(width, height),
                 Location = new Point(x, y),
@@ -541,7 +540,7 @@ namespace TaimisToolbench.Views.Rendering
                 return;
             }
 
-            new Panel()
+            new ClippedPanel()
             {
                 Size = new Point(width, height),
                 Location = new Point(x, y),
@@ -764,7 +763,7 @@ namespace TaimisToolbench.Views.Rendering
         private static Panel CreateCurrencyRowPanel(
             FlowPanel parent, int panelWidth, int rowHeight, Color background)
         {
-            return new Panel()
+            return new ClippedPanel()
             {
                 Size = new Point(panelWidth, rowHeight),
                 BackgroundColor = background,
@@ -783,7 +782,7 @@ namespace TaimisToolbench.Views.Rendering
         /// </summary>
         private void CreateCurrencyTableTopGap(FlowPanel parent, int panelWidth)
         {
-            var gap = new Panel()
+            var gap = new ClippedPanel()
             {
                 Size = new Point(panelWidth, SummarySectionLayoutMath.CurrencyTableTopGap),
                 Parent = parent,
@@ -1017,7 +1016,7 @@ namespace TaimisToolbench.Views.Rendering
 
         private void CreateFootnoteRow(string text, FlowPanel parent, int panelWidth)
         {
-            var rowPanel = new Panel()
+            var rowPanel = new ClippedPanel()
             {
                 Size = new Point(panelWidth, PlanContentHeightMath.FallbackTextRowHeight),
                 Parent = parent,

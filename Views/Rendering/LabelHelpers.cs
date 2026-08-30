@@ -36,7 +36,7 @@ namespace TaimisToolbench.Views.Rendering
         /// </summary>
         internal static Panel CreateRowDivider(Panel rowPanel, int panelWidth, int rowHeight, int bottomClearance)
         {
-            return new Panel()
+            return new ClippedPanel()
             {
                 Size = new Point(panelWidth, 2),
                 Location = new Point(0, rowHeight - 2 - bottomClearance),
@@ -127,14 +127,14 @@ namespace TaimisToolbench.Views.Rendering
             int textWidth = (int)System.Math.Ceiling(font.MeasureString(text).Width);
             int width = MeasureSmallTagWidth(text);
 
-            var outer = new Panel()
+            var outer = new ClippedPanel()
             {
                 Size = new Point(width, SmallTagHeight),
                 Location = new Point(x, y),
                 BackgroundColor = border,
                 Parent = parent,
             };
-            var inner = new Panel()
+            var inner = new ClippedPanel()
             {
                 Size = new Point(width - 2, SmallTagHeight - 2),
                 Location = new Point(1, 1),

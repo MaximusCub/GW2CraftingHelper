@@ -377,5 +377,41 @@ namespace TaimisToolbench.Tests.Services
                 Assert.True(Measure(message).ContentHeight < 145, message);
             }
         }
+
+        [Fact]
+        public void LineX_CentresEveryLineOnTheSameContentCentre()
+        {
+            // The V7 property: a shorter second line lands centred under the
+            // first rather than starting where the first one started.
+            const int contentWidth = 500;
+
+            int first = DialogLayoutMath.LineX(contentWidth, 460);
+            int second = DialogLayoutMath.LineX(contentWidth, 180);
+
+            Assert.Equal(20, first);
+            Assert.Equal(160, second);
+            Assert.Equal(first + (460 / 2), second + (180 / 2));
+            Assert.True(second > first);
+        }
+
+        [Fact]
+        public void LineX_PinsAnOverwideLineLeftRatherThanOverhangingBothSides()
+        {
+            Assert.Equal(0, DialogLayoutMath.LineX(500, 500));
+            Assert.Equal(0, DialogLayoutMath.LineX(500, 900));
+            Assert.Equal(0, DialogLayoutMath.LineX(0, 40));
+        }
+
+        [Fact]
+        public void LineX_LeavesASingleLineWhereItAlreadySat()
+        {
+            // Every one-line dialog in the module must not move: its one
+            // line is centred by exactly the arithmetic that centred the
+            // whole block before.
+            foreach (int lineWidth in new[] { 0, 1, 199, 200, 201, 499 })
+            {
+                Assert.Equal((500 - lineWidth) / 2, DialogLayoutMath.LineX(500, lineWidth));
+            }
+        }
     }
 }

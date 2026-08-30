@@ -158,7 +158,7 @@ namespace TaimisToolbench.Views.Rendering
             Func<int, DisciplinesColumnMath.ColumnEdges> edgesFor)
         {
             const int rowHeight = PlanContentHeightMath.DisciplineRowHeight;
-            var rowPanel = new Panel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
+            var rowPanel = new ClippedPanel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
             var font = UiFonts.Body;
             var edges = edgesFor(panelWidth);
 

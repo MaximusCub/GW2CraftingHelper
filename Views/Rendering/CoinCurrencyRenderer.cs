@@ -80,14 +80,12 @@ namespace TaimisToolbench.Views.Rendering
             public int[] TextWidths;
 
             /// <summary>
-            /// Extra y applied to the ICONS only, so a run whose number
-            /// labels are taller than CoinSegmentMath.CoinIconSize (the
-            /// rich tooltip's coin rows) can centre its fixed-size coin
-            /// icons against the text instead of leaving them stuck to
-            /// the text's top edge. Cached on the handle so
-            /// RepositionSegments reproduces the same offset without the
-            /// caller having to remember it. 0 everywhere else, which is
-            /// exactly the prior behaviour.
+            /// Extra y applied to the ICONS only, so the icon box centres
+            /// on the digits' ink rather than sitting on the top edge of
+            /// the number's line box - see
+            /// <see cref="CoinSegmentMath.InlineIconY"/>. Cached on the
+            /// handle so RepositionSegments reproduces the same offset
+            /// without the caller having to remember it.
             /// </summary>
             public int IconYOffset;
 
@@ -118,17 +116,18 @@ namespace TaimisToolbench.Views.Rendering
         /// <summary>
         /// Lays out coin segments left-to-right starting at x. alphaScale
         /// dims the number labels (not the icons - Panel has no tint
-        /// property) for dimmed not-crafted subtree rows. iconYOffset
-        /// vertically centres the fixed-size icons against a taller number
-        /// font - see SegmentLayoutHandle.IconYOffset.
+        /// property) for dimmed not-crafted subtree rows. The icons' own y
+        /// is this method's to decide, not the caller's - see
+        /// <see cref="DigitSeat"/>.
         /// </summary>
         internal static SegmentLayoutHandle LayoutCoinSegments(
             Panel parent, List<CoinSegmentMath.CoinSegmentSpec> segments, int startX, int y, BitmapFont font,
-            float alphaScale = 1f, int iconYOffset = 0, bool showShadow = false, int iconSize = 0)
+            float alphaScale = 1f, bool showShadow = false, int iconSize = 0)
         {
             var controls = new (Label, Panel)[segments.Count];
             var widths = new int[segments.Count];
             int effectiveIcon = iconSize > 0 ? iconSize : CoinSegmentMath.CoinIconSize;
+            int iconYOffset = DigitSeat(font, effectiveIcon);
             int x = startX;
             for (int i = 0; i < segments.Count; i++)
             {
@@ -146,6 +145,34 @@ namespace TaimisToolbench.Views.Rendering
                 IconYOffset = iconYOffset,
                 IconSize = iconSize,
             };
+        }
+
+        /// <summary>
+        /// Where this run's icons sit against its digits. THE one place an
+        /// inline coin or currency icon's y is decided, so every value cell
+        /// in the module seats identically and no call site can leave its
+        /// icons stuck to the top edge of the number's line box - which is
+        /// what all but two of them did.
+        /// <para>
+        /// Read off the face itself, not off a table: the digits' ink top
+        /// and height come from the '0' region, so a run drawn at any size
+        /// seats correctly without anything re-measuring Menomonia. A face
+        /// with no '0' is a broken install, not a layout case - it falls
+        /// back to the line box, which is what a font reports for a glyph
+        /// it does not have.
+        /// </para>
+        /// </summary>
+        private static int DigitSeat(BitmapFont font, int iconSize)
+        {
+            if (font == null)
+            {
+                return 0;
+            }
+
+            var zero = font.GetCharacterRegion('0');
+            return zero == null
+                ? CoinSegmentMath.InlineIconY(0, font.LineHeight, iconSize)
+                : CoinSegmentMath.InlineIconY(zero.YOffset, zero.Height, iconSize);
         }
 
         /// <summary>
@@ -336,6 +363,7 @@ namespace TaimisToolbench.Views.Rendering
         {
             var controls = new (Label, Panel)[segments.Count];
             var widths = new int[segments.Count];
+            int iconYOffset = DigitSeat(font, CoinSegmentMath.CoinIconSize);
             int x = startX;
             Color textColor = new Color(220, 220, 220);
             if (alphaScale < 1f)
@@ -365,15 +393,20 @@ namespace TaimisToolbench.Views.Rendering
                 // measured 16px box, so this segment's advance below is the
                 // number it always was.
                 var icon = IconControls.CreateCurrencyIcon(
-                    parent, seg.IconUrl, x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap, y,
-                    ItemIconTier.CurrencyBarRun, seg.Name);
+                    parent, seg.IconUrl, x + seg.TextWidth + CoinSegmentMath.CoinLabelIconGap,
+                    y + iconYOffset, ItemIconTier.CurrencyBarRun, seg.Name);
 
                 controls[i] = (label, icon);
                 widths[i] = seg.TextWidth;
                 x += seg.TextWidth + CoinSegmentMath.CoinLabelIconGap + CoinSegmentMath.CoinIconSize + CoinSegmentMath.CoinSegmentGap;
             }
 
-            return new SegmentLayoutHandle { Controls = controls, TextWidths = widths };
+            return new SegmentLayoutHandle
+            {
+                Controls = controls,
+                TextWidths = widths,
+                IconYOffset = iconYOffset,
+            };
         }
 
         /// <summary>
@@ -549,17 +582,24 @@ namespace TaimisToolbench.Views.Rendering
                 var controls = new (Label, Panel)[coinSegments.Count];
                 var widths = new int[coinSegments.Count];
                 var assetIds = new int[coinSegments.Count];
+                int iconYOffset = DigitSeat(font, CoinSegmentMath.CoinIconSize);
                 for (int i = 0; i < coinSegments.Count; i++)
                 {
                     var seg = coinSegments[i];
                     int x = SubColumnRightEdge(edges, seg.AssetId) - TreeCostColumnMath.SegmentWidth(seg.TextWidth);
                     controls[i] = CreateCoinSegment(
-                        parent, seg, x, y, font, alphaScale, 0, false, CoinSegmentMath.CoinIconSize);
+                        parent, seg, x, y, font, alphaScale, iconYOffset, false, CoinSegmentMath.CoinIconSize);
                     widths[i] = seg.TextWidth;
                     assetIds[i] = seg.AssetId;
                 }
 
-                coinHandle = new SegmentLayoutHandle { Controls = controls, TextWidths = widths, AssetIds = assetIds };
+                coinHandle = new SegmentLayoutHandle
+                {
+                    Controls = controls,
+                    TextWidths = widths,
+                    AssetIds = assetIds,
+                    IconYOffset = iconYOffset,
+                };
             }
 
             var currencySegments = BuildCurrencySegments(currencyAmounts, font);

@@ -49,6 +49,12 @@ namespace TaimisToolbench.Views
         private static readonly int MainLineButtonY =
             (PlanHistoryRowLayout.RowHeight - UiMetrics.ButtonHeight) / 2;
 
+        // The remove X is a compact square, not an on-tab button, so it
+        // centres on its own height rather than sharing the seat of the
+        // text buttons beside it.
+        private static readonly int RemoveButtonY =
+            (PlanHistoryRowLayout.RowHeight - PlanHistoryRowLayout.IconButtonWidth) / 2;
+
         // Not a row: one prose line with no icon column, so it does not
         // follow the rows' frame-driven height. It does share their left
         // edge - it stands where the list would.
@@ -79,7 +85,17 @@ namespace TaimisToolbench.Views
         private readonly ResizeSettleDebounce _resizeSettle;
 
         private readonly List<RenderedRow> _rows = new List<RenderedRow>();
-        private readonly List<Label> _columnHeaderLabels = new List<Label>();
+        private readonly List<SortableHeaderBlock> _columnHeaderLabels =
+            new List<SortableHeaderBlock>();
+
+        // Session-sticky, like the plan tables' own: a rebuild after a pin,
+        // a delete or a fresh capture keeps whatever order the user chose,
+        // and only a module reload clears it. Sorting overrides the
+        // pin-first default (PlanHistoryTableSorter says why).
+        private readonly TableSortState<PlanHistoryTableColumn> _sortState =
+            new TableSortState<PlanHistoryTableColumn>();
+
+        private HeaderCellPlan _headerCellPlan;
 
         private Panel _toolbarPanel;
         private Panel _columnHeaderPanel;
@@ -282,24 +298,55 @@ namespace TaimisToolbench.Views
             _clearButton.Click += (_, __) => OnClearHistoryClicked();
         }
 
+        /// <summary>
+        /// The three columns, labelled and clickable. All three sort: a
+        /// history list is read to answer "which plan", "how much did it
+        /// cost" and "when did I run it", and only the last of those is the
+        /// order the list already arrives in.
+        /// </summary>
         private void BuildColumnHeader(Container container, int width)
         {
             _columnHeaderPanel = HeaderBands.CreateColumnHeaderBand(
                 container, width, 0, ToolbarHeight);
 
-            foreach (string text in new[] { "Plan", "Cost", "Generated" })
+            var cells = new SortableHeaderCells(_columnHeaderPanel);
+            _headerCellPlan = new HeaderCellPlan(HeaderColumns.Length, cells);
+            for (int i = 0; i < HeaderColumns.Length; i++)
             {
-                _columnHeaderLabels.Add(new Label
-                {
-                    Font = HeaderBands.Font,
-                    TextColor = HeaderBands.LabelColor,
-                    Text = text,
-                    AutoSizeWidth = true,
-                    AutoSizeHeight = true,
-                    Location = new Point(0, ColumnHeaderLabelY),
-                    Parent = _columnHeaderPanel,
-                });
+                var column = HeaderColumns[i];
+                var block = SortableHeaderBlock.Create(
+                    _columnHeaderPanel, HeaderBands.Font, HeaderBands.LabelColor,
+                    ColumnHeaderLabelY, HeaderTitles[i], _sortState.DirectionFor(column));
+                SortableHeaderLabel.MarkSortable(block.Title);
+                SortableHeaderLabel.MarkSortable(block.IndicatorLabel);
+                _columnHeaderLabels.Add(block);
+                _headerCellPlan.Set(
+                    i, block.Title, block.Width, () => SortBy(column), block.IndicatorLabel);
             }
+        }
+
+        private static readonly PlanHistoryTableColumn[] HeaderColumns =
+        {
+            PlanHistoryTableColumn.Plan,
+            PlanHistoryTableColumn.Cost,
+            PlanHistoryTableColumn.Generated,
+        };
+
+        private static readonly string[] HeaderTitles = { "Plan", "Cost", "Generated" };
+
+        /// <summary>Cycles one column and rebuilds the list in the new
+        /// order. A full rebuild, not a re-place: these rows carry an
+        /// expansion panel whose height the flow owns, and the expanded row
+        /// is restored by id.</summary>
+        private void SortBy(PlanHistoryTableColumn column)
+        {
+            _sortState.Cycle(column);
+            for (int i = 0; i < _columnHeaderLabels.Count; i++)
+            {
+                _columnHeaderLabels[i].SetDirection(_sortState.DirectionFor(HeaderColumns[i]));
+            }
+
+            RebuildRows();
         }
 
         private void PositionChrome(Container container, int width)
@@ -336,13 +383,22 @@ namespace TaimisToolbench.Views
             SetHeaderLabel(0, bands.CaretX);
             SetHeaderLabelCentered(1, bands.CostCenterX);
             SetHeaderLabelCentered(2, bands.WhenCenterX);
+
+            // Each cell owns its column, so a click anywhere in it sorts -
+            // the split every other table in the module uses.
+            if (_headerCellPlan != null)
+            {
+                _headerCellPlan.SetBoundary(0, bands.CostCenterX - (_costBandWidth / 2));
+                _headerCellPlan.SetBoundary(1, bands.WhenCenterX - (_whenBandWidth / 2));
+                _headerCellPlan.Sync(_columnHeaderPanel.Width);
+            }
         }
 
         private void SetHeaderLabel(int index, int x)
         {
             if (index < _columnHeaderLabels.Count)
             {
-                _columnHeaderLabels[index].Location = new Point(x, ColumnHeaderLabelY);
+                _columnHeaderLabels[index].MoveTo(x);
             }
         }
 
@@ -353,8 +409,10 @@ namespace TaimisToolbench.Views
                 return;
             }
 
-            var label = _columnHeaderLabels[index];
-            label.Location = new Point(Math.Max(0, centerX - label.Width / 2), ColumnHeaderLabelY);
+            // The whole BLOCK centres, indicator included: centring the word
+            // alone would leave the pair sitting right of its own axis.
+            var block = _columnHeaderLabels[index];
+            block.MoveTo(Math.Max(0, centerX - (block.Width / 2)));
         }
 
         // ---------------------------------------------------------------
@@ -408,11 +466,12 @@ namespace TaimisToolbench.Views
             int barWidth = Math.Max(0, _contentPanel.Width - ScrollbarAllowance);
             _lastLayoutWidth = _contentPanel.Width;
 
-            var entries = PlanHistoryRetention.SortForDisplay(_snapshotEntries());
+            var entries = PlanHistoryTableSorter.Sort(
+                PlanHistoryRetention.SortForDisplay(_snapshotEntries()), _sortState);
 
             // Drop a stale expansion whose row is gone (deleted/evicted).
             if (_expandedEntryId != null
-                && entries.FindIndex(e => string.Equals(e.EntryId, _expandedEntryId, StringComparison.Ordinal)) < 0)
+                && !entries.Any(e => string.Equals(e.EntryId, _expandedEntryId, StringComparison.Ordinal)))
             {
                 _expandedEntryId = null;
             }
@@ -431,6 +490,12 @@ namespace TaimisToolbench.Views
                     _rows.Add(CreateRow(entry, barWidth, bands));
                 }
             }
+
+            // The band widths this pass measured are what the header
+            // centres on and what its click cells are split at, so the
+            // header is re-placed here rather than left on the previous
+            // list's measurements until the next resize.
+            PositionColumnHeader(barWidth);
 
             _clearButton.Enabled = !_isResolving && entries.Count > 0;
             UpdateStatusLine();
@@ -694,8 +759,9 @@ namespace TaimisToolbench.Views
         {
             var button = new FeedbackButton
             {
-                Size = new Point(PlanHistoryRowLayout.IconButtonWidth, UiMetrics.ButtonHeight),
-                Location = new Point(x, MainLineButtonY),
+                Size = new Point(
+                    PlanHistoryRowLayout.IconButtonWidth, PlanHistoryRowLayout.IconButtonWidth),
+                Location = new Point(x, RemoveButtonY),
                 Parent = parent,
             };
             button.SetGlyph(UiGlyphs.RemoveMark);
@@ -1080,7 +1146,7 @@ namespace TaimisToolbench.Views
 
             row.Resolve.Location = new Point(bands.ResolveX, MainLineButtonY);
             row.Pin.Location = new Point(bands.PinX, MainLineButtonY);
-            row.Delete.Location = new Point(bands.DeleteX, MainLineButtonY);
+            row.Delete.Location = new Point(bands.DeleteX, RemoveButtonY);
 
             if (row.DetailPanel != null)
             {

@@ -68,7 +68,12 @@ namespace TaimisToolbench.Services
         public const int CurrencyTopGap = 8;
         public const int NoteTopGap = 8;
 
-        public const int ButtonWidth = 28;
+        /// <summary>
+        /// The row's three glyph actions, at the compact square the game's
+        /// own window close control is drawn at rather than at the module's
+        /// on-tab button height (V4). Height matches - these are square.
+        /// </summary>
+        public const int ButtonWidth = GlyphButtonMetrics.RowActionSize;
 
         /// <summary>Room for "25." at UiFonts.Caption plus clearance.</summary>
         public const int RankWidth = 26;
