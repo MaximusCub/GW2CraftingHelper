@@ -742,5 +742,22 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(973, room.Left);
             Assert.True(room.Left > 1000 - 24 - 12, "the room reached into the name column");
         }
+
+        /// <summary>
+        /// The plan's tables stack under one another and three of them
+        /// head their flexing column with the same word, so the word has
+        /// to sit on the same x. The Recipe Tree's own depth-0 name rule
+        /// is NOT that x - its rows carry a caret column the other tables
+        /// have no equivalent of - which is what put its "Item" 8px right
+        /// of the "Item" below it.
+        /// </summary>
+        [Fact]
+        public void TableLeftHeaderX_IsTheSharedNameRule_NotTheTreesOwn()
+        {
+            Assert.Equal(ShoppingColumnMath.NameX, PlanRelayoutMath.TableLeftHeaderX);
+            Assert.True(
+                PlanRelayoutMath.TableLeftHeaderX < TreeRowShapePlanner.NameColumnOffset,
+                "the shared rule is left of the tree's own name rule");
+        }
     }
 }

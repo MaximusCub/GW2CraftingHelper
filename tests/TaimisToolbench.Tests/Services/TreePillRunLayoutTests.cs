@@ -12,6 +12,14 @@ namespace TaimisToolbench.Tests.Services
     /// pill, whatever happens to the pills beside it, so repeated clicks
     /// keep landing on the toggle instead of falling through to the row
     /// (which expands and collapses the node).
+    /// <para>
+    /// The renderer now draws one MARK in both states rather than the two
+    /// words below, so it feeds ReservedSlotWidth one measurement twice
+    /// and the rectangle is identical by construction. These tests keep
+    /// driving it with the two words: the harder input is the one worth
+    /// pinning, and the words are still what the toggle's tooltip is named
+    /// from.
+    /// </para>
     /// </summary>
     public class TreePillRunLayoutTests
     {

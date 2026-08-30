@@ -1981,9 +1981,23 @@ frozen hover chain: a decision pill re-solves and rebuilds its own row, a sort
 header re-renders the table it labels, a caret rebuilds the subtree under it.
 The replacement control lands under a stationary cursor with
 `MouseOver == false` and no `MouseEntered` fired, so the pill the user is
-pointing at reads as un-hovered until they jiggle the mouse - and this
-module's own `AnyPillHovered` guard, which asks the same question, answers
-wrongly in the meantime.
+pointing at reads as un-hovered until they jiggle the mouse.
+
+What this type is NOT is a way to answer "is a pill under the cursor". That
+question used to be asked of `Control.MouseOver` too, and the resync was what
+kept the answer honest - which held only while the resync's own hit test was
+honest. It is not, on a full rebuild: a freshly created row is added to its
+`FlowPanel` with no `Location` of its own, and Blish defers
+`FlowPanel.RecalculateLayout` to the next draw, so at the instant the click
+handler calls the resync every new row still sits at its container's origin.
+The resync then sets `MouseOver` on whichever row won the sibling tiebreak
+there, the pill genuinely under the cursor never gets it, and the row's
+expand/collapse handler - which defers to that flag - answered the NEXT click
+by expanding the node. `Services/TreeRowPillHitTest` removes the dependency
+rather than trying to make the flag correct: the guard reads the pills'
+rectangles against `RelativeMousePosition`, which is derived from live
+`AbsoluteBounds` at click time and cannot be stale in that window. The resync
+stays for what it does fix - the visible hover WASH on a rebuilt control.
 
 A LOST click is a different, also-measured mechanism, and this section is the
 one place it is stated. `MouseHandler` buffers exactly ONE pending mouse event
@@ -2310,13 +2324,33 @@ reported "rapid IGNORE toggling drops clicks". Ignoring a LEAF material - the
 common case, and the one the field report is about - passes the gate.
 
 The pill column's budget is exceeded because `DecisionPillPlanner.AppendOwnershipPills`
-unconditionally adds an "IGNORE" pill, plus "USING N OWNED" when applicable, to
+unconditionally adds an ignore toggle, plus "USING N OWNED" when applicable, to
 every ordinary node, on top of its 1-3 source pills. The row cannot grow to
 absorb them: `TreeRowHeight` is a fixed per-row height shared by every
 layout/scroll-height calculation in that file, so there is no wrap and no
 second line. Before `ComputePillFit`, trailing pills were simply dropped with
 nothing on the row to say they had existed - which is what the "+N" pill now
 says.
+
+The column itself is no longer flat, because a "+N" chip on a window with
+hundreds of unused pixels in the name column beside it is a lie the reader
+cannot act on. `Services/TreePillColumnMath` derives its width the way
+`EffectiveCostColumnWidth` already derives the cost column's: the widest full
+run any row in the tree needs, floored at
+`PlanRelayoutMath.TreePillColumnWidth` and capped at that floor plus half of
+whatever the panel has beyond the module's minimum width. The half is what
+makes the split safe at every width - widening the window can never leave the
+name column narrower than it was one pixel earlier, and at the minimum width
+the column cannot grow at all, so every deep-row budget
+`docs/research/minimum-window-width.md` derives is untouched. Measured on the
+reported Obsidian Heavy Breastplate rows at a 1920px window: a
+CRAFT/TP/HAVE-annotation row went from two pills and a "+1" chip, tightened,
+to all three at full padding, and the column took 82px of the 1314px the
+depth-0 name column held.
+
+Like the cost column's, the result is held as a one-way floor for the life of
+a plan (`TreeCostColumnFloor` says why a column edge that narrows under a
+click is a bug), and `TryRefreshInPlace` declines when it moves.
 
 That "+N" pill is deliberately not wired to a popup offering the hidden
 options. The hidden pills are almost always the trailing annotation and the

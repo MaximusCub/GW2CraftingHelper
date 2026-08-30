@@ -484,10 +484,67 @@ namespace TaimisToolbench.Tests.Services
 
             var widths = Scan(roots, currencyRunWidth: 88);
 
-            // "123"/"45"/"67" -> segments 21/20/20, two 6px gaps: 73px of
-            // coin ink, against 88px of currency ink one band to its right.
-            Assert.Equal(88, widths.WidestRowRunWidth);
+            // One row in each regime. The tie goes to the coin-only one -
+            // "123"/"45"/"67", segments 21/20/20 and two 6px gaps, 73px of
+            // ink - rather than to the currency row's 88px, and either way
+            // both fall well short of the 167px reserve.
+            Assert.Equal(73, widths.WidestRowRunWidth);
             Assert.Equal(167, TreeCostColumnMath.TotalWidth(widths));
+        }
+
+        /// <summary>
+        /// The two regimes do not share an extent, so the header follows
+        /// the one MORE rows are drawn in. Reported case: a plan whose
+        /// coin rows all collapse the currency band, plus a single vendor
+        /// row that does not, put the header 43px left of every coin
+        /// figure it was meant to label.
+        /// </summary>
+        [Fact]
+        public void Scan_OneMixedRowAmongCoinRows_DoesNotDefineTheInkExtent()
+        {
+            var coinRowsOnly = new[]
+            {
+                Node(1, subtreeCost: 1234567),
+                Node(2, subtreeCost: 45678),
+                Node(3, subtreeCost: 789),
+            };
+            var withOneMixedRow = new[]
+            {
+                Node(1, subtreeCost: 1234567),
+                Node(2, subtreeCost: 45678),
+                Node(3, subtreeCost: 789),
+                Node(4, subtreeCost: 4242, vendorCurrencyCosts: OneCurrencyLine()),
+            };
+
+            var without = Scan(coinRowsOnly, currencyRunWidth: 88);
+            var with = Scan(withOneMixedRow, currencyRunWidth: 88);
+
+            Assert.Equal(without.WidestRowRunWidth, with.WidestRowRunWidth);
+            Assert.True(TreeCostColumnMath.TotalWidth(with) > with.WidestRowRunWidth + 88);
+        }
+
+        /// <summary>
+        /// And the mirror: a column that is mostly vendor rows centres on
+        /// theirs, so the rule is "the regime with more rows", not "coin
+        /// always wins".
+        /// </summary>
+        [Fact]
+        public void Scan_MostlyMixedRows_TakeTheirOwnExtent()
+        {
+            var roots = new[]
+            {
+                Node(1, subtreeCost: 789),
+                Node(2, subtreeCost: 4242, vendorCurrencyCosts: OneCurrencyLine()),
+                Node(3, subtreeCost: 4243, vendorCurrencyCosts: OneCurrencyLine()),
+            };
+
+            var widths = Scan(roots, currencyRunWidth: 88);
+
+            // A mixed row keeps the currency band, so its coin segments
+            // start a whole band-plus-gap left of where a coin-only row's
+            // would - which is exactly why it cannot be the extent for a
+            // column of coin rows.
+            Assert.True(widths.WidestRowRunWidth > 88);
         }
 
         [Fact]

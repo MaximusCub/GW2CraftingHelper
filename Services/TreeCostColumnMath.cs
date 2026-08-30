@@ -39,14 +39,18 @@ namespace TaimisToolbench.Services
             public readonly int CurrencyRunWidth;
 
             /// <summary>
-            /// Widest run of INK any single row draws, measured back from
+            /// Widest run of INK the column's rows draw, measured back from
             /// the column's right edge - what the "Cost" header centres
             /// over (<see cref="HeaderX"/>). Strictly narrower than
             /// <see cref="TotalWidth"/> whenever the sub-column maxima come
             /// from different rows, and much narrower when the currency
             /// band exists at all: a coin-only row collapses that band for
             /// itself (<see cref="ComputeRowEdges"/>), so no row's ink ever
-            /// reaches the reserve's left edge. 0 when no row is priced.
+            /// reaches the reserve's left edge. Measured in the coin-only
+            /// regime wherever the column has a coin row at all, because
+            /// the two regimes have different extents and one mixed row
+            /// must not place the header for every coin row - see
+            /// WidestRowRun. 0 when no row is priced.
             /// <para>
             /// Not derivable from the four widths above, so a caller that
             /// compares two scans field by field to decide whether a
@@ -370,26 +374,48 @@ namespace TaimisToolbench.Services
             public int LeadSilverMixed;
             public int LeadCopperMixed;
             public int LeadCurrency;
+
+            /// <summary>Rows drawing ink in each regime - see
+            /// WidestRowRun for why the header follows the larger.</summary>
+            public int CoinOnlyRows;
+            public int MixedRows;
         }
 
         /// <summary>
-        /// Widest ink run of any single row, in pixels back from the
-        /// column's right edge. Resolved after the walk because a row's
+        /// Widest ink run the column's rows draw, in pixels back from its
+        /// right edge - the extent the "Cost" header centres over
+        /// (<see cref="HeaderX"/>). Resolved after the walk because a row's
         /// segments right-align into sub-columns whose edges are not known
         /// until every row has been measured.
+        /// <para>
+        /// The column lays rows out in two regimes and they do not share an
+        /// extent: a row with no currency ink collapses the shared currency
+        /// band for itself (<see cref="ComputeRowEdges"/>), so every coin
+        /// row starts a whole band-plus-gap to the RIGHT of where a mixed
+        /// coin+currency row starts. Taking the max over both put the
+        /// header over an extent no coin row ever reaches - measured on a
+        /// plan with a 96px currency band, one such row moved the header
+        /// 43px left of the centre of every coin row's ink, which is the
+        /// reported "still not centred". A header sits over ONE extent and
+        /// a single outlier row must not be it, so the regime with more
+        /// rows in it wins; a tie goes to the coin-only regime, which is
+        /// the one the shared sub-columns are laid out for.
+        /// </para>
         /// </summary>
         private static int WidestRowRun(CostColumnWidths widths, ScanAccumulator acc)
         {
-            var mixed = ComputeEdges(0, widths);
             var coinOnly = ComputeRowEdges(0, widths, rowDrawsCurrency: false);
+            int coinOnlyRun = Reach(coinOnly.GoldRightEdge, acc.LeadGoldCoinOnly);
+            coinOnlyRun = Max(coinOnlyRun, Reach(coinOnly.SilverRightEdge, acc.LeadSilverCoinOnly));
+            coinOnlyRun = Max(coinOnlyRun, Reach(coinOnly.CopperRightEdge, acc.LeadCopperCoinOnly));
 
-            int run = Reach(coinOnly.GoldRightEdge, acc.LeadGoldCoinOnly);
-            run = Max(run, Reach(coinOnly.SilverRightEdge, acc.LeadSilverCoinOnly));
-            run = Max(run, Reach(coinOnly.CopperRightEdge, acc.LeadCopperCoinOnly));
-            run = Max(run, Reach(mixed.GoldRightEdge, acc.LeadGoldMixed));
-            run = Max(run, Reach(mixed.SilverRightEdge, acc.LeadSilverMixed));
-            run = Max(run, Reach(mixed.CopperRightEdge, acc.LeadCopperMixed));
-            return Max(run, Reach(mixed.CurrencyRightEdge, acc.LeadCurrency));
+            var mixed = ComputeEdges(0, widths);
+            int mixedRun = Reach(mixed.GoldRightEdge, acc.LeadGoldMixed);
+            mixedRun = Max(mixedRun, Reach(mixed.SilverRightEdge, acc.LeadSilverMixed));
+            mixedRun = Max(mixedRun, Reach(mixed.CopperRightEdge, acc.LeadCopperMixed));
+            mixedRun = Max(mixedRun, Reach(mixed.CurrencyRightEdge, acc.LeadCurrency));
+
+            return acc.MixedRows > acc.CoinOnlyRows ? mixedRun : coinOnlyRun;
         }
 
         /// <summary>
@@ -494,6 +520,18 @@ namespace TaimisToolbench.Services
             ScanAccumulator acc, int goldSegment, int silverSegment, int copperSegment, int currencyRun)
         {
             bool mixed = currencyRun > 0;
+            if (goldSegment > 0 || silverSegment > 0 || copperSegment > 0 || mixed)
+            {
+                if (mixed)
+                {
+                    acc.MixedRows++;
+                }
+                else
+                {
+                    acc.CoinOnlyRows++;
+                }
+            }
+
             if (goldSegment > 0)
             {
                 if (mixed)

@@ -11,9 +11,12 @@ namespace TaimisToolbench.Services
     /// the toggle moved out from under the cursor that had just clicked it
     /// and the next click landed on the row instead, which expands or
     /// collapses the node. Anchored, its slot is the same rectangle in both
-    /// states - <see cref="ReservedSlotWidth"/> sizes it for the longer of
-    /// the two texts, so the pill neither moves nor resizes when "IGNORE"
-    /// becomes "IGNORED".
+    /// states: <see cref="ReservedSlotWidth"/> sizes ONE slot for both of
+    /// the faces it can draw, so the pill neither moves nor resizes across
+    /// a click. The two faces are now the same mark - the renderer draws
+    /// UiGlyphs.RemoveMark in a raised or pressed key rather than the words
+    /// "IGNORE"/"IGNORED" - which makes that rectangle identical by
+    /// construction rather than by measurement.
     /// </para>
     /// </summary>
     internal static class TreePillRunLayout

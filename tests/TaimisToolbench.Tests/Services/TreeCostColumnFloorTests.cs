@@ -214,11 +214,18 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void Widen_NeverNarrowsTheInkExtent()
         {
-            var floor = TreeCostColumnFloor.Widen(
-                TreeCostColumnMath.CostColumnWidths.Empty, Scan(TreeWithACurrencyRow()));
-            var afterIgnore = TreeCostColumnFloor.Widen(floor, Scan(TreeWithThatRowIgnored()));
+            // A tree whose WIDEST row is the one being ignored away, so
+            // the second scan genuinely reports less ink than the first -
+            // the currency row above owns the reserve but not the extent,
+            // which the header follows (TreeCostColumnMath.WidestRowRun).
+            var before = new List<CraftingTreeNode> { Node(1234567), Node(12345678) };
+            var after = new List<CraftingTreeNode> { Node(1234567), Node(null) };
 
-            Assert.True(Scan(TreeWithThatRowIgnored()).WidestRowRunWidth < floor.WidestRowRunWidth);
+            var floor = TreeCostColumnFloor.Widen(
+                TreeCostColumnMath.CostColumnWidths.Empty, Scan(before));
+            var afterIgnore = TreeCostColumnFloor.Widen(floor, Scan(after));
+
+            Assert.True(Scan(after).WidestRowRunWidth < floor.WidestRowRunWidth);
             Assert.Equal(floor.WidestRowRunWidth, afterIgnore.WidestRowRunWidth);
             Assert.True(TreeCostColumnFloor.Equal(floor, afterIgnore));
         }

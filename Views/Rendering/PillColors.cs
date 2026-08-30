@@ -44,6 +44,30 @@ namespace TaimisToolbench.Views.Rendering
         internal const float DimmedPillFactor = 0.6f;
 
         /// <summary>
+        /// The IGNORE toggle's mark, which inverts with the key under it:
+        /// near-black punched into the filled ON key (4.19:1 against that
+        /// amber), and the white every other interactive pill's label
+        /// draws when the key is OFF and unfilled. The pill's own
+        /// <see cref="GetPillColors"/> arm carries the rest of the
+        /// raised/pressed pair.
+        /// <para>
+        /// The punch-out is a FULL-STRENGTH affordance only.
+        /// <see cref="DimmedPillFactor"/> multiplies both the mark and the
+        /// key toward black, which compresses that 4.19:1 to 2.17:1 - below
+        /// the 3:1 non-text minimum, on a row a tree-wide ignore can
+        /// perfectly well reach (ignores are keyed by item id, so an
+        /// occurrence under a bought parent draws the ON key too). A dimmed
+        /// ON key therefore keeps the light mark, which reads 3.05:1
+        /// against it and still says "filled key" - the state signal is the
+        /// fill, not the inversion.
+        /// </para>
+        /// </summary>
+        internal static Color GlyphColor(bool isIgnoreActive, bool dimmed)
+        {
+            return isIgnoreActive && !dimmed ? new Color(28, 20, 6) : Color.White; // #1C1406
+        }
+
+        /// <summary>
         /// isIgnoreActive is only meaningful for PillKind.Ignore (whether
         /// THIS specific Ignore pill is the active/"IGNORED" state, i.e.
         /// node.IsIgnored) - ignored for every other kind.
@@ -80,15 +104,21 @@ namespace TaimisToolbench.Views.Rendering
                     fill = border * 0.15f;
                     break;
                 case PillKind.Ignore:
-                    // Amber when active ("IGNORED", currently toggled on);
-                    // plain clickable grey (matching Available) otherwise -
-                    // never Selected's green, to avoid reading as "the
-                    // chosen acquisition source". The original
-                    // active-amber #E5A83C border
-                    // measured 2.10:1 against white; darkened to #9C7327
-                    // (4.29:1), same hue.
-                    border = isIgnoreActive ? new Color(156, 115, 39) : new Color(138, 138, 138); // #9C7327 / #8A8A8A
-                    fill = isIgnoreActive ? border * 0.15f : Color.Transparent;
+                    // The module's one two-state TOGGLE, and since the
+                    // control stopped carrying a word (it draws
+                    // UiGlyphs.RemoveMark in both states) its state has to
+                    // be legible from the chrome alone. Raised vs.
+                    // pressed, the toolbar-toggle vocabulary: OFF is an
+                    // outlined key - crisp grey ring, no fill, matching the
+                    // clickable Available pill and never Selected's green
+                    // - and ON is that key pushed in, filled solid with the
+                    // amber the ring used to draw at #9C7327 (4.29:1
+                    // against white) and edged in a darker one so the lit
+                    // top edge a raised key shows is gone. The mark itself
+                    // inverts with the surface it sits on - see
+                    // <see cref="GlyphColor"/>.
+                    border = isIgnoreActive ? new Color(94, 69, 23) : new Color(138, 138, 138); // #5E4517 / #8A8A8A
+                    fill = isIgnoreActive ? new Color(156, 115, 39) : Color.Transparent; // #9C7327
                     break;
                 case PillKind.AchievementBitDeduped:
                     // Muted violet - distinct from Have's blue and

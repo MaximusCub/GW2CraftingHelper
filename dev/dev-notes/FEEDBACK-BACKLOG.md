@@ -28,17 +28,17 @@ Status: OPEN | IN PROGRESS (branch) | DONE (PR #n) | RULED OUT (reason)
 | id | Item | Status |
 |----|------|--------|
 | B1 | Toggling a node between CRAFT and VENDOR repopulates the Total Cost currency table, moving the scroll position; sometimes it grows enough to push the whole Recipe Tree section off the viewport. Repro: Obsidian Heavy Breastplate, collapse the breastplate node, toggle back and forth. | IN PROGRESS (`w6-viewport`) - cause was not the table growing: Blish's `Scrollbar` zeroes `ScrollDistance` inside the restore's own assignment when its cached percent is stale. |
-| B2 | **REGRESSION - still broken.** Clicking IGNORE repeatedly without moving the mouse eventually expands/collapses the node instead of toggling IGNORE. Two causes were fixed in PR #232 (pill membership, cost-column re-derivation); a third remains. | OPEN |
+| B2 | **REGRESSION - still broken.** Clicking IGNORE repeatedly without moving the mouse eventually expands/collapses the node instead of toggling IGNORE. Two causes were fixed in PR #232 (pill membership, cost-column re-derivation); a third remains. | IN PROGRESS (w6-tree) - third cause found: the row's guard read Blish's hover flag, which HoverChainResync cannot fix on a full rebuild because the new rows have not been laid out when it runs. Guard is now geometric. |
 | B3 | Tree content still overdraws the pinned header when scrolled. Owner's question, which must be answered not deflected: "why aren't we just positioning the viewport lower so this can never happen?" | IN PROGRESS (`w6-viewport`), **PARTIAL** - hard cutoff built and every container outside the tree swept. RESIDUAL: the per-depth containers in `Views/Rendering/TreeSectionController.cs` still need the mechanical `Panel`/`FlowPanel` -> `ClippedPanel`/`ClippedFlowPanel` swap. Blocked on `w6-tree` owning that file. B3 is NOT closed until that lands. |
 
 ## Layout and dynamic sizing
 
 | id | Item | Status |
 |----|------|--------|
-| L1 | "+N" no-room chips appear on Obsidian Heavy Breastplate rows where the real available width WOULD fit the full pill run, the ignore control and the currency cell without cramming. The dynamic layout logic is giving up too early. | OPEN |
-| L2 | Consider replacing the IGNORE text pill with an X control - no language to translate, fewer i18n problems later. | OPEN |
-| V5 | Recipe Tree "Cost" header still not visually centred over its content. | OPEN |
-| V6 | Recipe Tree "Item" column header should anchor further left. | OPEN |
+| L1 | "+N" no-room chips appear on Obsidian Heavy Breastplate rows where the real available width WOULD fit the full pill run, the ignore control and the currency cell without cramming. The dynamic layout logic is giving up too early. | IN PROGRESS (w6-tree) - pill column is data-derived now, floor 256 plus half the surplus past the minimum window. |
+| L2 | Consider replacing the IGNORE text pill with an X control - no language to translate, fewer i18n problems later. | IN PROGRESS (w6-tree) - remove mark in a raised (off) or pressed (on) key; state is the fill, not the mark. |
+| V5 | Recipe Tree "Cost" header still not visually centred over its content. | IN PROGRESS (w6-tree) - it centred over the widest SINGLE row, and one mixed coin+currency row spans a band every coin row collapses. |
+| V6 | Recipe Tree "Item" column header should anchor further left. | IN PROGRESS (w6-tree) - moved onto the plan's shared left-header rule, 8px left. |
 
 ## Visual polish
 

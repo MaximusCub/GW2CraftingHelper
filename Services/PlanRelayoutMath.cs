@@ -94,11 +94,30 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Width of the recipe tree's decision-pill column, the
-        /// pillColumnWidth every tree caller passes
-        /// <see cref="ComputeTreeColumnEdges"/>. Lives here, next to the
-        /// function that consumes it, so the Blish-free width tests assert
-        /// against the shipped column rather than a copy of it.
+        /// The x every plan table's left-hand header word sits on - an
+        /// alias for <see cref="ShoppingColumnMath.NameX"/>, which owns the
+        /// arithmetic and which Used Materials and Required Recipes
+        /// duplicate as their own NameX.
+        /// <para>
+        /// Named here because the Recipe Tree cannot derive it: its rows
+        /// carry a caret column before the icon, so its own depth-0 name
+        /// rule (TreeRowShapePlanner.NameColumnOffset) is 8px further
+        /// right, and anchoring "Item" there put the tree's header 8px
+        /// right of the identically-worded header on the table directly
+        /// beneath it. A reader sees the two words, not the two grids.
+        /// </para>
+        /// </summary>
+        public const int TableLeftHeaderX = ShoppingColumnMath.NameX;
+
+        /// <summary>
+        /// FLOOR width of the recipe tree's decision-pill column - the
+        /// narrowest pillColumnWidth a tree caller ever passes
+        /// <see cref="ComputeTreeColumnEdges"/>, and the width every tree
+        /// gets at the module's minimum window. Above that minimum the
+        /// column may claim more (Services/TreePillColumnMath), up to what
+        /// its widest row needs. Lives here, next to the function that
+        /// consumes it, so the Blish-free width tests assert against the
+        /// shipped column rather than a copy of it.
         /// <para>
         /// 240 until the minimum-width research measured the standard
         /// CRAFT/TP/VENDOR/IGNORE run at 222px against the 236px budget a
@@ -137,10 +156,12 @@ namespace TaimisToolbench.Services
         /// counterpart can never drift apart.
         /// <para>
         /// The pill+cost block is pinned to the panel edge (see
-        /// <see cref="PinnedRightEdge"/>), so the pill column's own budget -
-        /// maxRightEdge minus pillColX, which <see cref="ComputePillFit"/>
-        /// resolves against - is width-invariant: a pill that fits at one
-        /// window width fits at every other.
+        /// <see cref="PinnedRightEdge"/>), so for a given pillColumnWidth
+        /// the pill column's own budget - maxRightEdge minus pillColX,
+        /// which <see cref="ComputePillFit"/> resolves against - is
+        /// width-invariant: a pill that fits at one window width fits at
+        /// every other. The caller settles that width once per render, so
+        /// a resize drag never refits.
         /// </para>
         /// </summary>
         public static TreeColumnEdges ComputeTreeColumnEdges(
@@ -193,7 +214,7 @@ namespace TaimisToolbench.Services
         /// Where the recipe tree's two data headers may sit: "Source" over
         /// the pill runs, "Cost" over the coin runs, each bounded by the
         /// column beside it rather than by its own reserve. Both reserves
-        /// overstate their ink badly - the pill column is a fixed
+        /// overstate their ink badly - the pill column is at least
         /// <see cref="TreePillColumnWidth"/> whatever a row's badges
         /// measure, and the cost column's is a per-denomination sum no one
         /// row draws together - so a header clamped into one right-aligns

@@ -42,10 +42,18 @@ namespace TaimisToolbench.Services
                 // Toggles this ITEM id (not just this node) in or out of the
                 // ignore set, matching gw2e's own tree-wide-by-item-id
                 // "Ignore" semantics.
+                //
+                // Leads with the STATE, because the control itself no
+                // longer carries a word - it is a remove mark in a raised
+                // or pressed key (Views/Rendering/TreeSectionController).
+                // This is the only place the toggle is named, so the two
+                // texts DecisionPillPlanner owns are spent here.
                 return new PillTooltipPlan(
                     node.IsIgnored
-                        ? "Stop treating this item as fully in-hand"
-                        : "Treat this item as fully in-hand (ignore its owned-stock requirement)",
+                        ? DecisionPillPlanner.IgnoredPillText +
+                            " - click to stop treating this item as fully in-hand"
+                        : DecisionPillPlanner.IgnorePillText +
+                            " - treat this item as fully in-hand (ignore its owned-stock requirement)",
                     appendSubduing: false);
             }
 
