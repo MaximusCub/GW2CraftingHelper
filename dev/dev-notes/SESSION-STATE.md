@@ -143,3 +143,17 @@ never another agent's summary.
 - A branch checked out in a worktree cannot be `git checkout`ed in the main
   clone. `git diff master..branch` on a stale-based branch shows master-only
   work as deletions; use the three-dot form to see the real change set.
+
+
+## The reference was already in the owner's screenshots
+
+An agent reported V4's 24px X button as unverifiable because "no Trading Post
+capture exists in this repo", and that was relayed to the owner as needing his
+eye. The owner then pointed out the Trading Post was in the top corner of the
+ranker screenshot he had already sent. It was.
+
+The images the owner pastes are on disk at
+`~/.claude/image-cache/<session-id>/*.png` and can be measured with PIL. When a
+UI question is "does ours match the game's", check the owner's existing captures
+before declaring it unmeasurable - and prefer a RATIO between two controls in
+the SAME image, which needs no UI-scale assumption at all.
