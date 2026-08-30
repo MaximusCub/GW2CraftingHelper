@@ -2,9 +2,10 @@ namespace TaimisToolbench.Services
 {
     /// <summary>
     /// The square a row-action button draws in when its whole label is one
-    /// glyph: the Ranker row's up / down / remove trio and the Plan History
-    /// row's delete. Blish-free so the band math that reserves room for one
-    /// and the view that builds it read the same number.
+    /// glyph: the Ranker row's up / down / remove trio, the Plan History
+    /// row's delete, and the plan tree's IGNORE toggle. Blish-free so the
+    /// band math that reserves room for one and the view that builds it
+    /// read the same number.
     /// <para>
     /// These are NOT tab buttons. They used to draw at the module's on-tab
     /// button height, which put a 16px cross in the middle of a 28px

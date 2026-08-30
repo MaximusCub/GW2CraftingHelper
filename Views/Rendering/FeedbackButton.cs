@@ -9,10 +9,10 @@ namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// The module's button. A <see cref="StandardButton"/> that answers a
-    /// press, takes a font, takes a text colour, tints its icon and centres
-    /// an icon-only label honestly - four things Blish's button cannot be
-    /// talked into from the outside, all four living in StandardButton.Paint
-    /// and RecalculateLayout, both virtual and both overridden here.
+    /// press, takes a font, takes a text colour, tints its icon, tints its
+    /// plate and centres an icon-only label honestly - things Blish's button
+    /// cannot be talked into from the outside, all of them living in
+    /// StandardButton's own virtual Paint and RecalculateLayout.
     /// Defaults reproduce StandardButton's own rendering exactly, so this is
     /// a drop-in: a call site that sets none of the new properties draws
     /// pixel for pixel what it drew before.
@@ -64,6 +64,7 @@ namespace TaimisToolbench.Views.Rendering
 
         private Color _enabledTextColor = Color.Black;
         private Color _iconTint = Color.White;
+        private Color? _plateTint = null;
         private Rectangle _iconBounds = Rectangle.Empty;
         private Rectangle _textBounds = Rectangle.Empty;
 
@@ -109,6 +110,28 @@ namespace TaimisToolbench.Views.Rendering
         {
             get => _iconTint;
             set => SetProperty(ref _iconTint, value, false, nameof(IconTint));
+        }
+
+        /// <summary>
+        /// Plate modulation while the face draws, or null for the atlas
+        /// exactly as StandardButton ships it. The tree's ignore toggle
+        /// fills its plate with PillColors' ignore-active amber while its
+        /// item is ignored - the same filled-key state signal the pill it
+        /// replaced carried - and every other button leaves this null.
+        /// <para>
+        /// A tinted plate keeps the atlas face and the enabled ink even
+        /// while the control is disabled: the flat grey plate is Blish's
+        /// own disabled look, and repainting the toggle with it would
+        /// erase the one state the tint exists to carry. Inertness for a
+        /// tinted button is carried by Enabled itself (no Click, and
+        /// PressFeedback.Wire's own Enabled gate) plus whatever wash and
+        /// tooltip the caller adds, not by the plate.
+        /// </para>
+        /// </summary>
+        public Color? PlateTint
+        {
+            get => _plateTint;
+            set => SetProperty(ref _plateTint, value, false, nameof(PlateTint));
         }
 
         /// <summary>
@@ -198,13 +221,14 @@ namespace TaimisToolbench.Views.Rendering
         protected override void Paint(SpriteBatch spriteBatch, Rectangle bounds)
         {
             var plate = new Rectangle(3, 3, Width - 6, Height - 5);
-            if (Enabled)
+            if (Enabled || _plateTint.HasValue)
             {
                 spriteBatch.DrawOnCtrl(
                     this,
                     Face,
                     plate,
-                    new Rectangle(AnimationState * AtlasSpriteWidth, 0, AtlasSpriteWidth, AtlasSpriteHeight));
+                    new Rectangle(AnimationState * AtlasSpriteWidth, 0, AtlasSpriteWidth, AtlasSpriteHeight),
+                    _plateTint ?? Color.White);
             }
             else
             {
@@ -225,7 +249,9 @@ namespace TaimisToolbench.Views.Rendering
             // Assigned per frame for the same reason StandardButton does it:
             // the enabled state can change between layout passes, and the
             // colour is the only thing that says so once the plate is flat.
-            _textColor = Enabled ? _enabledTextColor : DisabledInk;
+            // A tinted face is a state signal (see PlateTint), so it keeps
+            // the enabled ink while disabled rather than the grey.
+            _textColor = Enabled || _plateTint.HasValue ? _enabledTextColor : DisabledInk;
             DrawText(spriteBatch, _textBounds);
         }
     }

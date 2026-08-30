@@ -2506,13 +2506,24 @@ hundreds of unused pixels in the name column beside it is a lie the reader
 cannot act on. `Services/TreePillColumnMath` derives its width the way
 `EffectiveCostColumnWidth` already derives the cost column's: the widest full
 run any row in the tree needs, floored at
-`PlanRelayoutMath.TreePillColumnWidth` and capped at that floor plus half of
-whatever the panel has beyond the module's minimum width. The half is what
-makes the split safe at every width - widening the window can never leave the
-name column narrower than it was one pixel earlier, and at the minimum width
-the column cannot grow at all, so every deep-row budget
-`docs/research/minimum-window-width.md` derives is untouched. Measured on the
-reported Obsidian Heavy Breastplate rows at a 1920px window: a
+`PlanRelayoutMath.TreePillColumnWidth` and capped at the space actually
+available between the column's two neighbours' minimums - the whole panel
+surplus past the module's minimum width leftward, plus the cost column's
+reserve above what its rows actually draw rightward
+(`TreePillColumnMath.Affordable`). An earlier cap of half the surplus was
+what the field report's second pass caught: the "1x Obsidian Shard" row
+still chipped on windows with room to spare on both sides of the column.
+Each direction stops at that side's own minimum. Leftward the name column
+keeps the budget it holds at the minimum window - the budgets
+`docs/research/minimum-window-width.md` derives - so at or below that
+minimum the surplus term is zero. Rightward the cost column keeps
+`TreeCostColumnMath.TotalWidth`, and the pills' claim on the slack swaps
+cost reserve for pill width one-for-one (`TreePillColumnMath.RightClaim`;
+`EffectiveCostColumnWidth` nets it out), so PillColX, every cost value and
+every name budget hold wherever the unclaimed layout put them - which is
+why widening the window can never leave the name column narrower than it
+was one pixel earlier, even at the minimum width. Measured on the reported
+Obsidian Heavy Breastplate rows at a 1920px window: a
 CRAFT/TP/HAVE-annotation row went from two pills and a "+1" chip, tightened,
 to all three at full padding, and the column took 82px of the 1314px the
 depth-0 name column held.
