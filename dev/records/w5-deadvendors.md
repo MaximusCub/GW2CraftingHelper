@@ -50,7 +50,10 @@ Fragment and the Mini Dolyak.
 other row in the dataset and now resolve to `UnknownSource` - no vendor
 offer, no recipe in `ref/recipes_seed.json` or
 `ref/mystic_forge_recipes.json`, and `NoSell` on `/v2/items` so no Trading
-Post fallback either:
+Post fallback either. Cross-checked against the wiki rather than against
+this dataset alone: `[[Sells item::<name>]]` returns the Battle Historian
+and nothing else for all five, so no live vendor was missed (the same
+query returns 50 vendors for Obsidian Shard, which is the control):
 
 - **Dragonite Ore (46733)** and **Empyreal Fragment (46735)**, ingredients
   in 9 and 10 recipes in `ref/recipes_seed.json` plus 2 each in
@@ -69,27 +72,83 @@ Post fallback either:
   other 17 Hero's weapons in this dataset but not these two, matching the
   wiki's own tables.
 
-Follow-up worth taking, not taken here: `ref/acquisition_hints_seed.json`
-has no entry for 46733 or 46735, so those two now show as UNKNOWN with no
-guidance. Two hand-verified hints would turn an honest blank into an
-honest answer.
+**So the hints ship with the exclusion, not after it.** An honest UNKNOWN
+still beats a confident lie, but a bare UNKNOWN badge with no text is a
+worse display than the wrong vendor route it replaces, and there was no
+reason to ship those two states one behind the other.
+`ref/acquisition_hints_seed.json` gains five rows, each read off the
+item's own wiki page:
 
-**Sweep: the class this belongs to.** Two wiki-authoritative lists were
+| item | badge | what the hint says |
+|---|---|---|
+| Dragonite Ore (46733) | `WORLD` | gathering nodes, world boss chests (3-30), reward-track loot boxes (the WvW Hero Weapon Box gives 50) |
+| Empyreal Fragment (46735) | `CHESTS` | any open-world, jumping puzzle or mini-dungeon chest gives 2-9; dungeon explorable paths 20 for each of the first two completions per day; Cracked Fractal Encryptions 15 or 50 |
+| Gift of Heroes (43244) | `REMOVED` | not obtainable at all - the item is `status = discontinued` and the Battle Historian was its only seller; held copies still upgrade Hero's weapons in the Mystic Forge |
+| Hero's Harpoon Gun (64283) | `WVW` | chosen from the Hero Weapon Box, the final reward of the WvW Hero Weapon Reward Track, or a WvW Exclusives Choice Chest |
+| Hero's Trident (64285) | `WVW` | same box; the skirmish merchants stock 17 of the 19 Hero's weapons but not these two |
+
+None of the five badges collides with a module-owned source pill
+(`DecisionPillPlanner.IsReservedSourceBadgeText`), and none of the five
+items has a shipped vendor offer any more, so
+`AcquisitionHintSeedVendorAgreementTests`' pinned population of
+hinted-items-that-also-have-offers is unchanged at {105804, 106712,
+106986}. The seed's own count literal moved 10 -> 15, which is the guard
+working: its comment says an eleventh row is "exactly the edit that
+should stop and read this test".
+
+### The finding that outlives this branch: 3,938 offers from 118 removed vendors
+
+**The Battle Historian is one of 118.** Two wiki-authoritative lists were
 pulled and intersected with the shipped data rather than pattern-matching
-on names: `Category:Historical NPCs` (659 pages) and every page with
-`[[Has availability::Discontinued]][[Has game id::+]]` (1,375 pages, 1,221
-in `Category:Discontinued items`).
+on names:
+
+```
+# every NPC page the wiki marks historical (659 pages)
+https://wiki.guildwars2.com/api.php?action=query&list=categorymembers
+    &cmtitle=Category:Historical%20NPCs&cmlimit=500&format=json
+
+# every item page marked discontinued that carries a game id (1,375 pages)
+https://wiki.guildwars2.com/api.php?action=ask&format=json&query=
+    [[Has availability::Discontinued]][[Has game id::+]]|?Has game id|limit=500
+
+# per-page check, either namespace (Is_historical, Has_availability, _INST)
+https://wiki.guildwars2.com/api.php?action=browsebysubject
+    &subject=Battle_Historian&format=json
+
+# every vendor row the wiki has for one item, live-vendor check
+https://wiki.guildwars2.com/api.php?action=ask&format=json&query=
+    [[Sells item::Dragonite Ore]]|?Has vendor
+```
 
 - **118 merchants in `ref/vendor_offers.json` are Historical NPCs**,
-  holding 3,987 offers before this change and 3,938 after. Largest:
-  Black Lion Voucher Dealer (273), Weapon Master (NPC) (171), Weapon
-  Trader (171), Merchant (WvW weaponsmith) (171), Zakka Hideslicer (157).
-  This is the real class, and the exclusion list is the wrong instrument
-  for it: 3,938 hand-written entries is not a hand-verified list, and a
-  blanket scrape-time `Is historical` filter would strand the **621 output
-  items whose only offers come from a historical NPC**. Teaching
-  `WikiSmwClient` to read the flag and record it per offer - filterable,
-  reversible, and visible in the data - is a project of its own.
+  holding 3,987 offers before this change and **3,938 after**, across
+  1,910 distinct output items. Largest: Black Lion Voucher Dealer (273),
+  Weapon Master (NPC) (171), Weapon Trader (171), Merchant (WvW
+  weaponsmith) (171), Zakka Hideslicer (157). Every one of those rows can
+  be picked by the solver today, and any priced in an unvalued token
+  ranks as free, which is the exact defect this branch fixed for one
+  vendor out of 118.
+- **The exclusion list cannot absorb this and should not try.** 3,938
+  hand-written entries is not a hand-verified list; the file's own header
+  says keep it small, and each entry is supposed to be a claim somebody
+  checked.
+- **Nor is a blanket filter safe as it stands: 621 output items have
+  offers ONLY from a historical NPC.** Dropping the class wholesale would
+  strand every one of them the way the Battle Historian stranded five,
+  and five was small enough to research by hand in an afternoon.
+- **The fix, for whoever picks this up.** `WikiSmwClient`'s vendor query
+  asks for `[[Sells item::+]]` subobjects and never looks at the parent
+  page. `Is historical` is available on the parent (`Has vendor.Is
+  historical` as a printout, or `[[Has vendor::<q>[[Is historical::t]]</q>]]`
+  as a condition - both verified working against the live API on
+  2026-08-29). Recording it PER OFFER rather than filtering at query time
+  is what makes it reversible: the data then says which rows are
+  historical, the module can decide what to do with them, and the 621
+  stranded items are visible as a list to work through rather than a
+  silent deletion.
+
+**Everything else the sweep turned up, with its verdict.**
+
 - **61 discontinued items are used as payment across 613 offers.** Most
   are NOT dead routes and were left alone: Collector Terksli, the Snowflake
   Trader and Evon Gnashblade still take old claim tickets (the wiki's own
