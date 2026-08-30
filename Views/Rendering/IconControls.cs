@@ -23,7 +23,7 @@ namespace TaimisToolbench.Views.Rendering
     /// hover. No pixel size, no rarity string and no hover reaches this file
     /// from a call site that did not name one. A currency has no rarity to
     /// name, so it takes <see cref="CreateCurrencyIcon"/> instead - one
-    /// entry point, one colour, no per-surface border.
+    /// entry point, its border decided by the tier's context, not a call site.
     /// </para>
     /// </summary>
     internal static class IconControls
@@ -78,16 +78,20 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// THE currency icon: a wallet currency, framed in the module's one
-        /// currency grey (<see cref="ItemIconFrame.Currency"/>) so no
-        /// surface has to choose a border of its own. Takes one of the two
-        /// CURRENCY tiers.
+        /// THE currency icon: a wallet currency, in the module's one
+        /// currency treatment so no surface has to choose a border of its
+        /// own. Takes one of the two CURRENCY tiers, and the tier carries
+        /// the context: <see cref="IconFrameGeometry.CurrencyIsFramed"/>
+        /// frames a CurrencyListRow icon (a row's subject) in the module's
+        /// one currency grey (<see cref="ItemIconFrame.Currency"/>) and
+        /// draws a CurrencyBarRun icon (a currency symbol seated after
+        /// digits, in the coins' role) with no frame at all.
         /// <para>
-        /// Pixel-neutral by construction: a currency tier's measured window
-        /// is the whole BOX, so <c>ItemIconTiers.ArtSize</c> insets the art
-        /// by the frame and the framed square lands exactly where the
-        /// unframed one did. An inline coin run's advance is a term in the
-        /// minimum-window-width derivation and does not move.
+        /// Pixel-neutral by construction: either way the icon occupies the
+        /// tier's measured window - the framed square insets its art inside
+        /// it, the frame-less one fills it - so an inline currency run's
+        /// advance, a term in the minimum-window-width derivation, does not
+        /// move.
         /// </para>
         /// <paramref name="tooltipText"/> is required, not defaulted: these
         /// icons mostly draw with no name text beside them, so a hover is
@@ -96,6 +100,12 @@ namespace TaimisToolbench.Views.Rendering
         internal static Panel CreateCurrencyIcon(
             Panel parent, string iconUrl, int x, int y, ItemIconTier tier, string tooltipText)
         {
+            if (!IconFrameGeometry.CurrencyIsFramed(tier))
+            {
+                return CreateUnframedIcon(
+                    parent, iconUrl, x, y, ItemIconTiers.FrameSize(tier), tooltipText);
+            }
+
             return CreateFrame(
                 parent, iconUrl, ItemIconFrame.Currency(), x, y,
                 ItemIconTiers.ArtSize(tier), ItemIconTiers.BorderThickness(tier), tooltipText);

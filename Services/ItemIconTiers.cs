@@ -40,9 +40,11 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// CURRENCY TIER 2 - in-game wallet SUMMARY BAR art, for a currency
-        /// icon inline beside a number inside a cell (the Ranker's shortfall
-        /// cells). The coin runs themselves are unframed and go through
-        /// CoinCurrencyRenderer, not here.
+        /// icon inline beside a number inside a cell. There the icon is a
+        /// currency symbol in the coin denominations' role, so it takes no
+        /// frame at all (<see cref="IconFrameGeometry.CurrencyIsFramed"/>) -
+        /// like the coin runs beside it, which are unframed and go through
+        /// CoinCurrencyRenderer.
         /// </summary>
         CurrencyBarRun,
 
