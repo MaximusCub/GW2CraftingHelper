@@ -157,3 +157,42 @@ The images the owner pastes are on disk at
 UI question is "does ours match the game's", check the owner's existing captures
 before declaring it unmeasurable - and prefer a RATIO between two controls in
 the SAME image, which needs no UI-scale assumption at all.
+
+
+## Where this session ended (2026-08-29)
+
+Three PRs open, all CI-green at the time of writing, none merged. Nothing is
+deployed: **the owner's live install still runs the wave-2 build.**
+
+| PR | Branch | Contents |
+|---|---|---|
+| #233 | `legendary-research-docs` | six research documents + the harness. Was red on the ASCII gate from a UTF-8 BOM on three harness sources; fixed. |
+| #235 | `wave5-data` | forge recipes + their root cause, five currency valuations, two dead vendors, barter plan totals, the Gaeting removal. 4,240 tests. |
+| #236 | `wave6-ui` | all sixteen wave-6 feedback items across five branches. 4,300 tests, exactly the expected sum of the branch deltas. |
+
+`FEEDBACK-BACKLOG.md` rule still stands: an item closes only when a MERGED PR is
+named beside it. Everything currently reads `IN PR #235` or `IN PR #236`, so
+nothing has closed yet.
+
+### Owed to the owner, none of it startable without him
+
+- **A deploy and a field test.** Nothing in #235 or #236 has been seen in game.
+- **F1 stays OPEN**: sticky headers are wired on the Snapshot tab only. The plan
+  tab needs a fixed-height spacer per band first; the recipe is in the backlog.
+- Three specific in-game checks: the mouse wheel over a pinned header strip, the
+  IGNORE toggle's smaller click target (29x24 mark vs a ~70x24 word), and V4's
+  24px against the real Trading Post at his UI scale.
+- **Git credential**: the default OAuth credential lacks `workflow` scope, so any
+  branch touching `.github/workflows/` must be pushed with the `gh` token.
+
+### Open design question, raised by the owner, not yet actioned
+
+Gaeting Crystal valuation. There is exactly one live id at a time. The table
+currently holds `{ 28, 3600 }` (Magnetite Shard) and `{ 77, 3600 }` as two
+independent literals, while 77's own comment says it must equal what 28 charges.
+Proposal on the table: peg 77 to 28 rather than pin a number or match by name -
+the name is the ambiguous part, and the only discriminator (the description) is
+documented on the wiki as stale. **Verify the 1:1 vendor claim before building
+anything on it.** A CI assertion that exactly one live currency is named "Gaeting
+Crystal" would turn the next transition from silent staleness into a loud failure
+with no runtime behaviour at all.
