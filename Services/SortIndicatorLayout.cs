@@ -23,9 +23,12 @@ namespace TaimisToolbench.Services
     internal static class SortIndicatorLayout
     {
         /// <summary>Gap between a header's word and its indicator - a
-        /// space's worth at the ColumnHeader tier, kept as a number because
-        /// the two are separate controls now and no string joins them.</summary>
-        public const int Gap = 4;
+        /// space's worth at the ColumnHeader tier for most of this
+        /// indicator's life, then doubled on owner feedback (the mark sat
+        /// ~5px after the label at his UI scale and read as attached to the
+        /// word). Kept as a number because the two are separate controls
+        /// now and no string joins them.</summary>
+        public const int Gap = 8;
 
         /// <summary>
         /// Opacity of a sortable column's indicator at rest. Low enough to
