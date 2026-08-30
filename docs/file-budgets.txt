@@ -41,7 +41,7 @@ Models/CurrencyMetadata.cs                                                      
 Models/CurrencyValuation.cs                                                             321
 Models/DailyCooldownItem.cs                                                              38
 Models/ExcessCraftOutput.cs                                                              43
-Models/Gw2Constants.cs                                                                  164
+Models/Gw2Constants.cs                                                                  166
 Models/HomesteadEfficiencyTiers.cs                                                       88
 Models/ItemAttributeLine.cs                                                              20
 Models/ItemMetadata.cs                                                                   23
@@ -347,9 +347,9 @@ tests/TaimisToolbench.Tests/Helpers/TooltipContentPlainText.cs                  
 tests/TaimisToolbench.Tests/Helpers/VendorOfferBuilders.cs                            123
 tests/TaimisToolbench.Tests/Models/AccountSnapshotSerializationTests.cs               107
 tests/TaimisToolbench.Tests/Models/BarterItemDecisionDefaultsTests.cs                 145
-tests/TaimisToolbench.Tests/Models/CurrencyDecisionDefaultsTests.cs                    64
+tests/TaimisToolbench.Tests/Models/CurrencyDecisionDefaultsTests.cs                    77
 tests/TaimisToolbench.Tests/Models/CurrencyValuationTests.cs                          305
-tests/TaimisToolbench.Tests/Models/Gw2ConstantsCurrencyNamesTests.cs                  176
+tests/TaimisToolbench.Tests/Models/Gw2ConstantsCurrencyNamesTests.cs                  178
 tests/TaimisToolbench.Tests/Models/HomesteadEfficiencyTiersTests.cs                    97
 tests/TaimisToolbench.Tests/Models/PersistedPlanSchemaMemberSetTests.cs                73
 tests/TaimisToolbench.Tests/Models/PlanHistorySchemaMemberSetTests.cs                  87

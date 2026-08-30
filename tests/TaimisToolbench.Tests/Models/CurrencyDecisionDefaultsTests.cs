@@ -7,7 +7,7 @@ namespace TaimisToolbench.Tests.Models
     // curated table, not a service - these tests pin its structural
     // invariants (no coin-keyed entry, no entry for the currencies the
     // maintainer explicitly decided must stay blank) rather than mirroring
-    // every one of its 41 entries.
+    // every one of its entries.
     public class CurrencyDecisionDefaultsTests
     {
         [Fact]
@@ -47,6 +47,19 @@ namespace TaimisToolbench.Tests.Models
         public void TryGetDefault_CurrenciesWithNoUpstreamEntry_ReturnsFalse(int currencyId)
         {
             Assert.False(CurrencyDecisionDefaults.TryGetDefault(currencyId, out _));
+        }
+
+        // Unlike the ids above, gw2efficiency DOES value id 39 (at 3600):
+        // this is the one upstream row the module drops on purpose, so the
+        // gap reads as a divergence and not as drift. The currency was
+        // retired in-game 2022-07-19 and force-converted to Magnetite
+        // Shards, so no account can hold one and no offer charges one.
+        // docs/ARCHITECTURE.md section 8.3.
+        [Fact]
+        public void TryGetDefault_RetiredGaetingCrystal_ReturnsFalse()
+        {
+            Assert.False(CurrencyDecisionDefaults.TryGetDefault(39, out long copperPerUnit));
+            Assert.Equal(0, copperPerUnit);
         }
 
         // Ids gw2efficiency's own table marks `undefined` (it assigns them

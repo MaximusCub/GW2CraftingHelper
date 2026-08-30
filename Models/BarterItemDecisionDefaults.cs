@@ -29,9 +29,7 @@ namespace TaimisToolbench.Models
         /// Gw2Constants (where currency names live, covering ids beyond
         /// CurrencyDecisionDefaults' own keys) because these two sets have
         /// exactly the same keys - a second table would be a sync hazard
-        /// with nothing to gain. Every name is the live /v2/items name, except
-        /// where two ids share one live name and a row has to stay
-        /// distinguishable - item 86094 below is the only such case.
+        /// with nothing to gain. Every name is the live /v2/items name.
         /// </summary>
         internal sealed class BarterItemDefault
         {
@@ -97,18 +95,6 @@ namespace TaimisToolbench.Models
             { 46682, new BarterItemDefault("Crystalline Ore", 3600) },
             { 70718, new BarterItemDefault("Tenebrous Crystal", 3600) },
             { 76254, new BarterItemDefault("Shimmering Crystal", 3600) },
-
-            // Not a vendor route. Item 86094 is the item form of wallet
-            // currency 39 - same icon asset - and carries that currency's
-            // own CurrencyDecisionDefaults value so the two forms cannot
-            // disagree. Wallet currency 77 shares the name but is a
-            // different, live good whose item form (104026) is not in this
-            // table; both 86094 and 39 were retired 2022-07-19. The name
-            // here departs from the live /v2/items name for that reason:
-            // it is the wiki's page title for this id, and without it the
-            // Settings grid draws two different goods under one label.
-            // dev/records/gaeting-crystal-duplicate-ids.md
-            { 86094, new BarterItemDefault("Gaeting Crystal (historical)", 3600) },
         };
 
         /// <summary>

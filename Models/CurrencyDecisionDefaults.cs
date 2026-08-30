@@ -82,13 +82,8 @@ namespace TaimisToolbench.Models
             { 34, 9 },       // Trade Contract
             { 35, 720 },     // Elegy Mosaic
             { 36, 135 },     // Testimony of Desert Heroics
-            // Retired in-game 2022-07-19, converted 1:1 into Magnetite
-            // Shards (id 28, also 3600), which is where the figure comes
-            // from. Kept so the row stays inspectable and clearable, since
-            // the default still applies to every solve. Currency 77 shares
-            // the name but is a different, live good.
-            // dev/records/gaeting-crystal-duplicate-ids.md
-            { 39, 3600 },    // Gaeting Crystal (historical)
+            // Upstream values id 39 (Gaeting Crystal); it is dropped here on
+            // purpose - retired in-game. docs/ARCHITECTURE.md section 8.3.
             { 45, 50 },      // Volatile Magic
             { 50, 25 },      // Festival Token
             { 53, 3500 },    // Green Prophet Shard

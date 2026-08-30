@@ -49,6 +49,7 @@ namespace TaimisToolbench.Tests.Models
             { 63, "Astral Acclaim" },
             { 65, "Testimony of Jade Heroics" },
             { 68, "Imperial Favor" },
+            { 77, "Gaeting Crystal" },
             { 78, "Fine Rift Essence" },
         };
 
@@ -77,6 +78,7 @@ namespace TaimisToolbench.Tests.Models
             { 63, "Astral Acclaim" },
             { 65, "Testimony of Jade Heroics" },
             { 68, "Imperial Favor" },
+            { 77, "Gaeting Crystal" },
             { 78, "Fine Rift Essence" },
         };
 

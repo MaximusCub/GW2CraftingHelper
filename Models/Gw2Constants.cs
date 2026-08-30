@@ -91,9 +91,6 @@ namespace TaimisToolbench.Models
         // Currency names are sourced from api.guildwars2.com/v2/currencies;
         // adjacent ids have carried each other's names before, so verify
         // every entry against the official API when broadening coverage.
-        // The API does not guarantee the name is unique - ids 39 and 77 both
-        // return "Gaeting Crystal" - so an id whose live name collides with
-        // another row's carries a disambiguator here instead.
         public static readonly Dictionary<int, string> KnownCurrencyNames = new Dictionary<int, string>
         {
             { 2, "Karma" },
@@ -130,14 +127,6 @@ namespace TaimisToolbench.Models
             { 34, "Trade Contracts" },
             { 35, "Elegy Mosaic" },
             { 36, "Testimony of Desert Heroics" },
-            // Retired 2022-07-19: balances were force-converted to
-            // Magnetite Shards and no account can hold it. Currency 77
-            // is a different, live good that shares the name, so the
-            // disambiguator is what keeps the two Settings rows apart.
-            // "Gaeting Crystal (historical)" is the wiki's own page title
-            // for this id, so the wiki link resolves too.
-            // dev/records/gaeting-crystal-duplicate-ids.md
-            { 39, "Gaeting Crystal (historical)" },
             { 45, "Volatile Magic" },
             { 47, "Racing Medallions" },
             { 49, "Mistborn Keys" },
@@ -156,6 +145,9 @@ namespace TaimisToolbench.Models
             // Live name is the singular "Imperial Favor".
             { 68, "Imperial Favor" },
             { 69, "Tales of Dungeon Delving" },
+            // The live API also names retired currency 39 "Gaeting Crystal";
+            // 77 is the live one. docs/ARCHITECTURE.md section 8.3.
+            { 77, "Gaeting Crystal" },
             { 78, "Fine Rift Essence" },
             { 79, "Rare Rift Essence" },
             { 80, "Masterwork Rift Essence" },

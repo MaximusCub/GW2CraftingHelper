@@ -49,10 +49,6 @@ namespace TaimisToolbench.Tests.Models
         }
 
         [Theory]
-        // Item 86094 Gaeting Crystal is the item form of wallet currency
-        // 39 (currency 77 shares the name but is a different good), so the
-        // two forms must not disagree about what one is worth.
-        [InlineData(86094, 3600)]
         [InlineData(19925, 667)] // Obsidian Shard: 25 Fractal Relics at 80, for 3
         [InlineData(86069, 200)] // Kralkatite Ore: 4 Volatile Magic at 50
         public void TryGetDefault_KnownItem_ReturnsExpectedValue(int itemId, long expected)
@@ -62,13 +58,14 @@ namespace TaimisToolbench.Tests.Models
         }
 
         [Fact]
-        public void GaetingCrystal_ItemAndWalletFormsAgree()
+        public void TryGetDefault_RetiredGaetingCrystalItemForm_ReturnsFalse()
         {
-            // Derived, not copied: if the currency table's own figure ever
-            // moves, this fails rather than letting the item form drift.
-            Assert.True(CurrencyDecisionDefaults.TryGetDefault(39, out long currencyValue));
-            Assert.True(BarterItemDecisionDefaults.TryGetDefault(86094, out long itemValue));
-            Assert.Equal(currencyValue, itemValue);
+            // Item 86094 was retired in-game 2022-07-19 alongside its wallet
+            // form, currency 39, and no vendor offer in ref/vendor_offers.json
+            // charges or produces it. A default here would price a good that
+            // can no longer change hands. docs/ARCHITECTURE.md section 8.3.
+            Assert.False(BarterItemDecisionDefaults.TryGetDefault(86094, out long copperPerUnit));
+            Assert.Equal(0, copperPerUnit);
         }
 
         // Maintainer decision: the Black Lion family is gem-store RNG-chest
@@ -103,11 +100,11 @@ namespace TaimisToolbench.Tests.Models
         {
             // Not a collision test - an item id and a currency id are
             // different id spaces and MAY share a number. This pins that
-            // the two tables are looked up separately: item 39 has no entry
-            // here even though currency 39 has one there, so a lookup that
-            // confused the two would be caught.
-            Assert.True(CurrencyDecisionDefaults.DefaultCopperPerUnit.ContainsKey(39));
-            Assert.False(BarterItemDecisionDefaults.Defaults.ContainsKey(39));
+            // the two tables are looked up separately: item 2 has no entry
+            // here even though currency 2 (Karma) has one there, so a lookup
+            // that confused the two would be caught.
+            Assert.True(CurrencyDecisionDefaults.DefaultCopperPerUnit.ContainsKey(2));
+            Assert.False(BarterItemDecisionDefaults.Defaults.ContainsKey(2));
         }
 
         [Fact]
@@ -118,7 +115,7 @@ namespace TaimisToolbench.Tests.Models
             // for which a whole-cost vendor route exists (measured
             // 2026-08-28). One vanishing from the table is a deliberate act
             // that should be noticed.
-            var expected = new[] { 46682, 92272, 94163, 86094, 19925, 92072, 86069 };
+            var expected = new[] { 46682, 92272, 94163, 19925, 92072, 86069 };
 
             var missing = expected.Where(id => !BarterItemDecisionDefaults.Defaults.ContainsKey(id)).ToList();
 
