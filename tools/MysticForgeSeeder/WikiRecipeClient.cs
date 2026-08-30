@@ -14,6 +14,13 @@ namespace MysticForgeSeeder
 
         public int Quantity { get; set; }
 
+        /// <summary>
+        /// The item id the wiki itself asserts for this ingredient, from
+        /// the recipe subobject's "Has ingredient with id" record. Null on
+        /// the older recipe template, which publishes names only.
+        /// </summary>
+        public int? GameId { get; set; }
+
         // Always set at construction (ParseIngredientRecord's one object
         // initializer, guarded by an IsNullOrEmpty check just before it).
         public string Name { get; set; } = string.Empty;
@@ -26,6 +33,13 @@ namespace MysticForgeSeeder
         public string OutputName { get; set; } = string.Empty;
 
         public int OutputQuantity { get; set; } = 1;
+
+        /// <summary>
+        /// The item id the wiki itself asserts for this recipe's output,
+        /// from the recipe template's "output item id" parameter. Null when
+        /// the template omits it.
+        /// </summary>
+        public int? OutputGameId { get; set; }
 
         public List<WikiIngredientEntry> Ingredients { get; set; }
             = new List<WikiIngredientEntry>();
@@ -64,7 +78,9 @@ namespace MysticForgeSeeder
                 "[[Has recipe source::Mystic forge]]" +
                 "|?Has canonical name" +
                 "|?Has output quantity" +
+                "|?Has output game id" +
                 "|?Has ingredient" +
+                "|?Has ingredient with id" +
                 $"|limit={QueryLimit}";
 
             while (true)
@@ -288,6 +304,18 @@ namespace MysticForgeSeeder
                 }
             }
 
+            // Output item id: the recipe template's own "output item id"
+            // parameter. Absent on templates that omit it, in which case
+            // the wiki derives nothing and the name is all we have.
+            int? outputGameId = null;
+            if (printouts.TryGetProperty("Has output game id", out var outIdArr) &&
+                outIdArr.GetArrayLength() > 0 &&
+                TryReadInt(outIdArr[0], out int outIdVal) &&
+                outIdVal > 0)
+            {
+                outputGameId = outIdVal;
+            }
+
             // Ingredients from Has ingredient records
             var ingredients = new List<WikiIngredientEntry>();
             if (printouts.TryGetProperty("Has ingredient", out var ingArray))
@@ -302,6 +330,8 @@ namespace MysticForgeSeeder
                 }
             }
 
+            AttachIngredientIds(printouts, ingredients);
+
             // Deterministic sort: indexed first (ascending), then unindexed (by name)
             ingredients = ingredients
                 .OrderBy(i => i.Index.HasValue ? 0 : 1)
@@ -313,8 +343,65 @@ namespace MysticForgeSeeder
             {
                 OutputName = outputName,
                 OutputQuantity = outputQuantity,
+                OutputGameId = outputGameId,
                 Ingredients = ingredients,
             };
+        }
+
+        /// <summary>
+        /// Copies the item ids from the recipe subobject's "Has ingredient
+        /// with id" records onto the matching "Has ingredient" entries.
+        /// The two arrays hold the same ingredients in unrelated order, so
+        /// they are joined on "Has ingredient index" - the only key the
+        /// wiki publishes for them. An index that is missing or repeated on
+        /// either side carries no id rather than a guessed one.
+        /// </summary>
+        private static void AttachIngredientIds(
+            JsonElement printouts, List<WikiIngredientEntry> ingredients)
+        {
+            if (!printouts.TryGetProperty("Has ingredient with id", out var withIdArray))
+            {
+                return;
+            }
+
+            var byIndex = new Dictionary<int, int>();
+            var ambiguous = new HashSet<int>();
+
+            foreach (var record in withIdArray.EnumerateArray())
+            {
+                var entry = ParseIngredientRecord(record);
+                if (entry?.Index == null || entry.GameId == null)
+                {
+                    continue;
+                }
+
+                if (!byIndex.TryAdd(entry.Index.Value, entry.GameId.Value))
+                {
+                    ambiguous.Add(entry.Index.Value);
+                }
+            }
+
+            var seen = new HashSet<int>();
+            foreach (var ing in ingredients)
+            {
+                if (ing.Index != null && !seen.Add(ing.Index.Value))
+                {
+                    ambiguous.Add(ing.Index.Value);
+                }
+            }
+
+            foreach (var ing in ingredients)
+            {
+                if (ing.Index == null || ambiguous.Contains(ing.Index.Value))
+                {
+                    continue;
+                }
+
+                if (byIndex.TryGetValue(ing.Index.Value, out int gameId))
+                {
+                    ing.GameId = gameId;
+                }
+            }
         }
 
         private static WikiIngredientEntry? ParseIngredientRecord(JsonElement record)
@@ -366,11 +453,25 @@ namespace MysticForgeSeeder
                 }
             }
 
+            // Item id: Has ingredient id.item[0]. Present only on the
+            // "Has ingredient with id" records, not on "Has ingredient".
+            int? gameId = null;
+            if (record.TryGetProperty("Has ingredient id", out var gidObj) &&
+                gidObj.TryGetProperty("item", out var gidItems) &&
+                gidItems.GetArrayLength() > 0)
+            {
+                if (TryReadInt(gidItems[0], out int gid) && gid > 0)
+                {
+                    gameId = gid;
+                }
+            }
+
             return new WikiIngredientEntry
             {
                 Index = index,
                 Quantity = quantity,
                 Name = name,
+                GameId = gameId,
             };
         }
 
