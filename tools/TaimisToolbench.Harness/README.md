@@ -26,6 +26,8 @@ dotnet run --project tools/TaimisToolbench.Harness/TaimisToolbench.Harness.cspro
 | `--print-cache-stats` | off | Print recipe cache hit/miss counters after planning |
 | `--clear-overlay-cache` | off | Clear the on-disk overlay recipe cache before running |
 | `--dump-tree` | off | Dump the full recipe tree, not just the top-level decision |
+| `--classify` | off | Bucket every terminal of the solved tree by the route the solver committed to, then print per-item counts, the unpriceable terminals by name, and a cross-item aggregate |
+| `--force-craft-root` | off | With `--classify`: when the plan's target is itself buyable and the solver buys it outright, re-solve with the root pinned to Craft so there is a tree to classify at all |
 | `--homestead-tier <0\|1\|2>` | pipeline default (tier 0) | Homestead Refinement efficiency tier, applied uniformly to Fiber/Metal/Wood (the live module exposes these three independently via the Settings tab; this harness applies one tier to all three for simplicity) |
 
 ## Profiles
@@ -39,6 +41,26 @@ comparison point for a solver change:
 | 1 | Gift of Fortune (plus Zojja's Claymore when `--live` is set) |
 | 2 | Exordium |
 | 3 | Klobjarne Geirr - reaches Homestead Refinement via Gift of the Homesteader; pair with `--homestead-tier` to compare decisions/quantities across tiers |
+| 10-27 | One representative item per legendary class (weapon Gen 1/2/3, Janthir spear, PvE/raid/WvW/PvP/fractal armour, aquabreather, trinkets, back items, rune, sigil, relic) |
+| 30 | Every profile 10-27 item in one process - the sweep `--classify` aggregates over |
+
+## Terminal Classification (`--classify`)
+
+A terminal is any node the solver did NOT decide to craft: Craft is the only
+decision that expands into real children, so a non-Craft node is where the
+plan stops and the player has to go and get something. Each is bucketed as
+Trading Post / vendor-for-coin / vendor-for-a-valued-currency /
+vendor-with-an-unvalued-cost-line / UnknownSource / Have / currency leaf.
+
+Run it `--live`. Offline, the null price client proves an empty Trading
+Post, so every tradeable node force-crafts down to raw materials and lands
+in Unknown or vendor; the same 18-item sweep produces 765 terminals live
+and 13,292 offline, with 0 Trading Post terminals in the offline pass. The
+offline numbers are a useful control for "what does the corpus alone
+represent", not a measurement of what the module shows a player.
+
+Findings from the first full sweep are written up in
+`dev/proposals/legendary-harness-findings.md`.
 
 ## Data Files
 
