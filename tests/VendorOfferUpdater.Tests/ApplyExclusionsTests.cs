@@ -6,11 +6,13 @@ using Xunit;
 
 namespace VendorOfferUpdater.Tests
 {
-    // The wiki describes vendor sales a patch removed years ago without
-    // marking those pages historical, so a scrape reintroduces them on
-    // every refresh. ref/vendor_offer_exclusions.json is the hand-verified
-    // refusal list; these tests pin that it is applied, that it is keyed on
-    // BOTH merchant and item, and that a missing list is survivable.
+    // The wiki describes vendor sales a patch removed years ago, sometimes
+    // on pages not marked historical and sometimes on pages whose marker the
+    // SMW vendor query never reads, so a scrape reintroduces them on every
+    // refresh. ref/vendor_offer_exclusions.json is the hand-verified refusal
+    // list; these tests pin that it is applied, that an entry carrying an
+    // outputItemId is keyed on BOTH merchant and item, that an entry without
+    // one refuses a whole merchant, and that a missing list is survivable.
     public class ApplyExclusionsTests
     {
         private static VendorOffer MakeOffer(string merchantName, int outputItemId)
@@ -55,6 +57,107 @@ namespace VendorOfferUpdater.Tests
             Assert.Equal(2, offers.Count);
             Assert.DoesNotContain(
                 offers, o => o.MerchantName == "Battle Master" && o.OutputItemId == 19678);
+        }
+
+        [Fact]
+        public void MerchantWithoutItemId_DropsEveryRowOfThatMerchantOnly()
+        {
+            string dir = WriteList(@"{ ""exclusions"": [
+                { ""merchantName"": ""Battle Historian"" } ] }");
+
+            var offers = new List<VendorOffer>
+            {
+                MakeOffer("Battle Historian", 46733),
+                MakeOffer("Battle Historian", 46735),
+                MakeOffer("Battle Historian", 19925),
+                // The live successor sells overlapping stock; a vendor-wide
+                // refusal must not reach it.
+                MakeOffer("Skirmish Supervisor", 19925),
+            };
+
+            int removed = Program.ApplyExclusions(ref offers, dir);
+
+            Assert.Equal(3, removed);
+            Assert.Equal("Skirmish Supervisor", Assert.Single(offers).MerchantName);
+        }
+
+        [Fact]
+        public void NonNumericItemId_DropsNothing_RatherThanTheWholeMerchant()
+        {
+            // A mistyped id must not silently widen into the merchant-wide
+            // form, which would delete every row the vendor sells.
+            string dir = WriteList(@"{ ""exclusions"": [
+                { ""merchantName"": ""Battle Master"", ""outputItemId"": ""19678"" } ] }");
+
+            var offers = new List<VendorOffer>
+            {
+                MakeOffer("Battle Master", 19678),
+                MakeOffer("Battle Master", 12345),
+            };
+
+            int removed = Program.ApplyExclusions(ref offers, dir);
+
+            Assert.Equal(0, removed);
+            Assert.Equal(2, offers.Count);
+        }
+
+        [Fact]
+        public void BlankMerchantName_DropsNothing_NotEveryUnnamedRow()
+        {
+            string dir = WriteList(@"{ ""exclusions"": [ { ""merchantName"": """" } ] }");
+
+            var offers = new List<VendorOffer>
+            {
+                MakeOffer("Battle Master", 19678),
+                new VendorOffer
+                {
+                    OfferId = "no-merchant",
+                    MerchantName = null,
+                    OutputItemId = 19678,
+                    OutputCount = 1,
+                    CostLines = new List<CostLine>(),
+                },
+            };
+
+            int removed = Program.ApplyExclusions(ref offers, dir);
+
+            Assert.Equal(0, removed);
+            Assert.Equal(2, offers.Count);
+        }
+
+        [Fact]
+        public void ShippedList_RefusesTheBattleHistorian_VendorWide()
+        {
+            // Against the real ref/ file, not a fixture: an entry that has
+            // stopped matching (a renamed merchant, a typo) removes nothing
+            // and reads exactly like a clean refresh.
+            var offers = new List<VendorOffer>
+            {
+                MakeOffer("Battle Historian", 46733),
+                MakeOffer("Battle Master", 19678),
+                MakeOffer("Skirmish Supervisor", 46733),
+            };
+
+            int removed = Program.ApplyExclusions(ref offers, RepoRefDirectory());
+
+            Assert.Equal(2, removed);
+            Assert.Equal("Skirmish Supervisor", Assert.Single(offers).MerchantName);
+        }
+
+        // Walks to the shipped list itself rather than to a ".git" marker,
+        // which is a FILE, not a directory, in a git worktree.
+        private static string RepoRefDirectory()
+        {
+            var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
+            while (dir != null &&
+                   !File.Exists(Path.Combine(
+                       dir.FullName, "ref", "vendor_offer_exclusions.json")))
+            {
+                dir = dir.Parent;
+            }
+
+            Assert.NotNull(dir);
+            return Path.Combine(dir!.FullName, "ref");
         }
 
         [Fact]

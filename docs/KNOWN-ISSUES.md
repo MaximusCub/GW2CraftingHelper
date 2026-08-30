@@ -1328,3 +1328,6 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Barter-item valuation: the vendor offers the solver was throwing away (2026-08-28)** - gate NOT RUN (no live session available on this branch).
   Cited as: barter-item-valuation.
   `dev/records/barter-item-valuation.md`
+- **The Battle Historian: a removed WvW vendor pricing legendary materials at zero (2026-08-29)** - gate not required (dev-tool and data change; verified by a byte-identical round trip and a `--diff-summary` showing 49 removed and nothing else touched).
+  Cited as: w5-deadvendors.
+  `dev/records/w5-deadvendors.md`

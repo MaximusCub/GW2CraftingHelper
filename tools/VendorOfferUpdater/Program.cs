@@ -1713,10 +1713,18 @@ namespace VendorOfferUpdater
         }
 
         /// <summary>
-        /// Removes offers named in ref/vendor_offer_exclusions.json. A
+        /// Removes offers named in ref/vendor_offer_exclusions.json. An
+        /// entry carrying an outputItemId refuses that one (merchant, item)
+        /// row; an entry with merchantName alone refuses every row of that
+        /// merchant, which is what a vendor removed from the game needs -
+        /// naming its 49 sales one by one would be 49 copies of a single
+        /// claim, and a re-scrape that adds a 50th would slip through. A
         /// missing or unreadable file is a warning, not a failure - the
         /// refresh still produces data, it just carries rows a human had
         /// refused, which the module's own agreement test then catches.
+        /// An entry matching nothing is warned about: a merchant-wide
+        /// refusal that has quietly stopped matching (a wiki page rename,
+        /// a typo) removes nothing and looks identical to a clean run.
         /// </summary>
         internal static int ApplyExclusions(ref List<VendorOffer> offers, string outputDir)
         {
@@ -1728,7 +1736,8 @@ namespace VendorOfferUpdater
                 return 0;
             }
 
-            var refused = new HashSet<(string Merchant, int ItemId)>();
+            var refusedRows = new HashSet<(string Merchant, int ItemId)>();
+            var refusedMerchants = new HashSet<string>(StringComparer.Ordinal);
             try
             {
                 using (var doc = JsonDocument.Parse(File.ReadAllText(path)))
@@ -1737,10 +1746,37 @@ namespace VendorOfferUpdater
                     {
                         foreach (var entry in arr.EnumerateArray())
                         {
-                            if (entry.TryGetProperty("merchantName", out var m) &&
-                                entry.TryGetProperty("outputItemId", out var i))
+                            if (!entry.TryGetProperty("merchantName", out var m))
                             {
-                                refused.Add((m.GetString() ?? string.Empty, i.GetInt32()));
+                                continue;
+                            }
+
+                            string merchant = m.GetString() ?? string.Empty;
+                            if (merchant.Length == 0)
+                            {
+                                // A blank name would match every offer whose
+                                // merchantName the scrape left null.
+                                Console.Error.WriteLine(
+                                    "Warning: exclusion entry with a blank merchantName ignored.");
+                                continue;
+                            }
+
+                            if (!entry.TryGetProperty("outputItemId", out var i))
+                            {
+                                refusedMerchants.Add(merchant);
+                            }
+                            else if (i.ValueKind == JsonValueKind.Number)
+                            {
+                                refusedRows.Add((merchant, i.GetInt32()));
+                            }
+                            else
+                            {
+                                // Never widened to a merchant-wide refusal:
+                                // a mistyped id must drop nothing, not
+                                // everything the merchant sells.
+                                Console.Error.WriteLine(
+                                    $"Warning: exclusion for \"{merchant}\" has a " +
+                                    "non-numeric outputItemId - entry ignored.");
                             }
                         }
                     }
@@ -1753,15 +1789,55 @@ namespace VendorOfferUpdater
                 return 0;
             }
 
-            if (refused.Count == 0)
+            if (refusedRows.Count == 0 && refusedMerchants.Count == 0)
             {
                 return 0;
             }
 
+            var unmatchedRows = new HashSet<(string Merchant, int ItemId)>(refusedRows);
+            var unmatchedMerchants = new HashSet<string>(refusedMerchants, StringComparer.Ordinal);
+            var kept = new List<VendorOffer>(offers.Count);
+            foreach (var offer in offers)
+            {
+                string merchant = offer.MerchantName ?? string.Empty;
+                if (refusedMerchants.Contains(merchant))
+                {
+                    unmatchedMerchants.Remove(merchant);
+                    continue;
+                }
+
+                var key = (merchant, offer.OutputItemId);
+                if (refusedRows.Contains(key))
+                {
+                    unmatchedRows.Remove(key);
+                    continue;
+                }
+
+                kept.Add(offer);
+            }
+
+            foreach (string merchant in unmatchedMerchants)
+            {
+                Console.Error.WriteLine(
+                    $"Warning: exclusion for merchant \"{merchant}\" matched no offer.");
+            }
+
+            foreach (var (merchant, itemId) in unmatchedRows)
+            {
+                // A row entry under a merchant this file also refuses
+                // wholesale never gets the chance to match, so warning
+                // about it would report a fault that is not there.
+                if (refusedMerchants.Contains(merchant))
+                {
+                    continue;
+                }
+
+                Console.Error.WriteLine(
+                    $"Warning: exclusion for \"{merchant}\" item {itemId} matched no offer.");
+            }
+
             int before = offers.Count;
-            offers = offers
-                .Where(o => !refused.Contains((o.MerchantName ?? string.Empty, o.OutputItemId)))
-                .ToList();
+            offers = kept;
             return before - offers.Count;
         }
     }
