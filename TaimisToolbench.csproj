@@ -169,6 +169,7 @@
     <Compile Include="Models\PlanStep.cs" />
     <Compile Include="Models\CurrencyCost.cs" />
     <Compile Include="Models\CurrencyValuation.cs" />
+    <Compile Include="Models\BarterItemCost.cs" />
     <Compile Include="Models\BarterItemDecisionDefaults.cs" />
     <Compile Include="Models\CurrencyDecisionDefaults.cs" />
     <Compile Include="Models\HomesteadEfficiencyTiers.cs" />

@@ -55,8 +55,8 @@ Status: OPEN | IN PROGRESS (branch) | DONE (PR #n) | RULED OUT (reason)
 
 | id | Item | Status |
 |----|------|--------|
-| R1 | Two currency ids (39 and 77) are both named "Gaeting Crystal". Establish whether one is deprecated, or produce a thesis for why both exist. | ANSWERED, removal IN PROGRESS on `w6-gaeting` |
-| R2 | Currency 77 is absent from `Gw2Constants` while 82 cost lines in `ref/vendor_offers.json` are priced in it. Found while answering R1. | IN PROGRESS on `w6-gaeting` |
+| R1 | Two currency ids (39 and 77) are both named "Gaeting Crystal". Establish whether one is deprecated, or produce a thesis for why both exist. Answered: id 39 was retired in-game 2022-07-19 and force-converted to Magnetite Shards; id 77 is the live one and carries the role forward across expansions rather than being replaced. Currency 39 and its item form 86094 removed from the module. Evidence: `dev/records/gaeting-crystal-duplicate-ids.md`. | IN PROGRESS (PR #235, not yet merged) |
+| R2 | Currency 77 is absent from `Gw2Constants` while 82 cost lines in `ref/vendor_offers.json` are priced in it. Found while answering R1. | IN PROGRESS (PR #235, not yet merged) |
 
 ## Confirmed working in the wave-2 build (owner-verified)
 

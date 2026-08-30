@@ -507,22 +507,74 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void CurrencyRequirementNote_NoCurrencies_IsNull()
         {
-            Assert.Null(SummarySectionLayoutMath.CurrencyRequirementNote(0));
-            Assert.Null(SummarySectionLayoutMath.CurrencyRequirementNote(-1));
+            Assert.Null(SummarySectionLayoutMath.CurrencyRequirementNote(null));
+            Assert.Null(SummarySectionLayoutMath.CurrencyRequirementNote(new List<PlanRowViewModel>()));
         }
 
         [Fact]
         public void CurrencyRequirementNote_OneCurrency_ReadsSingular()
         {
             Assert.Equal("+ 1 Currency Required",
-                SummarySectionLayoutMath.CurrencyRequirementNote(1));
+                SummarySectionLayoutMath.CurrencyRequirementNote(NonCoinRows(1, 0)));
         }
 
         [Fact]
         public void CurrencyRequirementNote_ManyCurrencies_StatesTheCount()
         {
             Assert.Equal("+ 3 Currencies Required",
-                SummarySectionLayoutMath.CurrencyRequirementNote(3));
+                SummarySectionLayoutMath.CurrencyRequirementNote(NonCoinRows(3, 0)));
+        }
+
+        // A barter item is not a currency, and the line that counts it
+        // must not call it one - the whole reason this took a row list.
+        [Fact]
+        public void CurrencyRequirementNote_BarterItemsOnly_ReadsAsItems()
+        {
+            Assert.Equal("+ 1 Item Required",
+                SummarySectionLayoutMath.CurrencyRequirementNote(NonCoinRows(0, 1)));
+            Assert.Equal("+ 4 Items Required",
+                SummarySectionLayoutMath.CurrencyRequirementNote(NonCoinRows(0, 4)));
+        }
+
+        [Fact]
+        public void CurrencyRequirementNote_BothKinds_CountsThemTogether()
+        {
+            Assert.Equal("+ 5 Currencies and Items Required",
+                SummarySectionLayoutMath.CurrencyRequirementNote(NonCoinRows(3, 2)));
+        }
+
+        [Fact]
+        public void NonCoinNameHeader_NamesOnlyTheKindsPresent()
+        {
+            Assert.Equal("Currency", SummarySectionLayoutMath.NonCoinNameHeader(null));
+            Assert.Equal("Currency", SummarySectionLayoutMath.NonCoinNameHeader(NonCoinRows(2, 0)));
+            Assert.Equal("Item", SummarySectionLayoutMath.NonCoinNameHeader(NonCoinRows(0, 2)));
+            Assert.Equal("Currency or Item", SummarySectionLayoutMath.NonCoinNameHeader(NonCoinRows(1, 1)));
+        }
+
+        private static List<PlanRowViewModel> NonCoinRows(int currencies, int barterItems)
+        {
+            var rows = new List<PlanRowViewModel>();
+            for (int i = 0; i < currencies; i++)
+            {
+                rows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.CurrencyCost,
+                    Label = "Currency " + i,
+                });
+            }
+
+            for (int i = 0; i < barterItems; i++)
+            {
+                rows.Add(new PlanRowViewModel
+                {
+                    RowType = PlanRowType.CurrencyCost,
+                    IsBarterItemCost = true,
+                    Label = "Token " + i,
+                });
+            }
+
+            return rows;
         }
 
         [Fact]
@@ -538,7 +590,7 @@ namespace TaimisToolbench.Tests.Services
             string tooltip = SummarySectionLayoutMath.CurrencyRequirementNoteTooltip(rows);
 
             Assert.StartsWith("Blue Prophet Shard, Fractal Relic, Spirit Shard", tooltip);
-            Assert.Contains("Currency table below", tooltip);
+            Assert.Contains("see the table below", tooltip);
         }
 
         [Fact]

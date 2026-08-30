@@ -689,8 +689,8 @@ jobs:
           # every currency hover in the module used to be. It was deleted
           # with its last caller. An ITEM takes ForItem/Composed and a WALLET
           # CURRENCY takes ForCurrency, decided by the id space the call site
-          # drew the icon from and never by the name: Gaeting Crystal is item
-          # 86094 AND currencies 39/77, one good in two id spaces.
+          # drew the icon from and never by the name: "Gaeting Crystal" is
+          # wallet currency 77 AND item 104026, one good in two id spaces.
           FACTORIES = {'ForItem', 'Composed', 'ForCurrency', 'None'}
           factories = set(re.findall(
               r'^        internal static ItemIconTooltip (\w+)\(', intent, re.M))

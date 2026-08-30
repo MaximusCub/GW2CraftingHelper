@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "comment": "Vendor rows the wiki still describes but the game no longer offers. The SMW scrape cannot tell a live vendor from one whose sale was removed in a patch when the page itself is not marked historical, so each entry here is a hand-verified refusal with its evidence. Applied by tools/VendorOfferUpdater at write time, so a refresh cannot reintroduce the row. Keep this list small: an entry is a claim that the wiki is wrong, and it needs a source.",
+  "comment": "Vendor rows the wiki still describes but the game no longer offers. The SMW scrape cannot tell a live vendor from one whose sale was removed in a patch when the page itself is not marked historical, and it does not read the historical marker on the pages that do carry one, so each entry here is a hand-verified refusal with its evidence. An entry with an outputItemId refuses that one (merchant, item) row; an entry with merchantName alone refuses every row of a merchant that no longer exists in the game. Applied by tools/VendorOfferUpdater at write time, so a refresh cannot reintroduce the row. Keep this list small: an entry is a claim that the shipped data is wrong, and it needs a source.",
   "exclusions": [
     {
       "merchantName": "Battle Master",
@@ -9,6 +9,18 @@
       "reason": "The Battle Master's 500 Badges of Honor sale was removed in the Spring 2016 Quarterly Update; Gift of Battle has since come only from the WvW Gift of Battle Item Reward Track. Shipping this row would price a legendary component from a vendor path that has not existed for a decade, and it contradicts this repo's own hand-verified acquisition hint for item 19678 (ref/acquisition_hints_seed.json, lastVerified 2026-07-20).",
       "sourceUrl": "https://wiki.guildwars2.com/wiki/Gift_of_Battle",
       "verified": "2026-08-25"
+    },
+    {
+      "merchantName": "Battle Historian",
+      "reason": "The NPC itself is gone, so the refusal is vendor-wide rather than per item: the wiki page carries 'status = Historical' (SMW 'Is historical = t', Category:Historical NPCs) and states the Battle Historian was replaced by the Skirmish Supervisor in the June 2017 Competitive Feature Pack. Its live successor is already in this dataset under 'Skirmish Supervisor' with 418 rows. All 49 scraped rows were priced in WvW Tournament Claim Tickets (item 66352), whose own page carries 'status = discontinued': the tournaments that awarded it last ran in 2014, the reward chests are discontinued, and consuming a held ticket now converts it to a WvW Skirmish Claim Ticket. That ticket has no coin valuation here, so every one of those rows ranked as free and undercut the real route for Dragonite Ore, Empyreal Fragment and Obsidian Shard.",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Battle_Historian",
+      "verified": "2026-08-29"
+    },
+    {
+      "merchantName": "Scholar Glenna (Gaeting Crystal)",
+      "reason": "A parenthesised variant page, not the live merchant: 'Scholar Glenna' is current and sells for Magnetite Shards in every raid, while 'Scholar Glenna (Gaeting Crystal)' carries 'status = historical' (SMW 'Is historical = t') and opens 'This page lists the items formerly available from Scholar Glenna ... The following offers were removed and replaced with equivalent offers.' The replacements are already in this dataset as the per-raid pages 'Scholar Glenna (Hall of Chains)', '(Mythwright Gambit)' and '(The Key of Ahdashim)', which is where these 121 rows' three locations point. The 2022-07-19 patch note is explicit on both halves: 'Gaeting Crystals have been retired and players will automatically have any Gaeting Crystals in their possession exchanged for an equal amount of Magnetite Shards' and 'Merchants who previously traded items for Gaeting Crystals now accept Magnetite Shards in their place.' The currency and the offers went in the same update.",
+      "sourceUrl": "https://wiki.guildwars2.com/wiki/Scholar_Glenna_(Gaeting_Crystal)",
+      "verified": "2026-08-29"
     }
   ]
 }

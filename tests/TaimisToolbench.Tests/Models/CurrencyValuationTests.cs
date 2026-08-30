@@ -213,8 +213,8 @@ namespace TaimisToolbench.Tests.Models
         [Fact]
         public void Constructor_ItemIdCollidingWithAValuedCurrencyId_IsIndependent()
         {
-            // Currency 39 is Gaeting Crystal in the wallet; item 39 is an
-            // unrelated item. The two tables must not answer for each other.
+            // Currency 39 and item 39 are unrelated things that happen to
+            // share a number. The two tables must not answer for each other.
             var valuation = new CurrencyValuation(
                 new Dictionary<int, long> { { 39, 100 } },
                 null,

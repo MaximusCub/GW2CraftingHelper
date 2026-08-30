@@ -23,7 +23,6 @@ namespace TaimisToolbench.Tests.Services.Recipes
     public class SeedFinalizeIndexTests
     {
         private const int GiftOfRays = 107040;
-        private const int GiftOfRaysRecipe = -1587;
 
         [Fact]
         public void FinalizeIndex_OnTheShippedSeed_DropsEmptyRowsAndAddsNothing()
@@ -62,12 +61,17 @@ namespace TaimisToolbench.Tests.Services.Recipes
             store.MergeMysticForgeRecipes(mfData);
 
             // Gift of Rays resolves through its forge row before the pass...
-            Assert.Contains(GiftOfRaysRecipe, store.TryGetSearch(GiftOfRays));
+            // Read the row rather than pinning the id: tools/MysticForgeSeeder
+            // renumbers the whole generated block on every run, so a literal
+            // here reports a routine reseed as a broken index.
+            var giftOfRaysRows = store.TryGetSearch(GiftOfRays);
+            Assert.NotNull(giftOfRaysRows);
+            Assert.NotEmpty(giftOfRaysRows);
 
             store.FinalizeIndex();
 
             // ...and still does after it.
-            Assert.Contains(GiftOfRaysRecipe, store.TryGetSearch(GiftOfRays));
+            Assert.Equal(giftOfRaysRows, store.TryGetSearch(GiftOfRays));
 
             var emptyKeys = rawSearches
                 .Where(kvp => kvp.Value.Count == 0)

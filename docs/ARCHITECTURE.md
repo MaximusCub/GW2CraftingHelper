@@ -998,6 +998,58 @@ what the wiki says the offer is.
 **Gates this model still does not have** are recorded in
 `docs/KNOWN-ISSUES.md` item 44.
 
+### 7.5 The plan's non-coin price
+
+**What:** `CraftingPlan` reports three costs, not one:
+`TotalCoinCost`, `CurrencyCosts` (per wallet currency) and
+`BarterItemCosts` (per untradeable vendor token). All three are summed
+across the whole plan from the same merged, aggregate-then-ceil vendor
+steps section 7 derives, never from the per-occurrence decision lines.
+`PlanViewModel.NonCoinCostTotals` and the Total Cost section's table are
+the display side, and they are one list projected from one set of rows so
+the plan-level figure and the table a reader checks it against cannot
+drift.
+
+**Why the barter half was missing.** A barter line's units ARE the price -
+nothing of it folds into any coin figure (section 8.3) - so before this,
+its only record anywhere in the plan was `PlanStep.VendorHasBarterItemCost`,
+a bool, plus per-node display leaves the tree suppresses whenever a merged
+step's component costs are unreliable. Measured over the shipped corpus,
+Legendary Rune (91536) buys 6 of its 7 vendor steps for no coin at all; a
+plan of that shape presenting one gold figure presents a fraction of its
+own price.
+
+**Never folded together.** A currency total, a barter total and a coin
+total are three quantities in three units, reported side by side. The
+module holds no exchange rate between them and must not invent one: a
+`CurrencyValuation` moves a comparison and never a committed total
+(section 8.3), and `Gw2Constants.CoinCurrencyId` is excluded from
+`CurrencyCosts` precisely so coin is never double-reported as a currency
+line. The two id spaces stay apart for the same reason `BarterItemCost` is
+a separate type from `CurrencyCost`: item 24 and currency 24 are unrelated
+things.
+
+**What the coin total still leaves out.** A cost line resolved through a
+subtree (section 7.4) contributes only its `RealCoin` to the offer above
+it; whatever CURRENCY that subtree spends is not carried up, so it reaches
+neither `CurrencyCosts` nor any other plan-level total. `CostLineUnitValue`
+records only that such a cost existed (`HasUnvaluedCost`), which is enough
+to keep the offer fallback-tier but not to report the quantity. Closing
+that would mean carrying cost lines up through `CostLineUnitValue` and
+de-duplicating them against the main tree's own demand, which is why it is
+recorded here rather than done in passing.
+
+**The floor disclosure.** Because a plan can carry a real cost the coin
+total counts as zero - an unpriceable node, or a barter line - the Total
+Cost section marks its tiles and states that the totals are a floor. The
+gate is that condition, not `TotalCoinCost == 0`: it had been the latter,
+which silenced the sentence on exactly the priced plans where a reader is
+most likely to mistake the coin figure for the whole answer (Legendary
+Rune: 49 unpriceable components under a five-figure silver total, with the
+disclosure suppressed). The zero-total case keeps its own narrower
+consequence, suppressing the profit band, which the widened gate does not
+touch.
+
 ---
 
 ## 8. Solver decision rules
@@ -1230,15 +1282,98 @@ and item 39 are unrelated things - so a single int-keyed map would answer
 the wrong question for one of them. `Models/CurrencyValuation.cs` holds
 the user's own overrides and clears over the top of both.
 
-The currency table is adapted from gw2efficiency's
+The currency table's first block is adapted from gw2efficiency's
 `CURRENCY_DECISION_PRICES` (`@gw2efficiency/recipe-calculation`,
 `src/static/currencyDecisionPrices.ts`, MIT, Copyright (c) 2016
 queicherius / David Reess). Shipping it as defaults is an explicit,
 one-time waiver of the repo's "do not invent data" rule for that table
-only: every value is sourced and attributed to the upstream MIT package
-rather than invented, and the permission notice the licence requires is
-reproduced verbatim in the source file itself. Research notes live in
+only: every value in that block is sourced and attributed to the upstream
+MIT package rather than invented, and the permission notice the licence
+requires is reproduced verbatim in the source file itself. Research notes live in
 [`docs/research/gw2e-currency-decision-prices.md`](research/gw2e-currency-decision-prices.md).
+
+gw2efficiency's table stops at id 70 and never gained a row for the
+Secrets of the Obscure, Janthir Wilds or Visions of Eternity currencies,
+so a second block in the same file carries values derived here. Its rule:
+the most coin one unit converts into through an **uncapped** vendor offer
+in `ref/vendor_offers.json` whose cost is that currency plus at most a
+minor coin component, priced at the live trading-post sell listing; or,
+where the game sells the same goods at the same counts for an
+already-valued sibling currency, that sibling's value. Capped offers are
+excluded for the same reason the barter table only counts repeatable
+exchanges: a weekly-capped conversion cannot absorb a stock of the
+currency, so it does not price the marginal unit. Erring high is the safe
+direction: an over-valued currency can lose a comparison it should have
+won, never win one it should have lost.
+
+| id | Currency | Value | Derivation (prices fetched 2026-08-29) |
+|---|---|---|---|
+| 30 | PvP League Ticket | 3770 | League Vendor sells 10 Shard of Glory for 1 ticket, uncapped; Shard of Glory sells at 377c against 1.2M listings. |
+| 66 | Ancient Coin | 197 | Chin-Hwa sells `Recipe: Harrier's Monastery Shoes` for 5, uncapped; TP sell 987c over 2,010 listings. The same vendor's other recipes imply 40-197, and Leivas' Antique Summoning Stone (10 coins, TP sell 13,792c) implies 1,379 but is capped at one per week. |
+| 76 | Ursus Oblige | 125 | Maw of the Volcano sells Potent Standard Sharpening Stone for 7 plus 120c, uncapped; TP sell 995c over 8,798 listings. Its other low-coin routes there imply 87-125. |
+| 77 | Gaeting Crystal, the current expansion's raid currency | 3600 | Its vendors sell one Magnetite Shard for one crystal, and price every other offer at exactly the count and coin that the Path of Fire raid vendor charges in Magnetite Shards (currency 28, 3600). |
+| 82 | Testimony of Castoran Heroics | 135 | At the Notary of Heroics the same items cost the same counts in Castoran, Desert (36) or Jade (65) Heroics, at 1, 6, 10, 100, 250 and 500. Both siblings are 135 upstream, so any other figure would contradict the block above. Corroborated independently: 6 buy a Siege Golem Blueprint, TP sell 791c, giving 132. |
+
+Currencies left deliberately unvalued, with the reason each resists a
+single defensible figure:
+
+- **63 Astral Acclaim** (127 offers). Settled by
+  [`dev/proposals/research-aa-spending-consensus.md`](../dev/proposals/research-aa-spending-consensus.md):
+  Wizard's Vault deal quality varies per item and per price tier, so one
+  implied rate misrepresents a supply curve as a point. The successor idea
+  is a ranked deal table, not a table row.
+- **72 Static Charge, 73 Pinch of Stardust, 75 Calcified Gasp** (161
+  offers). The Wizard's Tower and Gobbler converters sell one catalogue for
+  25 units of *any* map currency, so these are 1:1 with currencies the
+  block above values at 9 (Trade Contract), 70 (Ley Line Crystal), 310
+  (Tyrian Defense Seal) and 320 (Imperial Favor). Inheriting a sibling
+  gives a 35x spread with no way to choose, and none of the three has a
+  trading-post-tradable output to anchor on.
+- **78/79/80 Rift Essences** (111 offers). Their only cross-currency anchor
+  prices all three tiers identically, which contradicts the tiering; no
+  route ends in a tradable item.
+- **70 Legendary Insight** (148 offers) and **58 War Supplies** (114
+  offers). Marked `undefined` upstream, and no vendor route turns either
+  into anything tradable.
+- **81 Antiquated Ducat, 83 Aether-Rich Sap** (54 offers). Visions of
+  Eternity map currencies with no tradable output and no cross-currency
+  offer anywhere in the seed.
+- **47 Racing Medallion** (35 offers). Its two anchors are a 16c bottle of
+  wine and a single-listing 400 gold cosmetic, 333x apart with nothing
+  liquid between them.
+- **59 Unstable Fractal Essence** (29 offers), **46 PvP Tournament
+  Voucher** (14), **52 Red Prophet Shard** (9), **54 Blue Prophet Crystal**
+  (5). Low impact, and no uncapped anchor. Red Prophet Shard is the
+  instructive one: the three Eye of the North Emissaries sell the same item
+  for the same 2 units of Red, Green (3500) or Blue (300) Prophet Shard, so
+  inheriting a sibling would mean choosing between two upstream values that
+  are already 12x apart.
+
+**Rolling raid currencies, and the one row dropped from upstream.** The
+live API gives two wallet currencies the same name, "Gaeting Crystal".
+Currency 39 is the Path of Fire one: it was retired on 2022-07-19, every
+held balance force-converted into Magnetite Shards (currency 28), and no
+account has been able to hold one since. It is absent from
+`CurrencyDecisionDefaults` even though gw2efficiency's upstream table
+values it at 3600 - a deliberate divergence, not drift, annotated at the
+row in the research notes above. Its item form, item 86094, is absent from
+`BarterItemDecisionDefaults` for the same reason. Nothing in
+`ref/vendor_offers.json` charges currency 39 at all, and every offer that
+charges item 86094 belongs to one merchant the wiki marks historical,
+`Scholar Glenna (Gaeting Crystal)`.
+
+Currency 77 is the live one, and it is a *rolling* currency rather than a
+stable one. Each expansion its vendors are switched over to Magnetite
+Shards and every held balance is converted, but the id itself carries the
+role forward instead of being replaced the way 39 was: id 77's own
+`/v2/currencies` description still names Janthir Wilds while the wiki
+records the current content as Castora and flags the description as stale.
+So what a Gaeting Crystal buys - and therefore what one is worth - has a
+shelf life of one expansion. Any hardcoded valuation for id 77 is a
+snapshot of one expansion, not a constant, and is due a re-derivation
+whenever the next one ships. Measured evidence for all of the above,
+including the API and wiki captures:
+`dev/records/gaeting-crystal-duplicate-ids.md`.
 
 The barter table has no upstream to adapt - gw2efficiency values wallet
 currencies only - so each entry is derived here under a single stated
@@ -1319,6 +1454,25 @@ from a single cursor in the overlay manifest and has already repaired what
 the user was most likely to hit. Nothing waits on it: the verifier licenses
 negatives, this repairs positives, and plan generation uses the best corpus
 it has while this improves it underneath.
+
+**Item-id resolution in `tools/MysticForgeSeeder`** (`TryResolveId`). Each
+output and ingredient name has up to two candidate item ids: the id the
+name itself resolves to on the wiki, and the id the wiki's recipe subobject
+asserts. The name-resolved id wins wherever it succeeds, because a page
+that declares its own item id is stating the id of the item that page is
+about. The wiki states an asserted id explicitly only when the recipe
+template carries an `output item id` parameter; otherwise it derives one by
+name lookup, which picks an arbitrary member of a same-name pair - GW2
+ships several, e.g. `Recipe: Satchel of Mighty Embroidered Armor` is both
+9960 and 9962 - so it is the weaker source wherever both exist.
+
+The asserted id is nonetheless what makes multi-variant equipment
+resolvable at all. A page like `Ardent Glorious Armguards` covers an
+ascended and a legendary item, holds no page-level `Has game id`, and names
+its recipe's output `Ardent Glorious Armguards (legendary)`, which is no
+page at all. Every id it has lives on an `equipment variant table row`
+subobject, and the recipe template's explicit `output item id` is the
+wiki's own statement of which row the forge produces.
 
 **Where:** loaders - `Services/VendorOfferLoader.cs`,
 `Services/Recipes/RecipeCacheSerializer.cs`,
@@ -2394,12 +2548,19 @@ reached.
 
 ### 12.4 What the shape hash last moved for
 
-`PersistedPlan.SchemaShapeHash` last moved for the currency tooltip work,
-which is purely additive: one string, `CurrencyMetadata.Description`,
-absent from an older file and left null by Newtonsoft, which drops the
-tooltip's paragraph and nothing else. A plan written before it still
-deserializes and `CurrentSchemaVersion` stays at 3. A bump now costs a
-re-solve rather than the plan, but it still costs one.
+`PersistedPlan.SchemaShapeHash` last moved for the plan-level barter item
+total, which is purely additive: `CraftingPlan.BarterItemCosts`,
+`PlanStep.VendorBarterItemCosts` and the `BarterItemCost` type they reach.
+An older file omits all three, Newtonsoft leaves the lists null, and a
+restored plan then shows no barter rows in its Total Cost table until it is
+re-solved - the same degradation shape the previous addition had. A plan
+written before it still deserializes and `CurrentSchemaVersion` stays at 3.
+
+Before that it moved for the currency tooltip work, also purely additive:
+one string, `CurrencyMetadata.Description`, absent from an older file and
+left null by Newtonsoft, which drops the tooltip's paragraph and nothing
+else. A bump now costs a re-solve rather than the plan, but it still costs
+one.
 
 It does cost bytes. The persisted `CurrencyMetadata` is the whole
 `/v2/currencies` reply, so every saved plan grows by the descriptions of

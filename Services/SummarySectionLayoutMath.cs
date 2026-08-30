@@ -267,16 +267,26 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// The disclosure line's text, or null when the plan has no
-        /// currency costs (in which case the coin figure genuinely IS the
+        /// non-coin costs (in which case the coin figure genuinely IS the
         /// whole cost and no line is drawn). Pure copy rather than
         /// geometry, kept beside CostBandHeight because the two are one
         /// decision - the same precedent
         /// RequiredRecipesVisibility.BuildHeaderTitle already set for
         /// honest, count-derived header copy living in Services.
+        /// <para>
+        /// The table below carries two row kinds (wallet currencies and
+        /// barter items - see PlanRowViewModel.IsBarterItemCost), and this
+        /// line names whichever kinds are actually in it rather than
+        /// calling an untradeable token a currency.
+        /// </para>
         /// </summary>
-        public static string CurrencyRequirementNote(int currencyRowCount)
+        public static string CurrencyRequirementNote(IReadOnlyList<PlanRowViewModel> nonCoinRows)
         {
-            if (currencyRowCount <= 0)
+            int currencies = 0;
+            int items = 0;
+            CountNonCoinRowKinds(nonCoinRows, ref currencies, ref items);
+            int total = currencies + items;
+            if (total <= 0)
             {
                 return null;
             }
@@ -285,16 +295,74 @@ namespace TaimisToolbench.Services
             // slice of a three-tile band, and the reason WHY it matters
             // lives in the hover text rather than widening this line past
             // its tile.
-            return currencyRowCount == 1
-                ? "+ 1 Currency Required"
-                : $"+ {currencyRowCount} Currencies Required";
+            if (items == 0)
+            {
+                return currencies == 1
+                    ? "+ 1 Currency Required"
+                    : $"+ {currencies} Currencies Required";
+            }
+
+            if (currencies == 0)
+            {
+                return items == 1
+                    ? "+ 1 Item Required"
+                    : $"+ {items} Items Required";
+            }
+
+            return $"+ {total} Currencies and Items Required";
         }
 
         /// <summary>
-        /// Hover text for the disclosure line: the currency names
-        /// themselves, in the order the table below lists them. Null when
-        /// there is nothing to disclose. Never shows currency IDs (repo
-        /// invariant: IDs are internal-only).
+        /// The non-coin table's name-column header: "Currency" while every
+        /// row is a wallet currency, widened only when a barter item row is
+        /// actually present, so the common plan's header does not offer a
+        /// kind its table does not contain.
+        /// </summary>
+        public static string NonCoinNameHeader(IReadOnlyList<PlanRowViewModel> nonCoinRows)
+        {
+            int currencies = 0;
+            int items = 0;
+            CountNonCoinRowKinds(nonCoinRows, ref currencies, ref items);
+            if (items == 0)
+            {
+                return "Currency";
+            }
+
+            return currencies == 0 ? "Item" : "Currency or Item";
+        }
+
+        private static void CountNonCoinRowKinds(
+            IReadOnlyList<PlanRowViewModel> nonCoinRows, ref int currencies, ref int items)
+        {
+            if (nonCoinRows == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < nonCoinRows.Count; i++)
+            {
+                var row = nonCoinRows[i];
+                if (row == null)
+                {
+                    continue;
+                }
+
+                if (row.IsBarterItemCost)
+                {
+                    items++;
+                }
+                else
+                {
+                    currencies++;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Hover text for the disclosure line: the names themselves -
+        /// currencies and barter items alike - in the order the table below
+        /// lists them. Null when there is nothing to disclose. Never shows
+        /// IDs (repo invariant: IDs are internal-only).
         /// </summary>
         public static string CurrencyRequirementNoteTooltip(IReadOnlyList<PlanRowViewModel> currencyRows)
         {
@@ -318,7 +386,7 @@ namespace TaimisToolbench.Services
             }
 
             return string.Join(", ", names)
-                + "\nThese are spent on top of the coin cost shown - see the Currency table below.";
+                + "\nThese are spent on top of the coin cost shown - see the table below.";
         }
 
         // --- Currency table column geometry ---
