@@ -24,7 +24,19 @@ namespace TaimisToolbench.Services
         /// the separator - at 23 the descenders would sit on the rule.
         /// </summary>
         public const int StatusToSeparatorGap = 25;
-        public const int SeparatorToContentGap = 5;
+
+        /// <summary>
+        /// Zero: the scrolling viewport's top edge sits ON the separator
+        /// rule, so the cutoff ClipCutoffMath.CutoffTopFor publishes (the
+        /// viewport top plus SlipBudget) lands on the rule's bottom edge
+        /// and scrolled content clips flush against it at every GW2 UI
+        /// Size. Any positive value reopens a dead strip between the rule
+        /// and the first clipped row; the sub-unity slip budget lands
+        /// inside the rule's own 2px, which the strip's ZIndex paints
+        /// over. docs/ARCHITECTURE.md section V.26.1.
+        /// </summary>
+        public const int SeparatorToContentGap = 0;
+
         public const int ContentToBottomPad = 5;
 
         /// <summary>

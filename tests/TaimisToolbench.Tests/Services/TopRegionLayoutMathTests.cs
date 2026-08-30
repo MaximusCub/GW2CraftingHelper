@@ -20,20 +20,20 @@ namespace TaimisToolbench.Tests.Services
             // all, so a constant changing must fail here rather than
             // silently move the strip.
             //
-            // Re-baselined twice, by two pixels each time, and only ever
-            // below the status label: 21 -> 23 for the +2pt body bump, then
-            // 23 -> 25 when the status line moved to its own tier
-            // (TypeRampMetrics.StatusInk, lowest ink 23 against Body's 21).
-            // Every row ABOVE the status label is unmoved both times, which
-            // is the point of listing them all here.
+            // Re-baselined three times, only ever below the status label:
+            // 21 -> 23 for the +2pt body bump, then 23 -> 25 for the status
+            // tier (TypeRampMetrics.StatusInk, lowest ink 23 not 21), then
+            // ContentY 111 -> 106 when the viewport moved up onto the
+            // separator rule itself. The rows ABOVE the status label are
+            // unmoved all three times, which is the point of listing them.
             var layout = TopRegionLayoutMath.Compute(rowCount: 1, treeToolbarVisible: false);
 
             Assert.Equal(35, layout.InputPanelHeight);
             Assert.Equal(43, layout.ControlsRowY);
             Assert.Equal(81, layout.StatusRowY);
             Assert.Equal(106, layout.SeparatorY);
-            Assert.Equal(111, layout.ContentY);
-            Assert.Equal(116, layout.TopRegionHeight);
+            Assert.Equal(106, layout.ContentY);
+            Assert.Equal(111, layout.TopRegionHeight);
         }
 
         [Fact]
@@ -125,7 +125,10 @@ namespace TaimisToolbench.Tests.Services
                 Assert.True(layout.TreeToolbarRowY >= layout.ControlsRowY);
                 Assert.True(layout.StatusRowY >= layout.TreeToolbarRowY);
                 Assert.True(layout.SeparatorY > layout.StatusRowY);
-                Assert.True(layout.ContentY > layout.SeparatorY);
+
+                // The viewport's top edge is the separator rule itself, at
+                // every row count and toolbar state - zero dead strip.
+                Assert.Equal(layout.SeparatorY, layout.ContentY);
                 Assert.True(layout.TopRegionHeight > layout.ContentY);
             }
         }
@@ -138,7 +141,7 @@ namespace TaimisToolbench.Tests.Services
             var layout = TopRegionLayoutMath.Compute(rowCount: 0, treeToolbarVisible: true);
 
             Assert.Equal(0, layout.InputPanelHeight);
-            Assert.True(layout.ContentY > layout.SeparatorY);
+            Assert.Equal(layout.SeparatorY, layout.ContentY);
         }
     }
 }
