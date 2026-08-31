@@ -290,10 +290,16 @@ Read this section first. Everything above is history and evidence.
   THE GATE is the owner's review and acceptance of the functionality
   (his correction 2026-08-30; see also dev/dev-notes/FEEDBACK-BACKLOG.md's
   rule section - SHIPPED vs DONE).
-- **Worktrees are CLEANED to master only** on owner order 2026-08-30; the
-  merged `w6-*`/`wave6-ui` branches survive on origin if a surgical look
-  back is ever needed. A stray agent-harness worktree (`vivid-fjord`) and
-  its `.gitignore` entries were removed the same day.
+- **Worktree cleanup 2026-08-30, with a lesson:** the six `w6-*`/`wave6-ui`
+  worktrees and the merged branches on origin were removed on the owner's
+  order. The two nested copies under `TaimisToolbench/worktrees/`
+  (`vivid-fjord`, `faint-eagle`) and the `.cyboflow/worktrees/` + `worktrees/`
+  .gitignore lines were ALSO removed - wrongly: they belonged to other
+  software and sessions, not to this repo's agent work. The owner corrected
+  the scope ("cleanup of YOUR stale worktrees"); do not touch foreign
+  worktrees or .gitignore state in future sessions. The `.git` metadata for
+  both is gone; the copies sat at `ad667eb` and `36f21e0` respectively, so
+  committed work is safe, uncommitted state is not recoverable by us.
 
 ## Owner away 2026-08-30 for a few days - validations deferred
 
