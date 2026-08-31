@@ -232,7 +232,7 @@ Two riders:
   asynchronous half; `Logger` still gets every occurrence.
 
 **Full history:** KNOWN-ISSUES items 1, 12, 13, 36
-(`dev/dev-notes/HISTORY.md` after the WP-27 split).
+(the internal history, after the WP-27 split).
 
 ---
 

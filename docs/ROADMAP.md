@@ -78,7 +78,7 @@
   tracker (numbered catalog, the open list, and a ledger of every rotated
   milestone record); the full milestone records live one file each under
   [`dev/archive/known-issues/`](../dev/archive/known-issues/); and the pre-M38
-  fix-pass diary is [`dev/dev-notes/HISTORY.md`](../dev/dev-notes/HISTORY.md).
+  fix-pass diary is internal history (not published in this repository).
 - The original per-phase project plans (Phase A through the M14-M17
   navigation/visual-parity work, each with full scope/acceptance-criteria
   templates) are archived at

@@ -986,8 +986,8 @@ and does not fade until seven rows below it. The vertical terms now live in
 
 ## DEFERRED (recorded, not implemented)
 
-Carried over verbatim from the original backlog (full context:
-`dev/dev-notes/HISTORY.md`), plus two additional still-open items folded in
+Carried over verbatim from the original backlog (full context: the
+internal history), plus two additional still-open items folded in
 from items 31 and 32 below (marked as such) so this list covers every
 genuinely open item, not just the ones originally filed under a
 "DEFERRED" heading.

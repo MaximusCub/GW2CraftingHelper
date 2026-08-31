@@ -63,8 +63,8 @@ The normative gw2efficiency behavior spec these reports feed into lives one
 level up, at [`docs/gw2e-parity-spec.md`](../gw2e-parity-spec.md); the
 durable "why" these reports produced for the module's own implementation
 lives at [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md). For the full
-resolution history of each numbered item above, see
-[`dev/dev-notes/HISTORY.md`](../../dev/dev-notes/HISTORY.md).
+resolution history of each numbered item above, see the module's internal
+history (not published in this repository).
 
 ## A note on provenance paths
 
