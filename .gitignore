@@ -380,3 +380,8 @@ ref/mf_item_id_cache.json
 ref/wiki_vendor_cache.json
 ref/item_id_cache.json
 ref/seasonal_wikitext_cache.json
+
+# Private working state (owner direction 2026-08-30): kept local, never published
+dev/dev-notes/SESSION-STATE.md
+dev/dev-notes/FEEDBACK-BACKLOG.md
+dev/dev-notes/SESSION-HANDOFF.md
