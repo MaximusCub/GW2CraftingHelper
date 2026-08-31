@@ -398,8 +398,8 @@ picks them up via the wholesale `ref/` copy and ships them - gitignore
 only controls what `git` tracks, not what MSBuild's `CopyToOutputDirectory`
 -equivalent packaging step reads off disk.
 
-This was directly measured on the M38 WP-25 branch (recorded in
-`dev/dev-notes/HISTORY.md` under the WP-25 entry, 2026-07-23): a worktree
+This was directly measured on the M38 WP-25 branch (recorded in the
+internal history under the WP-25 entry, 2026-07-23): a worktree
 created **after** PR #92 (so never had the caches materialize at all)
 produced a `.bhm` of 6.0 MB, versus 7.2 MB from an equivalent build on a
 working copy that still had them - and the smaller, cache-free build

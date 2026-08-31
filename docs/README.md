@@ -72,8 +72,8 @@ In short:
 - [`../dev/archive/known-issues/`](../dev/archive/known-issues/) - 69 older
   records, rotated out of `KNOWN-ISSUES.md` verbatim in one 2026-08-24
   pass, before per-branch files existed.
-- [`../dev/dev-notes/HISTORY.md`](../dev/dev-notes/HISTORY.md) - the pre-M38
-  fix-pass diary, under the same item numbers.
+- the pre-M38 fix-pass diary, under the same item numbers - internal
+  history, not published in this repository.
 - [`../dev/proposals/`](../dev/proposals/) - designs for features that were
   never built.
 
@@ -120,9 +120,8 @@ test files only inside comments; nothing under `tests/` references them.
   ones only in the archive). A milestone is one themed wave of work, ending
   in a live desktop verification.
 - **WP-NN** - a work package inside the M38 cleanup wave specifically,
-  WP-01 through WP-29, defined in
-  [`dev/dev-notes/m38-plan/m38-cleanup-plan.md`](../dev/dev-notes/m38-plan/m38-cleanup-plan.md).
-  No other milestone uses WP numbering.
+  WP-01 through WP-29, defined in the M38 cleanup plan (internal working
+  document). No other milestone uses WP numbering.
 - **KNOWN-ISSUES #N** - an entry in the numbered catalog in
   [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md). Cited from `.cs` files as an anchor
   to the investigation behind a piece of code.

@@ -12,9 +12,9 @@ records) - that history is preserved in
 [`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md) (the current-state tracker: the
 numbered catalog, the open list, and a ledger pointing into
 [`dev/archive/known-issues/`](../dev/archive/known-issues/), where the full
-milestone records live one file each) and
-[`dev/dev-notes/HISTORY.md`](../dev/dev-notes/HISTORY.md) (the pre-M38 fix-pass
-diary this document distills). Each section below names the KNOWN-ISSUES
+milestone records live one file each) and the pre-M38 fix-pass diary this
+document distills (internal history, not published in this repository).
+Each section below names the KNOWN-ISSUES
 item number(s) it is drawn from so you can go read the original
 investigation.
 

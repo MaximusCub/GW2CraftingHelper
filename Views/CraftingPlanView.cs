@@ -38,7 +38,7 @@ namespace TaimisToolbench.Views
         #region Shared layout constants, colors, top-region geometry & dependencies
 
         // Not one of the architecture report's 11 responsibilities - shared
-        // substrate consumed by several regions below (see dev/dev-notes/m38-plan/m38-a1-architecture.md S3).
+        // substrate consumed by several regions below (docs/ARCHITECTURE.md section 5).
         private static readonly Logger Logger = Logger.GetLogger<CraftingPlanView>();
 
         // Layout constants. The top strip's own Y arithmetic lives in the
@@ -1984,7 +1984,7 @@ namespace TaimisToolbench.Views
 
         // Wires Input Rows (1), the wheel handlers (3/4), and the resize
         // handler (5) together onto the freshly built controls; not itself
-        // one of the 11 - see dev/dev-notes/m38-plan/m38-a1-architecture.md S3.
+        // one of the 11 - see docs/ARCHITECTURE.md section 5.
         public void Build(Container buildPanel)
         {
             // Screen-parented popups from the previous build cycle (one

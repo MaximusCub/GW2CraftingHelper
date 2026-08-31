@@ -90,9 +90,8 @@ history.
 
 **Proposal:** split the flat `Services/` directory into `Services/Pricing/`,
 `Services/Planning/`, `Services/Persistence/`, `Services/Vendor/`,
-`Services/Layout/` and `Services/Api/`, as set out in
-[`dev/dev-notes/m38-plan/m38-a1-architecture.md`](../dev/dev-notes/m38-plan/m38-a1-architecture.md)
-section 5.
+`Services/Layout/` and `Services/Api/`, as set out in the M38 architecture
+proposal, section 5 (internal working document).
 
 **Not executed.** None of the six directories exists; `Services/` is 141
 flat files with two subdirectories (`Recipes/`, `Diagnostics/`) that arrived

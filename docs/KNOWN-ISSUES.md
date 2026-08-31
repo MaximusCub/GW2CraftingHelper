@@ -20,8 +20,8 @@ all. They are the engineering record, in [`../dev/`](../dev/README.md):
 one file per branch in [`../dev/records/`](../dev/records/), the 69 older
 ones in [`../dev/archive/known-issues/`](../dev/archive/known-issues/), and
 the pre-M38 fix-pass diary - hypotheses, instrumentation, root-cause traces,
-dated gate records, under these same item numbers - in
-[`../dev/dev-notes/HISTORY.md`](../dev/dev-notes/HISTORY.md).
+dated gate records, under these same item numbers - in the module's internal
+history (not published in this repository).
 
 **Looking for *why* a piece of code is shaped the way it is**, rather than
 the story of how a specific bug was found and fixed?
@@ -149,8 +149,7 @@ Closed by the same synchronous-height-contract fix as item 12.
 
 Logged as a contrast follow-up to the M30 #11 pill-label fix (which only
 covered tree pills, not shopping-list source tags). No explicit resolution
-note was recorded against this item number in the original backlog; full
-context in `dev/dev-notes/HISTORY.md`.
+note was recorded against this item number in the original backlog.
 
 ### 16. Vendor-source items show no price
 
@@ -158,8 +157,7 @@ Logged: vendor-decision rows rendered empty Each/Total cells, including
 non-coin currency costs. The currency-icon rendering pipeline
 (`CoinCurrencyRenderer`, `CurrencyDisplayResolver`) that this item asked
 for is in production use today. No explicit "(FIXED in Mxx)" note was
-recorded against this item number in the original backlog; full context
-in `dev/dev-notes/HISTORY.md`.
+recorded against this item number in the original backlog.
 
 ### 17. Seed data gaps: false UNKNOWNs in the Exordium tree (FIXED in M33)
 
@@ -177,8 +175,7 @@ Logged: a node priced via one source (e.g. TP) could render a pill for a
 different source (e.g. VENDOR). The decision-pill-must-match-committed-
 source invariant this item asked for is covered today by
 `DecisionPillPlannerTests`. No explicit "(FIXED in Mxx)" note was recorded
-against this item number in the original backlog; full context in
-`dev/dev-notes/HISTORY.md`.
+against this item number in the original backlog.
 
 ### 19. Resize-drag scroll reset on height change (FIXED in M33)
 
@@ -256,9 +253,9 @@ because renumbering is forbidden and this is where it was written.
 Not separately numbered in the original backlog (recorded there as
 `WP-22`/`WP-23`/`WP-23b`/`WP-23c`/`WP-23d + WP-24`/`WP-25` narrative
 entries, plus the WP-26 cut decision). See `docs/ARCHITECTURE.md` section
-5 for the durable summary of what moved where and why, and
-`dev/dev-notes/HISTORY.md` for the full diff-evidence and live-verification
-record of each increment.
+5 for the durable summary of what moved where and why, and the internal
+history for the full diff-evidence and live-verification record of each
+increment.
 
 ### 24. Homestead refinement handling (parity gap) (FIXED in M37)
 
@@ -279,8 +276,8 @@ Deliberately NOT implemented: a "do you even own Homestead" master gate
 M35 left sell-value/profit rollups unset for multi-item batches. Fixed:
 `SellSideEconomics.ApplyBatchSellSideEconomics` sums each qualifying
 root's own sellable quantity/net sale value/profit into batch totals.
-Deliberately diverges from gw2e in two ways (both recorded in
-`dev/dev-notes/HISTORY.md` with the reasoning): the rollup does not filter
+Deliberately diverges from gw2e in two ways (both recorded in the internal
+history with the reasoning): the rollup does not filter
 out a bought-but-tradable root the way gw2e's `craft === true` filter
 does, and an untradable crafted root is excluded entirely (contributes
 zero) rather than silently absorbed as a hidden cost the way gw2e's own
@@ -1054,7 +1051,7 @@ genuinely open item, not just the ones originally filed under a
   warnings respectively); a future cleanup wave candidate.
 - **(M38 `Services/` foldering - recorded 2026-08-25, not executed)** The
   target folder shape named in
-  `dev/dev-notes/m38-plan/m38-a1-architecture.md` section 5 -
+  the M38 architecture proposal, section 5 (internal working document) -
   `Services/Pricing/`, `Services/Planning/`, `Services/Persistence/`,
   `Services/Vendor/`, `Services/Layout/`, `Services/Api/` - was never
   built: none of the six directories exists, and `Services/` is 141 flat
