@@ -2528,9 +2528,26 @@ CRAFT/TP/HAVE-annotation row went from two pills and a "+1" chip, tightened,
 to all three at full padding, and the column took 82px of the 1314px the
 depth-0 name column held.
 
-Like the cost column's, the result is held as a one-way floor for the life of
+Like the cost column's, something is held as a one-way floor for the life of
 a plan (`TreeCostColumnFloor` says why a column edge that narrows under a
-click is a bug), and `TryRefreshInPlace` declines when it moves.
+click is a bug), and `TryRefreshInPlace` declines when it moves. What is
+ratcheted is the widest run the plan has ever REQUIRED, not the width it was
+granted. The two are identical at a constant panel width, because clamping is
+monotonic - `max(clamp(a), clamp(b))` is `clamp(max(a, b))` - and they part
+only across a resize, which is where ratcheting the granted width was wrong
+twice over. It froze the share a wide window had afforded, so narrowing back
+to the minimum left the name column without the minimum-window budget the
+paragraph above says it keeps; and `RightClaim`, re-derived from the now
+smaller surplus, re-attributed those frozen pixels to the cost column's
+slack, moving `PillColX` at a constant pill width. Ratcheting the ink instead
+holds exactly the quantity an ignore click shrinks, which is the whole reason
+the floor exists.
+
+`TreePillColumnMath.Resolve` settles the width and the claim together from one
+`Affordable` and one surplus, and `TryRefreshInPlace` gates on BOTH. The claim
+is netted out of the cost column by `EffectiveCostColumnWidth`, so an in-place
+refresh that kept a stale claim placed its rows where a full render at the
+same window size would not have.
 
 That "+N" pill is deliberately not wired to a popup offering the hidden
 options. The hidden pills are almost always the trailing annotation and the

@@ -903,7 +903,7 @@ namespace TaimisToolbench.Services
                     // true per-unit rate (its per-batch coin cost divided by
                     // its own OutputCount), not a truncating average of the
                     // corrected AGGREGATE total over aggregate Quantity -
-                    // the same defect class B1 #2 already fixed for the
+                    // the same defect class already fixed for the
                     // currency "Each" cell via CurrencyDisplayResolver.
                     // ResolveUnitAmounts. Example: a "2 for 5" offer merged
                     // to demand 3 gives TotalCost=10 (2 batches); the old

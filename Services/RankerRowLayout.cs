@@ -71,7 +71,7 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// The row's three glyph actions, at the compact square the game's
         /// own window close control is drawn at rather than at the module's
-        /// on-tab button height (V4). Height matches - these are square.
+        /// on-tab button height. Height matches - these are square.
         /// </summary>
         public const int ButtonWidth = GlyphButtonMetrics.RowActionSize;
 
