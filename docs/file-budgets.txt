@@ -107,7 +107,7 @@ Services/DailyCooldownItemService.cs                                            
 Services/DecisionPillPlanner.cs                                                         441
 Services/Diagnostics/PlanPhaseTimingSummary.cs                                          215
 Services/Diagnostics/PlanTimingAnalyzer.cs                                              100
-Services/DialogLayoutMath.cs                                                            460
+Services/DialogLayoutMath.cs                                                            472
 Services/DisciplinesColumnMath.cs                                                       148
 Services/ExcessCraftOutputCalculator.cs                                                 158
 Services/FirstLoadSnapshotGate.cs                                                       86
@@ -284,7 +284,7 @@ Views/ItemRowState.cs                                                           
 Views/LogTabContent.cs                                                                  1538
 Views/MainThreadMarshal.cs                                                              141
 Views/MainView.cs                                                                       2831
-Views/DialogWindow.cs                                                                   106
+Views/DialogWindow.cs                                                                   108
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    425
 Views/PlanHistoryTabContent.cs                                                          1487
@@ -295,7 +295,7 @@ Views/Rendering/ColumnHeaderRowRenderer.cs                                      
 Views/Rendering/CraftStepsSectionRenderer.cs                                            264
 Views/Rendering/DisciplinesSectionRenderer.cs                                           288
 Views/Rendering/EmptyPlanStateRenderer.cs                                               81
-Views/Rendering/FeedbackButton.cs                                                       260
+Views/Rendering/FeedbackButton.cs                                                       265
 Views/Rendering/HeaderBands.cs                                                          154
 Views/Rendering/HeaderCellPlan.cs                                                       99
 Views/Rendering/HoverChainResync.cs                                                     75

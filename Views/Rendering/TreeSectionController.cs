@@ -897,6 +897,11 @@ namespace TaimisToolbench.Views.Rendering
             int scanned = TreeCostColumnMath.TotalWidth(_costColumnWidths);
             int reserve = scanned > TreeCostColumnWidth ? scanned : TreeCostColumnWidth;
             int effective = reserve - _pillColumnCostClaim;
+
+            // The floor cannot bind while the claim comes from
+            // ScannedPillColumn: TreePillColumnMath.RightClaim caps it at the
+            // rightSlack this same subtraction leaves, which is reserve minus
+            // scanned. It is here for a claim written from anywhere else.
             return effective > scanned ? effective : scanned;
         }
 
@@ -2051,7 +2056,12 @@ namespace TaimisToolbench.Views.Rendering
                     // the mark with the one face that can draw it.
                     toggle = new FeedbackButton
                     {
-                        Size = new Point(placement.Width, PillHeight),
+                        // Both axes from RowActionSize, as the Ranker and
+                        // Plan History rows already do. Its width comes from
+                        // ReservedIgnorePillWidth, which is that constant;
+                        // taking the height from PillHeight left it square
+                        // only while two independent numbers coincided.
+                        Size = new Point(placement.Width, GlyphButtonMetrics.RowActionSize),
                         Location = new Point(placement.X, pillY),
                         Parent = rowPanel,
                     };
@@ -2181,17 +2191,11 @@ namespace TaimisToolbench.Views.Rendering
                         ApplyOverridesAndResolve();
                     };
 
-                    // The toggle's press and hover are already its own: the
-                    // FeedbackButton constructor wired PressFeedback, and the
-                    // hover sweep is Blish's OnMouseEntered tween. Only the
-                    // pill needs this hand-rolled wash-and-restore pair.
-                    if (!isToggle)
-                    {
-                        Color restingBorder = borderColor;
-                        outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
-                        outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
-                        PressFeedback.Wire(outer);
-                    }
+                    // No hand-rolled wash-and-restore here: ignoreInteractive
+                    // implies PillKind.Ignore, so this arm only ever holds the
+                    // toggle, whose press came from FeedbackButton's own
+                    // PressFeedback wiring and whose hover is Blish's
+                    // OnMouseEntered tween. The pill arm above keeps the pair.
                 }
 
                 // Appends the value-detail

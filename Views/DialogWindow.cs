@@ -1,6 +1,7 @@
 using Blish_HUD.Content;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
+using TaimisToolbench.Services;
 
 namespace TaimisToolbench.Views
 {
@@ -82,14 +83,15 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// Window y of the content region's top edge. ConstructWindow
-        /// (decompiled 1.3.0) lands it at the requested contentRegion.Y
-        /// (ContentInsetY) plus STANDARD_TITLEBAR_HEIGHT (40) less the 11px
-        /// STANDARD_TITLEBAR_VERTICAL_OFFSET floor it clamps the window's
-        /// top padding to - the same 64px <see cref="ChromeHeight"/>'s
-        /// arithmetic already counts.
+        /// Window y of the content region's top edge. ConstructWindow lands
+        /// it at the requested contentRegion.Y (ContentInsetY) plus the
+        /// title bar's height, less the vertical-offset floor it clamps the
+        /// window's top padding to - the same pair
+        /// <see cref="ChromeHeight"/>'s arithmetic already counts, named
+        /// once in Services/WindowSizing rather than re-typed here.
         /// </summary>
-        internal const int ContentTopY = ContentInsetY + 40 - 11;
+        internal const int ContentTopY =
+            ContentInsetY + WindowSizing.TitleBarHeight - WindowSizing.TitleBarVerticalOffset;
 
         /// <summary>
         /// The content-relative Location a child of this window needs for

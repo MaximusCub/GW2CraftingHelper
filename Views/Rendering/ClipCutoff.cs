@@ -129,12 +129,20 @@ namespace TaimisToolbench.Views.Rendering
     /// Its own drawing is unclamped - the line is derived from its bounds, so
     /// clamping itself against it would only shrink the viewport.
     /// </summary>
-    internal sealed class ClipAuthorityFlowPanel : FlowPanel
+    internal class ClipAuthorityFlowPanel : FlowPanel
     {
-        public override void Draw(SpriteBatch spriteBatch, Rectangle drawBounds, Rectangle scissor)
+        /// <summary>
+        /// The edge the published line is derived from. Its own top by
+        /// default; a subclass overrides it to protect something else.
+        /// </summary>
+        protected virtual int ProtectedEdge => AbsoluteBounds.Y;
+
+        public sealed override void Draw(
+            SpriteBatch spriteBatch, Rectangle drawBounds, Rectangle scissor)
         {
             int previous = ClipCutoff.Enter(
-                ClipCutoffMath.CutoffTopFor(AbsoluteBounds.Y, GameService.Graphics.UIScaleMultiplier));
+                ClipCutoffMath.CutoffTopFor(
+                    ProtectedEdge, GameService.Graphics.UIScaleMultiplier));
             try
             {
                 base.Draw(spriteBatch, drawBounds, scissor);
@@ -153,17 +161,16 @@ namespace TaimisToolbench.Views.Rendering
     /// the ordinary viewport top, as <see cref="ClipAuthorityFlowPanel"/>
     /// derives it.
     /// <para>
-    /// Paint order cannot keep the band clean: the vendor's default
-    /// <c>ZIndex</c> is 5 (<c>Control._zIndex = 5</c> in the decompiled Blish
-    /// 1.3.0 binary), so the host's ZIndex-1 clip paints first and the
-    /// viewport's whole subtree overdraws the pinned band. A scissor bound is
-    /// order-independent - the line bites during the content's own walk -
-    /// and the re-assertion arithmetic that makes it hold is
-    /// docs/ARCHITECTURE.md section V.26.1's, via
+    /// The clip does now out-rank this panel in paint order too
+    /// (StickyHeaderHost.ClipZIndex), but the scissor bound is what the
+    /// band rests on: it is order-independent, biting during the content's
+    /// own walk rather than after it, so a band stays clean however the
+    /// two are sorted. The re-assertion arithmetic that makes it hold at
+    /// any nesting depth is docs/ARCHITECTURE.md section V.26.1's, via
     /// <see cref="ClipCutoffMath.CutoffTopFor"/>.
     /// </para>
     /// </summary>
-    internal sealed class StickyClipAuthorityFlowPanel : FlowPanel
+    internal sealed class StickyClipAuthorityFlowPanel : ClipAuthorityFlowPanel
     {
         private readonly Func<int?> _pinnedBandBottom;
 
@@ -177,20 +184,6 @@ namespace TaimisToolbench.Views.Rendering
             _pinnedBandBottom = pinnedBandBottom ?? throw new ArgumentNullException(nameof(pinnedBandBottom));
         }
 
-        public override void Draw(SpriteBatch spriteBatch, Rectangle drawBounds, Rectangle scissor)
-        {
-            int? pinned = _pinnedBandBottom();
-            int edge = pinned ?? AbsoluteBounds.Y;
-            int previous = ClipCutoff.Enter(
-                ClipCutoffMath.CutoffTopFor(edge, GameService.Graphics.UIScaleMultiplier));
-            try
-            {
-                base.Draw(spriteBatch, drawBounds, scissor);
-            }
-            finally
-            {
-                ClipCutoff.Exit(previous);
-            }
-        }
+        protected override int ProtectedEdge => _pinnedBandBottom() ?? base.ProtectedEdge;
     }
 }

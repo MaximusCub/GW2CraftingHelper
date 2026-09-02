@@ -123,9 +123,9 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Window y the title-bar textures begin at: TitleBarBounds.Y (0)
-        /// less STANDARD_TITLEBAR_VERTICAL_OFFSET.
+        /// less the vertical offset Services/WindowSizing names.
         /// </summary>
-        private const int TitleBarTextureTop = -11;
+        private const int TitleBarTextureTop = -WindowSizing.TitleBarVerticalOffset;
 
         /// <summary>
         /// Their height, measured from the vendor's own
@@ -169,7 +169,20 @@ namespace TaimisToolbench.Services
         /// </summary>
         public static int TitleX(int windowWidth, int titleWidth)
         {
-            int x = (Math.Max(0, windowWidth) - Math.Max(0, titleWidth)) / 2;
+            return CentredX(windowWidth, titleWidth);
+        }
+
+        /// <summary>
+        /// The three centrings this class does - the title over the window,
+        /// a body line over the content box, the button row over the
+        /// content box - are one rule: half the difference, never negative,
+        /// so an over-wide inner pins left rather than overhanging both
+        /// sides. Stated once because they have to agree: a title centred
+        /// on a different rule than the lines under it is visibly off.
+        /// </summary>
+        private static int CentredX(int outerWidth, int innerWidth)
+        {
+            int x = (Math.Max(0, outerWidth) - Math.Max(0, innerWidth)) / 2;
             return x > 0 ? x : 0;
         }
 
@@ -189,8 +202,7 @@ namespace TaimisToolbench.Services
         /// </summary>
         public static int LineX(int contentWidth, int lineWidth)
         {
-            int x = (contentWidth - lineWidth) / 2;
-            return x > 0 ? x : 0;
+            return CentredX(contentWidth, lineWidth);
         }
 
         /// <summary>One rendered paragraph: its physical lines and its top edge.</summary>
@@ -353,7 +365,7 @@ namespace TaimisToolbench.Services
 
             int contentHeight = messageBottom + MessageToButtonGap + ButtonHeight + ButtonBottomMargin;
             int buttonY = contentHeight - ButtonBottomMargin - ButtonHeight;
-            int confirmX = Math.Max(0, (width - rowWidth) / 2);
+            int confirmX = CentredX(width, rowWidth);
 
             return new Layout(
                 width, contentHeight, blocks, buttonY,
