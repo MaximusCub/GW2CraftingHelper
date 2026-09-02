@@ -1695,12 +1695,26 @@ namespace VendorOfferUpdater
             return sb.ToString();
         }
 
-        private static string FindRepoRoot()
+        /// <summary>
+        /// Walks up from <paramref name="startDirectory"/> (the running
+        /// binary's own directory by default) to the first ancestor
+        /// carrying a ".git" entry, falling back to the process's working
+        /// directory when none does.
+        /// <para>
+        /// The entry is tested as a file AND as a directory: a linked
+        /// worktree's ".git" is a FILE holding a gitdir pointer, so a
+        /// directory-only probe walks past the worktree root and resolves
+        /// ref/ in whichever repo it meets next. Same fix, same reason, at
+        /// tools/MysticForgeSeeder/Program.cs.
+        /// </para>
+        /// </summary>
+        internal static string FindRepoRoot(string? startDirectory = null)
         {
-            string? dir = AppContext.BaseDirectory;
+            string? dir = startDirectory ?? AppContext.BaseDirectory;
             while (dir != null)
             {
-                if (Directory.Exists(Path.Combine(dir, ".git")))
+                string gitPath = Path.Combine(dir, ".git");
+                if (Directory.Exists(gitPath) || File.Exists(gitPath))
                 {
                     return dir;
                 }
