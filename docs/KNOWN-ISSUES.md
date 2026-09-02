@@ -992,6 +992,20 @@ from items 31 and 32 below (marked as such) so this list covers every
 genuinely open item, not just the ones originally filed under a
 "DEFERRED" heading.
 
+- Dimmed IGNORE toggle's mark falls below the 3:1 non-text contrast
+  floor. `PillColors.DimmedPillFactor` (0.6) is applied as
+  `Control.Opacity`, which Blish multiplies into every `DrawOnCtrl`
+  colour, so the black mark AND the amber ON plate both composite toward
+  the backdrop together. Measured on the shipped colours (`#9C7327`
+  plate, black ink, sRGB relative luminance): **4.90:1 at full strength,
+  1.87:1 over a black backdrop and 2.04:1 over the row's own dark one.**
+  White ink in the dimmed state alone would read 4.41:1 / 4.04:1. It is
+  not changed because the owner's ruling on this glyph was that it is
+  black, and inverting it in one state is a design call for him, not a
+  correctness fix. The rule that used to encode exactly this inversion
+  (`PillColors.GlyphColor`) went dead when the hand-drawn toggle became a
+  `FeedbackButton` and has been deleted; this entry is where the argument
+  it carried now lives.
 - Localization (en/de/fr/es via API lang param): user-deferred backlog,
   "not core functionality". Full-milestone scale when picked up.
 - Upstream Blish HUD issue/PR for the wheel-delta wrap: REMOVED from the

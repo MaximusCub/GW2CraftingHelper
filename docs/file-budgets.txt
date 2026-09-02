@@ -107,7 +107,7 @@ Services/DailyCooldownItemService.cs                                            
 Services/DecisionPillPlanner.cs                                                         441
 Services/Diagnostics/PlanPhaseTimingSummary.cs                                          215
 Services/Diagnostics/PlanTimingAnalyzer.cs                                              100
-Services/DialogLayoutMath.cs                                                            435
+Services/DialogLayoutMath.cs                                                            460
 Services/DisciplinesColumnMath.cs                                                       148
 Services/ExcessCraftOutputCalculator.cs                                                 158
 Services/FirstLoadSnapshotGate.cs                                                       86
@@ -286,7 +286,7 @@ Views/MainThreadMarshal.cs                                                      
 Views/MainView.cs                                                                       2831
 Views/DialogWindow.cs                                                                   106
 Views/ModalBackdrop.cs                                                                  132
-Views/ModalDialog.cs                                                                    421
+Views/ModalDialog.cs                                                                    425
 Views/PlanHistoryTabContent.cs                                                          1487
 Views/RankerTabContent.cs                                                               3014
 Views/Rendering/ClickSound.cs                                                           197
@@ -402,7 +402,7 @@ tests/TaimisToolbench.Tests/Services/CurrencyValuationSerializerTests.cs        
 tests/TaimisToolbench.Tests/Services/DailyCooldownItemServiceTests.cs                   209
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerSubduingTests.cs                187
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerTests.cs                        1036
-tests/TaimisToolbench.Tests/Services/DialogLayoutMathTests.cs                           461
+tests/TaimisToolbench.Tests/Services/DialogLayoutMathTests.cs                           484
 tests/TaimisToolbench.Tests/Services/DisciplinesColumnMathTests.cs                      177
 tests/TaimisToolbench.Tests/Services/ExcessCraftOutputCalculatorTests.cs                345
 tests/TaimisToolbench.Tests/Services/FirstLoadSnapshotGateTests.cs                      153

@@ -450,12 +450,35 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void TitleLineY_IsTheLineBoxTopBlishPaintsItsOwnTitleAt()
         {
-            // Decompiled 1.3.0: PaintTitleText's destination rectangle
-            // starts at TitleBarBounds.Y (0) less the 11px offset the
-            // title-bar textures sit at. A self-drawn title seating
-            // anywhere else reads at a different height than the built-in
-            // one did.
-            Assert.Equal(-11, DialogLayoutMath.TitleLineY);
+            // PaintTitleText's destination rectangle starts at
+            // TitleBarBounds.Y (0) less the 11px offset the title-bar
+            // textures sit at - but DrawStringOnCtrl defaults to
+            // VerticalAlignment.Middle, so the LINE BOX starts one half of
+            // the difference lower. Menomonia 32 has lineHeight 36 (the
+            // vendor's own menomonia-32-regular.fnt) against a 64px
+            // title-bar texture, so the built-in title seats at 3.
+            Assert.Equal(3, DialogLayoutMath.TitleLineY(36));
+        }
+
+        [Fact]
+        public void TitleLineY_TruncatesEachHalfSeparately_AsTheVendorDoes()
+        {
+            // rect.Height / 2 - textSize.Y / 2, not (Height - textSize) / 2.
+            // They differ by a pixel on an odd face height, and a title one
+            // pixel off is exactly the class of defect this replaced.
+            Assert.Equal(21 - (37 / 2), DialogLayoutMath.TitleLineY(37));
+            Assert.NotEqual((64 - 37) / 2 - 11, DialogLayoutMath.TitleLineY(37));
+        }
+
+        [Fact]
+        public void TitleLineY_OnlyAFaceFillingTheWholeBarSeatsAtTheRectOrigin()
+        {
+            // The falsifiable half: -11 was the constant this replaced, and
+            // it is right for exactly one face height - one as tall as the
+            // title bar itself, which no shipped face is.
+            Assert.Equal(-11, DialogLayoutMath.TitleLineY(64));
+            Assert.Equal(21, DialogLayoutMath.TitleLineY(0));
+            Assert.Equal(21, DialogLayoutMath.TitleLineY(-40));
         }
     }
 }

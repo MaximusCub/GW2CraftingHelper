@@ -44,30 +44,6 @@ namespace TaimisToolbench.Views.Rendering
         internal const float DimmedPillFactor = 0.6f;
 
         /// <summary>
-        /// The IGNORE toggle's mark, which inverts with the key under it:
-        /// near-black punched into the filled ON key (4.19:1 against that
-        /// amber), and the white every other interactive pill's label
-        /// draws when the key is OFF and unfilled. The pill's own
-        /// <see cref="GetPillColors"/> arm carries the rest of the
-        /// raised/pressed pair.
-        /// <para>
-        /// The punch-out is a FULL-STRENGTH affordance only.
-        /// <see cref="DimmedPillFactor"/> multiplies both the mark and the
-        /// key toward black, which compresses that 4.19:1 to 2.17:1 - below
-        /// the 3:1 non-text minimum, on a row a tree-wide ignore can
-        /// perfectly well reach (ignores are keyed by item id, so an
-        /// occurrence under a bought parent draws the ON key too). A dimmed
-        /// ON key therefore keeps the light mark, which reads 3.05:1
-        /// against it and still says "filled key" - the state signal is the
-        /// fill, not the inversion.
-        /// </para>
-        /// </summary>
-        internal static Color GlyphColor(bool isIgnoreActive, bool dimmed)
-        {
-            return isIgnoreActive && !dimmed ? new Color(28, 20, 6) : Color.White; // #1C1406
-        }
-
-        /// <summary>
         /// isIgnoreActive is only meaningful for PillKind.Ignore (whether
         /// THIS specific Ignore pill is the active/"IGNORED" state, i.e.
         /// node.IsIgnored) - ignored for every other kind.
@@ -112,7 +88,8 @@ namespace TaimisToolbench.Views.Rendering
                     // green - and ON is that key pushed in, filled with the
                     // amber the ring used to draw at #9C7327 (4.29:1 on
                     // white) and edged darker so the lit top edge is gone.
-                    // The mark inverts with its surface - see GlyphColor.
+                    // The mark itself is the button's own ink, not this
+                    // function's: the toggle is a FeedbackButton now.
                     border = isIgnoreActive ? new Color(94, 69, 23) : new Color(138, 138, 138); // #5E4517 / #8A8A8A
                     fill = isIgnoreActive ? new Color(156, 115, 39) : Color.Transparent; // #9C7327
                     break;

@@ -122,15 +122,40 @@ namespace TaimisToolbench.Services
         public const int TitleRightReserve = 80;
 
         /// <summary>
-        /// Window y of the title's line box. Decompiled 1.3.0:
-        /// PaintTitleText draws the built-in title into
-        /// <c>_leftTitleBarDrawBounds.OffsetBy(TitleTextIndent, 0)</c>,
-        /// whose Y is TitleBarBounds.Y (0) less the 11px offset the
-        /// title-bar textures sit at, so the glyphs render from y -11 down.
-        /// A dialog that draws its own title seats it here to read at the
-        /// same height the built-in one did.
+        /// Window y the title-bar textures begin at: TitleBarBounds.Y (0)
+        /// less STANDARD_TITLEBAR_VERTICAL_OFFSET.
         /// </summary>
-        public const int TitleLineY = -11;
+        private const int TitleBarTextureTop = -11;
+
+        /// <summary>
+        /// Their height, measured from the vendor's own
+        /// <c>ref/titlebar-inactive.png</c> (1024x64). PaintTitleText's
+        /// destination rectangle is that whole texture rect, which is what
+        /// the vertical alignment centres a title inside.
+        /// </summary>
+        private const int TitleBarTextureHeight = 64;
+
+        /// <summary>
+        /// Window y of the line box a self-drawn title of
+        /// <paramref name="titleHeight"/> must take to sit where the
+        /// built-in one does. NOT the destination rectangle's origin:
+        /// <c>DrawStringOnCtrl</c> defaults to
+        /// <c>VerticalAlignment.Middle</c> and offsets by
+        /// <c>rect.Height / 2 - textSize.Y / 2</c>, each term truncated on
+        /// its own, which this reproduces term for term.
+        /// <para>
+        /// Seating at the rectangle's origin instead put the title 14px
+        /// high at the module's own face: Menomonia 32 has lineHeight 36
+        /// (the vendor's menomonia-32-regular.fnt), so the built-in title's
+        /// line box starts at 3, not -11.
+        /// </para>
+        /// </summary>
+        public static int TitleLineY(int titleHeight)
+        {
+            return TitleBarTextureTop
+                + (TitleBarTextureHeight / 2)
+                - (Math.Max(0, titleHeight) / 2);
+        }
 
         /// <summary>
         /// X that centres a title of <paramref name="titleWidth"/> over a

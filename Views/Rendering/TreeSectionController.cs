@@ -2063,10 +2063,14 @@ namespace TaimisToolbench.Views.Rendering
 
                     if (dimmed)
                     {
-                        // The whole control washes, not the colors: Opacity
-                        // multiplies into every DrawOnCtrl call, so the
-                        // plate, border and mark dim together and the state
-                        // contrast inside the button survives.
+                        // The whole control washes, not the colors: Blish
+                        // multiplies AbsoluteOpacity into every DrawOnCtrl
+                        // colour, so plate, border and mark dim together -
+                        // and so the ON key's mark drops to about 2:1
+                        // against its own plate, under the 3:1 non-text
+                        // floor. Measured, and left alone because the ink
+                        // colour is a design call: docs/KNOWN-ISSUES.md,
+                        // DEFERRED, "Dimmed IGNORE toggle's mark".
                         toggle.Opacity = PillColors.DimmedPillFactor;
                     }
 
