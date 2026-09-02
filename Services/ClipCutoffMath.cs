@@ -41,8 +41,22 @@ namespace TaimisToolbench.Services
         /// </summary>
         private const int PhaseSweep = 4096;
 
-        private static float _budgetScale;
-        private static int _budgetForScale = SlipBudget;
+        /// <summary>One scale and the budget measured for it, together, so
+        /// the pair is published by a single reference write and can never
+        /// be read torn.</summary>
+        private sealed class MeasuredBudget
+        {
+            internal readonly float Scale;
+            internal readonly int Value;
+
+            internal MeasuredBudget(float scale, int value)
+            {
+                Scale = scale;
+                Value = value;
+            }
+        }
+
+        private static MeasuredBudget _cachedBudget;
 
         /// <summary>
         /// The worst round-trip loss at <paramref name="scale"/>, measured
@@ -52,9 +66,10 @@ namespace TaimisToolbench.Services
         /// 2 at 0.81 and 0.897; 1 at 1.103.
         /// <para>
         /// Cached in one slot because the scale is a player setting that
-        /// changes rarely and this is read once per viewport per paint.
-        /// The read and the write are both on the paint thread; a racing
-        /// caller would only recompute.
+        /// changes rarely and this is read once per viewport per paint. A
+        /// racing caller only recomputes: the slot holds scale and budget
+        /// as one object, so a stale read is a whole stale pair, never a
+        /// budget belonging to a different scale.
         /// </para>
         /// </summary>
         public static int SlipBudgetFor(float scale)
@@ -67,9 +82,10 @@ namespace TaimisToolbench.Services
                 return SlipBudget;
             }
 
-            if (scale == _budgetScale)
+            var cached = _cachedBudget;
+            if (cached != null && cached.Scale == scale)
             {
-                return _budgetForScale;
+                return cached.Value;
             }
 
             int worst = 0;
@@ -82,8 +98,7 @@ namespace TaimisToolbench.Services
                 }
             }
 
-            _budgetForScale = worst;
-            _budgetScale = scale;
+            _cachedBudget = new MeasuredBudget(scale, worst);
             return worst;
         }
 
