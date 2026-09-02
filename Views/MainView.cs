@@ -714,10 +714,11 @@ namespace TaimisToolbench.Views
             // top when none is - and every container built inside it re-asserts that
             // line, which is what keeps scrolled rows out of the pinned band
             // (Views/Rendering/ClipCutoff.cs; arithmetic in docs/ARCHITECTURE.md
-            // section V.26.1). The vendor's default ZIndex is 5, so the host's
-            // ZIndex-1 clip paints first and paint order alone leaves the band
-            // overdrawn; the scissor is what protects it. The delegate reads the
-            // field lazily, so the host created just below is the one it sees.
+            // section V.26.1). The delegate reads the field lazily, so the host
+            // created just below is the one it sees. Unlike the plan tab there
+            // is no rule painting the strip between this top edge and the line
+            // it publishes: it is the scale's own slip budget, 0px at UI Size
+            // Large, and it buys a row not overdrawing the coin block above.
             _contentPanel = new StickyClipAuthorityFlowPanel(() => _stickyHeaders?.PinnedBandBottom)
             {
                 Size = new Point(w, buildPanel.ContentRegion.Height - TopRegionHeight),

@@ -2337,10 +2337,27 @@ Three things follow, and the third is the fix.
   mentioning depth.
 
 The line is set one budget BELOW the viewport's top edge, so what a
-descendant can reach is the edge itself and not a pixel above it. That
-spends the viewport's top 2 logical pixels rather than 2 pixels of the
-strip above it, and at rest they fall inside the plan header's own icon
-padding.
+descendant can reach is the edge itself and not a pixel above it. It spends
+the viewport's top pixels rather than pixels of the strip above it.
+
+The budget is the LIVE scale's worst round trip, not the four-size worst
+case. `ClipCutoffMath.SlipBudgetFor` measures it over a phase sweep and
+caches one slot; it is 0 at UI Size Large, where both floors are exact, 1
+at Larger and 2 at Small and Normal. The constant was reserving 2px at
+every scale, and the strip between the protected edge and the cutoff is
+nobody's to paint: at Large that cut the first 2px off every scrolled row
+in every viewport, and off every row under a pinned sticky band, for a
+round trip that loses nothing. The difference between the reserve and the
+loss a particular edge's phase actually suffers is also why a pinned band's
+seam FLICKERED rather than sitting still; `StickyHeaderHost` now paints
+that strip in the band's own fill while the band is whole, so the band
+reads as one piece at every scale.
+
+Where nothing paints the strip and nothing can - the Snapshot tab's
+viewport top, which has no rule under it - the reserve is still spent, and
+that is the trade the cutoff is: an unpainted pixel at the top of a
+scrolled row, against a row overdrawing the coin panel above it. It is 0px
+at UI Size Large after this change and at most 2px below it.
 
 Coverage is per-container by construction: a plain `Panel` left in the
 chain re-opens the accumulation below itself, which is why the swap is a
@@ -2352,15 +2369,55 @@ sites, and they are the ones that made the reach depth-dependent: a tree row
 at depth d sat under about 2d plain containers, one row panel and one child
 flow per level.
 
-`TopStripZIndex` nonetheless stays. It is not load-bearing for this defect
-any more, but it costs one integer per strip control at build time, and it
-is the only thing standing between a plain `Panel` added inside the viewport
-by a later change and the owner's original report. Nothing else can catch
-that: the repo invariants bar a test from referencing UI code, so the
-guarantee has no executable guard at the call sites - only
-`ClipCutoffMathTests` on the arithmetic. `SlipBudget` is likewise a
-measurement over the four GW2 UI Sizes that exist today, not a proof for a
-fifth.
+`TopStripZIndex` was described here and at its own declaration as defence in
+depth against a plain `Panel` added inside the viewport by a later change.
+It never was. `Container.PaintChildren` sorts `OrderBy(ZIndex)` - ASCENDING -
+while `Container.TriggerMouseInput` sorts descending, and the strip's value
+is 1 against the content panel's vendor default 5, so the strip paints
+FIRST and covers nothing. The constant now says so. The one control that
+does overlap the viewport, the separator rule, carries
+`CraftingPlanView.SeparatorZIndex` above the content panel and therefore
+paints last, which is what keeps it unnotched at the scales where a
+scrolled row can reach into its 2px.
+
+### V.26.2 Wheel-transparent containers
+
+`WheelTransparentClippedPanel` exists because a container drawn ON TOP of a
+scrolling panel swallows the wheel from it. Measured against Blish HUD's own
+source, not inferred:
+
+- `MouseHandler.HandleMouseEvent` runs a fresh
+  `SpriteScreen.TriggerMouseInput(eventType, state)` walk for every hooked
+  mouse event, wheel and click alike.
+- `Container.TriggerMouseInput` raises the container's OWN mouse event
+  first - which is how a `Panel`'s `Scrollbar`, subscribed to
+  `_associatedContainer.MouseWheelScrolled`, ever sees a wheel over a deep
+  child - then walks children by ZIndex descending, breaking on the first
+  non-`Filter` child that answers.
+- `Container.CapturesInput()` returns `Mouse | MouseWheel` for EVERY
+  container, unconditionally.
+
+So the ZIndex that lets a pinned sticky header be clicked to sort is the
+same ZIndex that stops the wheel reaching the scroll panel behind it, and
+the two asks were in direct contradiction as long as the answer was a
+ZIndex. `Control.TriggerMouseInput` does discriminate by event type,
+though: it returns null for `MouseWheelScrolled` unless the MouseWheel flag
+is set. A container that drops that flag therefore returns null for the
+wheel and non-null for the click, and the parent's loop steps past it to
+the scroll panel below - so the band sorts AND the wheel scrolls.
+
+Every container between the clip and the cursor has to answer the same way
+or the walk breaks inside it, which is why the sticky clip, the header band
+(`HeaderBands.Band`) and `SortableHeaderCells`' hover washes are all this
+type. Labels need no change: `Control.CapturesInput()` is `Mouse` alone.
+The plan tab's separator rule is this type for the same reason - it now
+paints above the content panel, so it also wins the hit test over the first
+2px of the first scrolled row.
+
+This is not covered by any test. The repo invariants bar a test from
+referencing UI code, and input dispatch is not expressible without it: the
+mechanism above is read off the vendor's source, and whether it behaves as
+read is an in-game observation.
 
 ### V.27 `PlanHeaderRenderer`: the three things that used to compete
 

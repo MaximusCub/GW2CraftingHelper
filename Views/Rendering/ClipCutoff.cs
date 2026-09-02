@@ -1,4 +1,5 @@
 using System;
+using Blish_HUD;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -99,6 +100,30 @@ namespace TaimisToolbench.Views.Rendering
     }
 
     /// <summary>
+    /// A <see cref="ClippedPanel"/> the mouse WHEEL passes straight
+    /// through, for a container drawn on top of a scrolling panel it must
+    /// not steal the wheel from. Dropping the MouseWheel capture flag is
+    /// what does it: <c>Control.TriggerMouseInput</c> discriminates by
+    /// event type where <c>Container</c> does not, so this answers a click
+    /// and declines a wheel, and the parent's hit-test loop steps past it
+    /// to the scrolling panel behind.
+    /// <para>
+    /// EVERY container between this one and the cursor has to answer the
+    /// same way or the walk breaks inside it, which is why the sticky
+    /// header band and its hover washes are this type too. The vendor
+    /// mechanism this is read off, and why a ZIndex alone could not satisfy
+    /// both asks: docs/ARCHITECTURE.md section V.26.2.
+    /// </para>
+    /// </summary>
+    internal class WheelTransparentClippedPanel : ClippedPanel
+    {
+        protected override CaptureType CapturesInput()
+        {
+            return CaptureType.Mouse;
+        }
+    }
+
+    /// <summary>
     /// The scrolling viewport itself: it publishes the cutoff for the whole
     /// of its own subtree's paint, then restores whatever was in force.
     /// Its own drawing is unclamped - the line is derived from its bounds, so
@@ -108,7 +133,8 @@ namespace TaimisToolbench.Views.Rendering
     {
         public override void Draw(SpriteBatch spriteBatch, Rectangle drawBounds, Rectangle scissor)
         {
-            int previous = ClipCutoff.Enter(ClipCutoffMath.CutoffTopFor(AbsoluteBounds.Y));
+            int previous = ClipCutoff.Enter(
+                ClipCutoffMath.CutoffTopFor(AbsoluteBounds.Y, GameService.Graphics.UIScaleMultiplier));
             try
             {
                 base.Draw(spriteBatch, drawBounds, scissor);
@@ -155,7 +181,8 @@ namespace TaimisToolbench.Views.Rendering
         {
             int? pinned = _pinnedBandBottom();
             int edge = pinned ?? AbsoluteBounds.Y;
-            int previous = ClipCutoff.Enter(ClipCutoffMath.CutoffTopFor(edge));
+            int previous = ClipCutoff.Enter(
+                ClipCutoffMath.CutoffTopFor(edge, GameService.Graphics.UIScaleMultiplier));
             try
             {
                 base.Draw(spriteBatch, drawBounds, scissor);
