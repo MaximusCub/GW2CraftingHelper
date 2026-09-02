@@ -107,7 +107,7 @@ Services/DailyCooldownItemService.cs                                            
 Services/DecisionPillPlanner.cs                                                         441
 Services/Diagnostics/PlanPhaseTimingSummary.cs                                          215
 Services/Diagnostics/PlanTimingAnalyzer.cs                                              100
-Services/DialogLayoutMath.cs                                                            435
+Services/DialogLayoutMath.cs                                                            472
 Services/DisciplinesColumnMath.cs                                                       148
 Services/ExcessCraftOutputCalculator.cs                                                 158
 Services/FirstLoadSnapshotGate.cs                                                       86
@@ -254,7 +254,7 @@ Services/TextWrapMath.cs                                                        
 Services/TooltipContent.cs                                                              495
 Services/TooltipLayoutMath.cs                                                           487
 Services/TooltipTextFormat.cs                                                           136
-Services/TopRegionLayoutMath.cs                                                         111
+Services/TopRegionLayoutMath.cs                                                         116
 Services/TradingPostMath.cs                                                             57
 Services/TradingPostService.cs                                                          359
 Services/TreeChipStripLayout.cs                                                         202
@@ -283,10 +283,10 @@ Views/ItemInputRowStrip.cs                                                      
 Views/ItemRowState.cs                                                                   39
 Views/LogTabContent.cs                                                                  1538
 Views/MainThreadMarshal.cs                                                              141
-Views/MainView.cs                                                                       2830
-Views/DialogWindow.cs                                                                   106
+Views/MainView.cs                                                                       2831
+Views/DialogWindow.cs                                                                   108
 Views/ModalBackdrop.cs                                                                  132
-Views/ModalDialog.cs                                                                    421
+Views/ModalDialog.cs                                                                    425
 Views/PlanHistoryTabContent.cs                                                          1487
 Views/RankerTabContent.cs                                                               3014
 Views/Rendering/ClickSound.cs                                                           197
@@ -295,7 +295,7 @@ Views/Rendering/ColumnHeaderRowRenderer.cs                                      
 Views/Rendering/CraftStepsSectionRenderer.cs                                            264
 Views/Rendering/DisciplinesSectionRenderer.cs                                           288
 Views/Rendering/EmptyPlanStateRenderer.cs                                               81
-Views/Rendering/FeedbackButton.cs                                                       260
+Views/Rendering/FeedbackButton.cs                                                       265
 Views/Rendering/HeaderBands.cs                                                          154
 Views/Rendering/HeaderCellPlan.cs                                                       99
 Views/Rendering/HoverChainResync.cs                                                     75
@@ -321,7 +321,7 @@ Views/Rendering/SortIndicator.cs                                                
 Views/Rendering/SortableHeaderBlock.cs                                                  108
 Views/Rendering/SortableHeaderCells.cs                                                  249
 Views/Rendering/SortableHeaderLabel.cs                                                  38
-Views/Rendering/StickyHeaderHost.cs                                                     334
+Views/Rendering/StickyHeaderHost.cs                                                     404
 Views/Rendering/SummarySectionRenderer.cs                                               1041
 Views/Rendering/TextRowRenderer.cs                                                      36
 Views/Rendering/TooltipFacility.cs                                                      288
@@ -402,7 +402,7 @@ tests/TaimisToolbench.Tests/Services/CurrencyValuationSerializerTests.cs        
 tests/TaimisToolbench.Tests/Services/DailyCooldownItemServiceTests.cs                   209
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerSubduingTests.cs                187
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerTests.cs                        1036
-tests/TaimisToolbench.Tests/Services/DialogLayoutMathTests.cs                           461
+tests/TaimisToolbench.Tests/Services/DialogLayoutMathTests.cs                           484
 tests/TaimisToolbench.Tests/Services/DisciplinesColumnMathTests.cs                      177
 tests/TaimisToolbench.Tests/Services/ExcessCraftOutputCalculatorTests.cs                345
 tests/TaimisToolbench.Tests/Services/FirstLoadSnapshotGateTests.cs                      153
@@ -621,7 +621,7 @@ tools/VendorOfferUpdater/Models/Gw2Constants.cs                                 
 tools/VendorOfferUpdater/Models/VendorOffer.cs                                          62
 tools/VendorOfferUpdater/Models/VendorOfferDataset.cs                                   21
 tools/VendorOfferUpdater/Models/VendorOfferManifest.cs                                  33
-tools/VendorOfferUpdater/Program.cs                                                     1844
+tools/VendorOfferUpdater/Program.cs                                                     1858
 tools/VendorOfferUpdater/QueryOptions.cs                                                17
 tools/VendorOfferUpdater/QueryStats.cs                                                  49
 tools/VendorOfferUpdater/TemporaryTemplateParser.cs                                     122

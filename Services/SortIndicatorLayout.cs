@@ -22,12 +22,11 @@ namespace TaimisToolbench.Services
     /// </summary>
     internal static class SortIndicatorLayout
     {
-        /// <summary>Gap between a header's word and its indicator - a
-        /// space's worth at the ColumnHeader tier for most of this
-        /// indicator's life, then doubled on owner feedback (the mark sat
-        /// ~5px after the label at his UI scale and read as attached to the
-        /// word). Kept as a number because the two are separate controls
-        /// now and no string joins them.</summary>
+        /// <summary>Gap between a header's word and its indicator. Wider
+        /// than a space's advance at the ColumnHeader tier: at that width
+        /// the mark measured ~5px from the label at the owner's UI scale
+        /// and read as attached to the word. Kept as a number because the
+        /// two are separate controls and no string joins them.</summary>
         public const int Gap = 8;
 
         /// <summary>

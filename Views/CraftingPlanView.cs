@@ -52,21 +52,29 @@ namespace TaimisToolbench.Views
         private const int SectionSpacing = 16;
 
         /// <summary>
-        /// ZIndex every control of the pinned top strip carries, above the
-        /// scrolling content panel's default 0. Blish paints a container's
-        /// children in ZIndex order, so the strip's own opaque pixels cover
-        /// whatever leaks past the viewport's top edge. A cover, not the
-        /// cutoff: the cutoff is ClipCutoff's re-asserted line, and every
-        /// container inside the viewport now re-asserts it. It stays as
-        /// defence in depth, because nothing can catch a plain Panel added
-        /// inside the viewport later - the repo invariants bar a test from
-        /// referencing UI code - and because SlipBudget is measured at the
-        /// four known GW2 UI Sizes rather than proved for a fifth. Since
-        /// the viewport's top edge sits on the separator rule itself, this
-        /// cover also carries real pixels at the sub-unity UI Sizes, where
-        /// the cutoff's SlipBudget lands inside the rule's own 2px.
+        /// ZIndex every control of the pinned top strip carries. BELOW the
+        /// scrolling content panel, whose ZIndex is the vendor default 5,
+        /// and paint order is ascending (<c>Container.PaintChildren</c>
+        /// sorts <c>OrderBy(ZIndex)</c>), so this covers nothing: it orders
+        /// the strip's own controls among themselves and no more. Only the
+        /// separator rule overlaps the viewport at all, and it carries
+        /// <see cref="SeparatorZIndex"/> for that reason.
         /// </summary>
         private const int TopStripZIndex = 1;
+
+        /// <summary>
+        /// The separator rule alone sits ABOVE the content panel's default
+        /// 5, so it paints last. The viewport's top edge is the rule itself
+        /// (TopRegionLayoutMath.SeparatorToContentGap is 0), and the
+        /// cutoff's reach is one slip budget above the line it publishes,
+        /// so at the UI Sizes whose clip round trip loses pixels a scrolled
+        /// row can reach into the rule's own 2px. Painting the rule after
+        /// the content is what keeps it unnotched at every scale; the
+        /// cutoff (Views/Rendering/ClipCutoff.cs) still does the work of
+        /// keeping rows out of the strip ABOVE the rule, which no control
+        /// paints over.
+        /// </summary>
+        private const int SeparatorZIndex = 10;
 
         // Aliased, not duplicated: the band height, its title y and its
         // caret y are one piece of arithmetic against the section-title
@@ -2168,25 +2176,30 @@ namespace TaimisToolbench.Views
             InlineSpinner.PlaceAfter(_statusSpinner, _statusLabel, InlineSpinnerLayout.LabelGap);
 
             // Static separator between controls and content
-            _separator = new Panel()
+            // WheelTransparent, not a plain Panel: it now paints above the
+            // content panel and therefore also WINS the hit test over it
+            // (that walk is ZIndex descending), so its 2px would otherwise
+            // swallow the wheel where it overlaps the first scrolled row.
+            _separator = new WheelTransparentClippedPanel()
             {
                 Size = new Point(w - RightEdgePadding, 2),
                 Location = new Point(0, layout.SeparatorY),
                 BackgroundColor = new Color(180, 180, 180),
                 Parent = buildPanel,
-                ZIndex = TopStripZIndex,
+                ZIndex = SeparatorZIndex,
             };
 
             // Scrollable content area - full width so scrollbar sits at the window edge.
             // Children use (Width - RightEdgePadding) to keep content clear of the scrollbar.
             // ClipAuthorityFlowPanel, not FlowPanel: this panel's top edge
             // is the separator rule itself (layout.ContentY == SeparatorY),
-            // so the cutoff lands on the rule's bottom edge and rows clip
-            // flush against it - TopRegionLayoutMath.SeparatorToContentGap.
-            // It is the only control that can publish that line for its own
-            // subtree - see Views/Rendering/ClipCutoff.cs and
-            // Services/ClipCutoffMath.cs. Every container built inside it
-            // re-asserts the line, which is what makes the cutoff
+            // so rows clip flush against it - SeparatorToContentGap. The
+            // rule's own 2px are covered by SeparatorZIndex painting it
+            // last, NOT by the cutoff, whose reach is a slip budget above
+            // the line it publishes. It is the only control that can
+            // publish that line for its own subtree - see
+            // Views/Rendering/ClipCutoff.cs. Every container built inside
+            // it re-asserts the line, which is what makes the cutoff
             // independent of how deep the recipe tree nests.
             _contentPanel = new ClipAuthorityFlowPanel()
             {

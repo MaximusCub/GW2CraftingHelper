@@ -158,8 +158,21 @@ namespace TaimisToolbench.Services
         // the top inset falls to TOP_PADDING. The band a tab wears is the
         // module's own, and it is the taller
         // PlanContentHeightMath.TabTitleBandHeight below.
-        private const int TitleBarHeight = 40;
-        private const int TitleBarVerticalOffset = 11;
+        /// <summary>
+        /// WindowBase2's STANDARD_TITLEBAR_HEIGHT. Internal because three
+        /// places in the module reproduce the vendor's title-bar arithmetic
+        /// (this class, Views/DialogWindow and
+        /// Services/DialogLayoutMath's title seat) and a re-typed 40 in any
+        /// of them is a number nothing would reconcile.
+        /// </summary>
+        internal const int TitleBarHeight = 40;
+
+        /// <summary>
+        /// WindowBase2's STANDARD_TITLEBAR_VERTICAL_OFFSET: how far into
+        /// the title-bar textures the bar itself begins, and so how far
+        /// ABOVE the window's own origin those textures start drawing.
+        /// </summary>
+        internal const int TitleBarVerticalOffset = 11;
         private const int PanelTopPadding = 7;
         private const int PanelBottomPadding = 7;
 

@@ -121,7 +121,7 @@ namespace TaimisToolbench.Tests.Services
         }
 
         /// <summary>
-        /// The W5 correction: the WHOLE surplus past the module's minimum
+        /// The correction: the WHOLE surplus past the module's minimum
         /// is the status column's to claim leftward. The name column keeps
         /// the budget it holds at the minimum window - the budgets
         /// docs/research/minimum-window-width.md was derived from - and
@@ -351,7 +351,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(1, Fit(run, slot, column).HiddenCount);
         }
 
-        // --- The W5 report: the 1x Obsidian Shard row, again ---
+        // --- The second field report: the 1x Obsidian Shard row, again ---
 
         // The plan the field report is about, as two nodes: a
         // currency-priced purchase whose three-pill run is the widest
@@ -544,6 +544,147 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(3, fit.VisibleCount);
             Assert.Equal(0, fit.HiddenCount);
             Assert.Equal(Padding - TightPadding, fit.WidthReduction);
+        }
+
+        // --- Resolve: width and claim settled together ---
+        private const int Floor = PlanRelayoutMath.TreePillColumnWidth;
+
+        /// <summary>
+        /// The defect: the plan-lifetime ratchet held the GRANTED width, so
+        /// a width earned at a wide window survived the window narrowing
+        /// again and the name column lost the budget it is supposed to keep
+        /// at the minimum. Ratcheting the required ink instead gives the
+        /// column back on the way down.
+        /// </summary>
+        [Fact]
+        public void Resolve_WidenThenNarrow_GivesTheNameColumnItsBudgetBack()
+        {
+            int required = Floor + 300;
+
+            var wide = TreePillColumnMath.Resolve(
+                required, 0, Floor, MinPanel() + 400, MinPanel(), 0);
+            Assert.Equal(Floor + 300, wide.Width);
+
+            var narrow = TreePillColumnMath.Resolve(
+                required, wide.RequiredFloor, Floor, MinPanel(), MinPanel(), 0);
+
+            Assert.Equal(Floor, narrow.Width);
+        }
+
+        /// <summary>
+        /// The other half of the same defect: with the granted width frozen
+        /// by the ratchet, RightClaim was re-derived from the CURRENT
+        /// surplus and re-attributed the frozen pixels to the cost column's
+        /// slack, which moves PillColX at constant pill width.
+        /// </summary>
+        [Fact]
+        public void Resolve_WidenThenNarrow_DoesNotReattributeTheClaim()
+        {
+            int required = Floor + 300;
+            int slack = 40;
+
+            var wide = TreePillColumnMath.Resolve(
+                required, 0, Floor, MinPanel() + 400, MinPanel(), slack);
+            Assert.Equal(0, wide.CostClaim);
+
+            var narrow = TreePillColumnMath.Resolve(
+                required, wide.RequiredFloor, Floor, MinPanel(), MinPanel(), slack);
+
+            // Whatever it claims, it is claimed by a width the panel can
+            // actually afford: claim is exactly what the width holds above
+            // the floor and the (zero) surplus.
+            Assert.Equal(narrow.Width - Floor, narrow.CostClaim);
+            Assert.Equal(Floor + slack, narrow.Width);
+        }
+
+        /// <summary>
+        /// The invariant the ratchet exists for, unchanged: an ignore click
+        /// shrinks the widest required run, and the column must not narrow
+        /// under the cursor because of it.
+        /// </summary>
+        [Fact]
+        public void Resolve_RequiredShrinksAtAConstantPanelWidth_ColumnHolds()
+        {
+            int panel = MinPanel() + 400;
+
+            var before = TreePillColumnMath.Resolve(
+                Floor + 300, 0, Floor, panel, MinPanel(), 0);
+
+            var after = TreePillColumnMath.Resolve(
+                Floor + 40, before.RequiredFloor, Floor, panel, MinPanel(), 0);
+
+            Assert.Equal(before.Width, after.Width);
+            Assert.Equal(before.CostClaim, after.CostClaim);
+        }
+
+        /// <summary>
+        /// TryRefreshInPlace gates an in-place row refresh on this answer.
+        /// It compares the WIDTH and the CLAIM, because the claim is netted
+        /// out of the cost column; two calls with the same inputs must
+        /// therefore agree on both, and the previous composition could
+        /// return the same width with a different claim.
+        /// </summary>
+        [Fact]
+        public void Resolve_SameInputs_AgreeOnWidthAndClaimAlike()
+        {
+            int panel = MinPanel() + 120;
+
+            var first = TreePillColumnMath.Resolve(
+                Floor + 300, Floor + 500, Floor, panel, MinPanel(), 60);
+            var second = TreePillColumnMath.Resolve(
+                Floor + 300, Floor + 500, Floor, panel, MinPanel(), 60);
+
+            Assert.Equal(first.Width, second.Width);
+            Assert.Equal(first.CostClaim, second.CostClaim);
+            Assert.Equal(first.Width - Floor - 120, first.CostClaim);
+        }
+
+        /// <summary>
+        /// At a constant panel width the new rule and the old one agree
+        /// exactly, because clamping is monotonic: max(clamp(a), clamp(b))
+        /// is clamp(max(a, b)). Only a resize parts them.
+        /// </summary>
+        [Theory]
+        [InlineData(0, 0)]
+        [InlineData(200, 0)]
+        [InlineData(400, 45)]
+        [InlineData(900, 45)]
+        public void Resolve_AtAConstantPanelWidth_MatchesTheClampThenRatchetOrder(
+            int extraPanel, int slack)
+        {
+            int panel = MinPanel() + extraPanel;
+            int required = Floor + 120;
+            int inkFloor = Floor + 380;
+
+            int affordable = TreePillColumnMath.Affordable(panel, Floor, MinPanel(), slack);
+            int oldOrder = TreePillColumnMath.ColumnWidth(required, Floor, affordable);
+            int oldFloorHeld = TreePillColumnMath.ColumnWidth(inkFloor, Floor, affordable);
+            oldOrder = oldOrder > oldFloorHeld ? oldOrder : oldFloorHeld;
+
+            Assert.Equal(
+                oldOrder,
+                TreePillColumnMath.Resolve(
+                    required, inkFloor, Floor, panel, MinPanel(), slack).Width);
+        }
+
+        /// <summary>
+        /// Panel width 0 is CraftingPlanView.GetCurrentPanelWidth's "no
+        /// content panel" answer. It pins nothing: the ink carried forward
+        /// is the ink, so the next render at a real width is free.
+        /// </summary>
+        [Fact]
+        public void Resolve_NoContentPanel_TakesTheFloorAndPinsNothing()
+        {
+            var none = TreePillColumnMath.Resolve(
+                Floor + 300, 0, Floor, 0, MinPanel(), 40);
+
+            Assert.Equal(Floor, none.Width);
+            Assert.Equal(0, none.CostClaim);
+            Assert.Equal(Floor + 300, none.RequiredFloor);
+
+            var next = TreePillColumnMath.Resolve(
+                Floor + 300, none.RequiredFloor, Floor, MinPanel() + 400, MinPanel(), 40);
+            Assert.Equal(Floor + 300, next.Width);
         }
 
         private static PlanRelayoutMath.PillFitPlan Fit(List<int> run, int slot, int columnWidth)

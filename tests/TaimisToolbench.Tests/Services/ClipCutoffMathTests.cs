@@ -6,7 +6,9 @@ namespace TaimisToolbench.Tests.Services
     /// <summary>
     /// The viewport's hard top cutoff, executable: that re-asserting one
     /// absolute line at every container bounds the whole subtree's reach at a
-    /// constant, and that the constant is <see cref="ClipCutoffMath.SlipBudget"/>.
+    /// constant, and that the constant is that scale's own worst round trip
+    /// (<see cref="ClipCutoffMath.SlipBudgetFor"/>), never worse than
+    /// <see cref="ClipCutoffMath.SlipBudget"/>.
     /// <para>
     /// The propagation model is the same transcription of the decompiled
     /// Blish HUD 1.3.0 paint pipeline that ClipTopSlipSimulationTests runs -
@@ -76,7 +78,7 @@ namespace TaimisToolbench.Tests.Services
             {
                 for (int viewportTop = 0; viewportTop <= PhaseSweep; viewportTop++)
                 {
-                    int cutoff = ClipCutoffMath.CutoffTopFor(viewportTop);
+                    int cutoff = ClipCutoffMath.CutoffTopFor(viewportTop, scale);
                     int worst = cutoff;
                     int edge = cutoff;
                     for (int level = 0; level < AbsurdDepth; level++)
@@ -118,6 +120,71 @@ namespace TaimisToolbench.Tests.Services
             // content still overdraws the strip at GW2 UI Size "Large" would
             // mean the cause is something other than this propagation.
             Assert.Equal(0, WorstUnclampedSlip(AbsurdDepth, 1.0f));
+        }
+
+        /// <summary>
+        /// The production budget is the measured one, not the four-size
+        /// worst case: at UI Size Large the round trip is exact, and
+        /// reserving 2px there cut scrolled rows 2px below every viewport
+        /// top and 2px below every pinned sticky band, with nothing
+        /// obliged to paint the strip.
+        /// </summary>
+        [Fact]
+        public void TheLiveBudgetIsTheScalesOwnWorstCase()
+        {
+            foreach (float scale in Scales)
+            {
+                Assert.Equal(
+                    WorstSingleContainerSlip(scale),
+                    ClipCutoffMath.SlipBudgetFor(scale));
+            }
+
+            Assert.Equal(0, ClipCutoffMath.SlipBudgetFor(1.0f));
+        }
+
+        /// <summary>
+        /// The cache is one slot, so the sequence a scale change produces
+        /// has to give each scale its own answer rather than the first
+        /// one asked for.
+        /// </summary>
+        [Fact]
+        public void TheBudgetCacheAnswersEachScaleForItself()
+        {
+            foreach (float scale in Scales)
+            {
+                Assert.Equal(WorstSingleContainerSlip(scale), ClipCutoffMath.SlipBudgetFor(scale));
+                Assert.Equal(WorstSingleContainerSlip(scale), ClipCutoffMath.SlipBudgetFor(scale));
+            }
+
+            foreach (float scale in Scales)
+            {
+                Assert.Equal(WorstSingleContainerSlip(scale), ClipCutoffMath.SlipBudgetFor(scale));
+            }
+        }
+
+        /// <summary>
+        /// A scale nobody has measured still gets an answer that bounds its
+        /// own round trip, which is the whole point of measuring rather
+        /// than tabulating - and a nonsense scale falls back to the
+        /// four-size worst case rather than to zero.
+        /// </summary>
+        [Fact]
+        public void AnUnlistedScaleIsMeasuredAndANonsenseOneFallsBack()
+        {
+            foreach (float scale in new[] { 0.75f, 1.25f, 1.5f, 2.0f })
+            {
+                int budget = ClipCutoffMath.SlipBudgetFor(scale);
+                for (int top = 0; top <= PhaseSweep; top++)
+                {
+                    Assert.True(
+                        top - ClipCutoffMath.PropagateClipTop(top, scale) <= budget,
+                        $"budget {budget} too small at y={top}, scale {scale}");
+                }
+            }
+
+            Assert.Equal(ClipCutoffMath.SlipBudget, ClipCutoffMath.SlipBudgetFor(0f));
+            Assert.Equal(ClipCutoffMath.SlipBudget, ClipCutoffMath.SlipBudgetFor(-1f));
+            Assert.Equal(ClipCutoffMath.SlipBudget, ClipCutoffMath.SlipBudgetFor(float.NaN));
         }
 
         private static int WorstSingleContainerSlip(float scale)

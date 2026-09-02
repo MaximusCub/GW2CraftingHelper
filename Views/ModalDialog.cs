@@ -173,12 +173,16 @@ namespace TaimisToolbench.Views
 
             // The window's title, drawn by us because Blish paints its own
             // left-aligned at a fixed indent with no alignment control
-            // (decompiled 1.3.0, PaintTitleText). Same face, the same
-            // line-box top Blish used and the same ColonialWhite it paints
-            // in, so the centred word reads exactly where the left-aligned
-            // one did, only moved. ClipsBounds off: the seat is above the
-            // content region, and Container.PaintChildren scissors a
-            // clipping child to that region.
+            // (PaintTitleText). Same face and the same ColonialWhite, and
+            // the seat is derived from this label's own measured height
+            // (DialogLayoutMath.TitleLineY) because the vendor's own draw
+            // centres the title in the title-bar rect rather than starting
+            // at its origin - so the centred word reads exactly where the
+            // left-aligned one did, only moved. AutoSize is applied in this
+            // initialiser, and Label recalculates synchronously on each of
+            // those setters, so Width and Height are live on the next line.
+            // ClipsBounds off: the seat is above the content region, and
+            // Container.PaintChildren scissors a clipping child to it.
             var title = new Label()
             {
                 Text = TitleText,
@@ -190,7 +194,7 @@ namespace TaimisToolbench.Views
             };
             title.Location = _window.ContentLocationFor(new Point(
                 DialogLayoutMath.TitleX(_window.Width, title.Width),
-                DialogLayoutMath.TitleLineY));
+                DialogLayoutMath.TitleLineY(title.Height)));
             title.Parent = _window;
 
             // One Label per physical line, each centred on the content box.

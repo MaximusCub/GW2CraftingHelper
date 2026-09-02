@@ -17,8 +17,9 @@ namespace TaimisToolbench.Views.Rendering
     /// of the scroll region, sized to the slice that should show. One band,
     /// not a copy: the hover washes, click cells and tooltips are the ones
     /// the table already built, so a pinned header sorts like the header it
-    /// is. The clip supplies the top-edge cut Blish will not, and is never
-    /// bigger than what it shows.
+    /// is - which takes both halves of <see cref="ClipZIndex"/>'s note. The
+    /// clip supplies the top-edge cut Blish will not, and is never bigger
+    /// than what it shows.
     /// </para>
     /// <para>
     /// Placement is <see cref="StickyHeaderLayout"/>'s; everything here is
@@ -31,15 +32,23 @@ namespace TaimisToolbench.Views.Rendering
         private static readonly Logger Logger = Logger.GetLogger<StickyHeaderHost>();
 
         /// <summary>
-        /// Deliberately BELOW the scrolling panel's own: the vendor's default
-        /// <c>Control</c> ZIndex is 5, so this clip paints first and scrolled
-        /// rows would overdraw a pinned band - the viewport's published
-        /// cutoff (Views/Rendering/ClipCutoff.cs) is what keeps the band
-        /// clean, not paint order. The low value is load-bearing for input:
-        /// the hit test walks children by ZIndex descending, so a wheel over
-        /// the pinned band falls through to the scrolling panel behind it.
+        /// Deliberately ABOVE the scrolling panel's own (the vendor default
+        /// is 5): the hit test walks children by ZIndex DESCENDING and
+        /// breaks on the first that answers, so at any lower value the
+        /// scroll panel wins every event over a pinned band and the click
+        /// lands on the scrolled row HIDDEN BEHIND it. Paint order is the
+        /// opposite walk (<c>Container.PaintChildren</c> orders ascending),
+        /// so this value also paints the band over the rows; the viewport's
+        /// published cutoff (Views/Rendering/ClipCutoff.cs) is kept as the
+        /// order-independent guarantee.
+        /// <para>
+        /// The wheel still reaches the scroll panel because the clip and
+        /// every container in the band below it are
+        /// <c>WheelTransparentClippedPanel</c> - see that type for the
+        /// mechanism.
+        /// </para>
         /// </summary>
-        private const int ClipZIndex = 1;
+        private const int ClipZIndex = 10;
 
         /// <summary>
         /// Where one tracked band sits inside the scrolling content, and how
@@ -132,11 +141,12 @@ namespace TaimisToolbench.Views.Rendering
                 Band = band,
                 Home = home,
                 Geometry = geometry,
-                Clip = new Panel()
+                Clip = new WheelTransparentClippedPanel()
                 {
                     Size = Point.Zero,
                     Visible = false,
                     ZIndex = ClipZIndex,
+                    BackgroundColor = HeaderBands.BandColor,
                     Parent = _parent,
                 },
             });
@@ -158,12 +168,17 @@ namespace TaimisToolbench.Views.Rendering
 
         /// <summary>
         /// The absolute y of the lowest pinned band's bottom edge as of the
-        /// most recent frame's placement, or null when none is pinned. The
+        /// most recent COMPLETED placement, or null when none is pinned. The
         /// viewport's authority reads this at paint time: the ticker's update
         /// and the paint walk are the same main thread with update first, so
-        /// the value is the frame's own. Held rather than reset when the
-        /// ticker's failure path has stopped updates - the frozen placement
-        /// keeps protecting the frozen band.
+        /// the value is the frame's own.
+        /// <para>
+        /// A frame that throws part-way publishes nothing: the value is an
+        /// absolute y and the clips are parent-relative, so a half-placed
+        /// frame left standing would drift from its band the moment the
+        /// window was dragged. The failure path stands the whole feature
+        /// down instead - see <see cref="StandDown"/>.
+        /// </para>
         /// </summary>
         internal int? PinnedBandBottom => _pinnedBottom;
 
@@ -192,14 +207,48 @@ namespace TaimisToolbench.Views.Rendering
             int originX = parentBounds.X + parentRegion.X;
             int originY = parentBounds.Y + parentRegion.Y;
 
-            _pinnedBottom = null;
+            int? lowest = null;
             for (int i = 0; i < _entries.Count; i++)
             {
                 int? bottom = Place(_entries[i], viewportTop, viewport.Height, originX, originY);
-                if (bottom.HasValue
-                    && (!_pinnedBottom.HasValue || bottom.Value > _pinnedBottom.Value))
+                if (bottom.HasValue && (!lowest.HasValue || bottom.Value > lowest.Value))
                 {
-                    _pinnedBottom = bottom;
+                    lowest = bottom;
+                }
+            }
+
+            // Published only once every band has been placed, so a throw
+            // part-way through cannot leave a cutoff describing a band that
+            // was never moved.
+            _pinnedBottom = lowest;
+        }
+
+        /// <summary>
+        /// Gives every band back to its own container and withdraws the
+        /// cutoff, leaving the tables scrolling normally with no sticky
+        /// headers at all. The failure path's degradation: a frozen band
+        /// with a frozen ABSOLUTE cutoff drifts from the parent-relative
+        /// clip drawing it as soon as the window is dragged, and scrolled
+        /// rows then overdraw exactly the band the cutoff was protecting.
+        /// Nothing is disposed - a control must not leave the tree from
+        /// inside the update walk over it.
+        /// </summary>
+        private void StandDown()
+        {
+            _pinnedBottom = null;
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                var entry = _entries[i];
+                try
+                {
+                    Unpin(entry, entry.Geometry());
+                }
+                catch (Exception ex)
+                {
+                    // The caller's geometry closure is the likeliest thing
+                    // to have thrown in the first place; one bad entry must
+                    // not strand the others pinned.
+                    Logger.Warn(ex, "Sticky header stand-down failed for one band");
                 }
             }
         }
@@ -234,9 +283,21 @@ namespace TaimisToolbench.Views.Rendering
                 return null;
             }
 
+            // The viewport cuts scrolled rows at the band's bottom plus the
+            // scale's slip budget, and how much of that strip a given row
+            // actually loses depends on its own edge's phase - so the strip
+            // has to be PAINTED or a hairline of window background flickers
+            // under the band as it scrolls. The clip carries the band's own
+            // fill for exactly that height. Only while the band is whole:
+            // during the push-out its bottom is the table's last row, and
+            // padding past that would draw band colour below the table.
+            int slipStrip = placement.VisibleHeight >= geometry.Height
+                ? ClipCutoffMath.SlipBudgetFor(GameService.Graphics.UIScaleMultiplier)
+                : 0;
+
             int clipX = homeBounds.X + homeRegion.X + geometry.X;
             var clipLocation = new Point(clipX - originX, viewportTop + placement.ClipY - originY);
-            var clipSize = new Point(geometry.Width, placement.VisibleHeight);
+            var clipSize = new Point(geometry.Width, placement.VisibleHeight + slipStrip);
             if (entry.Clip.Location != clipLocation)
             {
                 entry.Clip.Location = clipLocation;
@@ -314,6 +375,15 @@ namespace TaimisToolbench.Views.Rendering
                     // frozen table rather than as an error.
                     _host._stopped = true;
                     Logger.Warn(ex, "Sticky header placement failed; stopping");
+
+                    try
+                    {
+                        _host.StandDown();
+                    }
+                    catch (Exception standDownEx)
+                    {
+                        Logger.Warn(standDownEx, "Sticky header stand-down failed");
+                    }
 
                     // At most one line: _stopped is what keeps this from
                     // running again. Not disposed here - a control must not

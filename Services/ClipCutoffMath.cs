@@ -24,13 +24,83 @@ namespace TaimisToolbench.Services
     internal static class ClipCutoffMath
     {
         /// <summary>
-        /// Logical pixels one container's scissor round trip can lift the
-        /// clip's top edge. 2 at both sub-unity GW2 UI Sizes (0.81 and
-        /// 0.897), 1 at 1.103 and 0 at 1.0; the single number is the worst
-        /// of them, because the active scale is the player's setting and can
-        /// change without a rebuild.
+        /// Worst-case logical pixels one container's scissor round trip can
+        /// lift the clip's top edge, over every GW2 UI Size: 2, at the two
+        /// sub-unity ones. For a caller that knows the live scale,
+        /// <see cref="SlipBudgetFor"/> is the number that actually applies -
+        /// this constant over-clips by up to 2px at UI Size Large, where the
+        /// round trip is exact.
         /// </summary>
         public const int SlipBudget = 2;
+
+        /// <summary>
+        /// Absolute logical y values <see cref="SlipBudgetFor"/> sweeps. The
+        /// loss depends on the edge's phase against the scale, and a window
+        /// is draggable, so the answer has to hold at every y a clip top can
+        /// take - which a screen bounds well inside this.
+        /// </summary>
+        private const int PhaseSweep = 4096;
+
+        /// <summary>One scale and the budget measured for it, together, so
+        /// the pair is published by a single reference write and can never
+        /// be read torn.</summary>
+        private sealed class MeasuredBudget
+        {
+            internal readonly float Scale;
+            internal readonly int Value;
+
+            internal MeasuredBudget(float scale, int value)
+            {
+                Scale = scale;
+                Value = value;
+            }
+        }
+
+        private static MeasuredBudget _cachedBudget;
+
+        /// <summary>
+        /// The worst round-trip loss at <paramref name="scale"/>, measured
+        /// over <see cref="PhaseSweep"/> rather than tabulated, so an
+        /// unlisted UI Size gets its own true answer instead of the
+        /// four-value table's worst. 0 at 1.0, where both floors are exact;
+        /// 2 at 0.81 and 0.897; 1 at 1.103.
+        /// <para>
+        /// Cached in one slot because the scale is a player setting that
+        /// changes rarely and this is read once per viewport per paint. A
+        /// racing caller only recomputes: the slot holds scale and budget
+        /// as one object, so a stale read is a whole stale pair, never a
+        /// budget belonging to a different scale.
+        /// </para>
+        /// </summary>
+        public static int SlipBudgetFor(float scale)
+        {
+            // Negated rather than "<= 0f" so a NaN also falls back: casting
+            // a NaN product to int is platform-defined, and one that landed
+            // here would compute a budget from int.MinValue.
+            if (!(scale > 0f))
+            {
+                return SlipBudget;
+            }
+
+            var cached = _cachedBudget;
+            if (cached != null && cached.Scale == scale)
+            {
+                return cached.Value;
+            }
+
+            int worst = 0;
+            for (int top = 0; top <= PhaseSweep; top++)
+            {
+                int slip = top - PropagateClipTop(top, scale);
+                if (slip > worst)
+                {
+                    worst = slip;
+                }
+            }
+
+            _cachedBudget = new MeasuredBudget(scale, worst);
+            return worst;
+        }
 
         /// <summary>
         /// One edge through <c>RectangleExtension.ScaleBy</c>: a float32
@@ -70,10 +140,18 @@ namespace TaimisToolbench.Services
         /// that the single round trip between a container re-asserting the
         /// line and its children receiving it lands ON the viewport's edge
         /// rather than above it.
+        /// <para>
+        /// The budget is the live scale's, not the four-size worst case.
+        /// The difference is the strip between the protected edge and the
+        /// cutoff, which nothing is obliged to paint: at UI Size Large the
+        /// constant reserved 2px that the round trip never loses, so
+        /// scrolled rows were cut 2px below every viewport's top and 2px
+        /// below every pinned sticky band. docs/ARCHITECTURE.md V.26.1.
+        /// </para>
         /// </summary>
-        public static int CutoffTopFor(int viewportTop)
+        public static int CutoffTopFor(int viewportTop, float scale)
         {
-            return viewportTop + SlipBudget;
+            return viewportTop + SlipBudgetFor(scale);
         }
     }
 }

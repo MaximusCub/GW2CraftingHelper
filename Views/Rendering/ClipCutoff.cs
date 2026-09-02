@@ -1,4 +1,5 @@
 using System;
+using Blish_HUD;
 using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -99,16 +100,49 @@ namespace TaimisToolbench.Views.Rendering
     }
 
     /// <summary>
+    /// A <see cref="ClippedPanel"/> the mouse WHEEL passes straight
+    /// through, for a container drawn on top of a scrolling panel it must
+    /// not steal the wheel from. Dropping the MouseWheel capture flag is
+    /// what does it: <c>Control.TriggerMouseInput</c> discriminates by
+    /// event type where <c>Container</c> does not, so this answers a click
+    /// and declines a wheel, and the parent's hit-test loop steps past it
+    /// to the scrolling panel behind.
+    /// <para>
+    /// EVERY container between this one and the cursor has to answer the
+    /// same way or the walk breaks inside it, which is why the sticky
+    /// header band and its hover washes are this type too. The vendor
+    /// mechanism this is read off, and why a ZIndex alone could not satisfy
+    /// both asks: docs/ARCHITECTURE.md section V.26.2.
+    /// </para>
+    /// </summary>
+    internal class WheelTransparentClippedPanel : ClippedPanel
+    {
+        protected override CaptureType CapturesInput()
+        {
+            return CaptureType.Mouse;
+        }
+    }
+
+    /// <summary>
     /// The scrolling viewport itself: it publishes the cutoff for the whole
     /// of its own subtree's paint, then restores whatever was in force.
     /// Its own drawing is unclamped - the line is derived from its bounds, so
     /// clamping itself against it would only shrink the viewport.
     /// </summary>
-    internal sealed class ClipAuthorityFlowPanel : FlowPanel
+    internal class ClipAuthorityFlowPanel : FlowPanel
     {
-        public override void Draw(SpriteBatch spriteBatch, Rectangle drawBounds, Rectangle scissor)
+        /// <summary>
+        /// The edge the published line is derived from. Its own top by
+        /// default; a subclass overrides it to protect something else.
+        /// </summary>
+        protected virtual int ProtectedEdge => AbsoluteBounds.Y;
+
+        public sealed override void Draw(
+            SpriteBatch spriteBatch, Rectangle drawBounds, Rectangle scissor)
         {
-            int previous = ClipCutoff.Enter(ClipCutoffMath.CutoffTopFor(AbsoluteBounds.Y));
+            int previous = ClipCutoff.Enter(
+                ClipCutoffMath.CutoffTopFor(
+                    ProtectedEdge, GameService.Graphics.UIScaleMultiplier));
             try
             {
                 base.Draw(spriteBatch, drawBounds, scissor);
@@ -127,17 +161,16 @@ namespace TaimisToolbench.Views.Rendering
     /// the ordinary viewport top, as <see cref="ClipAuthorityFlowPanel"/>
     /// derives it.
     /// <para>
-    /// Paint order cannot keep the band clean: the vendor's default
-    /// <c>ZIndex</c> is 5 (<c>Control._zIndex = 5</c> in the decompiled Blish
-    /// 1.3.0 binary), so the host's ZIndex-1 clip paints first and the
-    /// viewport's whole subtree overdraws the pinned band. A scissor bound is
-    /// order-independent - the line bites during the content's own walk -
-    /// and the re-assertion arithmetic that makes it hold is
-    /// docs/ARCHITECTURE.md section V.26.1's, via
+    /// The clip does now out-rank this panel in paint order too
+    /// (StickyHeaderHost.ClipZIndex), but the scissor bound is what the
+    /// band rests on: it is order-independent, biting during the content's
+    /// own walk rather than after it, so a band stays clean however the
+    /// two are sorted. The re-assertion arithmetic that makes it hold at
+    /// any nesting depth is docs/ARCHITECTURE.md section V.26.1's, via
     /// <see cref="ClipCutoffMath.CutoffTopFor"/>.
     /// </para>
     /// </summary>
-    internal sealed class StickyClipAuthorityFlowPanel : FlowPanel
+    internal sealed class StickyClipAuthorityFlowPanel : ClipAuthorityFlowPanel
     {
         private readonly Func<int?> _pinnedBandBottom;
 
@@ -151,19 +184,6 @@ namespace TaimisToolbench.Views.Rendering
             _pinnedBandBottom = pinnedBandBottom ?? throw new ArgumentNullException(nameof(pinnedBandBottom));
         }
 
-        public override void Draw(SpriteBatch spriteBatch, Rectangle drawBounds, Rectangle scissor)
-        {
-            int? pinned = _pinnedBandBottom();
-            int edge = pinned ?? AbsoluteBounds.Y;
-            int previous = ClipCutoff.Enter(ClipCutoffMath.CutoffTopFor(edge));
-            try
-            {
-                base.Draw(spriteBatch, drawBounds, scissor);
-            }
-            finally
-            {
-                ClipCutoff.Exit(previous);
-            }
-        }
+        protected override int ProtectedEdge => _pinnedBandBottom() ?? base.ProtectedEdge;
     }
 }

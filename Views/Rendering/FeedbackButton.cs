@@ -220,8 +220,15 @@ namespace TaimisToolbench.Views.Rendering
 
         protected override void Paint(SpriteBatch spriteBatch, Rectangle bounds)
         {
+            // A tinted face is a state signal (see PlateTint), so a tinted
+            // button keeps its enabled plate, ink and icon while disabled
+            // rather than dropping to the grey. All three layers read this
+            // one test: keying the icon on Enabled alone dimmed it over a
+            // plate and ink that had stayed lit.
+            bool showsState = Enabled || _plateTint.HasValue;
+
             var plate = new Rectangle(3, 3, Width - 6, Height - 5);
-            if (Enabled || _plateTint.HasValue)
+            if (showsState)
             {
                 spriteBatch.DrawOnCtrl(
                     this,
@@ -243,15 +250,15 @@ namespace TaimisToolbench.Views.Rendering
             var icon = Icon?.Texture;
             if (icon != null && _iconBounds != Rectangle.Empty)
             {
-                spriteBatch.DrawOnCtrl(this, icon, _iconBounds, Enabled ? _iconTint : _iconTint * DisabledIconDim);
+                spriteBatch.DrawOnCtrl(
+                    this, icon, _iconBounds,
+                    showsState ? _iconTint : _iconTint * DisabledIconDim);
             }
 
             // Assigned per frame for the same reason StandardButton does it:
             // the enabled state can change between layout passes, and the
             // colour is the only thing that says so once the plate is flat.
-            // A tinted face is a state signal (see PlateTint), so it keeps
-            // the enabled ink while disabled rather than the grey.
-            _textColor = Enabled || _plateTint.HasValue ? _enabledTextColor : DisabledInk;
+            _textColor = showsState ? _enabledTextColor : DisabledInk;
             DrawText(spriteBatch, _textBounds);
         }
     }

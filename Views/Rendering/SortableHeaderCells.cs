@@ -144,7 +144,7 @@ namespace TaimisToolbench.Views.Rendering
                 {
                     _cells.Add(new Cell
                     {
-                        Wash = new ClippedPanel()
+                        Wash = new WheelTransparentClippedPanel()
                         {
                             BackgroundColor = Color.Transparent,
                             // Blish draws children in ZIndex order, and a

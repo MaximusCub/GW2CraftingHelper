@@ -27,13 +27,18 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Zero: the scrolling viewport's top edge sits ON the separator
-        /// rule, so the cutoff ClipCutoffMath.CutoffTopFor publishes (the
-        /// viewport top plus SlipBudget) lands on the rule's bottom edge
-        /// and scrolled content clips flush against it at every GW2 UI
-        /// Size. Any positive value reopens a dead strip between the rule
-        /// and the first clipped row; the sub-unity slip budget lands
-        /// inside the rule's own 2px, which the strip's ZIndex paints
-        /// over. docs/ARCHITECTURE.md section V.26.1.
+        /// rule, so scrolled content clips flush against it with no dead
+        /// strip between the rule and the first row. Any positive value
+        /// reopens that strip.
+        /// <para>
+        /// The cutoff does NOT protect the rule itself: its reach is one
+        /// slip budget above the line it publishes, so at the UI Sizes
+        /// whose clip round trip loses pixels a row can reach into the
+        /// rule's own 2px. What keeps the rule unnotched is paint order -
+        /// CraftingPlanView.SeparatorZIndex draws it after the content -
+        /// and NOT the top strip's ZIndex, which is below the content
+        /// panel's and paints first. docs/ARCHITECTURE.md section V.26.1.
+        /// </para>
         /// </summary>
         public const int SeparatorToContentGap = 0;
 

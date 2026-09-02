@@ -17,9 +17,9 @@ namespace TaimisToolbench.Services
     /// on rows the window had room for; so did half-the-surplus.
     /// </para>
     /// <para>
-    /// INVARIANT: the result is held as a one-way floor for the life of a
-    /// plan - see TreeCostColumnFloor for why an edge that narrows under a
-    /// click slides every pill out from under the cursor.
+    /// INVARIANT: the widest run the plan has ever REQUIRED is a one-way
+    /// floor for the life of that plan (<see cref="Resolve"/>); the
+    /// granted width is not, and answers to the window on screen.
     /// docs/ARCHITECTURE.md section V.33.
     /// </para>
     /// </summary>
@@ -139,6 +139,71 @@ namespace TaimisToolbench.Services
             }
 
             return width;
+        }
+
+        /// <summary>
+        /// One render's answer for the pill column: the width to reserve
+        /// and how much of it was taken from the cost column's slack.
+        /// </summary>
+        public readonly struct ColumnResolution
+        {
+            public readonly int Width;
+            public readonly int CostClaim;
+
+            /// <summary>
+            /// The ink high-water mark to carry into the next render of
+            /// this plan - see <see cref="Resolve"/>.
+            /// </summary>
+            public readonly int RequiredFloor;
+
+            public ColumnResolution(int width, int costClaim, int requiredFloor)
+            {
+                Width = width;
+                CostClaim = costClaim;
+                RequiredFloor = requiredFloor;
+            }
+        }
+
+        /// <summary>
+        /// Settles <see cref="ColumnWidth"/> and <see cref="RightClaim"/>
+        /// together, from one <see cref="Affordable"/> and one surplus, so
+        /// the width and the claim derived from it can never be attributed
+        /// to different window widths. Callers gate on BOTH returned
+        /// values; why, and why the ratchet is the ink's rather than the
+        /// granted width's, is docs/ARCHITECTURE.md section V.33.
+        /// <para>
+        /// <paramref name="panelWidth"/> 0 is the "no content panel"
+        /// answer (CraftingPlanView.GetCurrentPanelWidth): the column
+        /// takes its fixed floor and claims nothing. It pins nothing -
+        /// what carries forward is the ink - so the next render at a real
+        /// width is unconstrained by it.
+        /// </para>
+        /// </summary>
+        public static ColumnResolution Resolve(
+            int required, int requiredFloor, int floorWidth,
+            int panelWidth, int minimumPanelWidth, int rightSlack)
+        {
+            int ink = required > requiredFloor ? required : requiredFloor;
+            if (ink < 0)
+            {
+                ink = 0;
+            }
+
+            if (panelWidth <= 0)
+            {
+                return new ColumnResolution(floorWidth, 0, ink);
+            }
+
+            int surplus = panelWidth - minimumPanelWidth;
+            if (surplus < 0)
+            {
+                surplus = 0;
+            }
+
+            int affordable = Affordable(panelWidth, floorWidth, minimumPanelWidth, rightSlack);
+            int width = ColumnWidth(ink, floorWidth, affordable);
+            return new ColumnResolution(
+                width, RightClaim(width, floorWidth, surplus, rightSlack), ink);
         }
 
         /// <summary>

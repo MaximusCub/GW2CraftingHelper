@@ -39,8 +39,14 @@ namespace TaimisToolbench.Views.Rendering
         /// not decoration: the texture's alpha falls to ~53/255 at its right
         /// end, so a texture-only band would go half-transparent over the
         /// window backdrop.
+        /// <para>
+        /// Exposed because StickyHeaderHost paints the strip between a
+        /// pinned band's bottom and the viewport's cutoff with it, so
+        /// nothing shows through there at the UI Sizes whose clip round
+        /// trip loses pixels.
+        /// </para>
         /// </summary>
-        private static readonly Color BandColor = new Color(35, 35, 35);
+        internal static readonly Color BandColor = new Color(35, 35, 35);
 
         private static AsyncTexture2D _bandTexture;
 
@@ -117,7 +123,11 @@ namespace TaimisToolbench.Views.Rendering
 
         private static Panel Band(Container parent, int width, int height, int x, int y)
         {
-            return new ClippedPanel()
+            // Wheel-transparent because a band can be PINNED over the
+            // scrolling panel it belongs to (Views/Rendering/StickyHeaderHost),
+            // and every container between that host's clip and the cursor has
+            // to pass the wheel through or the walk breaks inside it.
+            return new WheelTransparentClippedPanel()
             {
                 Size = new Point(width, height),
                 Location = new Point(x, y),

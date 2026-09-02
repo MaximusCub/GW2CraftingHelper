@@ -243,13 +243,14 @@ namespace TaimisToolbench.Views.Rendering
             TreeCostColumnMath.CostColumnWidths.Empty;
 
         // This render pass's decision-pill column width, and the widest
-        // any render of THIS plan has already reserved. Same shape and
-        // same reason as the two cost-column fields above: data-derived
-        // per render, one-way for the life of the plan, because a column
-        // edge that narrows under a click slides every pill out from
-        // under the cursor (Services/TreeCostColumnFloor).
+        // run any render of THIS plan has ever REQUIRED. The ratchet is on
+        // the ink, not on the granted width, for the reason
+        // TreePillColumnMath.Resolve gives: an ignore click shrinks the
+        // required run, and that is what must not narrow under the cursor
+        // (Services/TreeCostColumnFloor), while the granted width answers
+        // to the window on screen.
         private int _pillColumnWidth = PlanRelayoutMath.TreePillColumnWidth;
-        private int _planPillColumnFloor = PlanRelayoutMath.TreePillColumnWidth;
+        private int _planPillRequiredFloor;
 
         // How much of THIS render's pill column was claimed from the cost
         // column's reserve above what its rows draw
@@ -333,7 +334,7 @@ namespace TaimisToolbench.Views.Rendering
             // The pill column's ink high-water mark is the same kind of
             // fact and is cleared with it.
             _planCostColumnFloor = TreeCostColumnMath.CostColumnWidths.Empty;
-            _planPillColumnFloor = PlanRelayoutMath.TreePillColumnWidth;
+            _planPillRequiredFloor = 0;
             _pillColumnCostClaim = 0;
             _sourceHeaderInkWidth = 0;
             _lastResult = result;
@@ -419,13 +420,13 @@ namespace TaimisToolbench.Views.Rendering
             _scannedNodeCount = scan.NodeCount;
 
             // Second data-derived column, after the cost one because it
-            // spends what the cost column leaves - see
-            // ScannedPillColumnWidth. The claim is what it spent of the
-            // cost column's own slack, which EffectiveCostColumnWidth
-            // hands back below.
-            _pillColumnWidth = ScannedPillColumnWidth(_treeRoots, panelWidth, out int pillCostClaim);
-            _pillColumnCostClaim = pillCostClaim;
-            _planPillColumnFloor = _pillColumnWidth;
+            // spends what the cost column leaves - see ScannedPillColumn.
+            // The claim is what it spent of the cost column's own slack,
+            // which EffectiveCostColumnWidth hands back below.
+            var pillColumn = ScannedPillColumn(_treeRoots, panelWidth);
+            _pillColumnWidth = pillColumn.Width;
+            _pillColumnCostClaim = pillColumn.CostClaim;
+            _planPillRequiredFloor = pillColumn.RequiredFloor;
 
             // Parenthesised count, like every other countable section
             // ("Used Materials (12)", "Shopping List (7)"). The number is
@@ -884,7 +885,7 @@ namespace TaimisToolbench.Views.Rendering
         /// floor, or the pre-scanned sub-columns' real total when a tree
         /// full of multi-gold (or currency-priced) values needs more - less
         /// whatever slack the decision-pill column claimed from that floor
-        /// (ScannedPillColumnWidth's out claim, never below the sub-columns'
+        /// (ScannedPillColumn's claim, never below the sub-columns'
         /// total). The column's RIGHT edge never moves, so narrowing it
         /// only lets the pills and their ink closer to values that are
         /// right-aligned anyway; widening it pushes the decision pills and
@@ -896,6 +897,11 @@ namespace TaimisToolbench.Views.Rendering
             int scanned = TreeCostColumnMath.TotalWidth(_costColumnWidths);
             int reserve = scanned > TreeCostColumnWidth ? scanned : TreeCostColumnWidth;
             int effective = reserve - _pillColumnCostClaim;
+
+            // The floor cannot bind while the claim comes from
+            // ScannedPillColumn: TreePillColumnMath.RightClaim caps it at the
+            // rightSlack this same subtraction leaves, which is reserve minus
+            // scanned. It is here for a claim written from anywhere else.
             return effective > scanned ? effective : scanned;
         }
 
@@ -935,27 +941,21 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// Blish-bound half of the pill-column scan: the walk and the
-        /// arithmetic live in TreePillColumnMath, this supplies the
-        /// measurements they cannot make. Answers the width to reserve
-        /// this render: the widest full run any row needs, floored at
-        /// PlanRelayoutMath.TreePillColumnWidth and at what this plan has
-        /// already reserved (an ignore cannot narrow the column mid-plan),
-        /// capped at the space actually available between the two
-        /// neighbours' minimums - TreePillColumnMath.Affordable's whole
-        /// surplus past the module's minimum window leftward, plus this
-        /// cost column's reserve above its content rightward.
+        /// Blish-bound half of the pill-column scan: the walk and the whole
+        /// width/claim rule live in TreePillColumnMath.Resolve, this
+        /// supplies the measurements they cannot make and the plan's ink
+        /// high-water mark.
         /// <para>
-        /// <paramref name="costClaim"/> is how much came from that
-        /// rightward direction: EffectiveCostColumnWidth nets it out of
-        /// the cost column's reserved width, extending the pills toward
-        /// the cost ink without moving PillColX, any cost value or any
-        /// name budget. An out parameter, not a field write, because
-        /// TryRefreshInPlace asks this method as a pure gate question.
+        /// Returns rather than writing fields, because TryRefreshInPlace
+        /// asks this as a pure gate question: an in-place refresh is only
+        /// safe when the answer is the one already on screen, and the
+        /// CLAIM is half of that answer (EffectiveCostColumnWidth nets it
+        /// out of the cost column's reserve, so a stale claim moves
+        /// PillColX against a full render at the same window size).
         /// </para>
         /// </summary>
-        private int ScannedPillColumnWidth(
-            IReadOnlyList<CraftingTreeNode> roots, int panelWidth, out int costClaim)
+        private TreePillColumnMath.ColumnResolution ScannedPillColumn(
+            IReadOnlyList<CraftingTreeNode> roots, int panelWidth)
         {
             var font = UiFonts.Caption;
             var plan = _host.CurrentPlan;
@@ -1008,32 +1008,13 @@ namespace TaimisToolbench.Views.Rendering
                 costSlack = 0;
             }
 
-            // A panel width of 0 is the "no content panel" answer
-            // (CraftingPlanView.GetCurrentPanelWidth); it must not be read
-            // as a window with no surplus, which would pin the column to
-            // its floor for the rest of the plan.
-            int surplus = panelWidth
-                - WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth);
-            int affordable = panelWidth > 0
-                ? TreePillColumnMath.Affordable(
-                    panelWidth,
-                    PlanRelayoutMath.TreePillColumnWidth,
-                    WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth),
-                    costSlack)
-                : _planPillColumnFloor;
-
-            int width = TreePillColumnMath.ColumnWidth(
-                required, PlanRelayoutMath.TreePillColumnWidth, affordable);
-            width = width > _planPillColumnFloor ? width : _planPillColumnFloor;
-
-            costClaim = panelWidth > 0
-                ? TreePillColumnMath.RightClaim(
-                    width,
-                    PlanRelayoutMath.TreePillColumnWidth,
-                    surplus,
-                    costSlack)
-                : 0;
-            return width;
+            return TreePillColumnMath.Resolve(
+                required,
+                _planPillRequiredFloor,
+                PlanRelayoutMath.TreePillColumnWidth,
+                panelWidth,
+                WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth),
+                costSlack);
         }
 
         /// <summary>
@@ -1651,8 +1632,13 @@ namespace TaimisToolbench.Views.Rendering
 
             // Same gate for the pill column, and for the same reason: the
             // rows this refresh preserves were placed against the width
-            // already on screen.
-            if (ScannedPillColumnWidth(newRoots, _host.PanelWidth, out _) != _pillColumnWidth)
+            // already on screen. The CLAIM is gated too - it is netted out
+            // of the cost column (EffectiveCostColumnWidth), so keeping a
+            // stale one places these rows where a full render at this same
+            // window size would not.
+            var pillColumn = ScannedPillColumn(newRoots, _host.PanelWidth);
+            if (pillColumn.Width != _pillColumnWidth
+                || pillColumn.CostClaim != _pillColumnCostClaim)
             {
                 return false;
             }
@@ -2070,7 +2056,12 @@ namespace TaimisToolbench.Views.Rendering
                     // the mark with the one face that can draw it.
                     toggle = new FeedbackButton
                     {
-                        Size = new Point(placement.Width, PillHeight),
+                        // Both axes from RowActionSize, as the Ranker and
+                        // Plan History rows already do. Its width comes from
+                        // ReservedIgnorePillWidth, which is that constant;
+                        // taking the height from PillHeight left it square
+                        // only while two independent numbers coincided.
+                        Size = new Point(placement.Width, GlyphButtonMetrics.RowActionSize),
                         Location = new Point(placement.X, pillY),
                         Parent = rowPanel,
                     };
@@ -2082,10 +2073,14 @@ namespace TaimisToolbench.Views.Rendering
 
                     if (dimmed)
                     {
-                        // The whole control washes, not the colors: Opacity
-                        // multiplies into every DrawOnCtrl call, so the
-                        // plate, border and mark dim together and the state
-                        // contrast inside the button survives.
+                        // The whole control washes, not the colors: Blish
+                        // multiplies AbsoluteOpacity into every DrawOnCtrl
+                        // colour, so plate, border and mark dim together -
+                        // and so the ON key's mark drops to about 2:1
+                        // against its own plate, under the 3:1 non-text
+                        // floor. Measured, and left alone because the ink
+                        // colour is a design call: docs/KNOWN-ISSUES.md,
+                        // DEFERRED, "Dimmed IGNORE toggle's mark".
                         toggle.Opacity = PillColors.DimmedPillFactor;
                     }
 
@@ -2196,17 +2191,11 @@ namespace TaimisToolbench.Views.Rendering
                         ApplyOverridesAndResolve();
                     };
 
-                    // The toggle's press and hover are already its own: the
-                    // FeedbackButton constructor wired PressFeedback, and the
-                    // hover sweep is Blish's OnMouseEntered tween. Only the
-                    // pill needs this hand-rolled wash-and-restore pair.
-                    if (!isToggle)
-                    {
-                        Color restingBorder = borderColor;
-                        outer.MouseEntered += (_, __) => outer.BackgroundColor = Color.White;
-                        outer.MouseLeft += (_, __) => outer.BackgroundColor = restingBorder;
-                        PressFeedback.Wire(outer);
-                    }
+                    // No hand-rolled wash-and-restore here: ignoreInteractive
+                    // implies PillKind.Ignore, so this arm only ever holds the
+                    // toggle, whose press came from FeedbackButton's own
+                    // PressFeedback wiring and whose hover is Blish's
+                    // OnMouseEntered tween. The pill arm above keeps the pair.
                 }
 
                 // Appends the value-detail
@@ -2373,7 +2362,7 @@ namespace TaimisToolbench.Views.Rendering
         /// Takes the measurement as a delegate rather than a font because
         /// its two callers need different ones: a row builds one closure
         /// over its own face, and the column pre-scan memoises across a
-        /// whole tree (ScannedPillColumnWidth).
+        /// whole tree (ScannedPillColumn).
         /// </para>
         /// </summary>
         private static int MeasuredPillWidth(PillSpec spec, Func<string, int> measureText, int toggleSlot)
@@ -2413,7 +2402,7 @@ namespace TaimisToolbench.Views.Rendering
         /// <para>
         /// The tooltip must not suggest widening the window: the pill
         /// column's width is settled once per render (see
-        /// ScannedPillColumnWidth), so dragging the window wider does not
+        /// ScannedPillColumn), so dragging the window wider does not
         /// move this chip and the advice would be false until the next
         /// Generate.
         /// </para>
