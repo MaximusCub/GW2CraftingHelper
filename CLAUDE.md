@@ -270,7 +270,21 @@ The goal is defensive engineering, not perfection.
 
 # PR Workflow (STRICT)
 
-All review happens via GitHub Pull Requests.
+Every change ships through a GitHub Pull Request, on its own branch, with a
+green build and a green SOLUTION-level test run before the PR exists.
+
+**The owner does NOT review pull requests, and does not want them posted for
+review** (his ruling 2026-08-30, reaffirmed 2026-09-03). Do not stop and wait
+for him on a PR. Once CI is green: merge it, deploy the build, and tell him
+what to look at in game.
+
+Green CI is the FLOOR that qualifies a build for his testing. It is never the
+acceptance. The gate is his in-game review of the functionality, so an item is
+SHIPPED when a PR merges and DONE only when he says it works.
+
+This paragraph exists because the rule that overrides it used to live only in
+an untracked file. A git worktree checks out tracked files only, so an agent
+working in one could not see it and would wait for a review that never comes.
 
 ## Branch
 

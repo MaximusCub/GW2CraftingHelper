@@ -408,7 +408,8 @@ namespace TaimisToolbench.Tests.Services
         {
             var content = TooltipContent.FromLines(new[]
             {
-                TooltipContent.HeaderLine("icon.png", "Bolt", "Legendary"),
+                TooltipContent.HeaderLine(
+                    "icon.png", "Bolt", TooltipHeaderSubject.ItemOfRarity("Legendary")),
                 TooltipContent.TextLine("Weapon Strength: 950 - 1,050"),
             });
 
@@ -482,7 +483,8 @@ namespace TaimisToolbench.Tests.Services
         {
             var content = TooltipContent.FromLines(new[]
             {
-                TooltipContent.HeaderLine("icon.png", "aaa bbb ccc", "Exotic"),
+                TooltipContent.HeaderLine(
+                    "icon.png", "aaa bbb ccc", TooltipHeaderSubject.ItemOfRarity("Exotic")),
             });
 
             // 39px indent + a 70px budget for the name itself.
@@ -515,7 +517,8 @@ namespace TaimisToolbench.Tests.Services
             // the reserved column.
             var content = TooltipContent.FromLines(new[]
             {
-                TooltipContent.HeaderLine(null, "Iconless Thing", "Basic"),
+                TooltipContent.HeaderLine(
+                    null, "Iconless Thing", TooltipHeaderSubject.ItemOfRarity("Basic")),
                 TooltipContent.TextLine("Basic"),
             });
 
@@ -572,7 +575,8 @@ namespace TaimisToolbench.Tests.Services
         {
             var content = TooltipContent.FromLines(new[]
             {
-                TooltipContent.HeaderLine("icon.png", "Bolt", "Legendary"),
+                TooltipContent.HeaderLine(
+                    "icon.png", "Bolt", TooltipHeaderSubject.ItemOfRarity("Legendary")),
             });
 
             Assert.Equal("Bolt", content.ToPlainText());

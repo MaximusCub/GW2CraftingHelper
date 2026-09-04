@@ -125,11 +125,12 @@ namespace TaimisToolbench.Views.Rendering
 
         /// <summary>
         /// Whether the frame is a border RING rather than a filled plate
-        /// with the art laid on top. True only for
-        /// <see cref="Currency"/>: currency art is mostly transparent, so a
-        /// plate behind it shows through as a background the field reported
-        /// as a defect. Item art is a full-bleed bag-slot square and hides
-        /// the plate, so the item frames keep it.
+        /// with the art laid on top. True for the two frames drawn around
+        /// CURRENCY art - <see cref="Currency"/> and
+        /// <see cref="ExplicitOutline"/>: currency art is mostly
+        /// transparent, so a plate behind it shows through as a background
+        /// the field reported as a defect. Item art is a full-bleed
+        /// bag-slot square and hides the plate, so the item frames keep it.
         /// </summary>
         internal bool IsOutline
         {
@@ -180,6 +181,19 @@ namespace TaimisToolbench.Views.Rendering
         internal static ItemIconFrame Explicit(Color color)
         {
             return new ItemIconFrame(color, outline: false);
+        }
+
+        /// <summary>
+        /// The same call-site-owned colour as <see cref="Explicit"/>, drawn
+        /// as a border RING - for a surface that owns the colour but whose
+        /// subject is a currency, whose transparent art cannot take a
+        /// plate (see <see cref="IsOutline"/>). The tooltip header, which
+        /// frames every subject in the game's own light grey rather than
+        /// in the module's currency grey, is the one such surface.
+        /// </summary>
+        internal static ItemIconFrame ExplicitOutline(Color color)
+        {
+            return new ItemIconFrame(color, outline: true);
         }
     }
 }

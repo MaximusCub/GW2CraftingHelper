@@ -50,7 +50,7 @@ namespace TaimisToolbench.Services
             /// regime wherever the column has a coin row at all, because
             /// the two regimes have different extents and one mixed row
             /// must not place the header for every coin row - see
-            /// WidestRowRun. 0 when no row is priced.
+            /// HeaderRun. 0 when no row is priced.
             /// <para>
             /// Not derivable from the four widths above, so a caller that
             /// compares two scans field by field to decide whether a
@@ -60,15 +60,32 @@ namespace TaimisToolbench.Services
             /// </summary>
             public readonly int WidestRowRunWidth;
 
+            /// <summary>
+            /// How far back from the column's right edge the leftmost ink
+            /// ANY row draws sits - the line the decision-pill column may
+            /// advance its right edge to and not past
+            /// (TreeSectionController.EffectiveCostColumnWidth). The
+            /// larger of the two regimes' runs, where
+            /// <see cref="WidestRowRunWidth"/> is whichever single regime
+            /// the header follows, so the two differ whenever the header
+            /// follows the coin-only rows and some mixed row reaches a
+            /// whole currency band further left. 0 when no row is priced,
+            /// which is not the same as "no row draws anything": an
+            /// unpriceable row still draws a dash this scan never
+            /// measures.
+            /// </summary>
+            public readonly int LeftmostInkReach;
+
             public CostColumnWidths(
                 int goldTextWidth, int silverTextWidth, int copperTextWidth, int currencyRunWidth,
-                int widestRowRunWidth = 0)
+                int widestRowRunWidth = 0, int leftmostInkReach = 0)
             {
                 GoldTextWidth = goldTextWidth;
                 SilverTextWidth = silverTextWidth;
                 CopperTextWidth = copperTextWidth;
                 CurrencyRunWidth = currencyRunWidth;
                 WidestRowRunWidth = widestRowRunWidth;
+                LeftmostInkReach = leftmostInkReach;
             }
 
             public static readonly CostColumnWidths Empty = new CostColumnWidths(0, 0, 0, 0);
@@ -89,8 +106,11 @@ namespace TaimisToolbench.Services
             /// <summary>
             /// Total width the populated sub-columns actually occupy, from
             /// the leftmost reserved x to costRightEdge - what the caller
-            /// must reserve for the cost column so a wide row cannot run
-            /// back into the decision pills to its left.
+            /// reserves so a wide row cannot run back into the decision
+            /// pills to its left. The reserve, not the floor: no one row's
+            /// ink reaches that leftmost x unless every sub-column maximum
+            /// is that row's, so what the pill column may not be let past
+            /// is <see cref="CostColumnWidths.LeftmostInkReach"/>.
             /// </summary>
             public readonly int TotalWidth;
 
@@ -185,12 +205,11 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Width every populated sub-column plus its separating gaps
-        /// occupies - what the tree must reserve for its cost column
-        /// (TreeSectionController passes max(this, its own fixed floor) as
-        /// ComputeTreeColumnEdges' costColumnWidth) so a tree full of
-        /// multi-gold values pushes the decision pills left instead of
-        /// silently overprinting them. Independent of costRightEdge, so it
-        /// can be asked before any column edge exists.
+        /// occupies - what the tree reserves for its cost column
+        /// (<see cref="Reserve"/>) so a tree full of multi-gold values
+        /// pushes the decision pills left instead of silently
+        /// overprinting them. Independent of costRightEdge, so it can be
+        /// asked before any column edge exists.
         /// </summary>
         public static int TotalWidth(CostColumnWidths widths)
         {
@@ -198,6 +217,65 @@ namespace TaimisToolbench.Services
             total = AddBand(total, SegmentWidth(widths.SilverTextWidth));
             total = AddBand(total, SegmentWidth(widths.CopperTextWidth));
             return AddBand(total, widths.CurrencyRunWidth);
+        }
+
+        /// <summary>
+        /// What the tree reserves for the cost column before the
+        /// decision-pill column spends any of it:
+        /// <paramref name="fixedFloor"/>, or <see cref="TotalWidth"/> when
+        /// the tree's own values need more.
+        /// </summary>
+        public static int Reserve(CostColumnWidths widths, int fixedFloor)
+        {
+            int total = TotalWidth(widths);
+            return total > fixedFloor ? total : fixedFloor;
+        }
+
+        /// <summary>
+        /// The narrowest the column may be squeezed to. Its right edge is
+        /// pinned to the panel and its sub-columns are derived from that
+        /// edge leftward (PlanRelayoutMath.ComputeTreeColumnEdges, then
+        /// <see cref="ComputeEdges"/>), so narrowing the column moves no
+        /// cost ink at all - only the pill column's right edge, rightward.
+        /// The one line that cannot be crossed is therefore
+        /// <see cref="CostColumnWidths.LeftmostInkReach"/>, and NOT
+        /// <see cref="TotalWidth"/>: that sums per-denomination maxima no
+        /// single row draws together, so flooring on it left 123 measured
+        /// pixels unused beside a pill run chipped to "+1".
+        /// <para>
+        /// A tree with nothing priced measures no ink, and its rows still
+        /// draw the unpriceable dash this scan never measures, so it keeps
+        /// its whole reserve rather than offering the column away.
+        /// </para>
+        /// </summary>
+        public static int InkFloor(CostColumnWidths widths, int fixedFloor)
+        {
+            return widths.LeftmostInkReach > 0
+                ? widths.LeftmostInkReach
+                : Reserve(widths, fixedFloor);
+        }
+
+        /// <summary>
+        /// Room the decision-pill column may claim from this column's
+        /// right side: the reserve above the ink floor.
+        /// </summary>
+        public static int RightSlack(CostColumnWidths widths, int fixedFloor)
+        {
+            int slack = Reserve(widths, fixedFloor) - InkFloor(widths, fixedFloor);
+            return slack > 0 ? slack : 0;
+        }
+
+        /// <summary>
+        /// The width the column actually gets once the pill column has
+        /// taken <paramref name="claim"/> of it, floored at
+        /// <see cref="InkFloor"/> so a claim written from outside
+        /// <see cref="RightSlack"/>'s answer still cannot reach the ink.
+        /// </summary>
+        public static int WidthAfterClaim(CostColumnWidths widths, int fixedFloor, int claim)
+        {
+            int effective = Reserve(widths, fixedFloor) - claim;
+            int floor = InkFloor(widths, fixedFloor);
+            return effective > floor ? effective : floor;
         }
 
         private static int AddBand(int total, int bandWidth)
@@ -344,9 +422,12 @@ namespace TaimisToolbench.Services
             }
 
             var widths = new CostColumnWidths(acc.Gold, acc.Silver, acc.Copper, acc.Currency);
+            RowRuns(widths, acc, out int coinOnlyRun, out int mixedRun);
             return new TreeColumnScan(
                 new CostColumnWidths(
-                    acc.Gold, acc.Silver, acc.Copper, acc.Currency, WidestRowRun(widths, acc)),
+                    acc.Gold, acc.Silver, acc.Copper, acc.Currency,
+                    HeaderRun(acc, coinOnlyRun, mixedRun),
+                    Max(coinOnlyRun, mixedRun)),
                 acc.NodeCount);
         }
 
@@ -376,41 +457,48 @@ namespace TaimisToolbench.Services
             public int LeadCurrency;
 
             /// <summary>Rows drawing ink in each regime - see
-            /// WidestRowRun for why the header follows the larger.</summary>
+            /// HeaderRun for why the header follows the larger.</summary>
             public int CoinOnlyRows;
             public int MixedRows;
         }
 
         /// <summary>
-        /// Widest ink run the column's rows draw, in pixels back from its
-        /// right edge - the extent the "Cost" header centres over
-        /// (<see cref="HeaderX"/>). Resolved after the walk because a row's
-        /// segments right-align into sub-columns whose edges are not known
-        /// until every row has been measured.
-        /// <para>
-        /// The column lays rows out in two regimes that do not share an
-        /// extent: a row with no currency ink collapses the shared currency
-        /// band for itself (<see cref="ComputeRowEdges"/>), so coin rows
-        /// start a band-plus-gap RIGHT of mixed rows. Taking the max put
-        /// the header over an extent no coin row reaches - measured at 43px
-        /// off centre with a 96px band. A header sits over ONE extent, so
-        /// the regime with more rows wins; a tie goes to coin-only, which
-        /// the shared sub-columns are laid out for.
-        /// </para>
+        /// The ink run each of the column's two layout regimes draws, in
+        /// pixels back from its right edge. A row with no currency ink
+        /// collapses the shared currency band for itself
+        /// (<see cref="ComputeRowEdges"/>), so coin rows start a
+        /// band-plus-gap RIGHT of mixed rows and the two do not share an
+        /// extent. Resolved after the walk because a row's segments
+        /// right-align into sub-columns whose edges are not known until
+        /// every row has been measured.
         /// </summary>
-        private static int WidestRowRun(CostColumnWidths widths, ScanAccumulator acc)
+        private static void RowRuns(
+            CostColumnWidths widths, ScanAccumulator acc, out int coinOnlyRun, out int mixedRun)
         {
             var coinOnly = ComputeRowEdges(0, widths, rowDrawsCurrency: false);
-            int coinOnlyRun = Reach(coinOnly.GoldRightEdge, acc.LeadGoldCoinOnly);
+            coinOnlyRun = Reach(coinOnly.GoldRightEdge, acc.LeadGoldCoinOnly);
             coinOnlyRun = Max(coinOnlyRun, Reach(coinOnly.SilverRightEdge, acc.LeadSilverCoinOnly));
             coinOnlyRun = Max(coinOnlyRun, Reach(coinOnly.CopperRightEdge, acc.LeadCopperCoinOnly));
 
             var mixed = ComputeEdges(0, widths);
-            int mixedRun = Reach(mixed.GoldRightEdge, acc.LeadGoldMixed);
+            mixedRun = Reach(mixed.GoldRightEdge, acc.LeadGoldMixed);
             mixedRun = Max(mixedRun, Reach(mixed.SilverRightEdge, acc.LeadSilverMixed));
             mixedRun = Max(mixedRun, Reach(mixed.CopperRightEdge, acc.LeadCopperMixed));
             mixedRun = Max(mixedRun, Reach(mixed.CurrencyRightEdge, acc.LeadCurrency));
+        }
 
+        /// <summary>
+        /// Which regime's run the "Cost" header centres over
+        /// (<see cref="HeaderX"/>). A header sits over ONE extent, so the
+        /// regime with more rows wins; a tie goes to coin-only, which the
+        /// shared sub-columns are laid out for. Taking the larger of the
+        /// two put the header over an extent no coin row reaches -
+        /// measured at 43px off centre with a 96px band. Layout wants that
+        /// larger value instead and asks for it by name
+        /// (<see cref="CostColumnWidths.LeftmostInkReach"/>).
+        /// </summary>
+        private static int HeaderRun(ScanAccumulator acc, int coinOnlyRun, int mixedRun)
+        {
             return acc.MixedRows > acc.CoinOnlyRows ? mixedRun : coinOnlyRun;
         }
 
@@ -418,7 +506,7 @@ namespace TaimisToolbench.Services
         /// How far left of the column's right edge a row reaches when its
         /// first segment is leadSegmentWidth wide and right-aligns on
         /// <paramref name="subColumnRightEdge"/>, which is itself <= 0
-        /// because <see cref="WidestRowRun"/> computes the edges off a
+        /// because <see cref="RowRuns"/> computes the edges off a
         /// right edge of 0. No such row means no reach.
         /// </summary>
         private static int Reach(int subColumnRightEdge, int leadSegmentWidth)

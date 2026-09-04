@@ -143,20 +143,22 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void Equal_SeesEveryField()
         {
-            var baseline = new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 4, 5);
+            var baseline = new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 4, 5, 6);
 
             Assert.True(TreeCostColumnFloor.Equal(
-                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 4, 5)));
+                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 4, 5, 6)));
             Assert.False(TreeCostColumnFloor.Equal(
-                baseline, new TreeCostColumnMath.CostColumnWidths(9, 2, 3, 4, 5)));
+                baseline, new TreeCostColumnMath.CostColumnWidths(9, 2, 3, 4, 5, 6)));
             Assert.False(TreeCostColumnFloor.Equal(
-                baseline, new TreeCostColumnMath.CostColumnWidths(1, 9, 3, 4, 5)));
+                baseline, new TreeCostColumnMath.CostColumnWidths(1, 9, 3, 4, 5, 6)));
             Assert.False(TreeCostColumnFloor.Equal(
-                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 9, 4, 5)));
+                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 9, 4, 5, 6)));
             Assert.False(TreeCostColumnFloor.Equal(
-                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 9, 5)));
+                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 9, 5, 6)));
             Assert.False(TreeCostColumnFloor.Equal(
-                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 4, 9)));
+                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 4, 9, 6)));
+            Assert.False(TreeCostColumnFloor.Equal(
+                baseline, new TreeCostColumnMath.CostColumnWidths(1, 2, 3, 4, 5, 9)));
         }
 
         /// <summary>
@@ -173,7 +175,7 @@ namespace TaimisToolbench.Tests.Services
             var fields = typeof(TreeCostColumnMath.CostColumnWidths)
                 .GetFields(BindingFlags.Public | BindingFlags.Instance);
 
-            Assert.Equal(5, fields.Length);
+            Assert.Equal(6, fields.Length);
         }
 
         /// <summary>
@@ -193,6 +195,7 @@ namespace TaimisToolbench.Tests.Services
                 TreeCostColumnMath.CostColumnWidths.Empty, scanned);
 
             Assert.Equal(scanned.WidestRowRunWidth, floored.WidestRowRunWidth);
+            Assert.Equal(scanned.LeftmostInkReach, floored.LeftmostInkReach);
 
             // The extent is load-bearing, not decorative: the header lands
             // somewhere else entirely without it.
@@ -217,7 +220,7 @@ namespace TaimisToolbench.Tests.Services
             // A tree whose WIDEST row is the one being ignored away, so
             // the second scan genuinely reports less ink than the first -
             // the currency row above owns the reserve but not the extent,
-            // which the header follows (TreeCostColumnMath.WidestRowRun).
+            // which the header follows (TreeCostColumnMath.HeaderRun).
             var before = new List<CraftingTreeNode> { Node(1234567), Node(12345678) };
             var after = new List<CraftingTreeNode> { Node(1234567), Node(null) };
 

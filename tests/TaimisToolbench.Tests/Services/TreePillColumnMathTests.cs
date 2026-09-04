@@ -687,6 +687,98 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(Floor + 300, next.Width);
         }
 
+        // --- The third field report: the same "+1" chip, on a plan with
+        // a currency band ---
+
+        /// <summary>The tree's fixed cost-column floor
+        /// (TreeSectionController.TreeCostColumnWidth), which the cost
+        /// column takes as its own floor and not as its reserve.</summary>
+        private const int CostFloor = 150;
+
+        /// <summary>
+        /// A plan with a currency band: one coin-priced row and one
+        /// currency-priced row, so the cost sub-column maxima come from
+        /// different rows and no row's ink reaches the reserve's left
+        /// edge. Digit advance 8px, currency run 88px.
+        /// </summary>
+        private static TreeCostColumnMath.CostColumnWidths CurrencyBandCostWidths()
+        {
+            var roots = new List<CraftingTreeNode>
+            {
+                new CraftingTreeNode { NodeId = 11, SubtreeCost = 1234567 },
+                new CraftingTreeNode
+                {
+                    NodeId = 12,
+                    SubtreeCost = 0,
+                    VendorCurrencyCosts = new List<CostLine>
+                    {
+                        new CostLine { Type = "Currency", Id = 23, Count = 1275 },
+                    },
+                },
+            };
+
+            return TreeCostColumnMath.Scan(roots, text => text.Length * 8, _ => 88);
+        }
+
+        /// <summary>
+        /// The two columns' arithmetic joined. Read as the fixed floor
+        /// less TreeCostColumnMath.TotalWidth, the cost slack was a
+        /// negative clamped to zero on every plan with a currency band, so
+        /// the short row chipped with the room sitting beside it. Read as
+        /// the reserve less the leftmost ink any row draws, the row fits
+        /// and the claim still stops short of every cost figure.
+        /// </summary>
+        [Fact]
+        public void ACurrencyBandsCostSlack_FitsTheShortRow_AndStopsShortOfTheInk()
+        {
+            var costWidths = CurrencyBandCostWidths();
+
+            Assert.True(CostFloor - TreeCostColumnMath.TotalWidth(costWidths) < 0);
+
+            int slack = TreeCostColumnMath.RightSlack(costWidths, CostFloor);
+            Assert.Equal(94, slack);
+
+            var resolved = TreePillColumnMath.Resolve(
+                ScannedRequired(OwnerPlanNodes()), 0, Floor, MinPanel(), MinPanel(), slack);
+
+            var fit = Fit(ShardRun(), ToggleSlot(), resolved.Width);
+            Assert.Equal(3, fit.VisibleCount);
+            Assert.Equal(0, fit.HiddenCount);
+
+            Assert.True(
+                TreeCostColumnMath.WidthAfterClaim(costWidths, CostFloor, resolved.CostClaim)
+                    >= costWidths.LeftmostInkReach);
+        }
+
+        /// <summary>
+        /// The claim moves the pill column's right edge and nothing else:
+        /// PillColX, and so every name budget, is where an unclaimed
+        /// layout at the same window width puts it, because
+        /// PlanRelayoutMath.ComputeTreeColumnEdges anchors the cost
+        /// column's right edge to the panel.
+        /// </summary>
+        [Fact]
+        public void ACurrencyBandsCostSlack_MovesNoNameBudget()
+        {
+            var costWidths = CurrencyBandCostWidths();
+            int reserve = TreeCostColumnMath.Reserve(costWidths, CostFloor);
+            int slack = TreeCostColumnMath.RightSlack(costWidths, CostFloor);
+
+            var resolved = TreePillColumnMath.Resolve(
+                ScannedRequired(OwnerPlanNodes()), 0, Floor, MinPanel(), MinPanel(), slack);
+
+            var unclaimed = PlanRelayoutMath.ComputeTreeColumnEdges(
+                MinPanel(), OwnerNameX(), 0, Floor, reserve, 8);
+            var claimed = PlanRelayoutMath.ComputeTreeColumnEdges(
+                MinPanel(), OwnerNameX(), 0, resolved.Width,
+                TreeCostColumnMath.WidthAfterClaim(costWidths, CostFloor, resolved.CostClaim), 8);
+
+            Assert.Equal(resolved.CostClaim, resolved.Width - Floor);
+            Assert.Equal(unclaimed.PillColX, claimed.PillColX);
+            Assert.Equal(unclaimed.NameMaxWidth, claimed.NameMaxWidth);
+            Assert.Equal(unclaimed.CostRightEdge, claimed.CostRightEdge);
+        }
+
         private static PlanRelayoutMath.PillFitPlan Fit(List<int> run, int slot, int columnWidth)
         {
             int maxRightEdge = columnWidth - TreePillColumnMath.TrailingClearance;

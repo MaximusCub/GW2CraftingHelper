@@ -433,8 +433,14 @@ namespace TaimisToolbench.Views.Rendering
                 // (166,175,174) on the xyaren capture's left edge) rather
                 // than in the rarity colour the module frames its ROWS
                 // with - the name beside it already carries the rarity.
+                // One colour, two shapes: a plate behind a currency's
+                // transparent art shows through as a background, so a
+                // currency takes the ring (ItemIconFrame.IsOutline).
+                ItemIconFrame frame = row.HeaderSubject.IsCurrency
+                    ? ItemIconFrame.ExplicitOutline(HeaderIconFrameColor)
+                    : ItemIconFrame.Explicit(HeaderIconFrameColor);
                 IconControls.CreateItemIcon(
-                    _contentPanel, row.IconUrl, ItemIconFrame.Explicit(HeaderIconFrameColor),
+                    _contentPanel, row.IconUrl, frame,
                     0, row.Y, ItemIconTier.TooltipHeader,
                     ItemIconTooltip.None(ItemIconSilence.DrawnInsideATooltip));
             }

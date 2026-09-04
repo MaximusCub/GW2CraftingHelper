@@ -50,7 +50,9 @@ namespace TaimisToolbench.Services
             for (int i = firstHidden; i < last; i++)
             {
                 var item = items[i];
-                builder.Header(item?.IconUrl, item?.Name, item?.Rarity);
+                builder.Header(
+                    item?.IconUrl, item?.Name,
+                    TooltipHeaderSubject.ItemOfRarity(item?.Rarity));
             }
 
             if (overflow > 0)

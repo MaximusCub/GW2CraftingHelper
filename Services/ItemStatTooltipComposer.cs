@@ -55,7 +55,7 @@ namespace TaimisToolbench.Services
             builder.Header(
                 stats.IconUrl,
                 string.IsNullOrEmpty(stats.Name) ? "Unknown Item" : stats.Name,
-                stats.Rarity);
+                TooltipHeaderSubject.ItemOfRarity(stats.Rarity));
 
             var facts = BuildFacts(stats, out bool bodyOpensUnderHeader);
 
