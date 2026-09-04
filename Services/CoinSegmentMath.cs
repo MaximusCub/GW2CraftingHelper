@@ -36,15 +36,15 @@ namespace TaimisToolbench.Services
         public const int CoinSegmentGap = 6;
 
         /// <summary>
-        /// Where an inline coin/currency icon's BOX sits inside the line box
-        /// of the number it marks, given the digits' own ink.
+        /// Where a WALLET CURRENCY's inline icon BOX sits inside the line box
+        /// of the number it marks, given the digits' own declared ink.
         /// <para>
         /// A Label's line box carries ascender and descender space that
         /// digits never occupy, so an icon seated at the top of it rides
-        /// high against the figures beside it - the reported defect. This is
-        /// the rule <see cref="CurrencyIconTiers.VerticalAlignmentRule"/>
-        /// records from the game's own wallet: the icon box is centred on
-        /// the number's INK.
+        /// high against the figures beside it. The seat is the centred half
+        /// of <see cref="CurrencyIconTiers.VerticalAlignmentRule"/>: the icon
+        /// box is centred on the number's ink. The three coin denominations
+        /// take <see cref="CoinIconY"/> instead.
         /// </para>
         /// <para>
         /// Never negative. An icon taller than the digits' ink would
@@ -55,6 +55,82 @@ namespace TaimisToolbench.Services
         public static int InlineIconY(int digitInkTop, int digitInkHeight, int iconSize)
         {
             int offset = ((2 * digitInkTop) + digitInkHeight - iconSize) / 2;
+            return offset < 0 ? 0 : offset;
+        }
+
+        /// <summary>
+        /// Empty pixels a Menomonia glyph box carries above and below the ink
+        /// it holds. The faces are built with <c>outline="1" spacing="1,1"</c>,
+        /// so a declared box is one pixel taller than its ink at each edge:
+        /// MEASURED off the shipped texture pages of menomonia 14-regular,
+        /// 16-regular, 20-bold and 32-regular, every '0' inks exactly rows
+        /// 1..height-2 of its own box. At 16-regular that puts the '0' box's
+        /// declared yoffset 2 height 15 over ink in line-box rows 3..15, and
+        /// 'H' (yoffset 3 height 14) over rows 4..15 - one shared ink bottom,
+        /// which is the baseline. A seat computed from the declared box alone
+        /// therefore sits a pixel high.
+        /// </summary>
+        public const int GlyphBoxInkPad = 1;
+
+        // The coin art's own padding, MEASURED off the three 32x32 textures
+        // Blish fetches by asset id: gold 156904 and silver 156907 ink rows
+        // 5..26, copper 156902 rows 4..26. The LAST inked row is 26 on all
+        // three - copper's extra row is at the top - so a seat that works
+        // from the bottom reads one number for every denomination.
+        private const int CoinArtTextureSize = 32;
+        private const int CoinArtLastInkRow = 26;
+
+        /// <summary>
+        /// Where the coin art's lowest ink lands inside an icon box of
+        /// <paramref name="iconSize"/> pixels, as an exclusive bottom edge.
+        /// Point-sampled: a destination row carries ink while the source rows
+        /// it covers still reach <c>CoinArtLastInkRow</c>, so the last inked
+        /// destination row is <c>26 * size / 32</c> and the edge below it is
+        /// one more. 0 for a non-positive size, which draws nothing.
+        /// </summary>
+        public static int CoinArtInkBottom(int iconSize)
+        {
+            return iconSize > 0 ? ((CoinArtLastInkRow * iconSize) / CoinArtTextureSize) + 1 : 0;
+        }
+
+        /// <summary>
+        /// Rows the game hangs a coin's ink BELOW the digits' ink bottom.
+        /// Derived, not chosen: the bar tier capture recorded in
+        /// <see cref="CurrencyIconTiers.VerticalAlignmentRule"/> is icon box
+        /// y114..129 against digit ink y115..126, and a 16px box puts the
+        /// art's last inked row at y127 (<see cref="CoinArtInkBottom"/>).
+        /// </summary>
+        public const int CoinInkBelowBaseline = 1;
+
+        /// <summary>
+        /// Where a GOLD, SILVER or COPPER icon's BOX sits inside the line box
+        /// of the number it marks: low enough that the coin's INK rests on the
+        /// digits' ink bottom, which is the baseline.
+        /// <para>
+        /// The coins alone. Every other inline currency icon keeps
+        /// <see cref="InlineIconY"/>'s centred seat, because the owner ruled
+        /// on 2026-09-04 that only gold, silver and copper move, having been
+        /// shown that the non-coin icons already measure centred to within
+        /// half a pixel in his own capture.
+        /// </para>
+        /// <para>
+        /// Neither edge is a number the caller holds: the glyph box runs
+        /// <see cref="GlyphBoxInkPad"/> past the digits' ink, and the icon
+        /// box runs past the coin art (<see cref="CoinArtInkBottom"/>). Then
+        /// <see cref="CoinInkBelowBaseline"/> further, because the game hangs
+        /// the coin under the baseline rather than resting it on one. Never
+        /// negative, for the reason <see cref="InlineIconY"/> gives.
+        /// </para>
+        /// </summary>
+        public static int CoinIconY(int digitInkTop, int digitInkHeight, int iconSize)
+        {
+            if (iconSize <= 0)
+            {
+                return 0;
+            }
+
+            int digitInkBottom = digitInkTop + digitInkHeight - GlyphBoxInkPad;
+            int offset = digitInkBottom - CoinArtInkBottom(iconSize) + CoinInkBelowBaseline;
             return offset < 0 ? 0 : offset;
         }
 
