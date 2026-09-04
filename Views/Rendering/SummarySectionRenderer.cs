@@ -610,7 +610,8 @@ namespace TaimisToolbench.Views.Rendering
 
             CreateCurrencyTableTopGap(parent, panelWidth);
             CreateCurrencyTableHeaderRow(
-                parent, panelWidth, scan, SummarySectionLayoutMath.NonCoinNameHeader(rows));
+                parent, panelWidth, scan, SummarySectionLayoutMath.NonCoinNameHeader(rows),
+                rows.Count);
             for (int i = 0; i < rows.Count; i++)
             {
                 CreateCurrencyTableRow(rows[i], parent, panelWidth, scan);
@@ -792,15 +793,21 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         private void CreateCurrencyTableHeaderRow(
-            FlowPanel parent, int panelWidth, CurrencyColumnScan scan, string nameHeaderText)
+            FlowPanel parent, int panelWidth, CurrencyColumnScan scan, string nameHeaderText,
+            int rowCount)
         {
-            var band = HeaderBands.CreateColumnHeaderBand(parent, panelWidth);
+            var flowBand = HeaderBands.CreateColumnHeaderBandInFlow(parent, panelWidth);
+            var band = flowBand.Band;
             var font = HeaderBands.Font;
             LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = nameHeaderText, Font = font, TextColor = HeaderBands.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(SummarySectionLayoutMath.CurrencyNameX, HeaderBands.LabelY),
+                Location = new Point(
+                    ColumnHeaderLabelMath.LabelX(
+                        SummarySectionLayoutMath.CurrencyNameX,
+                        SummarySectionLayoutMath.CurrencyIconX),
+                    HeaderBands.LabelY),
                 Parent = band,
             });
 
@@ -828,7 +835,7 @@ namespace TaimisToolbench.Views.Rendering
             // ShoppingListSectionRenderer's own cached column scan).
             _sink.AddRelayout(w =>
             {
-                band.Size = new Point(w, HeaderBands.RowHeight);
+                flowBand.Resize(w);
                 var moved = new CurrencyHeaderXs(
                     scan.EdgesFor(w), scan,
                     requiredHeaderWidth, haveHeaderWidth, neededHeaderWidth, statusHeaderWidth);
@@ -837,6 +844,13 @@ namespace TaimisToolbench.Views.Rendering
                 neededLabel.Location = new Point(moved.Needed, HeaderBands.LabelY);
                 statusLabel.Location = new Point(moved.Status, HeaderBands.LabelY);
             });
+
+            // Unlike every other plan table this one does NOT run to the
+            // end of its section: the multi-item note and the footnotes
+            // flow below it, so the band has to leave with its own last
+            // currency row rather than with the section.
+            _sink.TrackStickyBand(
+                flowBand, () => rowCount * CurrencyRowHeight);
         }
 
         /// <summary>

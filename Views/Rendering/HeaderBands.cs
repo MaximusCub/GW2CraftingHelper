@@ -113,6 +113,61 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
+        /// A band and the fixed-height panel that holds its place in a
+        /// FlowPanel. A FlowPanel measures its own children, so a band
+        /// lifted straight out of one to be pinned
+        /// (Views/Rendering/StickyHeaderHost) would close the flow up by
+        /// <see cref="RowHeight"/> and move every section below it; the
+        /// spacer is what the flow measures instead, and it stays put
+        /// whether the band is inside it or inside the sticky clip.
+        /// </summary>
+        internal readonly struct FlowBand
+        {
+            /// <summary>The band itself: the control carrying the labels
+            /// and sort cells, and the one that gets re-parented.</summary>
+            public readonly Panel Band;
+
+            /// <summary>Its place in the flow, and its parent whenever it
+            /// is not pinned.</summary>
+            public readonly Panel Spacer;
+
+            internal FlowBand(Panel band, Panel spacer)
+            {
+                Band = band;
+                Spacer = spacer;
+            }
+
+            /// <summary>Both halves take one width: a Blish container
+            /// clips its children to its own bounds, so a spacer narrower
+            /// than its band would cut the band's right end off.</summary>
+            internal void Resize(int width)
+            {
+                var size = new Point(width, RowHeight);
+                Spacer.Size = size;
+                Band.Size = size;
+            }
+        }
+
+        /// <summary>
+        /// The tier-3 band for a table that flows: see
+        /// <see cref="FlowBand"/> for what the extra panel buys.
+        /// </summary>
+        internal static FlowBand CreateColumnHeaderBandInFlow(Container parent, int width)
+        {
+            // Wheel-transparent and clipped for the same two reasons the
+            // band is - it is one more container in the viewport's chain,
+            // and a plain Panel there re-opens the clip drift
+            // Views/Rendering/ClipCutoff.cs closes.
+            var spacer = new WheelTransparentClippedPanel()
+            {
+                Size = new Point(width, RowHeight),
+                Parent = parent,
+            };
+
+            return new FlowBand(Band(spacer, width, RowHeight, 0, 0), spacer);
+        }
+
+        /// <summary>
         /// The tier-3 band at an explicit offset, for the tabs that place
         /// their chrome rows absolutely rather than flowing them.
         /// </summary>

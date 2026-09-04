@@ -108,7 +108,7 @@ namespace TaimisToolbench.Views.Rendering
             // (JustifiedColumnTracks.CenteredOverContent).
             ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                 contentFlow, panelWidth,
-                "Item", NameX,
+                "Item", ColumnHeaderLabelMath.LabelX(NameX, IconX),
                 "Amount", _sink,
                 onLeftClick: () => SortBy(PlanTableColumn.Item),
                 onRightClick: () => SortBy(PlanTableColumn.Amount),
@@ -124,7 +124,8 @@ namespace TaimisToolbench.Views.Rendering
                 // The Item column is everything left of the Amount band -
                 // the name's own ellipsis terms, with the gap split.
                 leftColumnEndForWidth: w => PlanRelayoutMath.HeaderSplitBeforeColumn(
-                    PlanRelayoutMath.PinnedRightEdge(w), maxQtyWidth, NameToQtyGap));
+                    PlanRelayoutMath.PinnedRightEdge(w), maxQtyWidth, NameToQtyGap),
+                rowsHeight: () => rows.Count * PlanContentHeightMath.UsedMaterialRowHeight);
 
             for (int i = 0; i < rows.Count; i++)
             {

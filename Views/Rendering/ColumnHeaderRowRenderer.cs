@@ -78,10 +78,12 @@ namespace TaimisToolbench.Views.Rendering
             string middleLabel = null, int middleX = 0, Func<int, int> middleXForWidth = null,
             Func<int, int> rightXForWidth = null, Action onLeftClick = null, Action onRightClick = null,
             Func<int, int> leftColumnEndForWidth = null, Func<int, int> rightLabelXForWidth = null,
-            TableSortDirection? leftSort = null, TableSortDirection? rightSort = null)
+            TableSortDirection? leftSort = null, TableSortDirection? rightSort = null,
+            Func<int> rowsHeight = null)
         {
-            var rowPanel = HeaderBands.CreateColumnHeaderBand(
+            var flowBand = HeaderBands.CreateColumnHeaderBandInFlow(
                 parent, BandWidth(rightXForWidth, panelWidth));
+            var rowPanel = flowBand.Band;
             var font = HeaderBands.Font;
             var leftBlock = SortableHeaderBlock.Create(
                 rowPanel, font, HeaderBands.LabelColor, HeaderBands.LabelY, leftLabel, leftSort);
@@ -141,7 +143,7 @@ namespace TaimisToolbench.Views.Rendering
 
             Action<int> relayout = w =>
             {
-                rowPanel.Size = new Point(BandWidth(rightXForWidth, w), HeaderBands.RowHeight);
+                flowBand.Resize(BandWidth(rightXForWidth, w));
                 rightBlock.MoveTo(
                     RightLabelX(w, rightXForWidth, rightLabelXForWidth, rightBlock.Width));
                 if (middleLabelControl != null && middleXForWidth != null)
@@ -158,6 +160,11 @@ namespace TaimisToolbench.Views.Rendering
                 plan.Sync(rowPanel.Width);
             };
             sink.AddRelayout(relayout);
+            if (rowsHeight != null)
+            {
+                sink.TrackStickyBand(flowBand, rowsHeight);
+            }
+
             return relayout;
         }
 

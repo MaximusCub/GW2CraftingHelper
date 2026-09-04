@@ -164,7 +164,7 @@ namespace TaimisToolbench.Views.Rendering
             var scan = new ColumnScan(
                 maxEachWidth, maxTotalWidth, maxQtyWidth, sourceColumnWidth, maxNameWidth,
                 maxQtyInk, maxSourceInk);
-            CreateShoppingListHeaderRow(contentFlow, panelWidth, scan);
+            CreateShoppingListHeaderRow(contentFlow, panelWidth, scan, rows.Count);
             for (int i = 0; i < rows.Count; i++)
             {
                 CreateShoppingRow(rows[i], contentFlow, panelWidth, scan, i == rows.Count - 1);
@@ -218,21 +218,23 @@ namespace TaimisToolbench.Views.Rendering
         // Column edges come from Render()'s shared pre-scan, so the header
         // lands on the same x as the rows below it.
         private void CreateShoppingListHeaderRow(
-            FlowPanel parent, int panelWidth, ColumnScan scan)
+            FlowPanel parent, int panelWidth, ColumnScan scan, int rowCount)
         {
             var edges = scan.EdgesFor(panelWidth);
-            var rowPanel = HeaderBands.CreateColumnHeaderBand(parent, panelWidth);
+            var flowBand = HeaderBands.CreateColumnHeaderBandInFlow(parent, panelWidth);
+            var rowPanel = flowBand.Band;
             var font = HeaderBands.Font;
             var color = HeaderBands.LabelColor;
 
             // The Item column flexes and its cells rule left, so its header
-            // stays on that rule at NameX. Every other header CENTRES over
-            // the INK its own cells cover, bounded by the columns either
-            // side of it and not by the band around that ink - see
-            // Services/JustifiedColumnTracks.HeaderRoom. Every one of the
-            // five carries a persistent sort indicator, and the block width
-            // that covers it is what the placement below is handed, so a
-            // sort click moves no column.
+            // stays on that rule - at the icon its rows open with, not at
+            // the name beside it (Services/ColumnHeaderLabelMath). Every
+            // other header CENTRES over the INK its own cells cover,
+            // bounded by the columns either side of it and not by the band
+            // around that ink - see JustifiedColumnTracks.HeaderRoom. Every
+            // one of the five carries a persistent sort indicator, and the
+            // block width that covers it is what the placement below is
+            // handed, so a sort click moves no column.
             var columns = new[]
             {
                 PlanTableColumn.Item, PlanTableColumn.Source, PlanTableColumn.Amount,
@@ -252,7 +254,7 @@ namespace TaimisToolbench.Views.Rendering
             int eachHeaderWidth = blocks[3].Width;
             int totalHeaderWidth = blocks[4].Width;
 
-            blocks[0].MoveTo(NameX);
+            blocks[0].MoveTo(ColumnHeaderLabelMath.LabelX(NameX, IconX));
             PlaceDataHeaders(
                 blocks, scan, edges,
                 sourceHeaderWidth, amountHeaderWidth, eachHeaderWidth, totalHeaderWidth);
@@ -282,7 +284,7 @@ namespace TaimisToolbench.Views.Rendering
             // call).
             _sink.AddRelayout(w =>
             {
-                rowPanel.Size = new Point(w, HeaderBands.RowHeight);
+                flowBand.Resize(w);
                 PlaceDataHeaders(
                     blocks, scan, scan.EdgesFor(w),
                     sourceHeaderWidth, amountHeaderWidth, eachHeaderWidth, totalHeaderWidth);
@@ -293,6 +295,9 @@ namespace TaimisToolbench.Views.Rendering
                 ApplyHeaderBoundaries(plan, scan, w, boundaries);
                 plan.Sync(rowPanel.Width);
             });
+
+            _sink.TrackStickyBand(
+                flowBand, () => rowCount * PlanContentHeightMath.ShoppingRowHeight);
         }
 
         /// <summary>

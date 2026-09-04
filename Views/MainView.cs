@@ -2269,6 +2269,8 @@ namespace TaimisToolbench.Views
 
             int columnCount = section.Grid.ColumnCount;
             int columnWidth = section.Grid.ColumnWidth;
+            int nameHeaderX = ColumnHeaderLabelMath.LabelX(
+                SnapshotItemGridLayout.CellTextX, SnapshotItemGridLayout.CellIconX);
 
             while (chrome.NameHeaders.Count < columnCount)
             {
@@ -2293,7 +2295,7 @@ namespace TaimisToolbench.Views
                 int amountX =
                     SnapshotItemGridLayout.CellAmountRightEdge(columnWidth) - chrome.AmountWidth;
 
-                chrome.NameHeaders[i].MoveTo(columnX + SnapshotItemGridLayout.CellTextX);
+                chrome.NameHeaders[i].MoveTo(columnX + nameHeaderX);
                 chrome.AmountHeaders[i].MoveTo(columnX + amountX);
             }
 
@@ -2478,7 +2480,8 @@ namespace TaimisToolbench.Views
             var hover = ItemRowHover(row, rarity, breakdown);
 
             IconControls.CreateItemIcon(
-                rowPanel, row.IconUrl, ItemIconFrame.ForRarity(rarity), 2, 1,
+                rowPanel, row.IconUrl, ItemIconFrame.ForRarity(rarity),
+                SnapshotItemGridLayout.CellIconX, 1,
                 ItemIconTier.BagSlot, hover);
 
             // Never display raw item IDs (repo invariant) - row.Name is
@@ -2625,7 +2628,8 @@ namespace TaimisToolbench.Views
             int walletValue = entry.Value;
             string currencyIconUrl = entry.IconUrl;
             IconControls.CreateItemIcon(
-                rowPanel, currencyIconUrl, ItemIconFrame.Currency(), 2, 2,
+                rowPanel, currencyIconUrl, ItemIconFrame.Currency(),
+                SnapshotItemGridLayout.CellIconX, 2,
                 ItemIconTier.CurrencyListRow,
                 // A WALLET row is a wallet currency by construction - the
                 // id came out of /v2/account/wallet - so the kind needs no

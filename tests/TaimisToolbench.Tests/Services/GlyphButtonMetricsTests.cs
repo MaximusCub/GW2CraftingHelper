@@ -5,20 +5,20 @@ using Xunit;
 namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
-    /// The row-action button's square, against the glyph atlas it has to
-    /// hold. The owner's report was that these draw too large beside the
-    /// game's own window close control; the floor below is what stops the
-    /// correction going one step too far, where the mark would draw over the
-    /// button's own border art.
+    /// The box a row action draws in. The owner's report was that the
+    /// module's X did not match the game window's close control; the answer
+    /// was to stop drawing an X at all and blit Blish's own key, so the box
+    /// is now the texture's measurement and no longer a glyph's. What is
+    /// pinned here is that the blit stays 1:1, that the two carets still
+    /// beside it still fit, and that every table reserves the one box.
+    /// <para>
+    /// The blit itself is Blish-bound and cannot be exercised here.
+    /// </para>
     /// </summary>
     public class GlyphButtonMetricsTests
     {
-        private static readonly int[] RowActionGlyphs =
-        {
-            0xE102, // CaretUp - reorder
-            0xE103, // CaretDown - reorder
-            0xE105, // RemoveMark - the X the report is about
-        };
+        /// <summary>The Ranker's reorder pair, the only glyphs left in a plate.</summary>
+        private static readonly int[] CaretGlyphs = { 0xE102, 0xE103 };
 
         private static GlyphFontDescriptor Shipped()
         {
@@ -28,52 +28,84 @@ namespace TaimisToolbench.Tests.Services
             }
         }
 
-        private static int LargestInk()
+        private static void LargestCaretInk(out int width, out int height)
         {
             var font = Shipped();
-            int largest = 0;
-            foreach (int codepoint in RowActionGlyphs)
+            width = 0;
+            height = 0;
+            foreach (int codepoint in CaretGlyphs)
             {
                 Assert.True(font.TryGet(codepoint, out var glyph));
-                largest = System.Math.Max(largest, System.Math.Max(glyph.Width, glyph.Height));
+                width = System.Math.Max(width, glyph.Width);
+                height = System.Math.Max(height, glyph.Height);
             }
-
-            return largest;
         }
 
         [Fact]
-        public void TheRowActionButton_HoldsItsWidestGlyphInsideThePlate()
+        public void TheCloseKey_IsSampledFromInsideItsOwnTexture()
         {
-            int ink = LargestInk();
-            int plateWidth = GlyphButtonMetrics.RowActionSize - GlyphButtonMetrics.PlateInsetX;
-            int plateHeight = GlyphButtonMetrics.RowActionSize - GlyphButtonMetrics.PlateInsetY;
-
-            Assert.True(plateWidth >= ink + (2 * GlyphButtonMetrics.GlyphMargin));
-            Assert.True(plateHeight >= ink + (2 * GlyphButtonMetrics.GlyphMargin));
+            // A source rectangle reaching past the texture samples whatever
+            // the atlas page holds next, and one that is not the box's own
+            // size would scale the key - which is exactly the mismatch with
+            // the window's close control that the report was about.
+            Assert.True(
+                GlyphButtonMetrics.CloseKeySourceX + GlyphButtonMetrics.RowActionWidth
+                    <= GlyphButtonMetrics.CloseKeyTextureSize);
+            Assert.True(
+                GlyphButtonMetrics.CloseKeySourceY + GlyphButtonMetrics.RowActionHeight
+                    <= GlyphButtonMetrics.CloseKeyTextureSize);
         }
 
         [Fact]
-        public void TheRowActionButton_IsTheSmallestSquareThatDoes()
+        public void TheCaretsBesideIt_StillFitTheirPlate()
         {
-            // The correction is a shrink, so the assertion that matters is
-            // the floor: one pixel smaller and the widest mark would be
-            // drawn over the border art rather than on the plate.
-            int ink = LargestInk();
-            int smaller = GlyphButtonMetrics.RowActionSize - 1;
+            // The carets are still a glyph on a FeedbackButton plate, and
+            // they now take the close key's box rather than setting it. One
+            // pixel of ink past the plate is drawn over the button's own
+            // border art, so this is the floor the shrink had to clear.
+            LargestCaretInk(out int inkWidth, out int inkHeight);
 
-            Assert.False(
-                smaller - GlyphButtonMetrics.PlateInsetX >= ink + (2 * GlyphButtonMetrics.GlyphMargin));
+            int plateWidth = GlyphButtonMetrics.RowActionWidth - GlyphButtonMetrics.PlateInsetX;
+            int plateHeight = GlyphButtonMetrics.RowActionHeight - GlyphButtonMetrics.PlateInsetY;
+
+            Assert.True(plateWidth >= inkWidth + (2 * GlyphButtonMetrics.GlyphMargin));
+            Assert.True(plateHeight >= inkHeight + (2 * GlyphButtonMetrics.GlyphMargin));
         }
 
         [Fact]
-        public void TheRankerAndPlanHistory_ReserveTheSameSquare()
+        public void TheRankerAndPlanHistory_ReserveTheSameBox()
         {
             // It is ONE control in two tabs, and the two tabs reserve room
-            // for it from separate constants. V4 named the Ranker's; leaving
-            // Plan History's behind would put two sizes of the same X in the
-            // same module.
-            Assert.Equal(GlyphButtonMetrics.RowActionSize, RankerRowLayout.ButtonWidth);
-            Assert.Equal(GlyphButtonMetrics.RowActionSize, PlanHistoryRowLayout.IconButtonWidth);
+            // for it from separate constants. Leaving one behind would put
+            // two sizes of the same X in the same module.
+            Assert.Equal(GlyphButtonMetrics.RowActionWidth, RankerRowLayout.ButtonWidth);
+            Assert.Equal(GlyphButtonMetrics.RowActionHeight, RankerRowLayout.ButtonHeight);
+            Assert.Equal(GlyphButtonMetrics.RowActionWidth, PlanHistoryRowLayout.IconButtonWidth);
+            Assert.Equal(GlyphButtonMetrics.RowActionHeight, PlanHistoryRowLayout.IconButtonHeight);
+        }
+
+        [Fact]
+        public void BothTables_CentreTheBoxOnItsOwnHeight()
+        {
+            // The two axes differ, so a seat that took the WIDTH would
+            // silently sit one pixel high in every row of both tables. Both
+            // seats are checked against the box's height and against the
+            // row they have to stay inside.
+            // The row is 60 and the box is odd, so the halves cannot be
+            // equal; one spare pixel below is the whole tolerance.
+            int rankerSeat = RankerRowLayout.MainLineY(RankerRowLayout.ButtonHeight);
+            Assert.InRange(
+                RankerRowLayout.RowHeight - RankerRowLayout.ButtonHeight - (2 * rankerSeat),
+                0,
+                1);
+
+            int historySeat =
+                (PlanHistoryRowLayout.RowHeight - PlanHistoryRowLayout.IconButtonHeight) / 2;
+            Assert.InRange(
+                PlanHistoryRowLayout.RowHeight - PlanHistoryRowLayout.IconButtonHeight
+                    - (2 * historySeat),
+                0,
+                1);
         }
     }
 }

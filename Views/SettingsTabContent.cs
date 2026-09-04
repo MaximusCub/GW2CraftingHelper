@@ -1832,6 +1832,12 @@ namespace TaimisToolbench.Views
         // aliases, not a second copy.
         private const int CurrencyRowHeight = SettingsCurrencyGridLayout.CurrencyRowHeight;
         private const int CellNameX = SettingsCurrencyGridLayout.CellNameX;
+
+        // The cell's icon is part of the name column, so its header rules
+        // on the icon rather than on the name beside it.
+        private static readonly int CellHeaderX = ColumnHeaderLabelMath.LabelX(
+            SettingsCurrencyGridLayout.CellNameX, SettingsCurrencyGridLayout.CellIconX);
+
         private const int CellInputWidth = SettingsCurrencyGridLayout.CellInputWidth;
         private const int CellDividerClearance = SettingsCurrencyGridLayout.CellDividerClearance;
         private static readonly int CellTextY = SettingsCurrencyGridLayout.CellTextY;
@@ -1999,7 +2005,7 @@ namespace TaimisToolbench.Views
                 Text = text,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(CellNameX, CurrencyHeaderTextY),
+                Location = new Point(CellHeaderX, CurrencyHeaderTextY),
                 Parent = _currencyHeaderPanel,
             };
         }
@@ -2036,7 +2042,7 @@ namespace TaimisToolbench.Views
                 }
 
                 _currencyHeaderNames[i].Location =
-                    new Point((i * columnWidth) + CellNameX, CurrencyHeaderTextY);
+                    new Point((i * columnWidth) + CellHeaderX, CurrencyHeaderTextY);
                 _currencyHeaderUnits[i].Location =
                     new Point((i * columnWidth) + unitX, CurrencyHeaderTextY);
             }

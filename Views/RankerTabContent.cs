@@ -68,7 +68,7 @@ namespace TaimisToolbench.Views
 
         private static int MainLineChipY => RankerRowLayout.MainLineY(LabelHelpers.SmallTagHeight);
 
-        private static int MainLineButtonY => RankerRowLayout.MainLineY(RankerRowLayout.ButtonWidth);
+        private static int MainLineButtonY => RankerRowLayout.MainLineY(RankerRowLayout.ButtonHeight);
 
         private static int MainLineBarY => RankerRowLayout.MainLineY(RankerRowLayout.ReadyBarHeight);
 
@@ -852,7 +852,11 @@ namespace TaimisToolbench.Views
             var bands = BandsFor(barWidth);
 
             SetHeaderLabel(0, bands.RankX);
-            SetHeaderLabel(1, bands.NameX);
+
+            // The rank column is a column of its own and stays out of
+            // Item's span: Item begins at the icon its rows open with, not
+            // at the band's left edge (Services/ColumnHeaderLabelMath).
+            SetHeaderLabel(1, ColumnHeaderLabelMath.LabelX(bands.NameX, bands.IconX));
 
             // The four data columns centre their header on the same track
             // their cells centre on, which is what puts a header over the
@@ -1035,7 +1039,7 @@ namespace TaimisToolbench.Views
             public int RemainingCellWidth;
             public FeedbackButton Up;
             public FeedbackButton Down;
-            public FeedbackButton Remove;
+            public CloseKeyButton Remove;
             public readonly List<Label> GateNameLabels = new List<Label>();
             public readonly List<Label> GateValueLabels = new List<Label>();
             public readonly List<Panel> GateBarTracks = new List<Panel>();
@@ -1536,8 +1540,8 @@ namespace TaimisToolbench.Views
                 row.Down.Click += (_, __) => MoveRow(rowIndex, up: false);
             }
 
-            row.Remove = CreateGlyphRowButton(
-                row.Panel, UiGlyphs.RemoveMark, bands.RemoveX, "Remove this item from your list.");
+            row.Remove = CreateRemoveButton(
+                row.Panel, bands.RemoveX, "Remove this item from your list.");
             row.Remove.Enabled = !_isRefreshing;
             row.Remove.Click += (_, __) => RemoveRow(rowIndex);
 
@@ -1591,27 +1595,21 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// A row action, and a REAL BUTTON. The three used to be Images
-        /// wearing game art, which was itself a repair: before that they
-        /// were StandardButtons labelled U+25B2/U+25BC/U+2715, none of which
-        /// Menomonia carries, so all three rendered as literally nothing.
-        /// <para>
-        /// Art on a bare Image reads as decoration and answers a hover with
-        /// whatever the view hand-rolls. A <see cref="FeedbackButton"/> is a
-        /// StandardButton, so it inherits Blish's own affordance:
-        /// OnMouseEntered/OnMouseLeft tween the public AnimationState 0 -&gt; 8
-        /// over 0.25s (Glide, linear, and rate-preserving on a reversal),
-        /// and Paint blits frame AnimationState of the nine-frame
-        /// "common/button-states" atlas into the plate - the left-to-right
-        /// sweep is painted INTO the artwork, not computed. Nothing here has
-        /// to reproduce it; deriving from the button is what buys it.
-        /// </para>
+        /// A reorder action, and a REAL BUTTON. A
+        /// <see cref="FeedbackButton"/> is a StandardButton, so it inherits
+        /// Blish's own affordance: OnMouseEntered/OnMouseLeft tween the
+        /// public AnimationState 0 -&gt; 8 over 0.25s (Glide, linear, and
+        /// rate-preserving on a reversal), and Paint blits frame
+        /// AnimationState of the nine-frame "common/button-states" atlas
+        /// into the plate - the left-to-right sweep is painted INTO the
+        /// artwork, not computed. Nothing here has to reproduce it;
+        /// deriving from the button is what buys it.
         /// </summary>
         private static FeedbackButton CreateRowButton(Panel parent, int x, string tooltip)
         {
             var button = new FeedbackButton
             {
-                Size = new Point(RankerRowLayout.ButtonWidth, RankerRowLayout.ButtonWidth),
+                Size = new Point(RankerRowLayout.ButtonWidth, RankerRowLayout.ButtonHeight),
                 Location = new Point(x, MainLineButtonY),
                 Parent = parent,
             };
@@ -1620,25 +1618,38 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// A row action whose whole label is one glyph from the module's own
-        /// atlas. StandardButton exposes no Font, which is exactly why these
-        /// could not be buttons before FeedbackButton: they need symmetric
-        /// triangles and a cross, and the one face Blish ships has none. The
-        /// standalone glyph face centres its ink in the line box rather than
-        /// seating it on a baseline, which is what a button with no
-        /// neighbouring text wants.
-        /// <para>
-        /// All THREE row actions come through here, and that is the point:
-        /// glyph text takes the button's own enabled/disabled ink, so the
-        /// set cannot drift into two weights the way a tinted icon beside
-        /// black text did (Services/UiGlyphs.RemoveMark).
-        /// </para>
+        /// A reorder action, whose whole label is one caret from the
+        /// module's own atlas. StandardButton exposes no Font, which is
+        /// exactly why these could not be buttons before FeedbackButton:
+        /// they need symmetric triangles, and the one face Blish ships has
+        /// none. The standalone glyph face centres its ink in the line box
+        /// rather than seating it on a baseline, which is what a button
+        /// with no neighbouring text wants.
         /// </summary>
         private static FeedbackButton CreateGlyphRowButton(
             Panel parent, string glyph, int x, string tooltip)
         {
             var button = CreateRowButton(parent, x, tooltip);
             button.SetGlyph(glyph);
+            return button;
+        }
+
+        /// <summary>
+        /// The remove action, which is Blish's own window close control and
+        /// not a plate carrying a mark - the two carets beside it keep the
+        /// same box (Views/Rendering/CloseKeyButton). It takes no explicit
+        /// Size: the control is born at that box, and a row that named its
+        /// own would be a second place the X could change size.
+        /// </summary>
+        private static CloseKeyButton CreateRemoveButton(
+            Panel parent, int x, string tooltip)
+        {
+            var button = new CloseKeyButton
+            {
+                Location = new Point(x, MainLineButtonY),
+                Parent = parent,
+            };
+            TooltipFacility.ApplyPlain(button, tooltip);
             return button;
         }
 

@@ -114,18 +114,16 @@ namespace TaimisToolbench.Views.Rendering
 
         /// <summary>
         /// Plate modulation while the face draws, or null for the atlas
-        /// exactly as StandardButton ships it. The tree's ignore toggle
-        /// fills its plate with PillColors' ignore-active amber while its
-        /// item is ignored - the same filled-key state signal the pill it
-        /// replaced carried - and every other button leaves this null.
+        /// exactly as StandardButton ships it. No caller sets it today; it
+        /// is here because the class promises StandardButton's whole
+        /// surface, alongside <see cref="IconTint"/>.
         /// <para>
         /// A tinted plate keeps the atlas face and the enabled ink even
         /// while the control is disabled: the flat grey plate is Blish's
-        /// own disabled look, and repainting the toggle with it would
-        /// erase the one state the tint exists to carry. Inertness for a
-        /// tinted button is carried by Enabled itself (no Click, and
-        /// PressFeedback.Wire's own Enabled gate) plus whatever wash and
-        /// tooltip the caller adds, not by the plate.
+        /// own disabled look, and repainting a state-carrying button with
+        /// it would erase the one thing the tint exists to say. Inertness
+        /// for a tinted button is carried by Enabled itself (no Click, and
+        /// PressFeedback.Wire's own Enabled gate), not by the plate.
         /// </para>
         /// </summary>
         public Color? PlateTint
@@ -144,9 +142,8 @@ namespace TaimisToolbench.Views.Rendering
         /// advances nothing.
         /// <para>
         /// Glyph TEXT, not an <see cref="StandardButton.Icon"/>: text takes
-        /// the enabled/disabled ink this button already paints, so a set of
-        /// row actions cannot end up half black text and half tinted
-        /// texture (Services/UiGlyphs.RemoveMark).
+        /// the enabled/disabled ink this button already paints, so a pair of
+        /// carets cannot end up half black text and half tinted texture.
         /// </para>
         /// </summary>
         internal void SetGlyph(string glyph)

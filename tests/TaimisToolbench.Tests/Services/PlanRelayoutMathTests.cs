@@ -746,18 +746,33 @@ namespace TaimisToolbench.Tests.Services
         /// <summary>
         /// The plan's tables stack under one another and three of them
         /// head their flexing column with the same word, so the word has
-        /// to sit on the same x. The Recipe Tree's own depth-0 name rule
-        /// is NOT that x - its rows carry a caret column the other tables
-        /// have no equivalent of - which is what put its "Item" 8px right
-        /// of the "Item" below it.
+        /// to sit on the same x. That x is the tables' icon gutter, not
+        /// the name beside it and not either grid's own depth-0 name rule.
         /// </summary>
         [Fact]
-        public void TableLeftHeaderX_IsTheSharedNameRule_NotTheTreesOwn()
+        public void TableLeftHeaderX_IsTheIconGutter_NotTheNameBesideIt()
         {
-            Assert.Equal(ShoppingColumnMath.NameX, PlanRelayoutMath.TableLeftHeaderX);
+            Assert.Equal(ShoppingColumnMath.IconX, PlanRelayoutMath.TableLeftHeaderX);
+            Assert.True(
+                PlanRelayoutMath.TableLeftHeaderX < ShoppingColumnMath.NameX,
+                "the rail is left of the name the tables' rows print");
             Assert.True(
                 PlanRelayoutMath.TableLeftHeaderX < TreeRowShapePlanner.NameColumnOffset,
-                "the shared rule is left of the tree's own name rule");
+                "the rail is left of the tree's own name rule");
+        }
+
+        /// <summary>
+        /// The rail still lands inside the Recipe Tree's Item column: the
+        /// tree opens its rows with a caret at x=0 and its icon 18px in, so
+        /// the rail sits in the caret's own band and never left of the row.
+        /// </summary>
+        [Fact]
+        public void TableLeftHeaderX_StaysInsideTheTreesOwnItemColumn()
+        {
+            Assert.True(PlanRelayoutMath.TableLeftHeaderX >= 0);
+            Assert.True(
+                PlanRelayoutMath.TableLeftHeaderX < TreeRowShapePlanner.CaretColumnWidth,
+                "the rail is inside the tree's caret band, not past its icon");
         }
     }
 }

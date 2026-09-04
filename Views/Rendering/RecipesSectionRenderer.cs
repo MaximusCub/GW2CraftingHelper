@@ -115,7 +115,8 @@ namespace TaimisToolbench.Views.Rendering
             // columns either side rather than by their own bands - the
             // module's header law, JustifiedColumnTracks.HeaderRoom. Only
             // Recipe stays on a rule: it is the flexing column, and its
-            // names start at NameX on every row.
+            // rows start with the icon its header rules on
+            // (Services/ColumnHeaderLabelMath).
             int disciplineHeaderWidth = MeasureWidth(headerFont, DisciplineHeaderText);
             int statusHeaderWidth = MeasureWidth(headerFont, StatusHeaderText);
             Func<int, int> statusLabelX = w =>
@@ -126,10 +127,14 @@ namespace TaimisToolbench.Views.Rendering
                     e.StatusRightEdge, statusInk, statusHeaderWidth, statusRoom);
             };
 
+            Func<int> rowsHeight =
+                () => section.Rows.Count * PlanContentHeightMath.RecipeRowHeight;
+
             if (anyDiscipline)
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
-                    contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink,
+                    contentFlow, panelWidth, RecipeHeaderText,
+                    ColumnHeaderLabelMath.LabelX(NameX, IconX), StatusHeaderText, _sink,
                     middleLabel: DisciplineHeaderText,
                     middleXForWidth: w =>
                     {
@@ -139,13 +144,16 @@ namespace TaimisToolbench.Views.Rendering
                         return JustifiedColumnTracks.CenteredOverContent(
                             e.DisciplineX, disciplineInk, disciplineHeaderWidth, disciplineRoom);
                     },
-                    rightLabelXForWidth: statusLabelX);
+                    rightLabelXForWidth: statusLabelX,
+                    rowsHeight: rowsHeight);
             }
             else
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
-                    contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink,
-                    rightLabelXForWidth: statusLabelX);
+                    contentFlow, panelWidth, RecipeHeaderText,
+                    ColumnHeaderLabelMath.LabelX(NameX, IconX), StatusHeaderText, _sink,
+                    rightLabelXForWidth: statusLabelX,
+                    rowsHeight: rowsHeight);
             }
 
             for (int i = 0; i < section.Rows.Count; i++)

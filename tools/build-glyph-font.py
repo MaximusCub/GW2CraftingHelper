@@ -74,14 +74,8 @@ BASE = 18
 # peaking at alpha 183, paler than Menomonia's own solid U+00D7, and check-lg,
 # the chevrons, plus-lg and dash-lg all fail the same way. A flattened FILL -
 # the carets - loses area rather than coverage and stays solid all the way
-# down, which is why the trio can be 8px tall.
-#
-# x-lg is below anyway, at ink_h=16, because its seat is a 28px button that
-# was already giving a 16px texture the whole box. Measured with --preview:
-# alpha peaks at 255 over a 2px diagonal, and the coverage sums to 58 pixels
-# of ink against the reading carets' 61 - the same mark weight beside them,
-# which is the whole reason it is here. Judge a new row that way rather than
-# by the fill/stroke label alone.
+# down, which is why the trio can be 8px tall. Judge a new row with --preview
+# on those terms rather than by the fill/stroke label alone.
 #
 # The wider affordance shortlist this font was scoped against is recorded in
 # dev/records/2026-08-glyph-font.md, along with which entries the stroke-weight
@@ -89,8 +83,9 @@ BASE = 18
 # UiGlyphs; do that when a seat exists and the artwork survives --preview.
 # The two SIZES are two seats, not a duplication. The sort pair rides inside a
 # Menomonia Bold 20 column header's own Label.Text, where 6px of ink beside a
-# 17px cap is an indicator; the reading pair is drawn at body size - in a 28px
-# button and in a tree row's 18px caret column - where 6px would be a speck.
+# 17px cap is an indicator; the reading pair is drawn at body size - in a row
+# action button and in a tree row's 18px caret column - where 6px would be a
+# speck.
 # Their rises differ for the same reason: rise is the ink centre's height above
 # the BASELINE of whichever face the glyph is merged into, and Bold 20 puts its
 # cap centre 8px up while Regular 16 puts its own 7px up
@@ -102,7 +97,6 @@ GLYPHS = [
     (0xE102, "caret-up-fill",         8,    7,      13, "caret up"),
     (0xE103, "caret-down-fill",       8,    7,      13, "caret down"),
     (0xE104, "caret-right-fill",     12,    7,       9, "caret right"),
-    (0xE105, "x-lg",                 16,    7,      17, "remove mark"),
 ]
 
 ATLAS_PADDING = 1

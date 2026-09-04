@@ -105,6 +105,9 @@ namespace TaimisToolbench.Views.Rendering
                     e.LevelRightEdge, maxLevelInk, levelHeaderWidth, levelRoom);
             };
 
+            Func<int> rowsHeight =
+                () => section.Rows.Count * PlanContentHeightMath.DisciplineRowHeight;
+
             if (anyCharacterText)
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
@@ -118,13 +121,15 @@ namespace TaimisToolbench.Views.Rendering
                         return JustifiedColumnTracks.CenteredOverContent(
                             e.CharX, maxCharInk, charHeaderWidth, charRoom);
                     },
-                    rightLabelXForWidth: levelLabelX);
+                    rightLabelXForWidth: levelLabelX,
+                    rowsHeight: rowsHeight);
             }
             else
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     contentFlow, panelWidth, DisciplineHeaderText, 8, LevelHeaderText, _sink,
-                    rightLabelXForWidth: levelLabelX);
+                    rightLabelXForWidth: levelLabelX,
+                    rowsHeight: rowsHeight);
             }
 
             for (int i = 0; i < section.Rows.Count; i++)

@@ -282,6 +282,7 @@
     <Compile Include="Views\Rendering\PressFeedback.cs" />
     <Compile Include="Views\Rendering\ClickSound.cs" />
     <Compile Include="Views\Rendering\ClipCutoff.cs" />
+    <Compile Include="Views\Rendering\CloseKeyButton.cs" />
     <Compile Include="Views\Rendering\FeedbackButton.cs" />
     <Compile Include="Views\Rendering\PillColors.cs" />
     <Compile Include="Views\Rendering\HoverChainResync.cs" />
@@ -346,6 +347,7 @@
     <Compile Include="Services\AboutLayoutMath.cs" />
     <Compile Include="Services\SnapshotItemGridLayout.cs" />
     <Compile Include="Services\HeaderCellMath.cs" />
+    <Compile Include="Services\ColumnHeaderLabelMath.cs" />
     <Compile Include="Services\SnapshotResultLayout.cs" />
     <Compile Include="Services\SnapshotTableSorter.cs" />
     <Compile Include="Services\ModuleLogLevel.cs" />
