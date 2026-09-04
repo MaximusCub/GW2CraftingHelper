@@ -20,14 +20,19 @@ namespace TaimisToolbench.Services
     /// </summary>
     internal static class SnapshotItemGridLayout
     {
+        /// <summary>Left edge of a cell's tier-1 bag-slot icon frame, and
+        /// so of the cell's content - the rule its header word takes
+        /// (<see cref="ColumnHeaderLabelMath"/>).</summary>
+        public const int CellIconX = 2;
+
         /// <summary>
-        /// Left edge of a cell's text column: the tier-1 bag-slot icon
-        /// frame at x=2 (art + 1px border each side) plus its right gap. It
-        /// lives here, derived from <see cref="ItemIconTiers.BagSlotIconSize"/>,
-        /// so <see cref="SnapshotMinColumnWidth"/> is derived from the geometry
+        /// Left edge of a cell's text column: the icon frame (art + 1px
+        /// border each side) plus its right gap. It lives here, derived
+        /// from <see cref="ItemIconTiers.BagSlotIconSize"/>, so
+        /// <see cref="SnapshotMinColumnWidth"/> is derived from the geometry
         /// the cells are actually built with and cannot drift from it.
         /// </summary>
-        public const int CellTextX = 2 + ItemIconTiers.BagSlotIconSize + 2 + 6;
+        public const int CellTextX = CellIconX + ItemIconTiers.BagSlotIconSize + 2 + 6;
 
         /// <summary>Gap kept clear of a cell's right edge.</summary>
         public const int CellTextRightPad = 8;

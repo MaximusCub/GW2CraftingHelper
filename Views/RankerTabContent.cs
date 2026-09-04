@@ -852,7 +852,11 @@ namespace TaimisToolbench.Views
             var bands = BandsFor(barWidth);
 
             SetHeaderLabel(0, bands.RankX);
-            SetHeaderLabel(1, bands.NameX);
+
+            // The rank column is a column of its own and stays out of
+            // Item's span: Item begins at the icon its rows open with, not
+            // at the band's left edge (Services/ColumnHeaderLabelMath).
+            SetHeaderLabel(1, ColumnHeaderLabelMath.LabelX(bands.NameX, bands.IconX));
 
             // The four data columns centre their header on the same track
             // their cells centre on, which is what puts a header over the

@@ -108,7 +108,7 @@ namespace TaimisToolbench.Views.Rendering
             // (JustifiedColumnTracks.CenteredOverContent).
             ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                 contentFlow, panelWidth,
-                "Item", NameX,
+                "Item", ColumnHeaderLabelMath.LabelX(NameX, IconX),
                 "Amount", _sink,
                 onLeftClick: () => SortBy(PlanTableColumn.Item),
                 onRightClick: () => SortBy(PlanTableColumn.Amount),

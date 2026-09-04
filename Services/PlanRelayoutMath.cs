@@ -94,20 +94,23 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// The x every plan table's left-hand header word sits on - an
-        /// alias for <see cref="ShoppingColumnMath.NameX"/>, which owns the
-        /// arithmetic and which Used Materials and Required Recipes
-        /// duplicate as their own NameX.
+        /// The one rail every plan table's left-hand header word sits on:
+        /// <see cref="ColumnHeaderLabelMath"/> applied to the icon gutter
+        /// the tables open their rows with
+        /// (<see cref="ShoppingColumnMath.IconX"/>), which Used Materials
+        /// and Required Recipes duplicate as their own IconX/NameX pair.
         /// <para>
-        /// Named here because the Recipe Tree cannot derive it: its rows
-        /// carry a caret column before the icon, so its own depth-0 name
-        /// rule (TreeRowShapePlanner.NameColumnOffset) is 8px further
-        /// right, and anchoring "Item" there put the tree's header 8px
-        /// right of the identically-worded header on the table directly
-        /// beneath it. A reader sees the two words, not the two grids.
+        /// A rail rather than each table's own answer because the Recipe
+        /// Tree's grid differs from the tables stacked under it - a caret
+        /// column sits before its icon, so its depth-0 gutter
+        /// (TreeRowShapePlanner.CaretColumnWidth) is 10px right of theirs -
+        /// and a reader sees the two identical words, not the two grids.
+        /// The rail stays inside the tree's own Item column, which starts
+        /// at its caret.
         /// </para>
         /// </summary>
-        public const int TableLeftHeaderX = ShoppingColumnMath.NameX;
+        public static int TableLeftHeaderX =>
+            ColumnHeaderLabelMath.LabelX(ShoppingColumnMath.NameX, ShoppingColumnMath.IconX);
 
         /// <summary>
         /// FLOOR width of the recipe tree's decision-pill column - the

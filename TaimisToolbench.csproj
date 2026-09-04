@@ -346,6 +346,7 @@
     <Compile Include="Services\AboutLayoutMath.cs" />
     <Compile Include="Services\SnapshotItemGridLayout.cs" />
     <Compile Include="Services\HeaderCellMath.cs" />
+    <Compile Include="Services\ColumnHeaderLabelMath.cs" />
     <Compile Include="Services\SnapshotResultLayout.cs" />
     <Compile Include="Services\SnapshotTableSorter.cs" />
     <Compile Include="Services\ModuleLogLevel.cs" />

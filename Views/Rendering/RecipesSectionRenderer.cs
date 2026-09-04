@@ -115,7 +115,8 @@ namespace TaimisToolbench.Views.Rendering
             // columns either side rather than by their own bands - the
             // module's header law, JustifiedColumnTracks.HeaderRoom. Only
             // Recipe stays on a rule: it is the flexing column, and its
-            // names start at NameX on every row.
+            // rows start with the icon its header rules on
+            // (Services/ColumnHeaderLabelMath).
             int disciplineHeaderWidth = MeasureWidth(headerFont, DisciplineHeaderText);
             int statusHeaderWidth = MeasureWidth(headerFont, StatusHeaderText);
             Func<int, int> statusLabelX = w =>
@@ -132,7 +133,8 @@ namespace TaimisToolbench.Views.Rendering
             if (anyDiscipline)
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
-                    contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink,
+                    contentFlow, panelWidth, RecipeHeaderText,
+                    ColumnHeaderLabelMath.LabelX(NameX, IconX), StatusHeaderText, _sink,
                     middleLabel: DisciplineHeaderText,
                     middleXForWidth: w =>
                     {
@@ -148,7 +150,8 @@ namespace TaimisToolbench.Views.Rendering
             else
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
-                    contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink,
+                    contentFlow, panelWidth, RecipeHeaderText,
+                    ColumnHeaderLabelMath.LabelX(NameX, IconX), StatusHeaderText, _sink,
                     rightLabelXForWidth: statusLabelX,
                     rowsHeight: rowsHeight);
             }

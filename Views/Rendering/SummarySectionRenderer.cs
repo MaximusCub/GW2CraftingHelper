@@ -803,7 +803,11 @@ namespace TaimisToolbench.Views.Rendering
             {
                 Text = nameHeaderText, Font = font, TextColor = HeaderBands.LabelColor,
                 AutoSizeWidth = true, AutoSizeHeight = true,
-                Location = new Point(SummarySectionLayoutMath.CurrencyNameX, HeaderBands.LabelY),
+                Location = new Point(
+                    ColumnHeaderLabelMath.LabelX(
+                        SummarySectionLayoutMath.CurrencyNameX,
+                        SummarySectionLayoutMath.CurrencyIconX),
+                    HeaderBands.LabelY),
                 Parent = band,
             });
 

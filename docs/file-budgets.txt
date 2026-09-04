@@ -91,6 +91,7 @@ Services/BoundedConcurrency.cs                                                  
 Services/ClickSoundVolume.cs                                                            90
 Services/CoinSegmentMath.cs                                                             226
 Services/ColumnBoardLayout.cs                                                           130
+Services/ColumnHeaderLabelMath.cs                                                       43
 Services/CompetencyOpportunityCalculator.cs                                             83
 Services/CompositeRecipeApiClient.cs                                                    84
 Services/CostLineValuation.cs                                                           121
@@ -170,7 +171,7 @@ Services/PlanHistoryRowLayout.cs                                                
 Services/PlanHistoryStore.cs                                                            155
 Services/PlanHistoryTableSorter.cs                                                      103
 Services/PlanPhaseEvent.cs                                                              73
-Services/PlanRelayoutMath.cs                                                            450
+Services/PlanRelayoutMath.cs                                                            453
 Services/PlanResultBuilder.cs                                                           375
 Services/PlanSolver.cs                                                                  2323
 Services/PlanStore.cs                                                                   219
@@ -231,7 +232,7 @@ Services/SnapshotFailureKind.cs                                                 
 Services/SnapshotFetchFailedException.cs                                                69
 Services/SnapshotHeaderLayout.cs                                                        205
 Services/SnapshotHelpers.cs                                                             79
-Services/SnapshotItemGridLayout.cs                                                      245
+Services/SnapshotItemGridLayout.cs                                                      250
 Services/SnapshotRefreshSlot.cs                                                         93
 Services/SnapshotResultLayout.cs                                                        90
 Services/SnapshotSearchResultBuilder.cs                                                 501
@@ -283,12 +284,12 @@ Views/ItemInputRowStrip.cs                                                      
 Views/ItemRowState.cs                                                                   39
 Views/LogTabContent.cs                                                                  1538
 Views/MainThreadMarshal.cs                                                              141
-Views/MainView.cs                                                                       2831
+Views/MainView.cs                                                                       2835
 Views/DialogWindow.cs                                                                   108
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    425
 Views/PlanHistoryTabContent.cs                                                          1487
-Views/RankerTabContent.cs                                                               3014
+Views/RankerTabContent.cs                                                               3018
 Views/Rendering/ClickSound.cs                                                           197
 Views/Rendering/CoinCurrencyRenderer.cs                                                 649
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              221
@@ -312,7 +313,7 @@ Views/Rendering/PlanHeaderRenderer.cs                                           
 Views/Rendering/PressFeedback.cs                                                        118
 Views/Rendering/RankerReadinessColors.cs                                                99
 Views/Rendering/RarityColors.cs                                                         199
-Views/Rendering/RecipesSectionRenderer.cs                                               362
+Views/Rendering/RecipesSectionRenderer.cs                                               365
 Views/Rendering/RichTooltipSurface.cs                                                   607
 Views/Rendering/RowRelayoutHelpers.cs                                                   72
 Views/Rendering/ShoppingBadgeColors.cs                                                  72
@@ -322,7 +323,7 @@ Views/Rendering/SortableHeaderBlock.cs                                          
 Views/Rendering/SortableHeaderCells.cs                                                  249
 Views/Rendering/SortableHeaderLabel.cs                                                  38
 Views/Rendering/StickyHeaderHost.cs                                                     404
-Views/Rendering/SummarySectionRenderer.cs                                               1050
+Views/Rendering/SummarySectionRenderer.cs                                               1054
 Views/Rendering/TextRowRenderer.cs                                                      36
 Views/Rendering/TooltipFacility.cs                                                      288
 Views/Rendering/TreeSectionController.cs                                                2530
@@ -332,7 +333,7 @@ Views/Rendering/GlyphFont.cs                                                    
 Views/Rendering/UiMetrics.cs                                                            60
 Views/Rendering/UsedMaterialsSectionRenderer.cs                                         223
 Views/ResizableTabbedWindow.cs                                                          250
-Views/SettingsTabContent.cs                                                             2936
+Views/SettingsTabContent.cs                                                             2942
 Views/SuggestionPanel.cs                                                                504
 Views/ViewAdapter.cs                                                                    261
 tests/TaimisToolbench.RecipeSeeder.Tests/RecipeSeederHttpTests.cs                       122
@@ -460,7 +461,7 @@ tests/TaimisToolbench.Tests/Services/PlanHistoryRowLayoutTests.cs               
 tests/TaimisToolbench.Tests/Services/PlanHistoryStoreTests.cs                           323
 tests/TaimisToolbench.Tests/Services/PlanHistoryTableSorterTests.cs                     177
 tests/TaimisToolbench.Tests/Services/PlanPhaseTimingSummaryTests.cs                     201
-tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                           763
+tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                           778
 tests/TaimisToolbench.Tests/Services/PlanResultBuilderTests.cs                          1103
 tests/TaimisToolbench.Tests/Services/PlanRootIgnoreTests.cs                             412
 tests/TaimisToolbench.Tests/Services/PlanSolverBarterItemValuationTests.cs              425

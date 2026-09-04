@@ -227,13 +227,14 @@ namespace TaimisToolbench.Views.Rendering
             var color = HeaderBands.LabelColor;
 
             // The Item column flexes and its cells rule left, so its header
-            // stays on that rule at NameX. Every other header CENTRES over
-            // the INK its own cells cover, bounded by the columns either
-            // side of it and not by the band around that ink - see
-            // Services/JustifiedColumnTracks.HeaderRoom. Every one of the
-            // five carries a persistent sort indicator, and the block width
-            // that covers it is what the placement below is handed, so a
-            // sort click moves no column.
+            // stays on that rule - at the icon its rows open with, not at
+            // the name beside it (Services/ColumnHeaderLabelMath). Every
+            // other header CENTRES over the INK its own cells cover,
+            // bounded by the columns either side of it and not by the band
+            // around that ink - see JustifiedColumnTracks.HeaderRoom. Every
+            // one of the five carries a persistent sort indicator, and the
+            // block width that covers it is what the placement below is
+            // handed, so a sort click moves no column.
             var columns = new[]
             {
                 PlanTableColumn.Item, PlanTableColumn.Source, PlanTableColumn.Amount,
@@ -253,7 +254,7 @@ namespace TaimisToolbench.Views.Rendering
             int eachHeaderWidth = blocks[3].Width;
             int totalHeaderWidth = blocks[4].Width;
 
-            blocks[0].MoveTo(NameX);
+            blocks[0].MoveTo(ColumnHeaderLabelMath.LabelX(NameX, IconX));
             PlaceDataHeaders(
                 blocks, scan, edges,
                 sourceHeaderWidth, amountHeaderWidth, eachHeaderWidth, totalHeaderWidth);
