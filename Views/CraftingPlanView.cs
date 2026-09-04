@@ -97,7 +97,10 @@ namespace TaimisToolbench.Views
         /// <para>
         /// The strip's rows are grid rows, not item rows - four items share
         /// one at the window minimum - so the width has to be passed in:
-        /// there is no strip height without it.
+        /// there is no strip height without it. Pass the width the strip is
+        /// LAID OUT at (<c>_stripReflow.AppliedWidth</c>) and not the
+        /// window's live width, which during a drag is a width the strip
+        /// has not moved to yet.
         /// </para>
         /// </summary>
         private TopRegionLayout ComputeTopRegionLayout(int w)
@@ -517,6 +520,17 @@ namespace TaimisToolbench.Views
         private const int ResizeDebounceMs = 150;
         private DateTime _lastResizeEventUtc;
         private bool _resizeSettlePending;
+
+        // The item input strip's column count is a step function of the
+        // panel width, so re-seating it on every drag tick stretches each
+        // cell between two boundaries and repacks the whole strip at each
+        // one. This gate holds the newest width and releases it once, at
+        // settle or on pointer release. Everything whose position derives
+        // from the strip's width reads AppliedWidth, never the live width:
+        // the reserved height and the strip it reserves for have to move on
+        // the same frame or the content jumps ahead of the strip.
+        private readonly DeferredReflowGate _stripReflow =
+            new DeferredReflowGate(ResizeDebounceMs);
 
         #endregion // Resize relayout: the closure registries - KNOWN-ISSUES #13/#19
 
@@ -1464,6 +1478,11 @@ namespace TaimisToolbench.Views
             _resizeScrollRestorePending = false;
             _resizeScrollSavedOffset = 0;
             _lastWheelEventUtc = null;
+
+            // The only thing that would have applied a deferred strip width
+            // was the ticker just cancelled, and the panel it was measured
+            // against is being torn down or replaced.
+            _stripReflow.CancelPending();
         }
 
         #endregion // FrameTicker: teardown - KNOWN-ISSUES #12/#13
@@ -1946,7 +1965,18 @@ namespace TaimisToolbench.Views
 
             int w = _buildPanel.ContentRegion.Width;
             int h = _buildPanel.ContentRegion.Height;
-            var layout = ComputeTopRegionLayout(w);
+
+            // A rebuild tears the strip's controls down and builds them
+            // again, so there is no in-progress layout left to smooth: take
+            // the live width and drop whatever a drag had deferred. Without
+            // a rebuild the strip is untouched, so its own width stands.
+            if (rebuildItemRows)
+            {
+                _stripReflow.Reset(w);
+            }
+
+            int stripWidth = _stripReflow.AppliedWidth;
+            var layout = ComputeTopRegionLayout(stripWidth);
 
             int savedScrollOffset = _contentPanel?.VerticalScrollOffset ?? 0;
             int previousContentHeight = _contentPanel?.Height ?? 0;
@@ -1954,7 +1984,7 @@ namespace TaimisToolbench.Views
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
             if (rebuildItemRows)
             {
-                _inputRows.Rebuild(_inputPanel, w);
+                _inputRows.Rebuild(_inputPanel, stripWidth);
             }
 
             _controlsPanel.Location = new Point(0, layout.ControlsRowY);
@@ -2007,6 +2037,10 @@ namespace TaimisToolbench.Views
 
             _buildPanel = buildPanel;
             int w = buildPanel.ContentRegion.Width;
+
+            // Everything below is built at this width, so it is also the
+            // width the strip is laid out at from here on.
+            _stripReflow.Reset(w);
 
             _inputRows.SeedFirstRow();
 
@@ -2826,6 +2860,7 @@ namespace TaimisToolbench.Views
             var container = (Container)sender;
             int w = container.ContentRegion.Width;
             int h = container.ContentRegion.Height;
+            var nowUtc = DateTime.UtcNow;
 
             // Capture the content panel's absolute scroll offset
             // (pixels) and height BEFORE either changes below - see
@@ -2835,16 +2870,18 @@ namespace TaimisToolbench.Views
             int previousContentHeight = _contentPanel?.Height ?? 0;
 
             // Update widths of layout panels. Top-strip controls keep their
-            // pre-existing direct updates - these were
-            // never part of the dispose+rebuild problem the relayout
-            // registry below replaces. The input strip is a grid whose
-            // column count is a function of this width, so a drag can move
-            // a cell sideways and onto another row - ResizeRows re-seats
-            // them - and the Y offsets below it come from the same
-            // ComputeTopRegionLayout formula Build()/ReflowTopRegion use.
-            var layout = ComputeTopRegionLayout(w);
+            // pre-existing direct updates - these were never part of the
+            // dispose+rebuild problem the relayout registry below replaces.
+            // The input strip is the exception: its cells are re-seated at
+            // drag settle instead (ApplyPendingStripReflow), and the Y
+            // offsets below the strip are computed from the width the strip
+            // is actually laid out at rather than from this one, so the
+            // content below can never move ahead of the strip above it. The
+            // panel itself still takes the live width - it is the clipping
+            // frame for cells that a narrowing drag has not re-seated yet.
+            _stripReflow.Observe(w, nowUtc);
+            var layout = ComputeTopRegionLayout(_stripReflow.AppliedWidth);
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
-            _inputRows.ResizeRows(w);
 
             _controlsPanel.Size = new Point(w, RowHeight);
             _controlsPanel.Location = new Point(0, layout.ControlsRowY);
@@ -2894,24 +2931,21 @@ namespace TaimisToolbench.Views
                 ReplayRelayout(panelWidth);
             }
 
-            // The trailing settle pass (re-ellipsis, a defensive
-            // relayout replay, and now the resize-scroll verify armed by
-            // PreserveScrollAcrossResize above) must be scheduled whenever
-            // EITHER dimension changed. Previously this ticker was
-            // scheduled only on a width change, which silently starved a
-            // pure height-only drag (e.g. dragging just the bottom edge) of
-            // any settle handling at all - exactly the drag shape the live
-            // regression was found under. Bounded to a single in-flight
-            // ticker (_resizeSettlePending) so repeated ticks during a drag
-            // just extend _lastResizeEventUtc rather than spawning parallel
-            // tickers - see ResizeSettleStep. Still gated on _currentPlan,
-            // unlike the replay above: every job this pass does (re-ellipsis,
-            // the defensive replay, the scroll verify, the notes re-render)
-            // is about rendered plan content, so a no-plan tab would spawn a
-            // ticker per drag to do nothing.
-            if (_currentPlan != null && (widthChanged || heightChanged))
+            // The trailing settle pass (re-ellipsis, a defensive relayout
+            // replay, the resize-scroll verify armed by
+            // PreserveScrollAcrossResize above, and the input strip's
+            // deferred reflow) must be scheduled whenever EITHER dimension
+            // changed. Scheduling it on a width change alone silently
+            // starved a pure height-only drag - dragging just the bottom
+            // edge - of any settle handling at all. Bounded to a single
+            // in-flight ticker (_resizeSettlePending) so repeated ticks
+            // during a drag just extend _lastResizeEventUtc rather than
+            // spawning parallel tickers - see ResizeSettleStep. The plan
+            // gate covers only the jobs about rendered plan content; a
+            // deferred strip width arms the pass with or without a plan.
+            if (_stripReflow.IsPending || (_currentPlan != null && (widthChanged || heightChanged)))
             {
-                _lastResizeEventUtc = DateTime.UtcNow;
+                _lastResizeEventUtc = nowUtc;
 
                 if (!_resizeSettlePending)
                 {
@@ -3141,8 +3175,15 @@ namespace TaimisToolbench.Views
             {
                 _resizeSettlePending = false;
                 _resizeScrollRestorePending = false;
+                _stripReflow.CancelPending();
                 return false;
             }
+
+            // Ahead of the interval check below, because a released pointer
+            // settles the strip with no quiet period at all. The gate's own
+            // interval is this pass's, measured from the same tick, so the
+            // strip has always been re-seated by the time the check passes.
+            ApplyPendingStripReflow();
 
             if ((DateTime.UtcNow - _lastResizeEventUtc).TotalMilliseconds < ResizeDebounceMs)
             {
@@ -3206,6 +3247,44 @@ namespace TaimisToolbench.Views
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// The deferred half of a resize: the input strip is re-seated at
+        /// the width the drag settled on, and the top region's Y arithmetic
+        /// is redone from the row count that width implies. One update for
+        /// both, so the cells and the content below them move on the same
+        /// frame. A no-op until the gate releases a width, which it does
+        /// once per drag - see the _stripReflow field comment.
+        /// </summary>
+        private void ApplyPendingStripReflow()
+        {
+            if (_buildPanel == null || _inputPanel == null)
+            {
+                return;
+            }
+
+            int settledWidth;
+            if (!_stripReflow.TryTake(DateTime.UtcNow, PointerHeld(), out settledWidth))
+            {
+                return;
+            }
+
+            _inputRows.ResizeRows(settledWidth);
+            ReflowTopRegion();
+        }
+
+        /// <summary>
+        /// Whether the left mouse button is down, which for a window being
+        /// dragged by an edge or a corner means the drag is still running.
+        /// Releasing it ends a drag with no quiet period, so the settle
+        /// gate counts a release as a settle in its own right rather than
+        /// making the user watch the strip re-seat itself after they let go.
+        /// </summary>
+        private static bool PointerHeld()
+        {
+            return GameService.Input?.Mouse?.State.LeftButton
+                == Microsoft.Xna.Framework.Input.ButtonState.Pressed;
         }
 
         /// <summary>
