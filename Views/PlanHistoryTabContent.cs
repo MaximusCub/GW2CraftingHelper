@@ -53,7 +53,7 @@ namespace TaimisToolbench.Views
         // centres on its own height rather than sharing the seat of the
         // text buttons beside it.
         private static readonly int RemoveButtonY =
-            (PlanHistoryRowLayout.RowHeight - PlanHistoryRowLayout.IconButtonWidth) / 2;
+            (PlanHistoryRowLayout.RowHeight - PlanHistoryRowLayout.IconButtonHeight) / 2;
 
         // Not a row: one prose line with no icon column, so it does not
         // follow the rows' frame-driven height. It does share their left
@@ -431,7 +431,7 @@ namespace TaimisToolbench.Views
             public FeedbackButton Open;
             public FeedbackButton Resolve;
             public Checkbox Pin;
-            public FeedbackButton Delete;
+            public CloseKeyButton Delete;
             public Panel DetailPanel;
             public readonly List<Label> DetailFlexLabels = new List<Label>();
             public readonly List<string> DetailFlexFulls = new List<string>();
@@ -750,21 +750,16 @@ namespace TaimisToolbench.Views
             return button;
         }
 
-        // The marks this seat has worn, in order: U+00D7, which Menomonia
-        // does carry but draws too faint to read as an action; then Blish's
-        // own X texture tinted dark, which landed within nine units of the
-        // ink this button paints DISABLED text in; now the module's own
-        // cross, which is what the Ranker's identical control draws.
-        private FeedbackButton CreateRemoveButton(Panel parent, int x)
+        // Blish's own window close control, which is what the Ranker's
+        // identical action draws (Views/Rendering/CloseKeyButton). No
+        // explicit Size: the control is born at that box.
+        private CloseKeyButton CreateRemoveButton(Panel parent, int x)
         {
-            var button = new FeedbackButton
+            var button = new CloseKeyButton
             {
-                Size = new Point(
-                    PlanHistoryRowLayout.IconButtonWidth, PlanHistoryRowLayout.IconButtonWidth),
                 Location = new Point(x, RemoveButtonY),
                 Parent = parent,
             };
-            button.SetGlyph(UiGlyphs.RemoveMark);
             TooltipFacility.ApplyPlain(button, "Remove this entry from the history.");
             return button;
         }

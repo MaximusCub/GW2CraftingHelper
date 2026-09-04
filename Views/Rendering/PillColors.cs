@@ -81,15 +81,12 @@ namespace TaimisToolbench.Views.Rendering
                     break;
                 case PillKind.Ignore:
                     // The one two-state TOGGLE, and it draws the same mark
-                    // (UiGlyphs.RemoveMark) either way, so its state has to
-                    // be legible from the chrome alone. Raised vs. pressed:
-                    // OFF is an outlined key - grey ring, no fill, matching
-                    // the clickable Available pill and never Selected's
-                    // green - and ON is that key pushed in, filled with the
-                    // amber the ring used to draw at #9C7327 (4.29:1 on
-                    // white) and edged darker so the lit top edge is gone.
-                    // The mark itself is the button's own ink, not this
-                    // function's: the toggle is a FeedbackButton now.
+                    // either way, so its state has to be legible from the
+                    // chrome alone: ON is that key pushed in, the amber the
+                    // ring used to draw at #9C7327 (4.29:1 on white).
+                    // Only the FILL is read - the toggle is a texture
+                    // (Views/Rendering/CloseKeyButton), which multiplies it
+                    // in and carries its own border in the art.
                     border = isIgnoreActive ? new Color(94, 69, 23) : new Color(138, 138, 138); // #5E4517 / #8A8A8A
                     fill = isIgnoreActive ? new Color(156, 115, 39) : Color.Transparent; // #9C7327
                     break;

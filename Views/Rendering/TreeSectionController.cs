@@ -2029,48 +2029,39 @@ namespace TaimisToolbench.Views.Rendering
                 Control outer;
                 Panel inner = null;
                 Label label = null;
-                FeedbackButton toggle = null;
+                CloseKeyButton toggle = null;
                 if (isToggle)
                 {
-                    // The toggle is the module's real button, not a pill
-                    // panel: Blish's own face atlas, border art, hover sweep
-                    // and press feedback come from FeedbackButton, which is
-                    // a StandardButton. Its size is the row-action square
-                    // (Services/GlyphButtonMetrics), and it fills its slot
-                    // exactly so the anchored rectangle below IS the hit
-                    // target in both states. The black mark on the parchment
-                    // face is the button's own enabled ink; SetGlyph pairs
-                    // the mark with the one face that can draw it.
-                    toggle = new FeedbackButton
+                    // The toggle is Blish's own window close control, not a
+                    // pill panel and not a plate carrying a mark
+                    // (Views/Rendering/CloseKeyButton). It fills its slot
+                    // exactly, so the anchored rectangle below IS the hit
+                    // target in both states.
+                    toggle = new CloseKeyButton
                     {
-                        // Both axes from RowActionSize, as the Ranker and
-                        // Plan History rows already do. Its width comes from
-                        // ReservedIgnorePillWidth, which is that constant;
-                        // taking the height from PillHeight left it square
-                        // only while two independent numbers coincided.
-                        Size = new Point(placement.Width, GlyphButtonMetrics.RowActionSize),
+                        // The width comes from ReservedIgnorePillWidth and
+                        // the height from the same metrics, because the two
+                        // axes of this control differ and PillHeight is
+                        // neither of them.
+                        Size = new Point(placement.Width, GlyphButtonMetrics.RowActionHeight),
                         Location = new Point(placement.X, pillY),
                         Parent = rowPanel,
                     };
-                    toggle.SetGlyph(UiGlyphs.RemoveMark);
                     if (node.IsIgnored)
                     {
-                        toggle.PlateTint = fillColor;
+                        toggle.Tint = fillColor;
                     }
 
-                    if (dimmed)
-                    {
-                        // The whole control washes, not the colors: Blish
-                        // multiplies AbsoluteOpacity into every DrawOnCtrl
-                        // colour, so plate, border and mark dim together -
-                        // and so the ON key's mark drops to about 2:1
-                        // against its own plate, under the 3:1 non-text
-                        // floor. Measured, and left alone because the ink
-                        // colour is a design call: docs/KNOWN-ISSUES.md,
-                        // DEFERRED, "Dimmed IGNORE toggle's mark".
-                        toggle.Opacity = PillColors.DimmedPillFactor;
-                    }
-
+                    // No wash of its own on a dimmed row. ignoreInteractive
+                    // below requires !dimmed, so a dimmed row's toggle is
+                    // always disabled, and CloseKeyButton fades a disabled
+                    // key by exactly PillColors.DimmedPillFactor - the pills
+                    // beside it get the same fraction, and a second wash
+                    // here would multiply the two. The key's mark then sits
+                    // at about 2:1 against its own plate, which is the art's
+                    // ratio rather than a colour anyone here picked:
+                    // docs/KNOWN-ISSUES.md, DEFERRED, "Dimmed IGNORE
+                    // toggle's mark".
                     outer = toggle;
                 }
                 else
@@ -2113,8 +2104,9 @@ namespace TaimisToolbench.Views.Rendering
                 // The pill went inert on a dimmed row by never being wired;
                 // a button is born armed, so Enabled is the switch: Blish
                 // gates Click on it and PressFeedback.Wire checks it before
-                // dimming or sounding. The hover sweep still plays, which is
-                // the behaviour the disabled Generate button already has.
+                // dimming or sounding. The hover state goes with it, because
+                // an inert key that lights under the cursor is a promise it
+                // will not keep.
                 if (toggle != null && !ignoreInteractive)
                 {
                     toggle.Enabled = false;
@@ -2180,9 +2172,9 @@ namespace TaimisToolbench.Views.Rendering
 
                     // No hand-rolled wash-and-restore here: ignoreInteractive
                     // implies PillKind.Ignore, so this arm only ever holds the
-                    // toggle, whose press came from FeedbackButton's own
-                    // PressFeedback wiring and whose hover is Blish's
-                    // OnMouseEntered tween. The pill arm above keeps the pair.
+                    // toggle, whose press came from CloseKeyButton's own
+                    // PressFeedback wiring and whose hover is the texture
+                    // swap. The pill arm above keeps the pair.
                 }
 
                 // Appends the value-detail
@@ -2360,23 +2352,23 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// The IGNORE toggle's slot width, which is the button itself: a
-        /// FeedbackButton at the module's row-action square
-        /// (Services/GlyphButtonMetrics), the compact close-key scale the
-        /// field report benchmarked it against. Nothing is padded on top of
-        /// the button's edge, because padding outside a filled button is a
-        /// dead strip the row's expand/collapse click would answer - the
-        /// exact mis-hit the anchored slot exists to prevent.
+        /// The IGNORE toggle's slot width, which is the control itself:
+        /// Blish's own window close key at its own measured box
+        /// (Services/GlyphButtonMetrics), which is the scale the field
+        /// report benchmarked it against. Nothing is padded on top of that
+        /// edge, because padding outside a filled control is a dead strip
+        /// the row's expand/collapse click would answer - the exact mis-hit
+        /// the anchored slot exists to prevent.
         /// <para>
-        /// The slot is state-independent by construction: the button draws
-        /// the same mark raised or filled (FeedbackButton.PlateTint), so
-        /// ignoring an item re-renders the toggle at the same rectangle it
-        /// was clicked in (Services/TreePillRunLayout).
+        /// The slot is state-independent by construction: the key draws the
+        /// same mark plain or amber (CloseKeyButton.Tint), so ignoring an
+        /// item re-renders the toggle at the same rectangle it was clicked
+        /// in (Services/TreePillRunLayout).
         /// </para>
         /// </summary>
         private static int ReservedIgnorePillWidth()
         {
-            return GlyphButtonMetrics.RowActionSize;
+            return GlyphButtonMetrics.RowActionWidth;
         }
 
         private const int PillLabelY = 2;

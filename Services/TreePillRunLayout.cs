@@ -14,7 +14,7 @@ namespace TaimisToolbench.Services
     /// states: <see cref="ReservedSlotWidth"/> sizes ONE slot for both of
     /// the faces it can draw, so the pill neither moves nor resizes across
     /// a click. The two faces are now the same mark - the renderer draws
-    /// UiGlyphs.RemoveMark in a raised or pressed key rather than the words
+    /// one close key, plain or amber, rather than the words
     /// "IGNORE"/"IGNORED" - which makes that rectangle identical by
     /// construction rather than by measurement.
     /// </para>
