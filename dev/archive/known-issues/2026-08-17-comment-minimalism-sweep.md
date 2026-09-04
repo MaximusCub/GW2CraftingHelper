@@ -60,7 +60,7 @@ AutoSize convergence class doc; WheelDeltaSanitizer's root-cause/
 threshold contract doc; ISectionRelayoutSink's seam contract;
 CurrencyDecisionDefaults' MIT permission notice; scroll
 preserve-restore-verify invariants in CraftingPlanView (comment edits
-only, no code touched in the high-evidence zones).
+only, no code touched in the files pinned by expensive evidence).
 
 **Flagged suspect claims (not rewritten; verify separately):** none
 found - no surviving comment's technical claim was determined false
@@ -89,7 +89,7 @@ suite 207/207 after the tools and tests batches (and after the
 findings-fix pass).
 
 Gate: PASS (comments and whitespace only - the review pass verified
-the diff contains no code-token change, so no desktop gate applies;
+the diff contains no code-token change, so no sandbox check applies;
 evidence is the no-semantic-change check plus both suites green at the
 verification pass - module 1827/1827, updater 207/207, build 0
 errors).

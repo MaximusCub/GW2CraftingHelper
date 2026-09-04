@@ -3,7 +3,7 @@
 This document describes the current, actual state of packaging and release
 for Taimi's Toolbench - not an aspirational process.
 
-**What the project actually practices today** (the v0.2.x field-test era):
+**What the project actually practices today** (the v0.2.x in-game testing era):
 a release is a CHANGELOG entry, a `manifest.json` version bump, and a
 matching `v<version>` git tag on the release commit, deployed by copying
 the built `.bhm` into a live Blish HUD install. `CHANGELOG.md` states the
@@ -111,7 +111,7 @@ compared with `git diff v0.2.0..v0.2.1`.
 The release-prep pass staged protocol steps 4-6 on this branch:
 `manifest.json` says `0.3.0`, `CHANGELOG.md` carries the `## 0.3.0`
 section the workflow publishes verbatim, and the version prose is swept.
-What remains after the field-test pass:
+What remains after the in-game testing pass:
 
 ```
 # 1. Refresh the recipe seeds (protocol step 2); commit if anything moved.

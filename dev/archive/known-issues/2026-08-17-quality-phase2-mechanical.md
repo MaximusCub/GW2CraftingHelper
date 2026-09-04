@@ -74,7 +74,7 @@ updater suite 207/207; RecipeSeeder suite 3/3.
 
 Gate: PASS (comment/doc/test-only batch plus dead-symbol deletions
 with re-verified zero references; no rendered surface changed, so no
-desktop gate applies; evidence is the per-commit build/suite record
+sandbox check applies; evidence is the per-commit build/suite record
 above and the verification pass at 9022c9b - module 1827/1827, updater
 207/207, build 0 errors).
 

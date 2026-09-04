@@ -3,7 +3,7 @@
 
 ## Root ignore suppression and the zero-cost band (root-ignore-summary-zero)
 
-Two findings from the same field-test round, both about what
+Two findings from the same round of in-game testing, both about what
 the plan shows once nothing is left to buy.
 
 ### 1. The root row must not offer IGNORE
@@ -114,7 +114,7 @@ Two pre-existing `DecisionPillPlannerTests` end-to-end cases asserted an
 IGNORE pill on a `BuildTree` root and were updated to the new
 expectation.
 
-### Desktop gate
+### Sandbox check
 
 1. Generate any plan. The **root row shows no IGNORE pill** - source
    pills and any HAVE annotation are unchanged, and every child row still
@@ -160,7 +160,7 @@ expectation.
    ignores, so ignoring an ingredient and then planning that item alone
    yields an ordinary un-ignored root.
 
-Gate: PASS with recorded partials (2026-08-23 night desktop session,
+Gate: PASS with recorded partials (2026-08-23 night sandbox session,
 branch build, captures preflight/gRZ1-gRZ6). LIVE-VERIFIED: the plan
 root offers no IGNORE pill - and on the strongest possible variant:
 a schema-3 plan RESTORED from disk into this build (PlanStoreHelpers

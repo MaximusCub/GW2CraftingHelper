@@ -119,7 +119,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void AmountColumn_SortsNumerically_NotLexicographically()
         {
-            // The field-test fixture's own amounts, plus a single-digit row:
+            // The in-game fixture's own amounts, plus a single-digit row:
             // a string sort would put "111" before "9".
             var rows = new List<PlanRowViewModel>
             {

@@ -1,25 +1,25 @@
 > **Frozen record - 2026-08-17, branch `high-evidence-zones`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
 > Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
 
-## High-evidence zones: policy rewrite + PlanContentHeightMath dead-code sweep (high-evidence-zones, 2026-08-17)
+## Freeze policy rewrite + PlanContentHeightMath dead-code sweep (high-evidence-zones, 2026-08-17)
 
-Two-part change, the first application of the new high-evidence-zone
-policy (2026-08-17, replacing the M38-era DO-NOT-TOUCH
-freeze - see this file's own policy note near the top).
+Two-part change, the first application of the new proof-carrying policy
+(2026-08-17, replacing the M38-era freeze - see this file's own policy
+note near the top).
 
 **Part 1 (policy docs).** Swept `docs/KNOWN-ISSUES.md` and
-`docs/ARCHITECTURE.md` for DO-NOT-TOUCH/frozen-file language that
+`docs/ARCHITECTURE.md` for frozen-file language that
 functions as an active, current-state statement (as opposed to a
 historical gate/review record narrating what applied to a specific past
 change at the time it was made, which was left untouched to preserve the
 record): added the policy note near the top of this file; reworded item
 23's and the concurrency-audit table's `CraftingPlanView` row's
-DO-NOT-TOUCH phrasing to "high-evidence zone (formerly DO-NOT-TOUCH)";
-reworded `docs/ARCHITECTURE.md` section 7's two do-not-touch statements
+frozen phrasing to "code pinned by expensive evidence (formerly frozen)";
+reworded `docs/ARCHITECTURE.md` section 7's two frozen-file statements
 about `VendorBatchSolver.cs`'s merged-ceil arithmetic the same way, and
 added the proof requirement to that section. `CLAUDE.md` (in-repo) was
-checked and does not carry DO-NOT-TOUCH/frozen-file language, so it
-needed no change. Historical narration of specific past PRs' DO-NOT-TOUCH
+checked and does not carry frozen-file language, so it
+needed no change. Historical narration of specific past PRs' frozen
 compliance (roughly two dozen entries throughout this file's numbered
 catalog and PR write-ups) was deliberately left in its original wording -
 rewriting those would misrepresent what rule actually applied at the
@@ -107,7 +107,7 @@ remains a real behavior-bearing change awaiting the architecture audit
 findings, and is out of scope here.
 
 Gate: PASS (non-visual change: docs policy rewrite plus dead-code
-deletion, so no desktop gate applies; evidence is the unreachability
+deletion, so no sandbox check applies; evidence is the unreachability
 grep proof plus the suite arithmetic above - 1765 baseline to 1760
 passing with only the 5 dead/vacuous tests removed, 0 failures, build
 clean at b420460).

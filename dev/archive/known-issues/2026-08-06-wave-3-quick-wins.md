@@ -1,9 +1,9 @@
 > **Frozen record - 2026-08-06, branch `wave-3-quick-wins`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
 > Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
 
-## Wave-3 quick wins (2026-08-06)
+## Quick wins (wave-3-quick-wins, 2026-08-06)
 
-Four changes from the same 2026-08-06 field-testing session,
+Four changes from the same 2026-08-06 in-game testing session,
 implemented in the isolated `wt-wave3a` worktree off master (4ac5461,
 includes PR #102) on branch `wave3a-quick-wins`. One commit per item.
 
@@ -77,13 +77,13 @@ code (`CraftingPlanView`'s checkbox wiring, `LogTabContent`'s
 constructor-injected delegates, `Module`'s tab-factory wiring) has no new
 tests per the Blish-free-tests invariant.
 
-Live desktop gate: PASS (2026-08-06, live branch-build
+Live sandbox check: PASS (2026-08-06, live branch-build
 sandbox session, captures w3a_01-06 in preflight/captures):
 - Use Own Materials starts CHECKED with zero interaction (fresh module
   session, capture w3a_01).
 - Required Recipes: header reads "(showing 14 missing of 34)" with Hide
   Unlocked Recipes CHECKED by default; unfiltering restores all 34 with
-  Auto-learned tags; the pre-wave total for the same plan was 47 - the
+  Auto-learned tags; the total before this batch for the same plan was 47 - the
   13 Mystic Forge combos are gone from the section entirely in both
   filter states; unverifiable-status rows correctly stay visible under
   the filter (sandbox has no API key, so unlock status is unknowable).

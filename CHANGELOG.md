@@ -85,7 +85,7 @@ recipe cache stops forgetting what it already knows.
 ## 0.2.4 - 2026-08-25
 
 The rest of the module catches up with the crafting planner, plus a
-second field-test round.
+second round of in-game testing.
 
 ### Changed
 - **Every tab now uses the width it occupies.** Settings becomes a
@@ -169,7 +169,7 @@ your screen.
 
 ## 0.2.2 - 2026-08-24
 
-Second field-test round plus the pixel-authenticity wave (PRs #163-#170).
+Second round of in-game testing plus the pixel-authenticity wave (PRs #163-#170).
 
 ### Added
 - Item tooltips now duplicate the in-game visual style, measured
@@ -217,12 +217,12 @@ Second field-test round plus the pixel-authenticity wave (PRs #163-#170).
 
 ## 0.2.1 - 2026-08-24
 
-First round of live field-test feedback, fixed and shipped (PRs #156-#161).
+First round of feedback from in-game use, fixed and shipped (PRs #156-#161).
 
 ### Fixed
 - The Clear Cache confirmation dialog now fits its whole message and its
   title bar renders cleanly; a second layout bug that clipped the last
-  wrapped line mid-glyph was caught on the desktop gate and fixed too.
+  wrapped line mid-glyph was caught on the sandbox check and fixed too.
 - The Settings currency valuation boxes now read as inputs: "Currency /
   Copper per unit" column headers, each box hinting its own default, and an
   instruction line. (The override mechanics were verified working all
@@ -264,7 +264,7 @@ First round of live field-test feedback, fixed and shipped (PRs #156-#161).
 
 ## 0.2.0 - 2026-08-23
 
-First stamped field-test release. Highlights relative to the unversioned
+First stamped release for in-game testing. Highlights relative to the unversioned
 development era:
 
 - Full 30-finding UX/visual audit implemented (visible tree carets, cost

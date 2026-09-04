@@ -225,9 +225,9 @@ round. No Blish HUD/BlishHUD.exe references in any test file; every
 test exercises a real production entry point, no contract mirrors. IDs
 remain internal-only; coin icons unaffected throughout this entire
 history (pricing/tooltip logic only, no coin-rendering code touched).
-No live desktop verification was performed at any point in this
+No live sandbox verification was performed at any point in this
 history - `TreeSectionController.cs` is Blish-bound and outside this
 repo's test-runnable surface, same constraint every UI-adjacent entry
 in this file notes.
 
-Gate: PARTIAL PASS 2026-08-16 (live desktop session). Fallback pricing exercised implicitly throughout live plans; the caveat tooltip's specific fallen-back shape did not occur in the tested plans - suite-covered, visual slice deferred.
+Gate: PARTIAL PASS 2026-08-16 (live sandbox session). Fallback pricing exercised implicitly throughout live plans; the caveat tooltip's specific fallen-back shape did not occur in the tested plans - suite-covered, visual slice deferred.

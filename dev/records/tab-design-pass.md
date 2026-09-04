@@ -7,7 +7,7 @@ The closing note of the app-wide UI consistency wave named exactly this
 milestone: those tabs took the wave's TYPE ramp but not its LAYOUT -
 Settings, Log and About stayed left-packed, with the panel's right half
 empty at every window width, because that wave scoped the ramp plus the
-Snapshot grid rather than a per-tab redesign. Reported in the field, on
+Snapshot grid rather than a per-tab redesign. Reported in game, on
 the Settings capture: the type hierarchy there does not follow the
 Crafting Plan pane's consistently, and every tab needs the same
 treatment.
@@ -165,8 +165,8 @@ checked against the tooltips already on the controls it describes:
 "some currencies show a default estimate" is carried by the default tag's
 own hover, "leave a currency unset" by the amount box's, and the
 price-basis pointer moved to the section title's hover. The two that
-remain are the one that says what the number means and the field-test
-line that says an amount can be typed over a default at all. This is
+remain are the one that says what the number means and the line that
+says an amount can be typed over a default at all. This is
 copy, not layout - cheap to revert.
 
 CORRECTION, since the first draft of this section got it wrong and said
@@ -176,7 +176,7 @@ default tag exists only on rows that HAVE a default, so on the four
 curated currencies that have none (Astral Acclaim and the three Rift
 Essence tiers) nothing said that leaving the box blank is a supported
 state rather than an unfinished one - which is the exact confusion the
-field-test note says this section already had once. The amount box's own
+in-game note says this section already had once. The amount box's own
 hover now states it on both of its branches. A comment asserting a false
 invariant is worse than no comment, so both it and this paragraph now
 say what is actually true.
@@ -360,7 +360,7 @@ width rather than the grid's, so a wrapped run can still reach ~20px
 right of the chrome edge. Re-deriving it would move a wrap threshold in a
 component this milestone has no complaint about.
 
-### Desktop gate checklist
+### Sandbox check checklist
 
 Take each tab at 1378 (the enforced minimum), 1638, 1836 and 2406, and
 one very wide (2560+). At EVERY width, on every tab: no band of empty
@@ -497,7 +497,7 @@ SNAPSHOT
 - The header title sits at the 16px inset with its rule 1px clear beneath
   the buttons.
 
-Gate: PASS (2026-08-25 desktop session, branch build at the fix HEAD,
+Gate: PASS (2026-08-25 sandbox session, branch build at the fix HEAD,
 captures preflight/gTB0-gTB5).
 
 SETTINGS - the tab that prompted the milestone. The left-packed run of

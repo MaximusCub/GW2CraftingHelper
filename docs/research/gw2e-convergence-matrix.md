@@ -2,10 +2,10 @@
 
 Date: 2026-08-15
 
-> DO-NOT-TOUCH references below predate the 2026-08-17 high-evidence-zone
-> policy - see docs/KNOWN-ISSUES.md's policy note. A DO-NOT-TOUCH citation
-> is no longer a blocking verdict; it is a proof requirement (see that
-> note for what proof looks like). Individual ADOPT/PRESERVE calls below
+> References below to frozen files predate the 2026-08-17 rule change -
+> see docs/KNOWN-ISSUES.md's policy note. Calling a file frozen is no
+> longer a blocking verdict; it is a proof requirement (see that note for
+> what proof looks like). Individual ADOPT/PRESERVE calls below
 > have not been re-litigated under the new rule.
 
 ## Method
@@ -64,7 +64,7 @@ Every claim is labeled:
 - **INVESTIGATE**: evidence is genuinely insufficient; noted with what would
   resolve it.
 
-No ADOPT below violates a repo invariant or touches a DO-NOT-TOUCH item
+No ADOPT below violates a repo invariant or touches a frozen item
 (ModuleLog locking, PlanContentHeightMath, PlanRelayoutMath, scroll machinery,
 merged-ceil vendor batching). Where gw2e's behavior would require violating a
 hard constraint (chiefly "do not invent data when APIs are missing"), the row
@@ -325,7 +325,7 @@ evidence.
 - Verdict: **PRESERVE**
 - Rationale: already-known, already-documented architectural divergence
   (`gw2e-parity-spec.md` Section 3), and the merged-ceil vendor batching this
-  feeds is a DO-NOT-TOUCH item. Not actionable in this area; not
+  feeds is a frozen item. Not actionable in this area; not
   re-litigated, no new considerations entry.
 
 ---
@@ -462,7 +462,7 @@ tree re-flagging, rounding*
 - Rationale: the same structural divergence already flagged by
   `gw2e-parity-spec.md` normative directive #4 and closely related to the
   already-documented one-recipe-per-output ARE finding (row 1). Our separate
-  VendorOffer architecture is what makes the DO-NOT-TOUCH merged-ceil vendor
+  VendorOffer architecture is what makes the frozen merged-ceil vendor
   batching, purchase-cap notices, and W4B vendor cost-component leaves
   possible - collapsing vendor into the recipe-candidate list would conflict
   with those hard constraints. Genuine marked improvement; considerations
@@ -515,7 +515,7 @@ tree re-flagging, rounding*
   side. Fix: add a same-item other-side fallback inside `GetUnitPrice`/
   `GetBuyCost` (the single call site both TP and vendor pricing already
   share) when the primary side is 0, matching gw2e's per-item fallback
-  semantics exactly. Does not touch DO-NOT-TOUCH vendor batching.
+  semantics exactly. Does not touch frozen vendor batching.
 
 ### 21. Trading Post fee math precision (listing fee + exchange tax) used in sell-side/profit metrics
 
@@ -724,7 +724,7 @@ hard constraint).
   `UsedMaterials` list, so `CraftingProfit` is understated by B's forgone-
   sale value even though B was never actually spent. gw2e's two-pass
   sequencing exists specifically to prevent exactly this. No repo invariant
-  or DO-NOT-TOUCH item blocks fixing it, but the fix is nontrivial:
+  or frozen item blocks fixing it, but the fix is nontrivial:
   InventoryReducer needs to become decision-aware (reuse a throwaway
   PlanSolver pass, the same pattern `OwnedMaterialsForceBuyPrePass` already
   uses, to learn per-node Source before consuming pool down a branch; or
@@ -891,7 +891,7 @@ reader itself flagged the duplication risk explicitly). **ADOPT** (size: S).
   locked "CURRENCY" pill with no price, matching gw2e.
 - Verdict: **EQUIVALENT**
 - Rationale: behavior matches in substance; extends `gw2e-parity-spec.md`
-  Section 4.4 forward to record the 2026-08-06 field-test addition as the
+  Section 4.4 forward to record the 2026-08-06 in-game addition as the
   parity-maintaining continuation, not a new gap.
 
 ### 41. Owned-materials per-node annotation wording
@@ -901,12 +901,12 @@ reader itself flagged the duplication risk explicitly). **ADOPT** (size: S).
 - Ours (measured, `Services/DecisionPillPlanner.cs:167-208`,
   `Views/Rendering/TreeSectionController.cs:1098-1113`): "HAVE {used}/{total}
   NEEDED" plus a tooltip spelling out total demand, covered count, and
-  remaining count together - a 2026-08-06 field-test fix for a
-  field-reported paradox where gw2e-style single-number wording read as
+  remaining count together - a 2026-08-06 in-game fix for a
+  reported in game paradox where gw2e-style single-number wording read as
   contradictory next to the row's own remaining-need prefix.
 - Verdict: **PRESERVE**
 - Rationale: marked improvement (shows total/covered/remaining together,
-  closing a real field-verified confusion gw2e's single-delta number
+  closing a real confusion, verified in game, that gw2e's single-delta number
   invites). Considerations entry added for awareness, not because it needs
   revisiting.
 
@@ -991,7 +991,7 @@ KNOWN-ISSUES #20.4.
   PlanContentHeightMath/PlanRelayoutMath change ... if implemented as a
   tooltip-only badge" - adding content to a tree row is precisely the class
   of change that perturbs row-height/relayout inputs, both of which are
-  DO-NOT-TOUCH; that assurance was unverified and should not be treated as
+  frozen; that assurance was unverified and should not be treated as
   settled if this is ever revisited.
 
 ### 45. "Recipe has N variants" badge (compensating for gw2e's one-recipe-per-output nesting ceiling) [already-known, ARE case]
@@ -1047,7 +1047,7 @@ KNOWN-ISSUES #20.4.
   "already how this module behaves" clause refers only to SECTION-level
   expansion, not tree-NODE expansion depth - re-verified by re-reading
   Section 6.2's own text). Whether the shallower gw2e default is preferable
-  is a taste question, but `PlanContentHeightMath` is on the DO-NOT-TOUCH
+  is a taste question, but `PlanContentHeightMath` is on the frozen-file
   list - this cannot become an ADOPT regardless of preference. Goes to
   considerations only, and any future change would need a path that does
   not touch `PlanContentHeightMath`'s core arithmetic.
@@ -1106,19 +1106,19 @@ KNOWN-ISSUES #20.4.
 - Rationale: already known/shipped; reconfirmed unchanged live 2026-08-15.
   Not a new finding.
 
-### 52. Merchant/Mystic Forge pill and sublabel relabeling [already shipped, field-verified]
+### 52. Merchant/Mystic Forge pill and sublabel relabeling [already shipped, verified in game]
 
 - gw2e (documented, `gw2e-parity-spec.md` Section 3.2): the Crafting pill
   relabels to "Merchant" when disciplines includes Merchant. No separate
   discussion found of a Mystic-Forge-specific exclusion in this pass
   (application.js's exact discipline-collection logic was not re-fetched).
-- Ours: KNOWN-ISSUES.md field-test wave finding E + wave-2 fix
+- Ours: KNOWN-ISSUES.md in-game finding E plus the follow-up fix
   (2026-08-06): Mystic Forge is excluded from Required Disciplines
   alongside the pre-existing Achievement/Merchant filter, and its sublabel
   renders "Mystic Forge" with no level number instead of the raw
   "MysticForge 0".
 - Verdict: **EQUIVALENT**
-- Rationale: already shipped and field-verified, consistent with gw2e's
+- Rationale: already shipped and verified in game, consistent with gw2e's
   general "Merchant is a pill-label variant, not a real discipline" pattern
   documented elsewhere in Section 3.2. Recorded here to extend coverage to
   this post-research-date fix; the Mystic-Forge-specific sub-claim on gw2e's
@@ -1219,7 +1219,7 @@ mechanics, decorations/guild upgrades*
   invented data, wiki-verified) plus a light, additive-only pre/post-pass
   keyed on Craft-source steps that reuses the existing `TimegatedItem`
   notice shape. Must not modify `VendorBatchSolver`'s own merged-ceil
-  vendor-batch cost math (DO-NOT-TOUCH) - this is a parallel, independent
+  vendor-batch cost math (frozen at the time) - this is a parallel, independent
   code path over Craft steps, not a change to vendor batching. Related: row
   27 (policy-driven bulk force-buy list) would consume the same curated id
   list for its "Daily cooldowns = Buy" half.

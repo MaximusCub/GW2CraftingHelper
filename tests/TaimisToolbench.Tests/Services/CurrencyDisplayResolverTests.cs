@@ -366,7 +366,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Null(CurrencyDisplayResolver.ResolveUnitAmounts(3, new List<CostLine>(), null));
         }
 
-        // --- ResolveTreeNodeUnitAmounts (field-test finding B: recipe-tree
+        // --- ResolveTreeNodeUnitAmounts (in-game finding B: recipe-tree
         // "Unit price:" tooltip for a pure/mixed-currency vendor node) ---
         [Fact]
         public void ResolveTreeNodeUnitAmounts_EvenDivision_ResolvesWholeNumberAmount_NoBundleLabel()

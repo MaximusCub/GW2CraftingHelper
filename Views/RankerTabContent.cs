@@ -105,7 +105,7 @@ namespace TaimisToolbench.Views
 
         // Muted grey is reserved for content meant to leave the user's
         // focus: the footer captions and the empty-state onboarding prose
-        // (matching EmptyPlanStateRenderer). Field test: primary row data at
+        // (matching EmptyPlanStateRenderer). Reported in game: primary row data at
         // this grey on the grey window read "as if disabled".
         private static readonly Color DimColor = new Color(150, 150, 150);
 
@@ -118,8 +118,8 @@ namespace TaimisToolbench.Views
 
         // The affordability chip reuses SummarySectionRenderer's
         // full-coverage tag colors (PillKind.Selected's darkened green,
-        // 4.21:1 against CreateSmallTag's white label) - the field test
-        // showed white text on RankerReadinessColors' pale #7EBA7E was
+        // 4.21:1 against CreateSmallTag's white label) - in game, white
+        // text on RankerReadinessColors' pale #7EBA7E was
         // unreadable. The readiness TEXT bands keep their own palette; only
         // the pill chrome borrows the proven badge combination.
         private static readonly Color AffordableChipBorder = new Color(31, 143, 12);
@@ -592,8 +592,8 @@ namespace TaimisToolbench.Views
 
         /// <summary>
         /// Selection is carried by BOTH the dot and the label: the dot alone
-        /// is a 16px difference in a row of text, which the field test for
-        /// the tab's other indicators showed reads as no difference at all.
+        /// is a 16px difference in a row of text, which read in game as no
+        /// difference at all on the tab's other indicators.
         /// </summary>
         private void UpdateModeRadios()
         {

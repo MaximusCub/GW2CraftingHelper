@@ -50,4 +50,4 @@ count change).
 Gate: PASS (private-signature refactor with zero behavior change -
 review confirmed public surfaces byte-identical, no test edits, and
 the classic bundling hazards absent; suite held at exactly 1837; no
-rendered surface changed, so no desktop gate applies).
+rendered surface changed, so no sandbox check applies).

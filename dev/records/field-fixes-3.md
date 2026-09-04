@@ -3,11 +3,11 @@
 
 ## Zero-band retention, scroll anchoring, click default, MF recipes, first-load snapshot (field-fixes-3)
 
-Five independent field reports from one live 0.2.3 session.
+Five independent reports from one live 0.2.3 session.
 
 ### 1. The zero band keeps its cells even when a term is unmeasured
 
-Reported in the field: the Total Cost section can end up displaying only
+Reported in game: the Total Cost section can end up displaying only
 the "Actual Cost to Craft" tile when everything in the recipe tree that
 requires ingredients or purchases ends up ignored. It should retain the
 other cells in the section and show them as 0 rather than making them
@@ -65,7 +65,7 @@ on the page.
 
 ### 2. Scroll anchoring across a re-solve
 
-Reported in the field: toggling IGNORE on a row in the recipe tree can
+Reported in game: toggling IGNORE on a row in the recipe tree can
 adjust which currencies show up in the Total section at the top, which
 makes the content under the cursor "move" as the view reflows.
 
@@ -97,7 +97,7 @@ where a missing row "would" be.
 
 ### 3. Click sound default 75 -> 35
 
-The field test that the click-volume section above was waiting on
+The in-game measurement that the click-volume section above was waiting on
 returned 35% or so as a reasonable click default volume.
 `ClickSoundVolume.DefaultPercent` is now 35 - 1.75x Blish's 0.2 fixed
 volume (+4.9 dB), 0.875x its 0.4 absolute ceiling (-1.2 dB), putting the
@@ -108,7 +108,7 @@ than the old ceiling" (true of 75, not of 35) were both restated.
 
 ### 4. UNKNOWN Mystic Forge gifts - measured: not the build bump, and mostly not a defect
 
-Reported in the field: Gift of Rays, Gift of the Survivors, Gift of the
+Reported in game: Gift of Rays, Gift of the Survivors, Gift of the
 People and Gift of the Hylek all show UNKNOWN in the recipe tree,
 alongside the per-generation log line "Recipe seed built for build 205505; current
 build 205780; seed negative entries will fall back to API."
@@ -128,7 +128,7 @@ recipes in `ref/mystic_forge_recipes.json` are already present in
 a non-empty `ref/recipe_search_seed.json` row that already lists that MF
 id (0 missing on each count). 107040 -> `[-1587]` is one of them.
 
-**The parent plan is Endless Summer (107022)**, named by the field
+**The parent plan is Endless Summer (107022)**, named by the in-game
 session's own `module_log.jsonl` and `plan.json`, not Orrax: 107040
 is an ingredient of -1586, and the other three gifts are its siblings.
 `MysticForgeSeedStalenessTests.RealShippedSeed_EndlessSummerGifts_...`
@@ -269,7 +269,7 @@ load latency - a granted subtoken reaches the fetch through
 `OnSubtokenUpdated`; this poll is only the backstop for the grant that
 fired before the handler was attached.
 
-### Desktop gate
+### Sandbox check
 
 1. **Zero band, unmeasured**: plan an item with no recipe and no
    Trading Post price (root row reads UNKNOWN), or any plan carrying an
@@ -323,7 +323,7 @@ fired before the handler was attached.
    status, the log shows no repeating fetch attempts, and adding the key
    mid-session starts exactly one fetch.
 
-Gate: PASS with two recorded partials (2026-08-25 desktop session,
+Gate: PASS with two recorded partials (2026-08-25 sandbox session,
 branch build merged with master, captures preflight/gFX1-gFX8,
 gAN1-gAN3, gFL1-gFL2, gMF1; display-sleep inhibitor held the session).
 
@@ -346,7 +346,7 @@ gAN1-gAN3, gFL1-gFL2, gMF1; display-sleep inhibitor held the session).
 3. CLICK DEFAULT: ClickSoundVolume.DefaultPercent is 35. Live check
    confirmed the other half of the contract - a persisted 78 from an
    earlier session survived the change, so only new installs take 35.
-4. MYSTIC FORGE UNKNOWN: live PASS on the field report -
+4. MYSTIC FORGE UNKNOWN: live PASS on the reported case -
    "Gift of Rays" now generates a complete plan (legendary-purple
    header, 892g 88s 38c, eight currency requirements listed) where it
    previously rendered UNKNOWN. Note the stale-build lead

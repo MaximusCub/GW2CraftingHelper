@@ -54,7 +54,7 @@ remember. Four rules carry weight.
    record. Two things may be added to an existing record because neither
    changes what it says: the provenance banner at the top, and a relative
    link repaired after a directory move.
-4. **Every record ends in a gate line.** The gate is the live desktop
+4. **Every record ends in a gate line.** The gate is the live sandbox
    session that runs the change against the real game - the only check this
    project has for anything a test cannot reach, which is most of the
    rendering. The line says `Gate: PASS`, `Gate: FAIL`, `Gate: PARTIAL
@@ -79,24 +79,25 @@ A threshold below its own floor is not a tripwire, and neither is one that
 depends on somebody remembering to run `wc -c`, which is why this one is a
 CI step.
 
-## Policy: high-evidence zones (formerly DO-NOT-TOUCH)
+## Policy: code pinned by expensive evidence
 
-High-evidence zones (formerly the do-not-touch list): `Services/ModuleLog.cs`,
-`Services/PlanContentHeightMath.cs`, `Services/PlanRelayoutMath.cs`, the
-scroll/resize/wheel machinery in `Views/CraftingPlanView.cs`, and
-`Services/VendorBatchSolver.cs`'s merged-ceil batching math. Changes are
-permitted when they carry their proof - characterization tests pinning
-current behavior BEFORE the change (for visual/geometry code: the
-pixel-scanner and a live desktop check), the standard adversarial review
-pipeline, and an explicit statement of what improved with evidence of zero
-regression. The burden of proof scales with the file's regression history;
-it never becomes prohibition. (Policy set 2026-08-17,
-replacing the M38-era freeze.)
+Some files behave the way they do because of measurements that cost a lot
+to take, and a change that looked harmless has broken them before:
+`Services/ModuleLog.cs`, `Services/PlanContentHeightMath.cs`,
+`Services/PlanRelayoutMath.cs`, the scroll/resize/wheel machinery in
+`Views/CraftingPlanView.cs`, and `Services/VendorBatchSolver.cs`'s
+merged-ceil batching math. Changing them is allowed, but the change has to
+carry its proof - characterization tests pinning current behavior BEFORE
+the change (for visual/geometry code: the pixel-scanner and a live sandbox
+check), the standard adversarial review pipeline, and an explicit statement
+of what improved with evidence of zero regression. The burden of proof
+scales with the file's regression history; it never becomes prohibition.
 
-Numbered items below that still say "DO-NOT-TOUCH" are historical records
-narrating what applied to that specific past change at the time it was
-made, and are left in their original wording to preserve the record; this
-section is the current, active statement of the rule.
+An earlier rule froze those files outright - no change permitted at all.
+That freeze was retired on 2026-08-17 and replaced by the paragraph above.
+Records below that describe a file as frozen are narrating what applied to
+that one past change on the date it was made, and are left in their
+original wording to preserve the record.
 
 ---
 
@@ -218,13 +219,13 @@ row's bottom edge unpredictably depending on scroll phase. M36b gave
 `CreateRowDivider` a `bottomClearance` parameter (1 extra logical pixel of
 gap for the vulnerable 44px/32px row types), proven immune by simulation
 across every row height and all four GW2 UI Size scale factors - this is
-high-evidence-zone machinery (formerly DO-NOT-TOUCH; see the policy note
-above), see `docs/ARCHITECTURE.md` section 3.
+machinery pinned by expensive evidence (see the policy note above), see
+`docs/ARCHITECTURE.md` section 3.
 Required Recipes and Crafting Steps were live pixel-scan verified at
 multiple scroll offsets after the fix; Required Disciplines (32px rows)
 was simulation-proven at the time but not yet individually pixel-scanned
 in that same pass - **this gap was closed by item 30 below** (M37 live
-desktop session, 2026-07-22, scanned Required Disciplines directly and
+sandbox session, 2026-07-22, scanned Required Disciplines directly and
 confirmed the same clean result the simulation predicted).
 
 Tier-2 re-run (2026-08-27, icon-tier2 branch): the tier-2 icon change
@@ -318,9 +319,9 @@ unseeded (no account/character concept exists in this module). See the
 DEFERRED list below for the specific named gaps (Skirmish Merchant page
 split, one unresolvable vendor-page rename, the wiki-drift superset).
 
-### 29. Owned-materials UI live verification (VERIFIED in M37, live desktop session 2026-07-22)
+### 29. Owned-materials UI live verification (VERIFIED in M37, live sandbox session 2026-07-22)
 
-### 30. Required Disciplines divider pixel-scan (VERIFIED in M37, live desktop session 2026-07-22)
+### 30. Required Disciplines divider pixel-scan (VERIFIED in M37, live sandbox session 2026-07-22)
 
 Closes the gap item 23 left open: Required Disciplines (32px rows) was
 scanned directly at two scroll offsets and matched the simulation's
@@ -423,7 +424,7 @@ a `_buildComplete` latch guarding `PollForUpdates()` against exactly this
 ThreadPool-vs-main-thread shape, on the assumption (recorded in that PR's
 own review) that `TabChanged` could not fire before `_logContent` pointed at
 a fully-built instance - but `Refresh()` itself never checked the latch, and
-the field crash proves that assumption's ordering is timing-dependent and
+the in-game crash proves that assumption's ordering is timing-dependent and
 CAN interleave. Two threads concurrently calling `Queue<(long,Label)>.
 Enqueue` on the SAME `_renderedRows` field corrupted its internal
 circular-buffer bookkeeping, producing the `Queue<T>.SetCapacity`
@@ -477,7 +478,7 @@ a main-thread path also touches):
 | `SettingsTabContent` (Settings tab) | NO HAZARD - `Build()` re-runs off the main thread on every tab revisit, but nothing outside `Build()` (no `Module.Update()` polling, no `TabChanged` handling) ever touches this class's fields; every other mutation is a button-`Click`/`CheckedChanged` handler, which cannot fire before `Build()` has already finished and the control exists. |
 | `AboutTabContent` (About tab) | NO HAZARD - static, render-once content; nothing outside its own `Build()` touches its fields. |
 | Plan History / Crafting Ranker placeholders (`Module.BuildPlaceholder`) | NO HAZARD - creates one `Label` and returns; nothing else ever references it. |
-| `CraftingPlanView` (Crafting Plan tab) | **HAZARD PRESENT, OUT OF SCOPE** - not modified (scroll/`FrameTicker` machinery is a high-evidence zone, formerly DO-NOT-TOUCH per M38, hardened M31-M36). A first sweep pass incorrectly recorded this row as no live race; a 2026-08-06 review corrected it: `Build()` calls `StopLiveTickers()` (`Views/CraftingPlanView.cs:1511`) on the ThreadPool thread; that method `Cancel()`s -> `Dispose()`s three `SpriteScreen`-parented `FrameTicker` Controls (`_scrollVerifyTicker`, `_resizeDebounceTicker`, `_wheelWrapVerifyTicker`) whose `DoUpdate` runs on the main thread and survives tab switches (they are parented to `GameService.Graphics.SpriteScreen`, not this view's own control tree - by design, per their own field comments), and zeroes `_resizeSettlePending`/`_resizeScrollRestorePending`/`_resizeScrollSavedOffset`/`_lastWheelEventUtc`, which those same main-thread ticker steps read and write. Same hazard class as the two fixed rows above; deferred to a dedicated pass that can safely touch the M31-M36 scroll machinery rather than fixed here. Follow-up (2026-08-17, tree-tooltip-composer milestone doc pass): the 2026-08-06 count of three `FrameTicker`s was itself stale by then - `_spinnerTicker` (the W3B status-strip spinner, added between the two reviews) is a fourth `SpriteScreen`-parented `FrameTicker` `StopLiveTickers()` also `Cancel()`s on the same ThreadPool-thread `Build()` call, in the identical hazard class as the other three; not independently verified live, same OUT OF SCOPE deferral as the rest of this row. |
+| `CraftingPlanView` (Crafting Plan tab) | **HAZARD PRESENT, OUT OF SCOPE** - not modified (scroll/`FrameTicker` machinery is pinned by expensive evidence, frozen outright under M38's earlier rule, hardened M31-M36). A first sweep pass incorrectly recorded this row as no live race; a 2026-08-06 review corrected it: `Build()` calls `StopLiveTickers()` (`Views/CraftingPlanView.cs:1511`) on the ThreadPool thread; that method `Cancel()`s -> `Dispose()`s three `SpriteScreen`-parented `FrameTicker` Controls (`_scrollVerifyTicker`, `_resizeDebounceTicker`, `_wheelWrapVerifyTicker`) whose `DoUpdate` runs on the main thread and survives tab switches (they are parented to `GameService.Graphics.SpriteScreen`, not this view's own control tree - by design, per their own field comments), and zeroes `_resizeSettlePending`/`_resizeScrollRestorePending`/`_resizeScrollSavedOffset`/`_lastWheelEventUtc`, which those same main-thread ticker steps read and write. Same hazard class as the two fixed rows above; deferred to a dedicated pass that can safely touch the M31-M36 scroll machinery rather than fixed here. Follow-up (2026-08-17, tree-tooltip-composer milestone doc pass): the 2026-08-06 count of three `FrameTicker`s was itself stale by then - `_spinnerTicker` (the W3B status-strip spinner, added between the two reviews) is a fourth `SpriteScreen`-parented `FrameTicker` `StopLiveTickers()` also `Cancel()`s on the same ThreadPool-thread `Build()` call, in the identical hazard class as the other three; not independently verified live, same OUT OF SCOPE deferral as the rest of this row. |
 
 A third review round (2026-08-06) found the second round's own fix had left
 behind a documentation defect of the exact class this issue exists to
@@ -520,7 +521,7 @@ Independently re-verified via `ilspycmd` decompilation of the vendored
 1) that this is false: `Container.Children` (`ControlCollection<T>`) holds
 its own `ReaderWriterLockSlim` and takes it on every operation, so unlike
 `LogTabContent`'s plain `Queue<T>`, concurrent `Children` access cannot
-corrupt the collection's internals - that is precisely why the field crash
+corrupt the collection's internals - that is precisely why the in-game crash
 landed in the module's own unsynchronized `Queue<T>` and not in Blish's
 `Children`. The two hazards that DO justify marshaling this tail, neither of
 which the prior comment named, are (a) the compound dispose-then-add
@@ -567,7 +568,7 @@ acting before Build's own tail has landed where relevant) plus the live
 gate below.
 
 **Live gate:** PASS (2026-08-06, live branch-build sandbox
-session under the hardened desktop protocol, captures logfix_01_empty.png /
+session under the hardened sandbox protocol, captures logfix_01_empty.png /
 logfix_02_search.png):
 - Empty-state placeholder renders exactly ONCE on first Log-tab open
   (the doubled-placeholder interleave shape is gone).
@@ -614,7 +615,7 @@ one. Same full record as item 37.
 ### Entries 40-63: citation anchors added 2026-08-25
 
 Source used to cite this file in six shapes - `#12`, `20`, `31a-F1`,
-`31c-audit`, `DO-NOT-TOUCH #13`, and bare phrases like "tree dimming rule" -
+`31c-audit`, `frozen-file #13`, and bare phrases like "tree dimming rule" -
 of which only `#N` resolved to anything. The entries below give a number to
 every record `.cs`, test and `ref/` files were citing by phrase, so `#N` is
 now the single shape and every citation resolves in one hop. Nothing was
@@ -784,8 +785,8 @@ long solve writes. Full record:
 
 The two formula-band tile rows and the non-coin currency table that replaced
 the old coin-total row list, plus the layout arithmetic that moved to
-`Services/SummarySectionLayoutMath.cs` rather than into the high-evidence
-`PlanContentHeightMath`. Full record:
+`Services/SummarySectionLayoutMath.cs` rather than into
+`PlanContentHeightMath`, which is pinned by expensive evidence. Full record:
 `dev/archive/known-issues/2026-08-15-w4a-total-cost-section-redesign.md`.
 
 ### 47. W4B: vendor cost-component leaves (the tree dimming rule)
@@ -905,9 +906,9 @@ Recorded as a finding rather than papered over at the
 seam. Full record:
 `dev/archive/known-issues/2026-08-23-plan-view-redesign.md`.
 
-### 60. Field-test fixes wave 3 (field-fixes-3)
+### 60. In-game fixes wave 3 (field-fixes-3)
 
-Five independent field reports from one live 0.2.3 session: zero-band
+Five independent reports from one live 0.2.3 session: zero-band
 retention, scroll anchoring across a re-solve, the click-sound default, the
 Mystic Forge UNKNOWN investigation (item 4 - measured: not the build bump,
 and mostly not a defect), and the first-load snapshot. Full record:
@@ -1152,11 +1153,11 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 2026-08-25 pass that split the append zone put its records in
 `dev/records/`, one per branch, and that is where every record goes now.
 
-- **Field-test UX wave (six S-sized display fixes, 2026-08-06)** - gate PASS 2026-08-06.
+- **In-game UX wave (six S-sized display fixes, 2026-08-06)** - gate PASS 2026-08-06.
   `dev/archive/known-issues/2026-08-06-field-test-ux-wave.md`
-- **Field-test UX wave 2: MysticForge sublabel drop fix (2026-08-06)** - gate PASS 2026-08-06.
+- **In-game UX wave 2: MysticForge sublabel drop fix (2026-08-06)** - gate PASS 2026-08-06.
   `dev/archive/known-issues/2026-08-06-field-test-ux-wave-2-mysticforge-sublabel-drop-fix.md`
-- **Wave-3 quick wins (2026-08-06)** - gate PASS 2026-08-06.
+- **Quick wins (wave-3-quick-wins, 2026-08-06)** - gate PASS 2026-08-06.
   `dev/archive/known-issues/2026-08-06-wave-3-quick-wins.md`
 - **W3B: Generation progress + rich logging (2026-08-08)** - gate PASS 2026-08-08.
   Cited as: W3B section.
@@ -1216,7 +1217,7 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
   `dev/archive/known-issues/2026-08-16-festival-vendor-auto-tagging-follow-up.md`
 - **Recorded follow-ups batch sweep (2026-08-17)** - gate not applicable 2026-08-16.
   `dev/archive/known-issues/2026-08-17-recorded-follow-ups-batch-sweep.md`
-- **High-evidence zones: policy rewrite + PlanContentHeightMath dead-code sweep (high-evidence-zones, 2026-08-17)** - gate PASS.
+- **Freeze policy rewrite + PlanContentHeightMath dead-code sweep (high-evidence-zones, 2026-08-17)** - gate PASS.
   Cited as: high-evidence-zones.
   `dev/archive/known-issues/2026-08-17-high-evidence-zones.md`
 - **Value-detail hover investigation, pipeline-level follow-up (value-detail-pipeline, 2026-08-17)** - gate not run live this pass.
@@ -1240,7 +1241,7 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
   `dev/archive/known-issues/2026-08-17-quality-phase4a-tracker.md`
 - **Quality-audit phase 4b: pure parameter bundling (B10, quality-phase4b-bundling)** - gate PASS.
   `dev/archive/known-issues/2026-08-17-quality-phase4b-bundling.md`
-- **Desktop gate batch: value-detail closure + partial currency coverage (2026-08-17, live session)** - gate: see record.
+- **Sandbox check batch: value-detail closure + partial currency coverage (2026-08-17, live session)** - gate: see record.
   `dev/archive/known-issues/2026-08-17-desktop-gate-batch-value-detail-closure-partial.md`
 - **Backlog cleanup batch (B8/B11/B13/B14/B15 + solver ctor hardening, backlog-cleanup)** - gate PASS 2026-08-17.
   `dev/archive/known-issues/2026-08-17-backlog-cleanup.md`
@@ -1278,7 +1279,7 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Cost band restyle (cost-band-restyle)** - gate PASS 2026-08-23.
   Cited as: "Cost band restyle", cost-band-restyle.
   `dev/archive/known-issues/2026-08-23-cost-band-restyle.md`
-- **Field-test fixes wave 1 (field-fixes-1)** - gate PASS after one gate-found fix 2026-08-23.
+- **In-game fixes wave 1 (field-fixes-1)** - gate PASS after one gate-found fix 2026-08-23.
   `dev/archive/known-issues/2026-08-23-field-fixes-1.md`
 - **Sortable plan tables (sortable-tables)** - gate PASS 2026-08-23.
   Cited as: "Sortable plan tables", sortable-tables.

@@ -242,8 +242,8 @@ namespace TaimisToolbench.Tests.Services
         }
 
         // The two count labels at their widest ordinary reading -
-        // "Overrides: 12" and "Ignored: 3" at Menomonia 16, the widths the
-        // field report this fit answers was written against. The module
+        // "Overrides: 12" and "Ignored: 3" at Menomonia 16, the widths this
+        // fit was written against. The module
         // measures its own labels at runtime (a Label's font is Blish's),
         // so these stand in for a size no Blish-free test can resolve;
         // nothing asserted against them is closer than 100px to a boundary.

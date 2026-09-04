@@ -2426,7 +2426,7 @@ namespace TaimisToolbench.Views
             // Both lines of a snapshot row - the item name and the
             // "Character: ..." source caption - carry names nobody here
             // picks the letters of, so both need the descender clearance
-            // (field test, bug 5; the shipped build clips the tail off
+            // (bug 5, reported in game; the shipped build clips the tail off
             // "Green Wood Log").
             return LabelHelpers.WithDescenderClearance(label);
         }

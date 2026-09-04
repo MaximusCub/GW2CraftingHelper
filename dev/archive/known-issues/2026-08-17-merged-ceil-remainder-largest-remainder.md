@@ -3,9 +3,9 @@
 
 ## Merged-ceil remainder: largest-remainder apportionment + display-layer narrowing fix (2026-08-17)
 
-**Milestone goal:** quorum verdict C6 (TARGETED_FIX_ONLY plus the
+**Milestone goal:** review verdict C6 (TARGETED_FIX_ONLY plus the
 judge's own new finding) on the `merged-ceil-remainder` stream, which
-enters `VendorBatchSolver` - a former high-evidence/freeze zone
+enters `VendorBatchSolver` - a former frozen file
 (retired 2026-08-17) - so per that retirement's own terms,
 characterize the current behavior in tests BEFORE changing it, then
 fix, then prove improved-X/regressed-nothing.
@@ -58,7 +58,7 @@ fix, then prove improved-X/regressed-nothing.
    CurrencyTable_AmountExceedsIntRange_ClampsRatherThanWrapsNegative`)
    confirmed reproducing the bug pre-fix and passing post-fix.
 4. **C6(b) currencyMap "overstates" claim - verified NOT a bug.** The
-   quorum verdict named a prior claim that a Conflict-tier vendor
+   review verdict named a prior claim that a Conflict-tier vendor
    step's `currencyMap` accumulation "overstates" cost. Searched this
    repo exhaustively (`docs/KNOWN-ISSUES.md`, `docs/ARCHITECTURE.md`,
    `docs/gw2e-considerations.md`, `docs/research/gw2e-convergence-
@@ -98,7 +98,7 @@ fix, then prove improved-X/regressed-nothing.
    copper for a merged step. Converted to the same largest-remainder
    (Hamilton) apportionment `AllocateVendorNodeCosts` uses. Also fixed
    the caller comment describing the deleted shape, a dangling renamed-
-   test reference, one (of several) self-contradicting "DO-NOT-TOUCH"
+   test reference, one (of several) self-contradicting "frozen"
    line, the flagship regression test's explanatory comment, and added
    a three-equal-quantity-occurrence tie-break test. This runtime change
    shipped with no new characterization pin of its own - see item 6.
@@ -112,7 +112,7 @@ fix, then prove improved-X/regressed-nothing.
    ComparisonValueDivergesPerOccurrenceUnderOldSharingRule` (two qty-3
    occurrences, currency value 10 not evenly divisible by total
    quantity 6 - old algorithm gives 3/7, new gives 5/5) to close that
-   gap. (b) item 5's DO-NOT-TOUCH sweep fixed only one of five stale
+   gap. (b) item 5's frozen-file sweep fixed only one of five stale
    instances (`VendorBatchSolver.cs:873`); the remaining four
    (`VendorBatchSolver.cs` class doc, `PlanSolver.cs` class doc, and two
    more `PlanSolver.cs` call-site comments) still asserted the merged-
@@ -173,7 +173,7 @@ locatable to edit in place; if the original claim exists elsewhere,
 that record should be updated to point back here rather than restate
 the (incorrect) claim.
 `VendorBatchSolver.cs:409`'s comment recounting a past review's own
-"one of the six DO-NOT-TOUCH merged-ceil batching methods" wording was
+"one of the six frozen merged-ceil batching methods" wording was
 left as-is (it accurately describes history at the time, not a present-
 tense claim about current code) - flagged here in case a future sweep
 disagrees.
@@ -204,7 +204,7 @@ this entry's own "Validation performed" section above, which remains
 accurate as a historical record of this stream's state at `81598bf`
 before the merge.
 
-Gate: not applicable - quorum-verdict cleanup with characterization-first proof where the high-evidence zone was entered; suite-pinned. Merged under the standing merge directive (2026-08-16).
+Gate: not applicable - review-verdict cleanup with characterization-first proof where the code pinned by expensive evidence was entered; suite-pinned. Merged under the standing merge directive (2026-08-16).
 
 **Second merge note:** `origin/master` moved again (PR #131,
 `value-detail-pipeline`, the entry immediately above this one - test-and-

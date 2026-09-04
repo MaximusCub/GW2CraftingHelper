@@ -44,7 +44,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Empty(PlanHistoryLabels.ItemLineTexts(new PlanHistoryEntry()));
         }
 
-        // Reported in the field: a Plan History hover showed only an icon
+        // Reported in game: a Plan History hover showed only an icon
         // and a name. A one-item entry has no extra lines - its one
         // item is the header - so the stat body is the whole rest of the
         // tooltip, and this is what decides the row is owed one.

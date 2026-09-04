@@ -110,7 +110,7 @@ namespace TaimisToolbench.Services
         /// The coins alone. Every other inline currency icon keeps
         /// <see cref="InlineIconY"/>'s centred seat: only gold, silver and
         /// copper move, because the non-coin icons already measure centred
-        /// to within half a pixel in a field capture.
+        /// to within half a pixel in an in-game screenshot.
         /// </para>
         /// <para>
         /// Neither edge is a number the caller holds: the glyph box runs
@@ -247,7 +247,7 @@ namespace TaimisToolbench.Services
             public string Text;
             public int TextWidth;
 
-            // Display name of this currency (field-test finding B's name-
+            // Display name of this currency (in-game finding B's name-
             // tooltip sweep principle: anywhere a currency icon shows, its
             // name must be available) - never rendered as text here
             // (width-neutral), only surfaced via the icon's BasicTooltipText

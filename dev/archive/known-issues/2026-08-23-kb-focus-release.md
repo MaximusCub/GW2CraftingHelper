@@ -142,7 +142,7 @@ No test was added. Every step of this is Blish-bound: which release API
 is called, the order Blish raises two of its own events in, and a walk
 over `Container.Children`. The testable-looking residue is a three-bool
 predicate that would only mirror the implementation, which this repo does
-not accept. It stands on the desktop gate. Neither second-pass change has
+not accept. It stands on the sandbox check. Neither second-pass change has
 a scripted repro - the reported dead keyboard is exercised by
 step 1, and step 6 is a regression check on the discriminator itself,
 which is the only part of this pass with behaviour a gate operator can
@@ -151,7 +151,7 @@ observe.
 `Views/Rendering/TreeSectionController.cs`, the tooltip composers and
 `RichTooltipSurface` were not touched.
 
-### Desktop gate
+### Sandbox check
 
 1. **The repro.** Crafting Plan tab, click the item search box, type a
    few letters, do NOT press Enter. Press Escape. Whatever the design
@@ -208,7 +208,7 @@ observe.
    matches), where Enter falls through AutocompleteTextBox to the same
    base path.
 
-Gate: PASS (2026-08-23 night desktop session, branch build, captures
+Gate: PASS (2026-08-23 night sandbox session, branch build, captures
 preflight/gKB1-gKB8). (1)+(2) The exact user repro with the mouse over
 the suggestion list: first Escape released the box (dropdown gone,
 caret gone, window OPEN - eaten by design, not by a stale slot),

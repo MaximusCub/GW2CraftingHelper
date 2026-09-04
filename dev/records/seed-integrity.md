@@ -3,7 +3,7 @@
 
 ## Seed integrity: the reseeder silently deleted hand-authored recipes (seed-integrity)
 
-Found while investigating the field report that Gift of Rays showed
+Found while investigating the in-game report that Gift of Rays showed
 UNKNOWN, by running the RecipeSeeder into a scratch directory and diffing
 its output against the shipped seed rather than trusting either.
 

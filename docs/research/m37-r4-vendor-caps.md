@@ -425,7 +425,7 @@ manual). Recommended minimal automation, scoped to the ~5,487 reachable offers
 ## 5. Sources
 
 - Local, read directly (all under the repo root,
-  main worktree only - `.claude/worktrees/*` copies ignored as stale):
+  main worktree only - scratch checkout copies ignored as stale):
   `docs/gw2e-parity-spec.md`, `docs/KNOWN-ISSUES.md` (items 17, 28), `Models/VendorOffer.cs`,
   `Models/CraftingPlan.cs`, `Models/TimegatedItem.cs`, `Services/VendorOfferHasher.cs`,
   `Services/VendorOfferStore.cs`, `Services/VendorOfferResolver.cs`,

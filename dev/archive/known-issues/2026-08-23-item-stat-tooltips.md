@@ -209,7 +209,7 @@ previously had no tooltip at all now have one.
   description that summarises several attributes is distinct wording and
   still renders.
 
-### Desktop gate (live, required)
+### Sandbox check (live, required)
 
 1. Generate a plan whose tree contains ordinary crafting materials
    (Mithril Ore, Orichalcum Ingot). Hover a material row: a tooltip
@@ -259,7 +259,7 @@ previously had no tooltip at all now have one.
 11. Infusion de-duplication: put a +1 Agony Infusion in a plan and hover
     it. "+1 Agony Resistance" must appear exactly ONCE.
 
-Gate: PASS (2026-08-24 desktop session, branch build at the
+Gate: PASS (2026-08-24 sandbox session, branch build at the
 review-fix HEAD, captures preflight/gIS3-gIS4). Generated +22 Agony
 Infusion live (typed adoption); hovering the root tree row rendered
 the full stat block on the opaque facility surface: the item name

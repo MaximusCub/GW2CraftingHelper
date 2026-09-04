@@ -815,7 +815,7 @@ threading, no new persistence mechanism.
 `tests/GW2CraftingHelper.Tests/Services/AccountItemIndexTests.cs` (excerpt),
 `m38-cleanup-plan.md` WP-16/17/21/22/27/28 sections, `Views/CraftingPlanView.cs` (targeted greps for `FrameTicker`),
 plus a repo-wide grep for `ResetToDefaults` (main tree only - worktrees
-under `.claude/worktrees` excluded).
+in scratch checkouts excluded).
 
 External, dev-time-only research (never called at runtime by the module):
 `blish-hud/Blish-HUD` GitHub repo (`TabbedWindow2.cs` source, `dev` branch,

@@ -31,7 +31,7 @@
 > the right-hand columns stay on-screen. Deep rows ellipsize there as they
 > did before.
 >
-> The **+2pt variant landed** on `font-and-polish` after a field test, so
+> The **+2pt variant landed** on `font-and-polish` after an in-game test, so
 > row/body text is now Menomonia 16 and small/caption/pill text
 > Menomonia 14 (`Views/Rendering/UiFonts`), and
 > `WindowSizing.MinWindowWidth` moved 1436 -> **1478**: section 7's

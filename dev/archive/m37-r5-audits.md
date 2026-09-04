@@ -96,7 +96,7 @@ items, currencies, recipes, account) fails or times out.
 **Findings: 6 confirmed (1 Critical, 5 MustFix), 0 refuted, 0 nice-to-have.**
 
 > Scope: master branch only (m37-homestead worktree and the stray
-> .claude/worktrees/agent-* copies were excluded per instructions). Swept
+> scratch checkouts of this same repo were excluded). Swept
 > every consumed /v2 endpoint family end-to-end for offline/API-down
 > degradation: /v2/commerce/prices (Gw2PriceApiClient -> TradingPostService,
 > 4 call sites in CraftingPlanPipeline), /v2/items (Gw2ItemApiClient ->

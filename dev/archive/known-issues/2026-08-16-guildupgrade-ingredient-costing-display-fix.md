@@ -160,4 +160,4 @@ only - see git log for full per-commit detail):
    closed the structurally identical unrecognized-`CostLine.Type` gap in
    `VendorBatchSolver`; 2 tests.
 
-Gate: PARTIAL PASS 2026-08-16 (live desktop session). Solver-side safety fully suite-covered; the GuildUpgrade pill/label visuals were unreachable live (no guild-decoration output is plannable via the search list) - visual slice rides the next natural opportunity.
+Gate: PARTIAL PASS 2026-08-16 (live sandbox session). Solver-side safety fully suite-covered; the GuildUpgrade pill/label visuals were unreachable live (no guild-decoration output is plannable via the search list) - visual slice rides the next natural opportunity.

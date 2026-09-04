@@ -5,7 +5,7 @@ using Xunit;
 namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
-    /// The box a row action draws in. Reported in the field: the module's
+    /// The box a row action draws in. Reported in game: the module's
     /// X did not match the game window's close control; the answer
     /// was to stop drawing an X at all and blit Blish's own key, so the box
     /// is now the texture's measurement and no longer a glyph's. What is

@@ -13,7 +13,7 @@ every complex consideration into exactly this section.
 
 ### Reconciliation: M14's one-row claim vs. the live capture's three lines
 
-The 2026-08-22 desktop captures (`preflight/ph11-scroll2.png`,
+The 2026-08-22 sandbox screenshots (`preflight/ph11-scroll2.png`,
 `preflight/ph12-scroll3.png`, Mystic Clover x77) show the Notes header
 reading "Notes (1)" above THREE stacked text lines. That is not a note
 containing line breaks and is not evidence against M14:
@@ -141,7 +141,7 @@ before), which is the regression guard on the retired hand-split.
 
 Validation: module build 0 errors; suite 1929/1929.
 
-Desktop gate should look at:
+Sandbox check should look at:
 1. Generate the Mystic Clover x77 plan and open Notes. The forge-scope
    caveat must render in full with no "..." anywhere in the section, and
    the section body must end flush against its last line of text - no
@@ -165,7 +165,7 @@ Desktop gate should look at:
    changed line count triggers - this is the item that exercises
    `RequestRerenderAfterSettle`, so also confirm repeated narrow/widen
    cycles do not accumulate drift or flicker.
-Gate: PASS (2026-08-22 evening desktop batch, branch build 35b83f9,
+Gate: PASS (2026-08-22 evening sandbox batch, branch build 35b83f9,
 captures preflight/gK1-gK3). Generated Mystic Clover x77 live on
 the branch build: the Notes section read "Notes (1)" and the forge
 caveat rendered as ONE note wrapping naturally across two width-fit

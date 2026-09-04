@@ -3,7 +3,7 @@
 
 ## W3C: Per-character discipline display (2026-08-08)
 
-Field-test feedback (gw2efficiency parity): the Required
+Reported in game (gw2efficiency parity): the Required
 Disciplines section of a generated plan listed each required discipline
 and its minimum rating, but never said WHO on the account could actually
 craft it. Implemented in the isolated `wt-w3c` worktree, STACKED on the
@@ -305,7 +305,7 @@ tests exercise real production code
 with no contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
 internal-only.
 
-Live desktop gate: PASS (2026-08-08, live session). Sandbox
+Live sandbox check: PASS (2026-08-08, live session). Sandbox
 Blish (isolated preflight settings, dummy-window mode) with the
 synthetic snapshot seeded with 4 `CharacterDisciplines` entries across
 2 characters. Verified live across two generated plans:

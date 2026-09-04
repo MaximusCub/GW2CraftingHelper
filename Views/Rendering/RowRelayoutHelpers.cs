@@ -23,7 +23,7 @@ namespace TaimisToolbench.Views.Rendering
     // every pre-extraction caller already ran it (after the rowPanel resize,
     // before the divider resize). LabelHelpers.CreateRowDivider itself - its
     // divider math and the M36b bottom-clearance calls - is called exactly
-    // as before, unedited (DO-NOT-TOUCH #6); this only wraps the
+    // as before, unedited; this only wraps the
     // surrounding boilerplate, not the divider's own arithmetic.
     //
     // Not adopted by SummarySectionRenderer.CreateCostTileRow/

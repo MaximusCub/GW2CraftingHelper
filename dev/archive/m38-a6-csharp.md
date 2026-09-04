@@ -9,7 +9,7 @@ pass was strictly read-only, and a build writes to
 `bin/`/`obj/` in a shared checkout, so anything here
 that would benefit from compiling was left as a proposed cheap check instead
 of being executed). All file/line references are to real source under the
-repo root; `.claude/worktrees/*` (scratch checkouts of this same repo)
+repo root; scratch checkouts of this same repo
 and `packages/`, `bin/`, `obj/`, `.vs/` were excluded from every scan below.
 
 **Headline finding first, because it is the one thing every other section

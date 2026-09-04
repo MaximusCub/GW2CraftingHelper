@@ -85,7 +85,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal("Armorsmith / Weaponsmith 400", result);
         }
 
-        // --- Field-test finding E: Mystic Forge is a facility, not a
+        // --- In-game finding E: Mystic Forge is a facility, not a
         // discipline - its sublabel shows the facility name with no level
         // number instead of the internal "MysticForge 0" id string. ---
         [Fact]

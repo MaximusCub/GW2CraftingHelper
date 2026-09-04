@@ -157,4 +157,4 @@ Gate: not yet run live - Blish-bound rendering (Plan Notes rows for the
 two newly-reported competency shapes, the now-gated Weighted subduing
 tooltip) has not been visually confirmed in a running Blish HUD client,
 same constraint every UI-adjacent entry in this file notes.
-Gate: not yet run live - queued for the next batched desktop session (recipe-sheet savings row and seasonal-tip negative check are explicit scenarios). Merged after the full review pipeline resolved every finding (verification's docs-staleness hold corrected in 30d66de), under the standing merge directive (2026-08-16).
+Gate: not yet run live - queued for the next batched sandbox session (recipe-sheet savings row and seasonal-tip negative check are explicit scenarios). Merged after the full review pipeline resolved every finding (verification's docs-staleness hold corrected in 30d66de), under the standing merge directive (2026-08-16).

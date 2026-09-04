@@ -20,7 +20,7 @@ scratch (~15 min, rate-limited).
 lines - rows the previous pass could not resolve and which no consumer
 could price. 581 items became purchasable that were not before, including
 **Gift of the Survivors (106712) from Castaway Agnes** - one of the four
-items reported in the field as UNKNOWN, and the one this data could
+items reported in game as UNKNOWN, and the one this data could
 actually fix (it is a Visions of Eternity vendor item, not a recipe).
 Seasonal tags went 57 -> 597.
 
@@ -59,8 +59,8 @@ a content change could move them; both now key on content, which is what
 they meant.
 
 Gate: not required - dev-tool and data change. Both suites green (module
-2650, tool 210), and the loss analysis above is the verification a desktop
-gate could not add.
+2650, tool 210), and the loss analysis above is the verification a sandbox
+check could not add.
 
 
 

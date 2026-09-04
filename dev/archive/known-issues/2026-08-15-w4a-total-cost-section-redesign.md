@@ -58,7 +58,7 @@ would not visually balance.
 `PlanRowViewModel` gained `TooltipText`; `SummarySectionRenderer.
 CreateFormulaBand` sets it directly on the caption `Label` control
 itself, never on the tile's containing `Panel` - the M32 lesson
-(`docs/KNOWN-ISSUES.md`'s "Field-test UX wave", finding D) is that a
+(`docs/KNOWN-ISSUES.md`'s "In-game UX wave", finding D) is that a
 label captures the mouse before a container tooltip underneath it would
 ever be reached, so the tooltip has to live on the exact control that
 receives the hover. Wording matches the spec's exact text for all five
@@ -102,14 +102,14 @@ to render-test the glyph directly. This module's own prior investigation
 (`docs/dev-notes/HISTORY.md`, "Carried follow-up resolved: caret glyphs")
 already found that a technically-representable Unicode glyph (a triangle
 expand/collapse indicator) was NOT the reliable choice for this exact
-font once live-tested across multiple desktop sessions/machines - ASCII
+font once live-tested across multiple sandbox sessions/machines - ASCII
 carets were kept instead. Given that precedent and no way to independently
 verify a different, also-unverified glyph here, this package takes the
 pre-authorized safe fallback: a small green "OK" pill via the existing
 `LabelHelpers.CreateSmallTag` helper (same one the tree's Locked/Available
 pills and the shopping source tag already use), colored to match
 `PillColors.PillKind.Selected`'s green (#1F8F0C) rather than adding a new
-`PillKind` for this single non-tree use. **A live desktop check of this
+`PillKind` for this single non-tree use. **A live sandbox check of this
 one glyph decision remains open** - if a future live check confirms the
 check-mark glyph (the escaped form, backslash-u-2713 - see the
 ASCII-only-source rule) renders cleanly in this font, swapping it in is
@@ -125,14 +125,14 @@ Text: "Prices are Trading Post data - actual purchase and sale prices are
 likely to vary."
 
 **7. Height agreement lives in a new class, not
-`PlanContentHeightMath.cs` (DO-NOT-TOUCH for this package).** The
+`PlanContentHeightMath.cs` (frozen for this package).** The
 redesigned section's shape (two independently-present tile rows, a
 currency table header + N rows, a note row, a footnote row) cannot be
 expressed by `PlanContentHeightMath.SummaryBodyHeight`'s pre-W4A formula
 (a single boolean "has a coin row" flag good for exactly one
 `CostTileRowHeight`, not two independently-gated bands) without editing
 that method - and `Services/PlanContentHeightMath.cs`/`PlanRelayoutMath.cs`
-were both explicitly DO-NOT-TOUCH for this package (shared infrastructure
+were both explicitly frozen for this package (shared infrastructure
 several other sections' row builders depend on, plus other in-flight
 work touching the same files). Resolution: a new `Services/
 SummarySectionLayoutMath.cs` (`BodyHeight`, `ComputeCurrencyColumnEdges`) -
@@ -161,7 +161,7 @@ of the M36b `Container.Paint` round-trip simulation sweep that
 section deliberately had no per-row dividers at all by its own original
 doc comment. Adding one at an unproven row height, for a visual element
 the spec never actually asked for, would have risked resurrecting
-exactly the defect DO-NOT-TOUCH #6 (divider math) exists to stay clear
+exactly the defect frozen-file #6 (divider math) exists to stay clear
 of. Currency rows resize via a plain `AddRelayout` closure instead, with
 no divider - the header row's dark background alone delineates the
 table, matching gw2e's own header-only table styling.
@@ -223,7 +223,7 @@ commits, before any push/PR:
   footnote rows a future change emits.
 - **Ellipsized currency-name tooltip swallowed (Must Fix,
   `CreateCurrencyTableRow`, both the build path and its `AddReellipsis`
-  closure).** The M32 lesson (this file's own "Field-test UX wave"
+  closure).** The M32 lesson (this file's own "In-game UX wave"
   finding D) is that a label captures the mouse before a tooltip on a
   control underneath it is ever reached; the currency table's `nameLabel`
   sat directly on top of its own truncated text with the tooltip stamped
@@ -335,7 +335,7 @@ TreeSectionController.cs` was not touched; every other section renderer
 (Used Materials, Shopping List, Crafting Steps, Required Disciplines,
 Required Recipes) is untouched.
 
-No live desktop verification was performed for this package (browser/game
+No live sandbox verification was performed for this package (browser/game
 automation was out of scope here) - item 5's glyph choice and
 the overall visual layout (including the review-fix round's new formula-
 band operators and widened currency columns) are unverified live and
@@ -416,17 +416,17 @@ modified - the fix lives entirely in `PlanRowViewModel` (new field),
 `PlanViewModelBuilder.BuildProfitFormulaBand` (sets it), and
 `SummarySectionRenderer.CreateFormulaBand` (reads it). Item/currency/
 vendor IDs remain internal-only; coin amounts still render icon-right-
-of-number throughout (unchanged). No live desktop verification was
+of-number throughout (unchanged). No live sandbox verification was
 performed for this round either, same caveat as item 11's own closing
 paragraph above.
 
-Gate: PASS 2026-08-16 (live sandbox session, combined wave-4 staging build). Verified: cost-band collapse rule (single Actual Cost to Craft tile when opportunity cost is zero - ARE and Zojja plans), currency table alphabetical with icons and correct Required/Have/Needed math, green OK badges on all fully-covered rows, TP-variance footnote, band-caption tooltip renders on hover, coin icons right of numbers. Checkmark-glyph experiment FAILED live (U+2713 renders as an empty tag in the Blish font) - the OK badge is the permanent marker choice.
+Gate: PASS 2026-08-16 (live sandbox session, combined staging build). Verified: cost-band collapse rule (single Actual Cost to Craft tile when opportunity cost is zero - ARE and Zojja plans), currency table alphabetical with icons and correct Required/Have/Needed math, green OK badges on all fully-covered rows, TP-variance footnote, band-caption tooltip renders on hover, coin icons right of numbers. Checkmark-glyph experiment FAILED live (U+2713 renders as an empty tag in the Blish font) - the OK badge is the permanent marker choice.
 
 Follow-ups (recorded during a later polish pass, not yet implemented):
 
 - Follow-up: delete `PlanContentHeightMath.SummaryBodyHeight`, its tests
   (`PlanContentHeightMathTests.cs` ~348-390), and `PlanRowType.CoinTotal`
-  once the DO-NOT-TOUCH freeze on `PlanContentHeightMath` lifts - all
+  once the freeze on `PlanContentHeightMath` lifts - all
   three are dead for production since `CraftingPlanView` routes Summary
   to `SummarySectionLayoutMath`. **DONE (2026-08-17, high-evidence-zones
   branch).** Characterized first per the new policy (see this file's

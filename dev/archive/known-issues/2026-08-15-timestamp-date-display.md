@@ -3,7 +3,7 @@
 
 ## Timestamp date display (all user-facing timestamps gain dates)
 
-Field-test feedback: a session can wrap over midnight, and plain
+Reported in game: a session can wrap over midnight, and plain
 HH:mm/h:mm tt time-only displays are ambiguous across a midnight
 boundary, so every user-facing timestamp in the module gains its date. No
 transient-event exclusions - the scope covered every one of them, not
@@ -62,5 +62,5 @@ row, or accept the risk as-is - left open.
   `CopyToClipboard`; a horizontal scroll on the Log tab's content panel is
   the real fix if that tab is revisited.
 
-Gate: PASS 2026-08-16 (live sandbox session, combined wave-4 staging build). Verified: Log tab rows render "[INFO] 2026-08-15 21:14:10" ISO-dated; a freshly-produced failure status renders "Refresh failed - GW2 API access not ready - Aug 15, 2026 9:32 PM (25d ago)" with no clipping at the default window width; plan strip and W3D banner dated. Note: a status string persisted by a PRE-fix build renders in the old time-only format until the next status write - expected, not a defect.
+Gate: PASS 2026-08-16 (live sandbox session, combined staging build). Verified: Log tab rows render "[INFO] 2026-08-15 21:14:10" ISO-dated; a freshly-produced failure status renders "Refresh failed - GW2 API access not ready - Aug 15, 2026 9:32 PM (25d ago)" with no clipping at the default window width; plan strip and W3D banner dated. Note: a status string persisted by a PRE-fix build renders in the old time-only format until the next status write - expected, not a defect.
 ---

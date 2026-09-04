@@ -188,7 +188,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.False(StatusText.IsStale(age, TimeSpan.FromMinutes(10)));
         }
 
-        // ---- ForRefreshFailure (field-tested pain: the
+        // ---- ForRefreshFailure (pain seen in game: the
         // Snapshot tab's Refresh Now used to show only bare
         // "Refresh Failed - {time}" regardless of cause) ----
         [Fact]

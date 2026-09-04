@@ -2,10 +2,10 @@
 
 Date: 2026-08-15
 
-> DO-NOT-TOUCH references below predate the 2026-08-17 high-evidence-zone
-> policy - see docs/KNOWN-ISSUES.md's policy note. A DO-NOT-TOUCH citation
-> is no longer a blocking verdict; it is a proof requirement (see that
-> note for what proof looks like). Individual entries below have not been
+> References below to frozen files predate the 2026-08-17 rule change -
+> see docs/KNOWN-ISSUES.md's policy note. Calling a file frozen is no
+> longer a blocking verdict; it is a proof requirement (see that note for
+> what proof looks like). Individual entries below have not been
 > re-litigated under the new rule.
 
 This is a living document, not a to-do list. Every entry below is a place
@@ -174,8 +174,8 @@ craft/vendor tie). Is our tie-break rule the right one?
   vendor."
 - **Why this is worth logging rather than treating as settled**: our separate
   VendorOffer architecture (distinct from the recipe list, with its own
-  purchase-cap and batch-merging model) is what makes several DO-NOT-TOUCH
-  features possible - merged-ceil vendor batching, purchase-cap notices, and
+  purchase-cap and batch-merging model) is what makes several of the
+  frozen files' features possible - merged-ceil vendor batching, purchase-cap notices, and
   the in-flight vendor cost-component leaves work. Folding vendor into the
   recipe list the way gw2e does would conflict with those. So the
   architecture stays; the open question is narrowly whether "vendor wins
@@ -278,14 +278,14 @@ should you have to turn that on explicitly like gw2e requires?
 ## 10. Owned-materials tree annotation wording: single delta vs total/covered/remaining
 
 **The question**: awareness only - this was already changed based on a real
-field-test finding, not a fresh question.
+in-game finding, not a fresh question.
 
 - **gw2e**: "Using {{ totalQuantity - usedQuantity }} owned materials" - a
   single delta number, with the row's own quantity label separately showing
   only what's still needed.
 - **Ours**: "HAVE {used}/{total} NEEDED" plus a tooltip spelling out total
   demand, covered count, and remaining count together - a fix (2026-08-06
-  field-test finding) for a real reported case where gw2e-style single-number
+  in-game finding) for a real reported case where gw2e-style single-number
   wording read as contradictory next to the row's own remaining-need prefix.
 - **Why preserve**: marked improvement, already shipped in response to real
   user confusion. Noted for awareness, not because it needs revisiting.
@@ -365,7 +365,7 @@ renders?
   (`depth < 2` in `PlanContentHeightMath.IsNodeExpanded`).
 - **Why this is genuinely open**: this is a taste call, not a correctness
   question, and I don't have a strong argument either way. But
-  `PlanContentHeightMath` is on the DO-NOT-TOUCH list for this repo, so even
+  `PlanContentHeightMath` is on the frozen-file list for this repo, so even
   if you decide gw2e's shallower default is preferable, it cannot be
   auto-adopted - any change here needs a path that doesn't touch that file's
   core arithmetic.
@@ -573,7 +573,7 @@ vendor path has won?
   PlanRelayoutMath change" - that assurance was never actually checked.
   Adding content to a tree row is exactly the class of change that perturbs
   row-height/relayout inputs, and both of those are on this repo's
-  DO-NOT-TOUCH list. Verify that concretely before assuming a tooltip-only
+  frozen-file list. Verify that concretely before assuming a tooltip-only
   badge is free.
 - **What matching gw2e would look like**: an inline tree-row badge/tooltip
   (display-only, reusing already-seeded `VendorOffer.DailyCap`/`WeeklyCap`

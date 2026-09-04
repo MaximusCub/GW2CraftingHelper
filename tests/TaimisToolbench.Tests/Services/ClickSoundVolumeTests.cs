@@ -112,7 +112,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(ClickSoundVolume.MinPercent, percent);
         }
 
-        // The field test has since returned 35. What must stay true is
+        // In-game testing has since returned 35. What must stay true is
         // that the default is a playable percent and that it is clearly
         // louder than what the old path actually played: Blish's
         // fixed-volume default of 0.2 (measured), i.e. 20 percent on this

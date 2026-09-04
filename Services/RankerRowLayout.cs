@@ -86,7 +86,7 @@ namespace TaimisToolbench.Services
         // own column-header label at the header band's bold ColumnHeader
         // font. Header and cells centre on the same track, so a track
         // narrower than its header spills into the columns on BOTH sides of
-        // it - the live desktop gate caught the right-aligned form of that
+        // it - the live sandbox check caught the right-aligned form of that
         // ("ReadhyDaining") when an empty table let the coin band collapse
         // to the width of a dash.
 
@@ -615,8 +615,8 @@ namespace TaimisToolbench.Services
         /// Analyze button pinned right, the two display toggles between them
         /// in reading order, the inline spinner after the status text.
         /// The run-progress text renders in the status band and ONLY
-        /// there - the field test showed status-length text stamped onto
-        /// the fixed-width button spilling past its edges.
+        /// there - in game, status-length text stamped onto the
+        /// fixed-width button spilled past its edges.
         /// <para>
         /// A toggle whose width is zero takes no slot at all, so the status
         /// band keeps the space rather than a rail of nothing sitting in it.
@@ -687,8 +687,8 @@ namespace TaimisToolbench.Services
         /// Currency shortfalls deliberately do NOT share the gate strip's
         /// rails any more. On the shared grid an entry rendered directly
         /// under whichever gate column its index landed on ("Ascalonian
-        /// Tear" under Materials, an essence under Disciplines), which the
-        /// field test read as children of unrelated gates. Their own
+        /// Tear" under Materials, an essence under Disciplines), which read
+        /// in game as children of unrelated gates. Their own
         /// indented, icon-led grid makes them parse as one currency list
         /// owned by the row.
         /// </summary>

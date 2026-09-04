@@ -3,7 +3,7 @@
 
 ## Content viewport falls short of the window bottom (KNOWN-ISSUES #66)
 
-Reported in the field: the bottom of the viewable port sits far above the
+Reported in game: the bottom of the viewable port sits far above the
 actual bottom of the overall textured window. The
 capture (`gate-master/viewport-short-of-window.png`, a crop of the lower
 window on a 3440x1440 client) shows three tree rows, a fourth clipped

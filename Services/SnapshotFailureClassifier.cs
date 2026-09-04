@@ -6,7 +6,7 @@ namespace TaimisToolbench.Services
 {
     /// <summary>
     /// Classifies a failed snapshot refresh into a SnapshotFailureKind - see
-    /// that enum's own doc comment for the field-tested incident this
+    /// that enum's own doc comment for the in-game incident this
     /// exists for. Deliberately matches by exception TYPE NAME (a plain
     /// string, e.g. "InvalidAccessTokenException") rather than by C# "is"
     /// type checks against Gw2Sharp's own exception classes: this file

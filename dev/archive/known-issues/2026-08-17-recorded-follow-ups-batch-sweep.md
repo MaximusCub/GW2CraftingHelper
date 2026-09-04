@@ -91,7 +91,7 @@ own nice-to-haves, the currency-name-index guard test, the
 `DailyCooldownItemService.Load` `ItemId <= 0` guard), (c) an accepted
 design tradeoff explicitly not a bug (the currency-valuation snapshot
 staleness note, the sticky seasonal-tag limitation), or (d) touches a
-DO-NOT-TOUCH file (`PlanContentHeightMath`'s tree-arm caption-row
+frozen file (`PlanContentHeightMath`'s tree-arm caption-row
 widening). None qualified as both pure comment/doc/test AND genuinely
 cheap beyond the four items already taken above - nothing further was
 taken.

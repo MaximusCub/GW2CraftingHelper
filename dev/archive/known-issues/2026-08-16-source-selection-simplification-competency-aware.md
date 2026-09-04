@@ -74,7 +74,7 @@ precedent, attached to `PlanSolver.Decision`/`SolverDecision`/
 reuses `VendorBatchSolver`'s own already-evaluated
 `VendorCurrencyCosts`/`VendorItemCosts`/coin-cost output verbatim
 (`VendorBatchSolver.cs` itself - the merged-ceil math - was never
-touched, per the DO-NOT-TOUCH list); Craft's breakdown decomposes the
+touched, per the frozen-file list); Craft's breakdown decomposes the
 candidate recipe's DIRECT (non-recursive) ingredient list, which needs
 no pricing/recursion since domination compares raw ingredient quantities
 by id, the same granularity `VendorItemCostLine.Quantity` already uses.
@@ -181,11 +181,11 @@ suppression fix's own test). All green at every commit checkpoint.
   (which are direct-ingredient-level by construction), and no case
   requiring deeper recursion was specified.
 
-No live desktop verification was performed - `Views/Rendering/
+No live sandbox verification was performed - `Views/Rendering/
 TreeSectionController.cs` and `Views/Rendering/PillColors.cs` are
 Blish-bound and outside this repo's test-runnable surface, same
 constraint every UI-adjacent entry in this file notes. The Subdued
 pill's actual on-screen color/tooltip rendering has not been visually
 confirmed in a running Blish HUD client.
 
-Gate: not yet run live - queued for the next desktop session (subdued-pill + competency-default visuals). Merged after the deepest pipeline of the wave: implementation, two adversarial rounds, three verification passes (the second MEASURED an overcorrection suppressing a real 70c opportunity; the third revert-tested both direction pins on the final design), under the standing merge directive (2026-08-16).
+Gate: not yet run live - queued for the next sandbox session (subdued-pill + competency-default visuals). Merged after the deepest pipeline of the wave: implementation, two adversarial rounds, three verification passes (the second MEASURED an overcorrection suppressing a real 70c opportunity; the third revert-tested both direction pins on the final design), under the standing merge directive (2026-08-16).

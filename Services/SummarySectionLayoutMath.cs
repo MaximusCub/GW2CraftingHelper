@@ -106,7 +106,7 @@ namespace TaimisToolbench.Services
         //
         // The cost band's result tile is the one number a user comes to
         // this section for. It used to say so with a promoted DefaultFont32
-        // amount; a field test replaced that with a tinted,
+        // amount; that was replaced with a tinted,
         // semi-transparent highlight box around the result tile, so all
         // three tiles now share ONE amount font and the band reads as one
         // formula again. The band's height is therefore no longer a
@@ -188,7 +188,7 @@ namespace TaimisToolbench.Services
         /// one. That line used to be counted BETWEEN the caption and a
         /// bottom-anchored amount, which dropped all three tiles' coin runs
         /// by its height while only the result tile had anything in the
-        /// space it left - the dead band the field report saw.
+        /// space it left - a dead band under the other two tiles.
         /// hasCurrencyNote must be "this Summary section has at least one
         /// CurrencyCost row" - the same condition
         /// Views/Rendering/SummarySectionRenderer.Render uses to decide
@@ -525,7 +525,7 @@ namespace TaimisToolbench.Services
         // the packed right-hand stack this table used to draw: at the plan
         // panel's real width that stack left ~1000px of nothing between a
         // currency's name and its first number, with no anchor for the eye
-        // between them, and the field report could not track a row across
+        // between them, and the eye could not track a row across
         // it. The idiom is RankerRowLayout.GateCell's, which already
         // divides a row's full width into N equal cells for the same
         // reason.

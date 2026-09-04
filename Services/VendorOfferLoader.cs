@@ -35,8 +35,8 @@ namespace TaimisToolbench.Services
             // System.Text.Json 5.0.0 (net461) has no synchronous
             // Deserialize(Stream) overload, only DeserializeAsync(Stream);
             // blocking on it here is safe because Blish's XNA host has no
-            // SynchronizationContext to deadlock against (see DO-NOT-TOUCH
-            // #2/#12), and the call site remains synchronous by design
+            // SynchronizationContext to deadlock against, and the call site
+            // remains synchronous by design
             // (P2b - moving load off Initialize - is explicitly excluded).
             return JsonSerializer.DeserializeAsync<VendorOfferDataset>(stream, Options)
                        .GetAwaiter().GetResult()

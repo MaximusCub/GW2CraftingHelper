@@ -132,7 +132,7 @@ Validation: build 0 errors and the full suite green before each commit
 (1886 baseline -> 1928 with the new layout tests; the increase is all
 new tests, zero regressions).
 
-Desktop gate items (all in the Settings tab):
+Sandbox check items (all in the Settings tab):
 1. Currency rows are one line each, with Clear on the same line and a
    readable "default N" tag at the right of every defaulted cell (the
    whole number, not a clipped one) - check a 4-digit default such as
@@ -166,7 +166,7 @@ Desktop gate items (all in the Settings tab):
 7. Type a bad amount into one currency, filter it off screen, click
    Save: the amber "1 invalid entry not saved" must be accompanied by
    that row reappearing with its red "Invalid" tag despite the filter.
-Gate: PASS (2026-08-22 evening desktop batch, branch build b740035,
+Gate: PASS (2026-08-22 evening sandbox batch, branch build b740035,
 captures preflight/gG1-gG7). (1) The tab rendered top-down as: top
 Save bar, Homestead / Logging / Snapshot short sections each with
 the 2px header rule, then Currency Valuations with the filter box,

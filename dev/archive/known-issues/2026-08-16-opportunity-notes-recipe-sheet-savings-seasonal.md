@@ -112,7 +112,7 @@ need a hand edit like this one) is a recorded follow-up, not this pass.
 `FestivalDisplayNames`), `Services/CraftingTreeBuilder.cs`
 (`ApplyReferenceRecipeInfo`), `Services/CostLineValuation.cs` (new,
 shared coin-valuation helper - never touches `VendorBatchSolver`, one of
-the DO-NOT-TOUCH files), `Services/SeasonalOfferFilter.cs` (new),
+the frozen files), `Services/SeasonalOfferFilter.cs` (new),
 `Services/RecipeSheetSavingsCalculator.cs` (new),
 `Services/SeasonalVendorTipCalculator.cs` (new),
 `Services/CraftingPlanPipeline.cs` (two new optional constructor
@@ -143,7 +143,7 @@ projects alongside the main suite).
 - [x] Pricing logic preserves multi-source correctness (`CostLineValuation`
   refuses - never guesses - on a non-coin currency line, an unpriced Item
   line, or any unrecognized `CostLine.Type`, mirroring `VendorBatchSolver.
-  EvaluateVendorOffers`' own posture without touching that DO-NOT-TOUCH
+  EvaluateVendorOffers`' own posture without touching that frozen
   file).
 - [x] IDs remain internal-only (every note resolves item/recipe/discipline
   **names**, never raw ids).
@@ -194,7 +194,7 @@ own identical "cheapest priceable offer wins" precedent - new test
 - Seasonal-offer detection is a one-time hand tag of three known rows,
   not an automated wiki-scrape pass - see the SEASONAL VENDOR TIP section
   above.
-- No live desktop verification was performed - `Views/CraftingPlanView.cs`
+- No live sandbox verification was performed - `Views/CraftingPlanView.cs`
   and `Views/Rendering/NotesSectionRenderer.cs` are Blish-bound and
   outside this repo's test-runnable surface, same constraint every
   UI-adjacent entry in this file notes (including the immediately
@@ -209,5 +209,5 @@ own identical "cheapest priceable offer wins" precedent - new test
   `recipeSheetItemIdByRecipeId` seed in production (see above), but has
   not yet been confirmed against a real generated plan on-screen.
 
-Gate: PASS (negative checks) 2026-08-16 (live desktop session). Seasonal exclusion verified as the headline: the ARE craft path now prices ectos at the real TP rate (~26s vs the old ~4s26 phantom Halloween vendor), the ecto row's vendor source is gone entirely, and the Candy Corn tip correctly does NOT render out of season; sheet-savings positive render suite-covered.
-Gate: not yet run live - queued for the next batched desktop session. Merged after the full review pipeline resolved every finding (2 adversarial rounds, verification zero-blocking, 1536/1536 pre-merge), under the standing merge directive (2026-08-16).
+Gate: PASS (negative checks) 2026-08-16 (live sandbox session). Seasonal exclusion verified as the headline: the ARE craft path now prices ectos at the real TP rate (~26s vs the old ~4s26 phantom Halloween vendor), the ecto row's vendor source is gone entirely, and the Candy Corn tip correctly does NOT render out of season; sheet-savings positive render suite-covered.
+Gate: not yet run live - queued for the next batched sandbox session. Merged after the full review pipeline resolved every finding (2 adversarial rounds, verification zero-blocking, 1536/1536 pre-merge), under the standing merge directive (2026-08-16).

@@ -41,7 +41,7 @@ namespace TaimisToolbench.Tests.Services
         }
 
         // ---- FailedSourceExceptionTypeNames (SnapshotFailureClassifier's
-        // input - field-tested pain) ----
+        // input - pain seen in game) ----
         [Fact]
         public void TwoArgConstructor_FailedSourceExceptionTypeNames_IsEmptyNotNull()
         {

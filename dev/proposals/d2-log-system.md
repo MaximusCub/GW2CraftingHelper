@@ -79,7 +79,7 @@ Replaces `Views/LogTabContent.cs` (74 lines) with a genuine search/view pane, fo
 **lightweight FlowPanel(CanScroll)** pattern (pattern A) - this tab's content is
 label-per-row with a toolbar, not multi-column ellipsized rows that must reflow live during a resize
 drag, so it does not need to opt into the M33 PlanContentHeightMath/relayout-registry contract (pattern
-B, `CraftingPlanView`-only, DO-NOT-TOUCH per M38).
+B, `CraftingPlanView`-only, frozen per M38).
 
 **Layout** (top to bottom, inside the `ViewAdapter`-provided bordered panel - same chrome every other
 tab gets):

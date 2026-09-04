@@ -51,7 +51,7 @@ labels/icons) have no `BasicTooltipText` of their own and silently
 captured the mouse first over most of the row - including over the
 Total cell's own currency amount, the one place a user hovering "do I
 have enough?" would look. This repo has already root-caused and fixed
-this exact class twice (the "Field-test UX wave" finding D and the
+this exact class twice (the "In-game UX wave" finding D and the
 ellipsized-currency-name tooltip fix in `SummarySectionRenderer.cs`).
 Fixed in `Views/Rendering/ShoppingListSectionRenderer.cs`:
 `BuildTooltip()` now also assigns the same string to
@@ -81,7 +81,7 @@ consumers are `CurrencyDisplayResolver`, `ShoppingRowTooltipFormatter`,
 and the model itself; `SummarySectionRenderer` uses a Have/Needed column
 table and `DecisionPillPlanner` already uses `HAVE`/`NEEDED`. The four
 hits in `docs/dev-notes/HISTORY.md` (lines 745, 1496, 1765, 2615) are
-historical field-test transcripts and are deliberately left verbatim,
+historical in-game feedback transcripts and are deliberately left verbatim,
 not updated - recorded here so a future reviewer does not need to
 re-derive that exclusion.
 
@@ -99,4 +99,4 @@ assertions.
 PASS, 0 errors (pre-existing StyleCop warnings only, none in
 edited files).
 
-Gate: not yet run live - queued for the next desktop session. Merged after the full review pipeline resolved every finding, under the standing merge directive (2026-08-16).
+Gate: not yet run live - queued for the next sandbox session. Merged after the full review pipeline resolved every finding, under the standing merge directive (2026-08-16).

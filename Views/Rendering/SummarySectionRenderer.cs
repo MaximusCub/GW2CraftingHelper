@@ -15,9 +15,9 @@ namespace TaimisToolbench.Views.Rendering
     // (via TextRowRenderer), and a subdued footnote row (CreateFootnoteRow).
     // Height agreement for this shape lives in
     // Services/SummarySectionLayoutMath.BodyHeight, not
-    // PlanContentHeightMath (a high-evidence zone, formerly DO-NOT-TOUCH,
-    // for this package - see docs/KNOWN-ISSUES.md#policy-high-evidence-zones) - see
-    // that class's own doc comment for the full rationale.
+    // PlanContentHeightMath, shared infrastructure this package must not
+    // reshape (see docs/KNOWN-ISSUES.md's policy on code pinned by
+    // expensive evidence) - see that class's doc comment for the rationale.
     internal sealed class SummarySectionRenderer
     {
         private readonly ISectionRelayoutSink _sink;
@@ -488,7 +488,7 @@ namespace TaimisToolbench.Views.Rendering
         /// vanishes or survives according to its own sub-pixel phase
         /// (KNOWN-ISSUES #23). The band's y is a scroll offset away and the
         /// box's x follows the panel width, so the four edges each land on
-        /// a different phase - field report: the box drew its top and
+        /// a different phase - in game the box drew its top and
         /// bottom and neither side. At 2, floor(2 * 0.81) = 1 covered
         /// physical pixel at the smallest supported UI scale, on all four
         /// edges. Content is inset by CostBandBoxPadX (14) / PadY (6), so

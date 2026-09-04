@@ -7,7 +7,7 @@ Follow-up to "Gate investigation: receipt/what-if captions + value-detail
 hover (2026-08-16)" above: that entry's Item 2 traced the value-detail
 hover only as far as `PlanSolver.Solve -> CraftingTreeBuilder.BuildTree ->
 ValueDetailTooltipBuilder.TryBuild` (the seam test) and found no defect,
-but the live miss reproduced again on two separate desktop builds after
+but the live miss reproduced again on two separate sandbox builds after
 that entry was merged - a stronger signal than "stale build", so this
 pass went one layer further down: the full `CraftingPlanPipeline.
 GenerateStructuredAsync` path the seam test does not model at all (VOM
@@ -134,7 +134,7 @@ no Blish HUD reference, no fake logic, no fake file I/O. Build:
 `"/mnt/c/Program Files/dotnet/dotnet.exe" build
 C:/Dev/Blish/wt-valuedetail/GW2CraftingHelper.csproj -p:Platform=x64` -
 clean, 0 errors (pre-existing StyleCop warnings only, none in either
-touched file). No files on the DO-NOT-TOUCH list (`ModuleLog`,
+touched file). No files on the frozen-file list (`ModuleLog`,
 `PlanContentHeightMath`, `PlanRelayoutMath`, scroll machinery,
 `VendorBatchSolver` merged-ceil batching) were edited - only a test file
 and this doc.
@@ -142,6 +142,6 @@ and this doc.
 Gate: not run live this pass - test-and-docs change with no runtime
 code touched; pipeline-level behaviour is suite-pinned (mutation-checked
 per the review record above) and the live hover re-check stays on the
-next desktop gate batch, where fallback-tier propagation is the first
+next sandbox check batch, where fallback-tier propagation is the first
 thing to rule out. Merged under the standing merge
 directive (2026-08-16).

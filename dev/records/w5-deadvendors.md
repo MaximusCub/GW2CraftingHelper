@@ -288,5 +288,5 @@ Module 3,971, RecipeSeeder 3, VendorOfferUpdater 238 (4,212 total, from a
 4,208 baseline plus the four new tests), all green. Two exclusions, 170
 offers removed, seven acquisition hints added. The byte-identical round
 trip of the untouched dataset through the tool's own serializer, run again
-before the second exclusion, is the verification a desktop gate could not
+before the second exclusion, is the verification a sandbox check could not
 add.

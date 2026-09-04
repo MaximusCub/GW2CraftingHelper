@@ -50,7 +50,7 @@ a legend rather than a header.
 
 ### B - one item-icon component
 
-Reported in the field: item icon displays did not run through one
+Reported in game: item icon displays did not run through one
 standardized code path - some sites answered a hover and others did not,
 some drew a rarity border and others drew the bare icon art. The
 inventory, taken at v0.2.3:
@@ -95,7 +95,7 @@ not the colour - is what this directive buys there.
 
 ### C - the Snapshot tab's layout
 
-Reported in the field: the Snapshot tab needed the layout overhaul too -
+Reported in game: the Snapshot tab needed the layout overhaul too -
 it had no tooltips and the same icon inconsistency.
 
 The results were a grid of unlabelled two-line cards. They are two
@@ -143,7 +143,7 @@ panel), `SnapshotTableSorter` holds the comparators, and
 
 ### D - sortable headers are cells, not text
 
-Reported in the field: a column header that can be clicked to sort should
+Reported in game: a column header that can be clicked to sort should
 wash lightly on hover to show that an action can be triggered from it, and
 both the hover note and the click should answer over the whole column
 header cell rather than over its text alone.
@@ -370,7 +370,7 @@ triggering. None is touched here. `Services/PlanViewModelBuilder.cs` and
 `Views/CraftingPlanView.cs` are untouched apart from one mechanical
 rename of the icon component in the latter.
 
-### Desktop gate
+### Sandbox check
 
 1. **The ramp, on each of the four tabs.** Snapshot: "Account Snapshot"
    at 24 bold over a full-width rule, the status line at 18 bold,
@@ -433,7 +433,7 @@ rename of the icon component in the latter.
    dark border must have a light line immediately inside it, and NO text
    behind the tooltip may be legible through it (audit H6).
 
-Gate: PASS (2026-08-25 desktop session, branch build, captures
+Gate: PASS (2026-08-25 sandbox session, branch build, captures
 preflight/gTY1-gTY15; display-sleep inhibitor held the session).
 
 A. RAMP: Settings, Log and About now carry 24-bold section titles with

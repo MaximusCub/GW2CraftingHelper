@@ -54,8 +54,8 @@ namespace TaimisToolbench.Views.Rendering
         /// clip window, where the floor/ceil scissor round trip documented
         /// on <see cref="CreateRowDivider"/> can shave it off - so whether a
         /// given descender survives depends on the scroll phase and the GW2
-        /// UI scale, which is why it reads as intermittent. Field test, bug
-        /// 5: character names in Required Disciplines lost the tail of
+        /// UI scale, which is why it reads as intermittent. Bug 5, reported
+        /// in game: character names in Required Disciplines lost the tail of
         /// their 'y'. Two pixels, matching the Log tab's row metrics, which
         /// have measured their own rows as Measure(font, "Ag").Height + 2
         /// since they were written.

@@ -37,7 +37,7 @@ breakdown is one click away via the existing expander machinery.
 component's TP-valued gold amount did not previously survive past
 `VendorBatchSolver.EvaluateVendorOffers` (an Item cost line was folded
 straight into `coinCost` and discarded as a discrete number) - the
-merged-ceil batching arithmetic itself (DO-NOT-TOUCH) is unchanged; a new
+merged-ceil batching arithmetic itself (frozen at the time) is unchanged; a new
 `VendorItemCostLine` (`ItemId`/`Quantity`/`GoldValue`) is captured at the
 EXACT SAME multiplication site that already fed `coinCost`, scaled by the
 same `unitsNeeded`, and threaded through `VendorOfferEvaluation` ->
@@ -147,7 +147,7 @@ level lower.
   "no leaves" whenever this flag is set, regardless of kind count - the
   node still shows its own correctly reallocated `SubtreeCost`, just without
   an unprovable item/currency breakdown. Deliberately kept OUT of
-  `VendorBatchSolver.cs` (DO-NOT-TOUCH: merged-ceil batching math) - the new
+  `VendorBatchSolver.cs` (frozen: merged-ceil batching math) - the new
   pass lives in `PlanSolver.cs`, reads `AllocateVendorNodeCosts`'s own
   already-public inputs/outputs (`vendorOccurrences`, `stepMap`) strictly
   after it returns, and writes only the new auxiliary flag; `VendorBatchSolver.cs`'s
@@ -220,7 +220,7 @@ level lower.
 
 - *Justified, not changed (`Services/VendorBatchSolver.cs` line 333):
   the `itemsScalable`/`continue` overflow guard added inside
-  `EvaluateVendorOffers`.* Flagged as new control flow inside a DO-NOT-TOUCH
+  `EvaluateVendorOffers`.* Flagged as new control flow inside a frozen
   method. Kept as-is: it is structurally identical to - and only extends to
   a second cost dimension - the pre-existing `scalable`/`continue` guard a
   few lines below it for currency lines (same file, same loop, same
@@ -241,7 +241,7 @@ Blish HUD references in tests; every new test exercises real production
 code (`PlanSolver.Solve`, `CraftingTreeBuilder.BuildTree`,
 `CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`) with
 no contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
-internal-only. `VendorBatchSolver.cs`'s DO-NOT-TOUCH merged-ceil methods
+internal-only. `VendorBatchSolver.cs`'s frozen merged-ceil methods
 (`EvaluateVendorOffers`, `FinalizeVendorBatches`, `AllocateVendorNodeCosts`,
 `MergeVendorCurrencyCosts`, `VendorBatchesEqual`, `ScaleCostLines`) had
 their dollar-amount arithmetic (coin costs, ceil/batch selection,
@@ -304,7 +304,7 @@ new one). No new Blish HUD references in tests; both new/extended tests
 exercise real production code (`PlanSolver.Solve`,
 `CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`)
 with no contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
-internal-only. `VendorBatchSolver.cs`'s DO-NOT-TOUCH merged-ceil methods
+internal-only. `VendorBatchSolver.cs`'s frozen merged-ceil methods
 had their dollar-amount arithmetic left byte-for-byte unchanged - the only
 edit inside that file this round is the one `Count > 0` capture guard
 (plus its doc comment). `ResolveWithOverrides`/`BuildPresetOverrides`
@@ -356,7 +356,7 @@ rather than adding a new one). No new Blish HUD references in tests; the
 extended test exercises real production code (`PlanSolver.Solve`,
 `CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`)
 with no contract-mirror/fake-logic tests. Item/currency/vendor IDs remain
-internal-only. `VendorBatchSolver.cs`'s DO-NOT-TOUCH merged-ceil methods
+internal-only. `VendorBatchSolver.cs`'s frozen merged-ceil methods
 were not touched at all this round (the fix is entirely inside
 `CraftingPlanPipeline.cs`, a cosmetic ownership-annotation map consulted
 strictly after solving). `ResolveWithOverrides`/`BuildPresetOverrides`
@@ -372,7 +372,7 @@ solver decision, only the cosmetic HAVE pill a display leaf reads
 afterward.
 
 **Pre-gate addendum (2026-08-15): "OWN n"/"CURRENCY" badge wording pass.**
-Field testing found the component leaves' informational HAVE/
+In-game testing found the component leaves' informational HAVE/
 "HAVE x/y NEEDED" pill (Section "Decision pills stay decision-free" above)
 misleading: that vocabulary means "your stock covers this need and reduced
 the plan cost" everywhere else in the tree, but a component leaf's
@@ -420,7 +420,7 @@ to the plain-node wording only.
 Updated: `Models/CraftingTreeNode.cs` (`IsCostComponent`'s and
 `ComponentOwnedQuantity`'s doc comments), `Services/CraftingTreeBuilder.cs`
 (`ResolveOwnedQuantity`'s doc comment), `Services/DecisionPillPlanner.cs`,
-`Views/Rendering/TreeSectionController.cs`. `DO-NOT-TOUCH` files (`Services/
+`Views/Rendering/TreeSectionController.cs`. Frozen files (`Services/
 ModuleLog.cs`, `Services/PlanContentHeightMath.cs`, `Services/
 PlanRelayoutMath.cs`, scroll machinery, `VendorBatchSolver`'s merged-ceil
 vendor batching math) were not touched. `DecisionPillPlannerTests` updated:
@@ -435,4 +435,4 @@ references in tests; the extended/added tests exercise the real
 fake-logic tests. Item/currency/vendor IDs remain internal-only (badge text
 is `"OWN n"`/`"CURRENCY"` only, never an id).
 
-Live desktop gate: Gate: PASS 2026-08-16 (live sandbox session, combined wave-4 staging build). Verified on the real Amalgamated Rift Essence vendor path: component leaves render under the vendor-selected root (ecto leaf's gold share exactly equals the parent's collapsed total; three currency leaves blank-cost with CURRENCY badges), OWN badges show the RAW wallet holding (300/150/100 against 250/100/50 needs) after the gate-found clamp fix in this branch, no OWN badge at zero holding, manual override to VENDOR re-solves and the overridden state survives module restart via the persisted plan, tree-button tooltips render live (Best Path text verified verbatim). Known composition note: component leaves and the dimmed what-crafting-would-cost reference branch both render under a vendor root with a recipe - as designed; a visual separator is a queued UX question.
+Live sandbox check: Gate: PASS 2026-08-16 (live sandbox session, combined staging build). Verified on the real Amalgamated Rift Essence vendor path: component leaves render under the vendor-selected root (ecto leaf's gold share exactly equals the parent's collapsed total; three currency leaves blank-cost with CURRENCY badges), OWN badges show the RAW wallet holding (300/150/100 against 250/100/50 needs) after the gate-found clamp fix in this branch, no OWN badge at zero holding, manual override to VENDOR re-solves and the overridden state survives module restart via the persisted plan, tree-button tooltips render live (Best Path text verified verbatim). Known composition note: component leaves and the dimmed what-crafting-would-cost reference branch both render under a vendor root with a recipe - as designed; a visual separator is a queued UX question.

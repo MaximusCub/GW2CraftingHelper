@@ -312,9 +312,9 @@ namespace TaimisToolbench.Tests.Services
             // used to yield rootTotalCost=180 / rootComparisonValue=186
             // and a fabricated "Currencies: 0g 0s 6c" ValueDetailTooltipBuilder
             // line on a purely coin-priced plan. AllocateVendorNodeCosts
-            // corrects each merged leaf's TotalCost but (by design,
-            // DO-NOT-TOUCH: VendorBatchSolver's own merged-ceil batching
-            // math) never touches ComparisonValue itself; PlanSolver's own
+            // corrects each merged leaf's TotalCost but (by design:
+            // VendorBatchSolver's own merged-ceil batching math) never
+            // touches ComparisonValue itself; PlanSolver's own
             // vendorComparisonDeltas/RecomputeComparisonValues passes must
             // keep the two in lockstep instead. Asserts ComparisonValue ==
             // TotalCost on every merged leaf AND the Craft root above it -

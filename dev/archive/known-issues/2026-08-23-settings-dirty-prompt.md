@@ -3,7 +3,7 @@
 
 ## Settings dirty prompt (settings-dirty-prompt)
 
-Field-test requirement: if settings have been edited before tabbing
+Reported in game: if settings have been edited before tabbing
 away, the module must prompt the user to save or discard those changes
 before proceeding. The
 Settings tab has one Save button covering four sections, and nothing
@@ -192,7 +192,7 @@ than before and with no frame drawn in between.
   in practice - `ModalBackdrop` blocks the module window while any dialog
   is up, so the tab click that would trigger it cannot land.
 
-Desktop gate:
+Sandbox check:
 
 1. Settings tab, edit one currency amount (type a number into an empty
    box), then click another tab. The prompt appears, headed "Confirm",
@@ -248,7 +248,7 @@ Desktop gate:
     Confirm and on Cancel, and Escape/X still cancels, with the module
     window interactive again afterwards.
 
-Gate: PASS (2026-08-23 desktop session, branch build at the
+Gate: PASS (2026-08-23 sandbox session, branch build at the
 review-round-2 HEAD, captures preflight/gF2a-gF2d). Typed 7 into
 Karma's box and tabbed to Snapshot: the prompt appeared with the
 exact dirty count ("You have 1 unsaved change on the Settings tab.

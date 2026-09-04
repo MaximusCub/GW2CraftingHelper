@@ -226,7 +226,7 @@ namespace TaimisToolbench.Tests.Services
         }
 
         // ---------------------------------------------------------------
-        // The header minimum-width floor - the live desktop gate's Fix 1.
+        // The header minimum-width floor - the live sandbox check's Fix 1.
         // The header labels right-align at the same edges the cells do, so
         // every band must stay at least as wide as its own header text even
         // when the table is empty and no cell has been measured.
@@ -265,7 +265,7 @@ namespace TaimisToolbench.Tests.Services
         [MemberData(nameof(RealWidths))]
         public void AnEmptyTablesHeaderCellsDoNotOverlap(int rowWidth)
         {
-            // Exactly the shape the desktop gate photographed as
+            // Exactly the shape the sandbox check photographed as
             // "ReadhyDaining": zero rows, so a dash-width coin band. Each
             // right-aligned header must clear the cell to its left even then.
             var bands = RankerRowLayout.Compute(rowWidth, 8);

@@ -207,8 +207,8 @@ namespace TaimisToolbench.Views
             // Auto-size BOTH axes and parent last - ApiAccessDialog's proven
             // AddWrappedLine shape. A fixed Width with AutoSizeHeight takes
             // Blish's stale-layout-pass measure and clipped the second
-            // wrapped line mid-glyph (gate capture gA6w). Each line centers
-            // by its own measured width instead.
+            // wrapped line mid-glyph, seen in a verification screenshot.
+            // Each line centers by its own measured width instead.
             var block = layout.Blocks[0];
             for (int i = 0; i < block.Lines.Count; i++)
             {

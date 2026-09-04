@@ -3,10 +3,10 @@
 
 ## Font bump and decision-round polish (font-and-polish)
 
-Four decisions from the same field-test round, taken as four
+Four decisions from the same round of in-game testing, taken as four
 commits. The first is the module-wide type change the
 minimum-window-width research had been holding open; the other three are
-small, independent fixes to things the field test tripped over.
+small, independent fixes to things in-game use tripped over.
 
 ### 1. The +2pt bump
 
@@ -302,7 +302,7 @@ Things a reviewer should look at hardest, stated rather than buried:
    example total - which is the 6px that separates 1478 from 1472.
 5. **The spinner wiring has no automated coverage.** `Module` and
    `MainView` are Blish-bound; the two-flag OR and the `Update()` drain
-   are argued from source and pinned only by desktop gate item 4.
+   are argued from source and pinned only by sandbox check item 4.
 6. **`Checkbox` staying at Font14** is a visible inconsistency in the
    Settings tab and the Snapshot source filters - Blish gives no seam.
    Worth a look at the gate.
@@ -310,7 +310,7 @@ Things a reviewer should look at hardest, stated rather than buried:
    padding pass** where it did not before. Not a regression (the pass
    exists for this), but it is a visible density change on those rows.
 
-### Desktop gate
+### Sandbox check
 
 1. At the **1478** minimum, read a plan and a snapshot end to end on
    every tab. Row text is legibly larger than before and nothing is
@@ -336,7 +336,7 @@ Things a reviewer should look at hardest, stated rather than buried:
    then click a tree decision pill (re-solve) and confirm the sort and
    its indicator SURVIVE that.
 
-Gate: PASS (2026-08-23 desktop session, branch build at the fix HEAD,
+Gate: PASS (2026-08-23 sandbox session, branch build at the fix HEAD,
 captures preflight/gFP5-gFP36), with two sub-cases left to the live
 install. (1) READING PASS at the effective minimum: every tab read end
 to end - snapshot rows and source tags, tree pills including the "+2"

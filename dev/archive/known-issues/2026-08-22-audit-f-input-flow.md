@@ -90,7 +90,7 @@ Validation: build 0 errors and the full suite green per commit (1906,
 up from 1886 with the 20 new ItemRowSelection tests). No new test
 references Blish.
 
-What the desktop gate should look at:
+What the sandbox check should look at:
 
 1. **Stale-pick invalidation, live:** pick an item from the suggestion
    list, then edit the box to a different item's name and press Generate.
@@ -130,7 +130,7 @@ What the desktop gate should look at:
 7. **Button tooltips:** hover "+" and "-" and confirm the tooltips read
    plainly and do not clip.
 
-Gate: PASS (2026-08-22 evening desktop batch, branch build 454681b,
+Gate: PASS (2026-08-22 evening sandbox batch, branch build 454681b,
 captures preflight/gF0-gF5). (1) Typed "mystic clover" lowercase,
 never opened the suggestion list, pressed Generate: the module log
 recorded "Plan for Mystic Clover x1" - unique-exact-name adoption

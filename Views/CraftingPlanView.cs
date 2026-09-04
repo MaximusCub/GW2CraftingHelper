@@ -288,7 +288,7 @@ namespace TaimisToolbench.Views
         // row set, so an inherited sort silently re-orders rows the user
         // never sorted, and the header indicator on a table they did not
         // touch this plan reads as the module's own doing rather than
-        // theirs (field-test round). The reset sits at
+        // theirs (reported in game). The reset sits at
         // TriggerGenerate's commit point, which the override/re-solve paths
         // do not run through at all - see ResetPerPlanSortState.
         //

@@ -592,8 +592,8 @@ namespace TaimisToolbench.Tests.Services
         // StillOneCostTileRowHeight) asserted
         // PlanContentHeightMath.SummaryBodyHeight's shape via
         // PlanRowType.CoinTotal. Deleted as dead code (KNOWN-ISSUES #46,
-        // closed under the high-evidence-zone policy - see
-        // docs/KNOWN-ISSUES.md#policy-high-evidence-zones): CoinTotal was
+        // closed under the policy in docs/KNOWN-ISSUES.md for code
+        // pinned by expensive evidence): CoinTotal was
         // never emitted by PlanViewModelBuilder, and SummaryBodyHeight
         // was unreachable
         // for a real Summary section once the redesign routed

@@ -4,7 +4,7 @@
 ## Cost band restyle (cost-band-restyle)
 
 Revises audit-D's promotion of the Total Cost section's result tile,
-against a live field test. The requirement: centre the currency table
+against live in-game use. The requirement: centre the currency table
 under Total Cost; render the gold/silver/copper text at the SAME size
 for Total Materials Value, Your Materials Used and Actual Cost to Craft;
 and, to highlight Actual Cost to Craft, draw a box around it with a
@@ -20,7 +20,7 @@ the extra leading with `PlanContentHeightMath.PromotedCostTileRowHeight`
 broke the thing the band exists to say: three tiles that read as one
 formula, `Total Materials Value - Your Materials Used = Actual Cost to
 Craft`, cannot read as one formula when the right-hand side is drawn at
-twice the size of the left. The field test is the first look at it in
+twice the size of the left. In-game use is the first look at it in
 the live game, and it says so directly.
 
 ### The three changes
@@ -100,7 +100,7 @@ line + `4` gap + `20` coin run + `6` box pad + `6` box margin = **68**,
 and **86** with the disclosure line (`+18`, unchanged). It was 76/94.
 `PlanContentHeightMath.PromotedCostTileRowHeight`, whose only reader was
 `CostBandHeight` (compiler-verified - `PlanContentHeightMath` is a
-high-evidence zone, and this is a deletion of a constant nothing reads,
+code pinned by expensive evidence, and this is a deletion of a constant nothing reads,
 not a change to one that is read), is gone.
 
 The 20px caption-line reserve is deliberately larger than the ~17 the
@@ -134,7 +134,7 @@ measured caption heights, and one pinning `CostBandBoxWidth` against its
 tile slice at the narrowest panel the module can present). Tree clean,
 nothing pushed.
 
-### What the desktop gate should look at
+### What the sandbox check should look at
 
 1. **Equal sizes.** Total Materials Value, Your Materials Used and
    Actual Cost to Craft draw their gold/silver/copper numbers at the
@@ -156,7 +156,7 @@ nothing pushed.
    band is shorter by exactly one line, and the box still fits inside it
    with no clipping at the top or bottom.
 
-Gate: PASS (2026-08-23 desktop session, branch build at the
+Gate: PASS (2026-08-23 sandbox session, branch build at the
 review-fix HEAD, capture preflight/gWB1-cost-band.png, restored
 Mystic Clover x77 plan). All three tiles' coin runs render at one
 size; the Actual Cost to Craft tile sits in the gold-tinted

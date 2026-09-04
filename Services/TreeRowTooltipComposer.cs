@@ -114,7 +114,7 @@ namespace TaimisToolbench.Services
                 (node.Decision == CraftingDecision.BuyFromTp ||
                  node.Decision == CraftingDecision.BuyFromVendor))
             {
-                // Field-test finding B: a pure-currency vendor offer
+                // In-game finding B: a pure-currency vendor offer
                 // (spirit shards, karma, ...) has UnitCost == 0 (not null -
                 // see CraftingTreeBuilder.BuildNode), which used to render a
                 // misleading "0g 0s 0c" instead of the real per-unit

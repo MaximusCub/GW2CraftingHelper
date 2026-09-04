@@ -1,9 +1,9 @@
 > **Frozen record - 2026-08-06, branch `field-test-ux-wave-2-mysticforge-sublabel-drop-fix`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
 > Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
 
-## Field-test UX wave 2: MysticForge sublabel drop fix (2026-08-06)
+## In-game UX wave 2: MysticForge sublabel drop fix (2026-08-06)
 
-One pre-investigated display-layer fix, following up on field-test wave
+One pre-investigated display-layer fix, following up on in-game UX wave
 finding E above. Display-layer only, no InventoryReducer/PlanSolver/
 VendorBatchSolver changes.
 
@@ -40,8 +40,7 @@ HUD references in tests; the new test exercises real production code
 (`PlanViewModelBuilder.Build`/`FormatDisciplineSublabel`) with no
 contract-mirror/fake-logic tests.
 
-Live desktop gate: PASS (2026-08-06, same session as the
-wave-1 gate above): the corrected sublabel path rendered live - recipes
+Live sandbox check: PASS (2026-08-06, same session as the earlier gate above): the corrected sublabel path rendered live - recipes
 whose only source is the forge show "Mystic Forge" with no level, and
 the mixed-discipline safeguard is additionally covered by the end-to-end
 test; no MysticForge row in Required Disciplines (count header (3)

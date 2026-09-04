@@ -512,7 +512,7 @@ namespace TaimisToolbench.Views
         /// reality, not a frozen view from before the tab was last closed.
         /// Gated on <see cref="_buildComplete"/> exactly like
         /// <see cref="PollForUpdates"/> - see that field's own doc comment
-        /// for why (the field crash was this method racing
+        /// for why (the in-game crash was this method racing
         /// Build()'s tail on two different threads; both are main-thread-
         /// only now, so the guard here is about avoiding a redundant
         /// rebuild, not a crash).

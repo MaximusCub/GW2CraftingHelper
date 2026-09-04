@@ -140,7 +140,7 @@ namespace TaimisToolbench.Tests.Services
         }
 
         /// <summary>
-        /// The other direction the field report names: the cost column's
+        /// The other direction reported in game: the cost column's
         /// reserve above what its rows actually draw is slack every row
         /// leaves empty, so the status column may claim it rightward. A
         /// negative slack (content already wider than the reserve's floor)
@@ -351,9 +351,9 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(1, Fit(run, slot, column).HiddenCount);
         }
 
-        // --- The second field report: the 1x Obsidian Shard row, again ---
+        // --- The second report: the 1x Obsidian Shard row, again ---
 
-        // The plan the field report is about, as two nodes: a
+        // The plan reported in game, as two nodes: a
         // currency-priced purchase whose three-pill run is the widest
         // status text in the tree, and the short "1x Obsidian Shard" row
         // (two sources, an ownership annotation, the toggle) beside it,
@@ -687,7 +687,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(Floor + 300, next.Width);
         }
 
-        // --- The third field report: the same "+1" chip, on a plan with
+        // --- The third report: the same "+1" chip, on a plan with
         // a currency band ---
 
         /// <summary>The tree's fixed cost-column floor

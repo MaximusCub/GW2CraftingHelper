@@ -19,7 +19,7 @@ disagree, `decisions.md` wins.
 **Tables justify, they do not pull in.** Audit batch H pulled every
 table's right-hand block LEFT to sit one 24px breathing room past the
 widest name it rendered. The recovered space landed to the RIGHT of the
-block, which the field test rejected: columns bunched to the left
+block, which was rejected in game: columns bunched to the left
 instead of justifying out to take the available width dynamically,
 leaving stranded dead space. Every block is now pinned at
 `PlanRelayoutMath.PinnedRightEdge(P) = P - 8`, the name column is the
@@ -268,7 +268,7 @@ on the pre-redesign figure.
 
 ### Phase 2 - the pill update-in-place fix
 
-Field report: rapid IGNORE toggling with a stationary mouse drops
+Reported in game: rapid IGNORE toggling with a stationary mouse drops
 clicks, and the pill stops highlighting. Two distinct mechanisms, both
 measured against decompiled Blish HUD 1.3.0.
 
@@ -484,12 +484,12 @@ move.
    render that clears the first; and it is entered from three places
    (a local re-solve, a sort click, the Hide Unlocked filter). Read
    `ResetContentPanelToEmpty`, `RenderPlan`'s preserve branch and
-   `RenderPlanAfterResolve` together. Desktop gate steps 2, 4 and 7
+   `RenderPlanAfterResolve` together. Sandbox check steps 2, 4 and 7
    are what actually exercise it.
 3b. **`TryRefreshInPlace`'s gate is deliberately conservative and its
    rejections are invisible.** A rejected refresh is a correct full
    rebuild, so a gate that is too tight looks like nothing at all -
-   the click simply stays slow. If the field test says clicks are
+   the click simply stays slow. If in-game testing says clicks are
    still dropped, instrument the gate before changing anything else:
    the node-count and cost-width checks are the two most likely to
    reject a case that would have been fine. `TreeRowIdentity` is a
@@ -636,7 +636,7 @@ closes over survives. The frame-shortening half is the real argument and
 the whole of it. The clause is deleted rather than softened - the
 surrounding prose is a measured argument, so a wrong sentence in it
 carries a wrong constant's weight, and this is the sentence a reader
-would trust if the field test still reported dropped clicks.
+would trust if clicks were still dropped in game.
 `HoverChainResync` states the mechanism correctly and is now the wording
 of record, pointed at from here.
 
@@ -717,7 +717,7 @@ residual is a documentation defect only: a slot missing from
 narrower than the one that ships. A stale test over-claiming a tier is
 worth strictly less than two controls sharing a click target.
 
-### Desktop gate checklist (live Blish, real plan)
+### Sandbox check checklist (live Blish, real plan)
 
 1. Every section at the 1378px minimum width: the ramp is legible -
    section title, then column header, then row, each visibly a step
@@ -791,7 +791,7 @@ worth strictly less than two controls sharing a click target.
     one item and prices another, the row-identity gate has a hole.
     Post-review finding 1.
 
-Gate: PASS (2026-08-24 morning desktop session, branch build, captures
+Gate: PASS (2026-08-24 morning sandbox session, branch build, captures
 preflight/gRD1-gRD17). Verified live: (1) the ramp reads as three
 clear tiers in every section; (2) full-width justification holds at
 the 1900 client, at 1024, and at the ~930 floor - headers, dividers

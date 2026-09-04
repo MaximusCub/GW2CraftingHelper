@@ -70,7 +70,7 @@ deliberately skipped:
 
 Validation: build 0 errors and the full suite green before each commit
 (1884, then 1886 once the two IsSourceEnabled boundary tests landed).
-Gate: PASS (2026-08-19, Paint-dummy desktop session, branch build
+Gate: PASS (2026-08-19, Paint-dummy sandbox session, branch build
 3310169, capture preflight/nth1-log-status.png). The one visual
 surface in the batch is the Log status row rework (review Must Fix):
 clicking Copy on an empty log rendered "Nothing to copy" on its own

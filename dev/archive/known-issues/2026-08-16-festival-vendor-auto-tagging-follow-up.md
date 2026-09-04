@@ -250,7 +250,7 @@ fully green.
 - **Correction (2026-08-17 review fix, Must Fix): the claim above that
   this pass adds "no new runtime UI-facing code path" is WRONG.** The
   data change alone alters runtime behavior in two measured ways, so a
-  live desktop gate is warranted (not optional) before this can be
+  live sandbox check is warranted (not optional) before this can be
   considered fully validated:
   - (a) the display-name gap described above (now fixed in this review
     pass) - before the fix, any plan touching an active dragonbash/
@@ -278,7 +278,7 @@ fully green.
     `SeasonalOfferFilter`/`SeasonalVendorTipCalculator` are pre-existing,
     prior-gated code paths, but this pass changed what data flows through
     them.
-  - Live desktop verification for (a)/(b) above has not yet been
+  - Live sandbox verification for (a)/(b) above has not yet been
     performed as part of this review-fix pass either - flagging it here
     so the gate step (below) covers it rather than
     treating this as settled.

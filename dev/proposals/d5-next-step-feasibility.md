@@ -95,7 +95,7 @@ The word "almost" in the first bullet is load-bearing; see route splitting below
 
 **Salvage stays out of the model.** The TP price of a liquid commodity already embeds its salvage economics (arbitrage keeps salvage-derived supply priced into the sell/buy quotes), so modeling salvage as a separate route double-counts. The one caveat - bound items whose only un-gated alternative IS salvage - is in Section 5.5.
 
-**The live specimen (docs/KNOWN-ISSUES.md, M37 desktop-wave observation (d), 2026-07-22).** The merged build currently renders:
+**The live specimen (docs/KNOWN-ISSUES.md, M37 sandbox-run observation (d), 2026-07-22).** The merged build currently renders:
 
 > "Glob of Ectoplasm is timegated - Weekly limit: 1 (plan needs 86)"
 

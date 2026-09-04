@@ -322,7 +322,7 @@ production entry point (`InventoryReducer.Reduce`,
 `GenerateStructuredMultiAsync`, `PlanStore.LoadLatest`), no contract
 mirrors, no fake file I/O. IDs remain internal-only throughout; coin
 icons unaffected (pricing/reduction logic only, no coin-rendering code
-touched). No live desktop verification was performed -
+touched). No live sandbox verification was performed -
 `Views/CraftingPlanView.cs`'s new inline checkbox is Blish-bound and
 outside this repo's test-runnable surface, same constraint every
 UI-adjacent entry in this file notes; the checkbox's layout (fixed
@@ -357,4 +357,4 @@ re-reducing re-solve. Build: `dotnet build GW2CraftingHelper.csproj
 -p:Platform=x64` - clean, 0 errors. Tests: 1428 passed, 0 failed (1425
 + the 3 new `PlanStoreTests` facts above).
 
-Gate: PASS 2026-08-16 (live desktop session). Inline toggle renders next to Use Own Materials (checked default); schema-v2 one-time plan reset consumed the old v1 file cleanly (strip showed Ready, no restored plan); decision behavior suite-covered.
+Gate: PASS 2026-08-16 (live sandbox session). Inline toggle renders next to Use Own Materials (checked default); schema-v2 one-time plan reset consumed the old v1 file cleanly (strip showed Ready, no restored plan); decision behavior suite-covered.

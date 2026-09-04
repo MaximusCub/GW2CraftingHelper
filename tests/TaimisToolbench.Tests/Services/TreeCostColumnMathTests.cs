@@ -246,7 +246,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void ComputeRowEdges_CoinOnlyRow_EndsOnTheColumnRightEdge()
         {
-            // Field test, bug 4: the "Cost" header right-aligns on the
+            // Bug 4, reported in game: the "Cost" header right-aligns on the
             // column's own right edge, so a row that never fills the shared
             // currency band must not stop short of it - a gold figure
             // sitting a whole currency band left of the header is what the

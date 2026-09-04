@@ -13,7 +13,7 @@ namespace TaimisToolbench.Tests.Services
     {
         private static readonly Func<string, int> Fixed10 = s => (s ?? "").Length * 10;
 
-        // Roughly the live plan width: the desktop capture the audit was
+        // Roughly the live plan width: the sandbox screenshot the audit was
         // taken from had ~830px usable.
         private const int LivePanelWidth = 830;
 

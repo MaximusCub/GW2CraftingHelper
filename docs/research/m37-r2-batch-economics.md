@@ -416,7 +416,7 @@ ground-truth table to reproduce here. The relevant "ground truth" is:
 ## 3. Current module state
 
 All read directly from the working tree at
-the repo root (not the `.claude/worktrees/*` copies,
+the repo root (not the scratch checkout copies,
 which were not inspected).
 
 ### 3.1 `Models/CraftingPlanResult.cs`

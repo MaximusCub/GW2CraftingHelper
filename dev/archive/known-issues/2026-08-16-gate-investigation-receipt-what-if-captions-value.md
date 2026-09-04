@@ -3,7 +3,7 @@
 
 ## Gate investigation: receipt/what-if captions + value-detail hover (2026-08-16)
 
-Two live gate findings from a batched desktop session against the
+Two live gate findings from a batched sandbox session against the
 `ui-bundle`/`currency-ux-package` features (both entries earlier in this
 file). Both were investigated to the deepest reachable, Blish-free seam via
 new real-production-path tests; neither investigation found a code defect.
@@ -125,8 +125,8 @@ Both new tests exercise real production entry points (`PlanSolver`,
 `VendorOfferStore`/`InventoryReducer` where applicable - no Blish HUD
 reference, no fake logic, no fake file I/O. Build:
 `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - clean, 0 errors.
-No files on the DO-NOT-TOUCH list (`ModuleLog`, `PlanContentHeightMath`,
+No files on the frozen-file list (`ModuleLog`, `PlanContentHeightMath`,
 `PlanRelayoutMath`, scroll machinery, `VendorBatchSolver` merged-ceil
 batching) were edited.
 
-Gate: investigation outcome recorded 2026-08-16 - no code defect found; both live-gate anomalies (captions on override-re-solve, value-detail on a valued-vendor-child craft root) reproduce as PASSING real-path tests at every Blish-free seam (2 new tests); residual is Blish-side render binding or an observation artifact - both visuals re-verify at the next desktop session. Merged under the standing merge directive (2026-08-16).
+Gate: investigation outcome recorded 2026-08-16 - no code defect found; both live-gate anomalies (captions on override-re-solve, value-detail on a valued-vendor-child craft root) reproduce as PASSING real-path tests at every Blish-free seam (2 new tests); residual is Blish-side render binding or an observation artifact - both visuals re-verify at the next sandbox session. Merged under the standing merge directive (2026-08-16).

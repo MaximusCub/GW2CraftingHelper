@@ -77,7 +77,7 @@ tooltip text/divergence decision lives in the new Blish-free
 `ValueDetailTooltipBuilder`, matching this repo's established pattern of
 keeping tree-rendering logic unit-testable outside `TreeSectionController`.
 Audited (not assumed) that "currency names available wherever an icon/
-amount appears" was already satisfied by prior work (field-test finding
+amount appears" was already satisfied by prior work (in-game finding
 B's tooltip sweep, `IconControls.CreateItemIcon`'s `tooltipText`
 parameter) - no changes needed for that sub-requirement.
 
@@ -115,7 +115,7 @@ Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - clean,
 0 errors, no new warnings in any new/edited file. Tests: 1410 (baseline)
 -> 1435 (Feature 1, +25) -> 1446 (Feature 2, +11) -> 1470 (Feature 3,
 +24), all green at every step (`dotnet test tests/GW2CraftingHelper.Tests/
-GW2CraftingHelper.Tests.csproj`). No live desktop verification was
+GW2CraftingHelper.Tests.csproj`). No live sandbox verification was
 performed - `Views/SettingsTabContent.cs` and
 `Views/Rendering/TreeSectionController.cs` are Blish-bound and outside
 this repo's test-runnable surface, same constraint every UI-adjacent
@@ -155,4 +155,4 @@ value already behaves in a saved snapshot (both are frozen at solve time),
 so it is arguably correct snapshot semantics rather than a bug - noted
 here so it is not rediscovered as one.
 
-Gate: PASS with one deferred slice 2026-08-16 (live desktop session). Plan-scope currency pills verified live in collapsed full-coverage form (plain HAVE on all covered leaves incl. W4B component leaves - the unified vocabulary); Settings defaults suite-covered; value-detail hover: all three suppression paths verified live correct (unvalued ARE, component leaves, non-diverging rows) but no positive render occurred in the tested shapes - a propagation question (vendor-child currency valuations folding into a craft root's DecisionValue) is under investigation on branch gate-fixes.
+Gate: PASS with one deferred slice 2026-08-16 (live sandbox session). Plan-scope currency pills verified live in collapsed full-coverage form (plain HAVE on all covered leaves incl. W4B component leaves - the unified vocabulary); Settings defaults suite-covered; value-detail hover: all three suppression paths verified live correct (unvalued ARE, component leaves, non-diverging rows) but no positive render occurred in the tested shapes - a propagation question (vendor-child currency valuations folding into a craft root's DecisionValue) is under investigation on branch gate-fixes.

@@ -65,7 +65,7 @@ coin figure is the whole cost", which a barter node breaks:
 `RecipeSheetSavingsCalculator` (direct and recursive), then
 `SeasonalVendorTipCalculator`, then `TreeRowTooltipComposer`, which would
 have printed "Unit price: 0c" for an item that really costs tokens - the
-same field-test finding a pure-currency offer already had to suppress.
+same in-game finding a pure-currency offer already had to suppress.
 All three now check `VendorHasBarterItemCost`, and each guard has a test
 that was confirmed red with the guard stubbed out before being restored.
 

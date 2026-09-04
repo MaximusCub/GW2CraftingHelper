@@ -248,7 +248,7 @@ contract mirrors, no fake file I/O (the shipped-seed-file test reads
 the real `ref/daily_cooldown_items.json` from disk via the existing
 `RepoFileLocator` helper). IDs remain internal-only - the new craft-
 cooldown notice text never surfaces an item id, only its resolved name.
-No live desktop verification was performed - `Views/MainView.cs`,
+No live sandbox verification was performed - `Views/MainView.cs`,
 `Views/SuggestionPanel.cs`, and `Views/Rendering/TreeSectionController.cs`
 are all Blish-bound and outside this repo's test-runnable surface; the
 icon-placeholder fix in particular (a Snapshot-tab render change) has
@@ -344,7 +344,7 @@ assertion exercises a real production entry point
 `CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`,
 `Gw2ConstantsCurrencyNamesTests`), no contract mirrors, no fake file
 I/O. IDs remain internal-only - the new/changed hint text never
-surfaces an item id. No live desktop verification was performed (same
+surfaces an item id. No live sandbox verification was performed (same
 Blish-bound surface as PART A/B/C).
 
-Gate: PASS 2026-08-16 (live desktop session). Deldrimor Steel Ingot x5 rendered the timegate notice verbatim ('Lump of Mithrillium is timegated - 1 per day per account - crafting 5 will take about 5 days'); the empty-IconUrl magenta fix verified on the Snapshot tab (Spirit Shards row degrades to no icon); currency-name corrections suite-covered.
+Gate: PASS 2026-08-16 (live sandbox session). Deldrimor Steel Ingot x5 rendered the timegate notice verbatim ('Lump of Mithrillium is timegated - 1 per day per account - crafting 5 will take about 5 days'); the empty-IconUrl magenta fix verified on the Snapshot tab (Spirit Shards row degrades to no icon); currency-name corrections suite-covered.

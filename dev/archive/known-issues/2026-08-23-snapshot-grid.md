@@ -3,7 +3,7 @@
 
 ## Snapshot item grid (snapshot-grid)
 
-Field test: the Snapshot window should consider a multiple-column
+Reported in game: the Snapshot window should consider a multiple-column
 display, because a single-column list wastes screen real estate. It did:
 at the 1436px window minimum a
 Snapshot result row spanned the whole 1330px content panel to show a name
@@ -138,7 +138,7 @@ messages about the whole list, not cells in it. The search box, the
 content-type dropdown, the source-filter checkboxes and their master
 toggle, and the coin row above the list are all untouched.
 
-### Desktop gate (live, required)
+### Sandbox check (live, required)
 
 1. Snapshot tab at the window minimum (1436): the result list renders
    **two columns**, and reading it left-to-right then down matches the
@@ -182,7 +182,7 @@ toggle, and the coin row above the list are all untouched.
    nonsense text - both messages span the panel at the top left, not
    inside a column-width cell.
 
-Gate: PASS (2026-08-24 desktop session, branch build at the
+Gate: PASS (2026-08-24 sandbox session, branch build at the
 review-fix HEAD, captures preflight/gSG1-gSG3). At the 1436 window
 minimum the result list rendered as TWO ~655px columns in
 left-to-right reading order (Augur's Stone | Green Wood Log /

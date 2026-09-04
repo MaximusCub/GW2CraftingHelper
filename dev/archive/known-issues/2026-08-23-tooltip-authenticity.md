@@ -9,7 +9,7 @@
 > upgrade blue is measured at (85,153,255), not the spec's recommended
 > value; `MaxContentWidth` moved 350 -> 392; the inner bevel ring is not in
 > the game (it darkens inward); and the canvas carries a blue-green cast,
-> not pure black. Desktop-gate step 3's "so are the rarity word" clause and
+> not pure black. Sandbox-check step 3's "so are the rarity word" clause and
 > the line-order map's `<Rarity> white` row are the superseded statements.
 > The white ATTRIBUTE lines, line order, and blank rules were all
 > re-confirmed by the same captures.
@@ -33,7 +33,7 @@
 > cooldown DOES exist in the API (inside buff.description markup); and
 > a field ruling retired the Menomonia-16 divergence - the
 > tooltip renders at 14 with `MaxContentWidth` 350. The line-order map
-> and desktop-gate steps 3/6/15 below describe the superseded shapes.
+> and sandbox-check steps 3/6/15 below describe the superseded shapes.
 >
 > **Superseded further - 2026-08-28, branch `wave1-tooltips`.** The
 > field ruling that retired the Menomonia-16 divergence is itself
@@ -237,7 +237,7 @@ re-ellipsis closures stop re-stamping tooltips entirely.
   body shape - Gathering's description/level/flags body matches Gizmo's
   and Trophy's, Tool's matches Container's and Consumable's, MiniPet's
   matches Trophy's, and all three of those neighbours are contiguous.
-  Desktop gate step 6 settles it in one hover.
+  Sandbox check step 6 settles it in one hover.
   **Judgment call - flagged.**
 - **Armour's slot line is the API's own noun plus "Armor"** - "Gloves
   Armor" where the game says "Hand Armor". The game's slot vocabulary
@@ -439,8 +439,8 @@ y=130-139 at x4-23, coin icon x23-41). Row 128 carries no glyph and rows
 122-127 only the `q` descender of "Required": 111 -> 129 is ONE 18px
 pitch, contiguous. FWDekker agrees for nine of the eleven builders that
 emit a value. The blank now splits on the item's shape - see the
-line-order block above - and desktop gate step 6 was corrected, since it
-had told the tester to confirm the divergence.
+line-order block above - and sandbox check step 6 was corrected, since it
+asked for the divergence to be confirmed.
 
 **3. A tooltip CLEAR could be undone by the next re-stamp - FIXED.**
 `TooltipFacility.Register` inferred a source's fallback text from
@@ -457,7 +457,7 @@ already showing in full. `ApplyPlain` now records the caller's intent -
 clears included - on any source the control already carries. It costs
 one `ConditionalWeakTable` lookup per plain tooltip assignment, on the
 render path. Not unit-testable: `TooltipFacility` takes a Blish
-`Control` and tests stay Blish-free, so desktop gate step 12 carries the
+`Control` and tests stay Blish-free, so sandbox check step 12 carries the
 check and now names the no-stat-block precondition it needs.
 
 ### Post-review corrections, round 3
@@ -479,11 +479,11 @@ unknown shape falls to Generic. They are now their own labelled arm,
 still contiguous but on a stated nearest-body-shape inference rather
 than a borrowed measurement, recorded under "Accepted divergences" as
 the one guess in the table, pinned by a Theory test that says so, and
-handed to desktop gate step 6. The counts are corrected here, in
+handed to sandbox check step 6. The counts are corrected here, in
 `ItemStatTooltipComposer.ValueSitsAfterABlank`'s doc comment and in
 `ItemStatTooltipComposerTests`.
 
-### Desktop gate (live, required)
+### Sandbox check (live, required)
 
 1. Hover a crafting material row in the recipe tree. The box opens with a
    ~34x34 FRAMED ICON and the item name beside it, vertically centred on
@@ -562,7 +562,7 @@ handed to desktop gate step 6. The counts are corrected here, in
     available for this entry." - never an empty box. After the top-up
     lands the same hover shows the full stat block.
 
-Gate: PASS (2026-08-23 night desktop session, branch build at a291fb1,
+Gate: PASS (2026-08-23 night sandbox session, branch build at a291fb1,
 captures preflight/gTT1-gTT28). Verified live: the full ascended block
 (Wupwup Claymore - icon header with framed 32px icon and pink name,
 thousands-separated strength, nine white attribute lines, one line per

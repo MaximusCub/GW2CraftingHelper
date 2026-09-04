@@ -113,7 +113,7 @@ costing 0 coin + 500,000 units of an unvalued currency, purely because
 0 <= 500. This is NOT a scale mismatch (both sides are real coin, after
 the finding-1 fix above) and not new unsoundness introduced by this
 milestone: it is the identical heuristic `EvaluateVendorOffers`' own
-DO-NOT-TOUCH fallback-vs-fallback ranking already uses today (rank by
+frozen fallback-vs-fallback ranking already uses today (rank by
 coin part alone, since currency is unknowable/incomparable across
 offers - see that method's doc comment), now visible in a new pairing
 (craft vs. vendor) that never existed before this milestone added a
@@ -122,7 +122,7 @@ favor of craft would require inventing some notion of "this coin part
 isn't a meaningful proxy for total cost," which is exactly the kind of
 currency-exchange-rate judgment the repo invariant (avoid inventing
 currency comparisons) forbids, and the vendor-side ranking rule is
-explicitly DO-NOT-TOUCH pattern-donor code this milestone mirrors
+explicitly frozen pattern-donor code this milestone mirrors
 rather than redesigns. The deliberate choice is documented here (not
 just left silent)
 and locked by a dedicated regression test,

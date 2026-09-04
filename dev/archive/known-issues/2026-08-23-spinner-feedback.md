@@ -3,7 +3,7 @@
 
 ## Spinner and button feedback (spinner-feedback)
 
-Two field-test requirements:
+Two requirements reported in game:
 
 - Replace the module's ASCII-text loading spinner with Blish's own
   circular animated spinner, the one drawn under the module icons in the
@@ -148,7 +148,7 @@ wired control is a descendant of another - the labels inside a tree row
 and inside a section header do receive the events, but they carry
 tooltips, not press wiring.
 
-### Desktop gate
+### Sandbox check
 
 1. Plan tab, press Generate Plan on a real multi-item request: a
    circular painterly spinner turns to the right of the status text for
@@ -191,7 +191,7 @@ tooltips, not press wiring.
    `audio/button-click.wav`, 22,616 bytes uncompressed) and that the
    name passed is the unprefixed one Blish's own working callers use.
 
-Gate: PASS (2026-08-24 desktop sessions, captures
+Gate: PASS (2026-08-24 sandbox sessions, captures
 preflight/gC1-gC14). (1) SPINNER: "Building recipe tree..." rendered
 with Blish's golden circular spinner inline in the plan strip, and
 two captures ~350ms apart show DIFFERENT rotation frames - the

@@ -206,7 +206,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void TabTitleBand_CostsLessThanTheViewportReclaimedForIt()
         {
-            // The field report was about screen real estate, so the trade
+            // The report was about screen real estate, so the trade
             // has to be stated as an assertion and not only in a commit
             // message. The tab title band is 15px more chrome than the 36px
             // Blish header it replaced (7 border padding + 44 band, against
