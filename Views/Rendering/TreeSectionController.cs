@@ -881,28 +881,17 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// Width the cost column actually needs this render: its fixed
-        /// floor, or the pre-scanned sub-columns' real total when a tree
-        /// full of multi-gold (or currency-priced) values needs more - less
-        /// whatever slack the decision-pill column claimed from that floor
-        /// (ScannedPillColumn's claim, never below the sub-columns'
-        /// total). The column's RIGHT edge never moves, so narrowing it
-        /// only lets the pills and their ink closer to values that are
-        /// right-aligned anyway; widening it pushes the decision pills and
-        /// the name budget left - which is the point: before, a wide cost
-        /// run silently overprinted the pills.
+        /// Width the cost column actually gets this render: its reserve
+        /// (TreeCostColumnMath.Reserve) less whatever the decision-pill
+        /// column claimed from it (ScannedPillColumn's claim), never below
+        /// the leftmost ink any row draws. Widening it pushes the decision
+        /// pills and the name budget left - which is the point: before, a
+        /// wide cost run silently overprinted the pills.
         /// </summary>
         private int EffectiveCostColumnWidth()
         {
-            int scanned = TreeCostColumnMath.TotalWidth(_costColumnWidths);
-            int reserve = scanned > TreeCostColumnWidth ? scanned : TreeCostColumnWidth;
-            int effective = reserve - _pillColumnCostClaim;
-
-            // The floor cannot bind while the claim comes from
-            // ScannedPillColumn: TreePillColumnMath.RightClaim caps it at the
-            // rightSlack this same subtraction leaves, which is reserve minus
-            // scanned. It is here for a claim written from anywhere else.
-            return effective > scanned ? effective : scanned;
+            return TreeCostColumnMath.WidthAfterClaim(
+                _costColumnWidths, TreeCostColumnWidth, _pillColumnCostClaim);
         }
 
         /// <summary>
@@ -996,17 +985,10 @@ namespace TaimisToolbench.Views.Rendering
                     leading, PillGap, anchored ? toggleSlot : 0);
             });
 
-            // The cost column's reserve above what its rows actually draw
-            // is the room toward the currency column: reserve minus
-            // TotalWidth, never negative, and fresh off _costColumnWidths
-            // rather than EffectiveCostColumnWidth because the latter
-            // already nets out the PREVIOUS render's claim.
-            int costTotal = TreeCostColumnMath.TotalWidth(_costColumnWidths);
-            int costSlack = TreeCostColumnWidth - costTotal;
-            if (costSlack < 0)
-            {
-                costSlack = 0;
-            }
+            // Room the cost column can give back, off _costColumnWidths
+            // rather than through EffectiveCostColumnWidth, because the
+            // latter already nets out the PREVIOUS render's claim.
+            int costSlack = TreeCostColumnMath.RightSlack(_costColumnWidths, TreeCostColumnWidth);
 
             return TreePillColumnMath.Resolve(
                 required,

@@ -30,15 +30,16 @@ namespace TaimisToolbench.Services
         /// comparing totals would let a wide currency run pay for a
         /// narrowed gold band and slide that band's icons sideways.
         /// <para>
-        /// WidestRowRunWidth is carried the same way. It must be carried
-        /// at all - dropping it left the "Cost" header centring over an
-        /// ink extent of 0, i.e. right-aligned on the column edge - and it
-        /// is widened rather than adopted because a row's reach back from
-        /// that edge grows with the reserve it is measured against
-        /// (TreeCostColumnMath.WidestRowRun computes it off the SCAN's
-        /// bands, which the floor may widen afterwards), and because a
-        /// one-way value keeps a re-solve that only removes ink eligible
-        /// for TreeSectionController's in-place refresh.
+        /// The two ink extents are carried the same way. They must be
+        /// carried at all - dropping WidestRowRunWidth left the "Cost"
+        /// header centring over an ink extent of 0, i.e. right-aligned on
+        /// the column edge - and they are widened rather than adopted
+        /// because a row's reach back from that edge grows with the
+        /// reserve it is measured against (TreeCostColumnMath.RowRuns
+        /// computes them off the SCAN's bands, which the floor may widen
+        /// afterwards), and because a one-way value keeps a re-solve that
+        /// only removes ink eligible for TreeSectionController's in-place
+        /// refresh.
         /// </para>
         /// </summary>
         public static TreeCostColumnMath.CostColumnWidths Widen(
@@ -49,7 +50,8 @@ namespace TaimisToolbench.Services
                 Max(floor.SilverTextWidth, scanned.SilverTextWidth),
                 Max(floor.CopperTextWidth, scanned.CopperTextWidth),
                 Max(floor.CurrencyRunWidth, scanned.CurrencyRunWidth),
-                Max(floor.WidestRowRunWidth, scanned.WidestRowRunWidth));
+                Max(floor.WidestRowRunWidth, scanned.WidestRowRunWidth),
+                Max(floor.LeftmostInkReach, scanned.LeftmostInkReach));
         }
 
         /// <summary>
@@ -68,7 +70,8 @@ namespace TaimisToolbench.Services
                 && a.SilverTextWidth == b.SilverTextWidth
                 && a.CopperTextWidth == b.CopperTextWidth
                 && a.CurrencyRunWidth == b.CurrencyRunWidth
-                && a.WidestRowRunWidth == b.WidestRowRunWidth;
+                && a.WidestRowRunWidth == b.WidestRowRunWidth
+                && a.LeftmostInkReach == b.LeftmostInkReach;
         }
 
         private static int Max(int a, int b)

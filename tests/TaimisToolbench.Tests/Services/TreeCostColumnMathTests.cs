@@ -571,6 +571,117 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(0, widths.WidestRowRunWidth);
         }
 
+        // --- LeftmostInkReach, and the column budget the decision-pill
+        // column spends against it (Reserve / InkFloor / RightSlack /
+        // WidthAfterClaim) ---
+
+        /// <summary>The tree's fixed cost-column floor, which
+        /// TreeSectionController passes as fixedFloor.</summary>
+        private const int FixedFloor = 150;
+
+        [Fact]
+        public void RightSlack_MaximaFromDifferentRows_IsRoomTheOldReadingCalledNegative()
+        {
+            // The reported defect: the room the pill column may claim was
+            // read as the fixed FLOOR less TotalWidth, and TotalWidth sums
+            // per-denomination maxima no one row draws, so any tree with a
+            // currency band produced a negative that clamped to zero and
+            // the column could never claim rightward at all.
+            var roots = new[]
+            {
+                Node(1, subtreeCost: 1234567),
+                Node(2, subtreeCost: 0, vendorCurrencyCosts: OneCurrencyLine()),
+            };
+
+            var widths = Scan(roots, currencyRunWidth: 88);
+
+            Assert.Equal(167, TreeCostColumnMath.TotalWidth(widths));
+            Assert.True(FixedFloor - TreeCostColumnMath.TotalWidth(widths) < 0);
+
+            Assert.Equal(88, widths.LeftmostInkReach);
+            Assert.Equal(167, TreeCostColumnMath.Reserve(widths, FixedFloor));
+            Assert.Equal(79, TreeCostColumnMath.RightSlack(widths, FixedFloor));
+        }
+
+        /// <summary>
+        /// The ink reach is the max over BOTH regimes, where
+        /// WidestRowRunWidth is whichever single one the header follows.
+        /// A mixed row among coin rows does not move the header, but its
+        /// coin segments start a whole currency band further left, and
+        /// that is the line the pill column may not cross.
+        /// </summary>
+        [Fact]
+        public void Scan_AMixedRowTheHeaderIgnores_StillSetsTheInkReach()
+        {
+            var roots = new[]
+            {
+                Node(1, subtreeCost: 1234567),
+                Node(2, subtreeCost: 45678),
+                Node(3, subtreeCost: 789),
+                Node(4, subtreeCost: 4242, vendorCurrencyCosts: OneCurrencyLine()),
+            };
+
+            var widths = Scan(roots, currencyRunWidth: 88);
+
+            Assert.Equal(73, widths.WidestRowRunWidth);
+            Assert.Equal(140, widths.LeftmostInkReach);
+            Assert.Equal(27, TreeCostColumnMath.RightSlack(widths, FixedFloor));
+        }
+
+        [Fact]
+        public void WidthAfterClaim_NoClaimCanReachTheLeftmostInk()
+        {
+            var roots = new[]
+            {
+                Node(1, subtreeCost: 1234567),
+                Node(2, subtreeCost: 45678),
+                Node(3, subtreeCost: 789),
+                Node(4, subtreeCost: 4242, vendorCurrencyCosts: OneCurrencyLine()),
+            };
+
+            var widths = Scan(roots, currencyRunWidth: 88);
+            int slack = TreeCostColumnMath.RightSlack(widths, FixedFloor);
+
+            Assert.Equal(
+                widths.LeftmostInkReach,
+                TreeCostColumnMath.WidthAfterClaim(widths, FixedFloor, slack));
+
+            // And a claim written from outside RightSlack's answer stops
+            // on the same line rather than walking through the values.
+            Assert.Equal(
+                widths.LeftmostInkReach,
+                TreeCostColumnMath.WidthAfterClaim(widths, FixedFloor, slack + 500));
+        }
+
+        [Fact]
+        public void RightSlack_NothingPriced_OffersNoneOfTheColumn()
+        {
+            // Every row still draws the unpriceable dash, which this scan
+            // never measures, so a reach of 0 must not read as "the whole
+            // column is free".
+            var widths = Scan(new[] { Node(1), Node(2) });
+
+            Assert.Equal(0, widths.LeftmostInkReach);
+            Assert.Equal(FixedFloor, TreeCostColumnMath.InkFloor(widths, FixedFloor));
+            Assert.Equal(0, TreeCostColumnMath.RightSlack(widths, FixedFloor));
+            Assert.Equal(
+                FixedFloor, TreeCostColumnMath.WidthAfterClaim(widths, FixedFloor, 90));
+        }
+
+        [Fact]
+        public void RightSlack_OneCoinOnlyRow_IsTheFixedFloorsOwnSurplus()
+        {
+            // A single row's ink does fill the sub-column reserve - every
+            // maximum is its own - so what is left to give back is the
+            // fixed floor's surplus over that ink, 76px the old reading
+            // also refused because it compared the floor with itself.
+            var widths = Scan(new[] { Node(1, subtreeCost: 12345656) });
+
+            Assert.Equal(74, widths.LeftmostInkReach);
+            Assert.Equal(TreeCostColumnMath.TotalWidth(widths), widths.LeftmostInkReach);
+            Assert.Equal(FixedFloor - 74, TreeCostColumnMath.RightSlack(widths, FixedFloor));
+        }
+
         // --- HeaderX (the "Cost" header centres over the INK, not over
         // either reserve around it, and only the pill column on its left
         // and the table's own edge on its right may move it - see
