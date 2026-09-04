@@ -45,7 +45,9 @@ namespace TaimisToolbench.Services
             }
             else if (identity.HasSubject)
             {
-                builder.Header(identity.IconUrl, identity.Name, identity.Rarity);
+                builder.Header(
+                    identity.IconUrl, identity.Name,
+                    TooltipHeaderSubject.ItemOfRarity(identity.Rarity));
             }
 
             if (extraContent != null && !extraContent.IsEmpty)

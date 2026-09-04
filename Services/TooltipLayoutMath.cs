@@ -129,7 +129,8 @@ namespace TaimisToolbench.Services
         {
             internal LaidOutRow(
                 IReadOnlyList<PlacedSpan> spans, int width, int y, int height, string iconUrl,
-                TooltipLineKind kind = TooltipLineKind.Text)
+                TooltipLineKind kind = TooltipLineKind.Text,
+                TooltipHeaderSubject subject = default(TooltipHeaderSubject))
             {
                 Spans = spans;
                 Width = width;
@@ -137,6 +138,7 @@ namespace TaimisToolbench.Services
                 Height = height;
                 IconUrl = iconUrl;
                 Kind = kind;
+                HeaderSubject = subject;
             }
 
             public IReadOnlyList<PlacedSpan> Spans { get; }
@@ -168,6 +170,13 @@ namespace TaimisToolbench.Services
             /// bare ~26px effect icon that shares <see cref="IconUrl"/>.
             /// </summary>
             public TooltipLineKind Kind { get; }
+
+            /// <summary>
+            /// The header line's subject, carried through from
+            /// <see cref="TooltipLine.HeaderSubject"/> - what the surface
+            /// frames <see cref="IconUrl"/> by on a header row.
+            /// </summary>
+            public TooltipHeaderSubject HeaderSubject { get; }
         }
 
         public sealed class Layout
@@ -258,7 +267,8 @@ namespace TaimisToolbench.Services
                 // the icon rides the first row of its line only.
                 void BreakRow()
                 {
-                    rows.Add(new LaidOutRow(current, x, y, lineHeight, iconUrl, line.Kind));
+                    rows.Add(new LaidOutRow(
+                        current, x, y, lineHeight, iconUrl, line.Kind, line.HeaderSubject));
                     y += lineHeight;
                     // Continuations are ordinary text rows: only the FIRST
                     // row of a header line carries the icon and its height.

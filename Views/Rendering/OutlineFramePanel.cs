@@ -8,10 +8,10 @@ namespace TaimisToolbench.Views.Rendering
 {
     /// <summary>
     /// A frame that paints a border RING and leaves its interior alone -
-    /// what <see cref="ItemIconFrame.Currency"/> asks for. Deliberately not
-    /// a filled Panel: a fill covers the whole box, and currency art is
-    /// mostly transparent, so it shows through as a background rather than
-    /// as a border.
+    /// what an <see cref="ItemIconFrame.IsOutline"/> frame asks for.
+    /// Deliberately not a filled Panel: a fill covers the whole box, and
+    /// currency art is mostly transparent, so it shows through as a
+    /// background rather than as a border.
     /// <para>
     /// The ring is four <c>DrawOnCtrl</c> calls inside ONE control rather
     /// than four child Panels. Four children per icon would triple the

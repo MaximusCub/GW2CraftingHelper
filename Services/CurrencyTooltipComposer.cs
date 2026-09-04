@@ -52,10 +52,11 @@ namespace TaimisToolbench.Services
 
             var builder = new TooltipContentBuilder();
 
-            // No rarity: a currency has none, and the neutral name colour
-            // is the same statement ItemIconFrame.Currency() makes about
-            // the icon beside it.
-            builder.Header(facts.IconUrl, facts.Name, null);
+            // A currency has no rarity to have. The subject is what gives
+            // the header icon the ring frame its transparent art needs,
+            // the same statement ItemIconFrame.Currency() makes about the
+            // wallet row's icon.
+            builder.Header(facts.IconUrl, facts.Name, TooltipHeaderSubject.Currency());
 
             if (facts.WalletQuantity.HasValue)
             {

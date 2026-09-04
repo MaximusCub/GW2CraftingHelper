@@ -97,12 +97,13 @@ namespace TaimisToolbench.Services
         /// while the body below it started at x=0.
         /// </para>
         /// </summary>
-        public static TooltipLine HeaderLine(string iconUrl, string name, string rarity)
+        public static TooltipLine HeaderLine(string iconUrl, string name, TooltipHeaderSubject subject)
         {
             return new TooltipLine(
-                new List<TooltipSpan> { TooltipSpan.RarityText(name ?? "", rarity) },
+                new List<TooltipSpan> { TooltipSpan.RarityText(name ?? "", subject.RarityKey) },
                 TooltipLineKind.Header,
-                iconUrl ?? "");
+                iconUrl ?? "",
+                subject);
         }
 
         public static TooltipLine Line(params TooltipSpan[] spans)
@@ -134,6 +135,73 @@ namespace TaimisToolbench.Services
         Effect,
     }
 
+    /// <summary>
+    /// WHO a header row is about - what
+    /// <see cref="TooltipContentBuilder.Header"/> takes in place of a bare
+    /// rarity string, and what the rich surface reads to frame the header
+    /// icon.
+    /// <para>
+    /// A rarity string cannot tell a CURRENCY, which has no rarity to look
+    /// up, apart from an item nobody looked up: both arrive as null. The
+    /// two want different frames - currency art is mostly transparent and
+    /// a filled frame behind it shows through as a grey background, the
+    /// defect the field reported on the Snapshot tab - so the call site
+    /// has to say which it means, and a factory name is what a diff shows.
+    /// </para>
+    /// </summary>
+    internal readonly struct TooltipHeaderSubject
+    {
+        private readonly string _rarityKey;
+        private readonly bool _currency;
+
+        private TooltipHeaderSubject(string rarityKey, bool currency)
+        {
+            _rarityKey = rarityKey;
+            _currency = currency;
+        }
+
+        /// <summary>The rarity colouring the name, null for a currency and
+        /// for an unknown rarity alike - both neutral, and neither is a
+        /// guess.</summary>
+        public string RarityKey => _rarityKey;
+
+        /// <summary>Whether the subject has no rarity to have, rather than
+        /// an unresolved one. Only <see cref="Currency"/> sets it.</summary>
+        public bool IsCurrency => _currency;
+
+        /// <summary>
+        /// An item whose rarity has been RESOLVED - what
+        /// <c>ItemRarityResolution.Resolve</c> returned after looking
+        /// everywhere this surface has. Null from that policy is a
+        /// legitimately unknown rarity; a caller that has not looked wants
+        /// <see cref="ItemOfUnknownRarity"/> instead.
+        /// </summary>
+        public static TooltipHeaderSubject ItemOfRarity(string resolvedRarity)
+        {
+            return new TooltipHeaderSubject(resolvedRarity, false);
+        }
+
+        /// <summary>
+        /// An item whose rarity this surface structurally cannot know,
+        /// because its data source carries none. Renders the same neutral
+        /// name as an unresolved rarity, and the call site is on record
+        /// that the gap is in the DATA.
+        /// </summary>
+        public static TooltipHeaderSubject ItemOfUnknownRarity()
+        {
+            return new TooltipHeaderSubject(null, false);
+        }
+
+        /// <summary>
+        /// A currency: there is no rarity to resolve, and the header icon
+        /// takes the ring frame its transparent art needs.
+        /// </summary>
+        public static TooltipHeaderSubject Currency()
+        {
+            return new TooltipHeaderSubject(null, true);
+        }
+    }
+
     internal sealed class TooltipLine
     {
         private readonly IReadOnlyList<TooltipSpan> _spans;
@@ -141,16 +209,25 @@ namespace TaimisToolbench.Services
         internal TooltipLine(
             IReadOnlyList<TooltipSpan> spans,
             TooltipLineKind kind = TooltipLineKind.Text,
-            string iconUrl = null)
+            string iconUrl = null,
+            TooltipHeaderSubject subject = default(TooltipHeaderSubject))
         {
             _spans = spans ?? new List<TooltipSpan>();
             Kind = kind;
             IconUrl = iconUrl;
+            HeaderSubject = subject;
         }
 
         public IReadOnlyList<TooltipSpan> Spans => _spans;
 
         public TooltipLineKind Kind { get; }
+
+        /// <summary>
+        /// Who a <see cref="TooltipLineKind.Header"/> row is about - what
+        /// decides the frame drawn around <see cref="IconUrl"/>. Meaningless
+        /// on every other kind, which draw no framed icon.
+        /// </summary>
+        public TooltipHeaderSubject HeaderSubject { get; }
 
         /// <summary>
         /// The item icon drawn at the head of a
@@ -339,14 +416,14 @@ namespace TaimisToolbench.Services
         /// <see cref="TooltipContent.HeaderLine"/>. Commits whatever line
         /// was open first: a header is a whole row, never a run inside one.
         /// </summary>
-        public TooltipContentBuilder Header(string iconUrl, string name, string rarity)
+        public TooltipContentBuilder Header(string iconUrl, string name, TooltipHeaderSubject subject)
         {
             if (_current != null)
             {
                 EndLine();
             }
 
-            _lines.Add(TooltipContent.HeaderLine(iconUrl, name, rarity));
+            _lines.Add(TooltipContent.HeaderLine(iconUrl, name, subject));
             return this;
         }
 

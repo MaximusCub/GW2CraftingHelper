@@ -100,7 +100,7 @@ Services/CraftingPlanPipeline.cs                                                
 Services/CraftingTreeBuilder.cs                                                         626
 Services/CurrencyDisplayResolver.cs                                                     236
 Services/CurrencyMetadataService.cs                                                     159
-Services/CurrencyTooltipComposer.cs                                                     92
+Services/CurrencyTooltipComposer.cs                                                     93
 Services/CurrencyTooltipFacts.cs                                                        80
 Services/CurrencyValuationSerializer.cs                                                 221
 Services/DailyCooldownItemService.cs                                                    77
@@ -135,7 +135,7 @@ Services/ItemMetadataService.cs                                                 
 Services/ItemRarityResolution.cs                                                        78
 Services/ItemRowRequestBuilder.cs                                                       101
 Services/ItemRowSelection.cs                                                            199
-Services/ItemRowTooltipComposer.cs                                                      86
+Services/ItemRowTooltipComposer.cs                                                      88
 Services/ItemSearchProviderFactory.cs                                                   61
 Services/ItemStatBlockFactory.cs                                                        189
 Services/ItemStatMath.cs                                                                64
@@ -152,7 +152,7 @@ Services/ModuleLogLevel.cs                                                      
 Services/ModuleLogStore.cs                                                              272
 Services/ModuleSettings.cs                                                              437
 Services/MultiItemHeaderLayout.cs                                                       137
-Services/MultiItemHeaderTooltipComposer.cs                                              65
+Services/MultiItemHeaderTooltipComposer.cs                                              67
 Services/MysticForgeRecipeData.cs                                                       211
 Services/NotesSectionLayoutMath.cs                                                      111
 Services/OwnedMaterialsForceBuyPrePass.cs                                               128
@@ -251,7 +251,7 @@ Services/TableSortState.cs                                                      
 Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
 Services/TextWrapMath.cs                                                                324
-Services/TooltipContent.cs                                                              495
+Services/TooltipContent.cs                                                              572
 Services/TooltipLayoutMath.cs                                                           487
 Services/TooltipTextFormat.cs                                                           136
 Services/TopRegionLayoutMath.cs                                                         116
@@ -311,7 +311,7 @@ Views/Rendering/PillColors.cs                                                   
 Views/Rendering/PlanHeaderRenderer.cs                                                   322
 Views/Rendering/PressFeedback.cs                                                        118
 Views/Rendering/RankerReadinessColors.cs                                                99
-Views/Rendering/RarityColors.cs                                                         185
+Views/Rendering/RarityColors.cs                                                         199
 Views/Rendering/RecipesSectionRenderer.cs                                               357
 Views/Rendering/RichTooltipSurface.cs                                                   607
 Views/Rendering/RowRelayoutHelpers.cs                                                   72
@@ -569,7 +569,7 @@ tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                
 tests/TaimisToolbench.Tests/Services/TextWrapMathTests.cs                               297
 tests/TaimisToolbench.Tests/Services/TooltipComposerContentTests.cs                     215
 tests/TaimisToolbench.Tests/Services/TooltipContentTests.cs                             152
-tests/TaimisToolbench.Tests/Services/TooltipLayoutMathTests.cs                          627
+tests/TaimisToolbench.Tests/Services/TooltipLayoutMathTests.cs                          631
 tests/TaimisToolbench.Tests/Services/TooltipSpanRoleTests.cs                            108
 tests/TaimisToolbench.Tests/Services/TooltipTextFormatTests.cs                          138
 tests/TaimisToolbench.Tests/Services/TopRegionLayoutMathTests.cs                        147
