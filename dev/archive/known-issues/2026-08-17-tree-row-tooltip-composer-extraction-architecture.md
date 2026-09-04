@@ -188,4 +188,4 @@ with the emitted line content pinned by the suite (1802 green at the
 stream's verification, re-run post-merge below); the visual surface is
 unchanged by construction, and the next desktop gate batch covers
 tooltips incidentally through its deferred value-detail hover check.
-Merged under the maintainer's standing merge directive (2026-08-16).
+Merged under the standing merge directive (2026-08-16).

@@ -46,7 +46,7 @@ pill kinds: Selected, Have, OwnedInfo (finding A's text), and
 AchievementBitDeduped (explains the COUNTED ELSEWHERE semantics per
 #26).
 
-**E. Mystic Forge is a facility, not a discipline (user-approved).** The
+**E. Mystic Forge is a facility, not a discipline (approved).** The
 forge has no rating requirement and nothing to unlock, so it no longer
 appears in the Required Disciplines section (joins the existing
 Achievement/Merchant filter in `PlanResultBuilder.
@@ -68,15 +68,15 @@ TreeSectionController's pill rendering, IconControls, CoinCurrencyRenderer)
 has no new tests per the Blish-free-tests invariant - covered by the live
 desktop gate instead.
 
-Live desktop gate: PASS (orchestrator, 2026-08-06, live branch-build
+Live desktop gate: PASS (2026-08-06, live branch-build
 sandbox session under the hardened desktop protocol, captures uxg_01-11
 in preflight/captures; Exordium plan with the synthetic snapshot, Use Own
 Materials on, tree fully expanded):
 - Finding A + final wording: the partial-coverage pill renders
   "HAVE 30/75 NEEDED" live (45x Stabilizing Matrix row: needs 75, owns 30)
   directly above a fully-covered row's plain blue "HAVE" (Mystic
-  Runestone) - the vocabulary alignment reads exactly as the maintainer
-  intended; hover shows the approved tooltip verbatim: "Needs 75 total -
+  Runestone) - the vocabulary alignment is as intended; hover shows the
+  approved tooltip verbatim: "Needs 75 total -
   30 covered by your materials, 45 left to acquire".
 - Finding B1: hovering a non-coin vendor row's price area shows
   "Unit price: 92 for 912 Spirit Shard" (Philosopher's Stone; the

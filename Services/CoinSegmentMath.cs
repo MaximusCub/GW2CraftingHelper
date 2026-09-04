@@ -108,10 +108,9 @@ namespace TaimisToolbench.Services
         /// digits' ink bottom, which is the baseline.
         /// <para>
         /// The coins alone. Every other inline currency icon keeps
-        /// <see cref="InlineIconY"/>'s centred seat, because the owner ruled
-        /// on 2026-09-04 that only gold, silver and copper move, having been
-        /// shown that the non-coin icons already measure centred to within
-        /// half a pixel in his own capture.
+        /// <see cref="InlineIconY"/>'s centred seat: only gold, silver and
+        /// copper move, because the non-coin icons already measure centred
+        /// to within half a pixel in a field capture.
         /// </para>
         /// <para>
         /// Neither edge is a number the caller holds: the glyph box runs

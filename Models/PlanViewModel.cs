@@ -187,7 +187,7 @@ namespace TaimisToolbench.Models
 
         public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; set; }
 
-        // currency-ux-package (Feature 3, maintainer-ratified #21
+        // currency-ux-package (Feature 3, KNOWN-ISSUES #21
         // resolution): passthrough of CraftingPlan.TimegatedItems
         // (informational-only vendor purchase caps - see that class's own
         // doc comment), re-indexed by ItemId so the Recipe Tree's

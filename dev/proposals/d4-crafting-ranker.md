@@ -16,14 +16,14 @@ Claims are tagged **MEASURED** (read directly from code or a cited report),
 
 A sibling proposal, `d5-next-step-feasibility.md`, already exists in this
 folder and also targets the Crafting Ranker tab. It is a feasibility study
-for a **different, larger** ask - the user's separate "tell me what to do
-next" directive (buy/craft/farm guidance). D5's own scope line says its
+for a **different, larger** goal - "tell me what to do next" (buy/craft/farm
+guidance). D5's own scope line says its
 target is "the Crafting Ranker tab... currently a placeholder," and it
 sketches a `RankerStore` holding an ordered `List<PlanRequestItem>`
 priority list, plus a `NextActionClassifier` action-bucketing engine
 ("Do Next" section), with its own effort classes and sequencing.
 
-**This proposal (D4) is the two-fold ask the brief actually assigns it**:
+**This proposal (D4) covers the two-fold requirement**:
 closeness-to-completion ranking + priority ordering of a watchlist. It is
 the **foundation** D5's "Do Next" layer would sit on top of, not a
 competing design. Concretely:
@@ -37,8 +37,7 @@ competing design. Concretely:
   ready right now. This is a deeper drill-in on one item's plan, gated on
   its own feasibility tiers (D5 rates Tier 1 HIGH/buildable, Tier 2
   MEDIUM/lower-bound-only, Tier 3 LOW/out-of-scope-forever).
-- Per this proposal's own brief (point 5): design the **seam** to D5's
-  engine, do not build it. Section 6 below does exactly that, and points
+- Scope rule: design the **seam** to D5's engine, do not build it. Section 6 below does exactly that, and points
   at D5's Section 3.2 (greedy-by-priority scheduling) rather than
   re-deriving it.
 - **Reconciliation requirement, flagged as an open question (14.1):** D4
@@ -53,11 +52,9 @@ competing design. Concretely:
 
 ## 1. Problem / intent
 
-User directive (verbatim): *"the idea of the crafting ranker for me was
-two-fold: one, to be able to see, of all the items i'm interested in,
-which am i closest to completion on? and secondarily, to be able to set
-the priority order of multiple items so that you are working to complete
-them in your own priority order."*
+Intent, two-fold: (1) of all the items a player is interested in, which are
+they closest to completing? and (2) let them set the priority order of
+multiple items, so work proceeds in their own priority order.
 
 Today (MEASURED): "Crafting Ranker" is tab #5 in `Module.cs`'s tab strip
 (icon 156686), registered as `Module.BuildPlaceholder` - a single grey
@@ -93,7 +90,7 @@ cost is overwhelmingly coin-priceable materials).
 quantity, AccountSnapshot snapshot, CancellationToken ct, ...,
 OwnMaterialsMode ownMaterialsMode = Free, ...)` (`Services/
 CraftingPlanPipeline.cs:212`) already does exactly the "solve with the
-snapshot and compare to solving without it" mechanism the brief asks for,
+snapshot and compare to solving without it" mechanism this metric needs,
 with zero new pipeline code:
 
 - **Passing `snapshot: null`** skips inventory reduction entirely
@@ -130,8 +127,7 @@ coinCloseness = baseline.Plan.TotalCoinCost == 0
 
 ### 2.3 Displaying the components, not just the ratio
 
-The brief explicitly asks for the metric's components to be visible, not
-just a single percentage. Per watchlist row:
+The metric's components must be visible, not just a single percentage. Per watchlist row:
 
 - **Primary**: the coin-closeness percentage (2.2), rendered as a label
   (see 9.4 for why not a literal progress-bar control).
@@ -144,8 +140,8 @@ just a single percentage. Per watchlist row:
   summed with coin or converted to a blended number (repo invariant:
   "avoid invalid currency comparisons"). Each currency line can itself
   show a component ratio against `baseline.Plan.CurrencyCosts` for that
-  same currency id (see 2.4) if the maintainer wants per-currency progress
-  too - optional, not required for v1.
+  same currency id (see 2.4) if per-currency progress is wanted too -
+  optional, not required for v1.
 - **Remaining time-gated units**: `owned.Plan.TimegatedItems`
   (`List<TimegatedItem>{ItemId, CapType, CapValue, NeededCount}`,
   MEASURED `Models/TimegatedItem.cs`) rendered as an informational note
@@ -157,8 +153,7 @@ just a single percentage. Per watchlist row:
 
 ### 2.4 Being honest when currencies/time-gates dominate
 
-This is the brief's explicit ask (point 1's last clause), and it is a
-real correctness issue, not a nice-to-have:
+This is a real correctness issue, not a nice-to-have:
 
 - **Currency-only items** (`baseline.Plan.TotalCoinCost == 0` but
   `baseline.Plan.CurrencyCosts` non-empty, e.g. a pure Ascended-shard/
@@ -175,7 +170,7 @@ real correctness issue, not a nice-to-have:
   currencies or time-gated purchases may show high percentages while
   still requiring significant currency or time to finish - check the
   currency and time-gate lines below each item."* This is the honesty
-  the brief asks for, delivered as a standing disclosure rather than a
+  required here, delivered as a standing disclosure rather than a
   per-item guess at blending currencies into one number (2.1 already
   rejected blending as the primary metric for exactly this reason).
 - **Monotonicity is asserted, not proven, and needs a guard.** Owning
@@ -184,7 +179,7 @@ real correctness issue, not a nice-to-have:
   `OwnMaterialsMode.Valued` force-buy pre-pass changes *which* nodes are
   bought vs. crafted for cost-efficiency, not whether inventory helps.
   This proposal did **not** trace `PlanSolver.FinalizeVendorBatches`/
-  `EvaluateVendorOffers` far enough this session to prove
+  `EvaluateVendorOffers` far enough to prove
   `owned.Plan.TotalCoinCost <= baseline.Plan.TotalCoinCost` holds in every
   edge case (e.g. a pathological vendor-batch rounding interaction). The
   ratio must be `Clamp01`-guarded defensively (already shown in 2.2), and
@@ -226,7 +221,7 @@ persisted shape trivially convertible into the exact type
 ### 3.2 Adding an item - reuse the existing search UI verbatim
 
 `Views/SuggestionPanel.cs` + `Views/AutocompleteTextBox.cs` +
-`Contracts/IItemSearchProvider.cs` (MEASURED, full read this session) are
+`Contracts/IItemSearchProvider.cs` (MEASURED, full read) are
 already a clean, decoupled, event-based "search for a plan-valid item"
 control: `SuggestionPanel` wraps an `AutocompleteTextBox`, calls
 `IItemSearchProvider.SearchAsync(query, maxResults, ct)`, and raises
@@ -250,7 +245,7 @@ this proposal recommends **updating that entry's quantity in place**
 (and leaving its priority position unchanged) rather than creating a
 second row for the same item - flagged as an explicit open question
 (14.3) since "replace" vs. "prompt the user" vs. "allow duplicates with
-different quantities" are all defensible and the brief doesn't specify.
+different quantities" are all defensible and none is mandated.
 
 ### 3.3 Removing an item
 
@@ -290,9 +285,8 @@ could drift out of sync with the list's actual order.
 
 Store: `Services/RankerStore.cs` (name reconciled with D5), same shape as
 `Services/StatusStore.cs`/`Services/VendorOfferStore.cs`'s atomic-write
-idiom - **not** `SnapshotStore.cs`'s idiom. **Correction to the scout
-notes, MEASURED this session (matching an identical correction already
-made in `d3-plan-history.md`):** `SnapshotStore.Save` uses a plain
+idiom - **not** `SnapshotStore.cs`'s idiom. **MEASURED (matching an
+identical correction already made in `d3-plan-history.md`):** `SnapshotStore.Save` uses a plain
 `File.WriteAllText`, no tmp file, no atomic replace at all;
 `StatusStore.Save` genuinely does `.tmp` + `File.Copy(..., overwrite:
 true)` + `File.Delete`. `RankerStore` should follow `StatusStore`'s
@@ -389,7 +383,7 @@ public static class RankerPriorityOrdering
   reflow need that would justify the heavier contract.
 
 **Drag-and-drop is flagged as a stretch enhancement, not recommended for
-v1.** If the maintainer wants it, it needs its own feasibility spike
+v1.** If it is wanted, it needs its own feasibility spike
 first (confirm whether `Container` exposes mouse-drag events usable for
 free-position or list-swap dragging without breaking the ViewAdapter's
 documented "don't nest two scrollable panels, hit-testing breaks" caution
@@ -401,10 +395,9 @@ scroll panels) - not something this proposal can sign off on from a
 
 ## 5. REFRESH cost
 
-### 5.1 Explicit button, never automatic (per the brief)
+### 5.1 Explicit button, never automatic
 
-A single "Refresh" button atop the tab, matching the brief's explicit
-instruction. No per-frame recompute, no auto-refresh on tab-open, no
+A single "Refresh" button atop the tab, an explicit requirement. No per-frame recompute, no auto-refresh on tab-open, no
 polling `FrameTicker`. This also sidesteps WP-17's FrameTicker-teardown
 concern entirely (Section 13) - there is nothing to tear down.
 
@@ -423,10 +416,10 @@ own harness numbers (Exordium, item 90551, `--profile 2 --iterations 6`):
 These numbers are for **one specific item** (Exordium) and are explicitly
 flagged in that report as the benchmark reference tree, not a ceiling - a
 deep legendary-precursor tree is very plausibly larger/slower and this
-proposal has **not measured one**. Before shipping, the maintainer should
-run `GW2CraftingHelper.Harness.exe --profile <a legendary> --iterations 6`
+proposal has **not measured one**. Before shipping, run
+`GW2CraftingHelper.Harness.exe --profile <a legendary> --iterations 6`
 (same tool WP-07 already uses for its own before/after proof) against a
-representative watchlist target, not assume Exordium generalizes.
+representative watchlist target, rather than assuming Exordium generalizes.
 
 **Why 2N is more tolerable than it sounds (MEASURED, real caching
 infrastructure already in place, provided the Ranker reuses existing
@@ -464,8 +457,8 @@ services (`TradingPostService._cacheLock`, `RecipeService._cacheGate`)
 already serialize concurrent access internally (MEASURED locks), so
 parallelizing does not obviously buy wall-clock time proportional to N -
 it has not been measured to help, and sequential is simpler to reason
-about for the generation-guard below. Flagged as an open question (14.5)
-if the maintainer wants parallel fan-out measured as a follow-up.
+about for the generation-guard below. Flagged as an open question (14.5):
+parallel fan-out could be measured as a follow-up.
 
 ### 5.4 Threading and cancellation
 
@@ -493,7 +486,7 @@ if the maintainer wants parallel fan-out measured as a follow-up.
 
 ## 6. Seam to the future "what-to-do-next" engine
 
-Per the brief: design the seam, do not build the engine. D5
+Scope rule: design the seam, do not build the engine. D5
 (`d5-next-step-feasibility.md`) already did the hard scheduling-semantics
 thinking here - Section 3 of that document works through shared-material/
 shared-cap scheduling in detail and lands on a specific, well-reasoned
@@ -533,8 +526,8 @@ feasibility tiers and open questions.
 
 Each watchlist item is solved **on its own** via the single-item
 `GenerateStructuredAsync(itemId, quantity, ...)` overload (Section 2.2) -
-not the multi-item list overload. This is the "independent" option the
-brief poses, and it is what this proposal recommends for v1, for a
+not the multi-item list overload. This is the "independent" option, and it
+is what this proposal recommends for v1, for a
 concrete reason grounded in what the pipeline can actually report:
 
 **`CraftingPlanResult` has no per-root cost breakdown for a joint/multi-
@@ -560,8 +553,7 @@ are shown as "100 more clovers needed" it double-counts the true combined
 need (which the M35 multi-item wrapper, used by the Crafting Plan tab
 today for a *simultaneous* multi-item request, already solves correctly
 via merged-ceil vendor batching - MEASURED, `docs/KNOWN-ISSUES.md` #21.1).
-This is the exact asymmetry the brief's point 6 asks to be surfaced, not
-hidden.
+This asymmetry must be surfaced, not hidden.
 
 **UI mitigation**: a standing caption under the list (can share space with
 2.4's currency/time-gate caption or sit just below it): *"Each item's
@@ -579,14 +571,13 @@ of promising a joint Ranker mode this proposal does not build.
 A "joint closeness" mode - solving the entire watchlist as one
 `GenerateStructuredAsync(IReadOnlyList<PlanRequestItem>, ...)` batch and
 somehow attributing a per-root remaining-cost share - is the Ranker's
-direct analog of the M35 multi-item wrapper, exactly as the brief's point
-6 names it. It cannot be built as a v1 UI feature because (7.1) the
+direct analog of the M35 multi-item wrapper. It cannot be built as a v1 UI feature because (7.1) the
 pipeline does not expose a per-root cost split within a joint solve.
 Building it would mean extending `PlanResultBuilder`/the solve pipeline
 with a new "attribute merged-batch cost back to each contributing root"
 computation - a real, separate, pipeline-level feature, logged here as an
-explicit open question (14.4) for the maintainer, not something this
-proposal's effort estimate (Section 12) includes.
+explicit open question (14.4), not something this proposal's effort
+estimate (Section 12) includes.
 
 ---
 
@@ -709,8 +700,7 @@ their own tabs.
 ### 9.4 No native progress-bar control (MEASURED)
 
 Neither the shipped `Blish HUD.exe`'s type-name strings nor its XML doc
-contain a `ProgressBar`, `Meter`, or `Bar` control (grepped both this
-session). This codebase's own `Views/` never renders one either. Two
+contain a `ProgressBar`, `Meter`, or `Bar` control (both grepped). This codebase's own `Views/` never renders one either. Two
 low-risk options for the percentage cell, both usable with controls
 already confirmed to exist:
 
@@ -728,7 +718,7 @@ already confirmed to exist:
 Recommendation: start with option 1 (Section 8 already assumes a text
 cell); option 2 is a low-risk, easy follow-up polish pass once the tab
 exists, not a blocker for v1. Flagged as an open question (14.6) in case
-the maintainer has a visual preference up front.
+there is a visual preference up front.
 
 ### 9.5 Threading notes
 
@@ -750,7 +740,7 @@ truth for "how should owned materials be valued," used identically by
 the Crafting Plan tab and the Ranker.
 
 Possible future settings (explicitly **not** proposed for v1, listed only
-because the brief's format asks what settings a feature introduces - the
+because the proposal format asks what settings a feature introduces - the
 efficiency principle in the project's own review rules argues against
 adding these speculatively):
 
@@ -758,7 +748,7 @@ adding these speculatively):
   real usage shows the list growing unreasonably large; no evidence for
   that yet.
 - An "auto-refresh on tab open" toggle - explicitly discouraged by the
-  brief's own "explicit Refresh button, not per-frame" instruction; not
+  "explicit Refresh button, not per-frame" rule; not
   recommended even as an opt-in, given the 2N-solve cost model (5.2).
 
 ---
@@ -784,7 +774,7 @@ adding these speculatively):
   `Blish_HUD`/`Gw2Sharp` references, keeping their tests in the Blish-free
   suite alongside every existing `*StoreTests.cs`/pure-logic test.
 - **`gw2efficiency` is research-only, never called at runtime**: this
-  proposal's web research (Section 15) is dev-time-only, as instructed;
+  proposal's web research (Section 15) is dev-time-only;
   the shipped feature makes zero network calls to gw2efficiency or the
   wiki - every number comes from this module's own pipeline and the
   official GW2 API paths that pipeline already uses.
@@ -836,7 +826,7 @@ variant (Section 7.3) - the one piece that *would* require pipeline-level
 work - is explicitly deferred as a separate future item, not part of this
 estimate.
 
-If the maintainer wants to cut scope: dropping the optional "Affordable
+If scope must be cut: dropping the optional "Affordable
 now" chip (2.5), the per-currency progress sub-lines (2.3's optional
 extra), and the faked visual bar (9.4 option 2) brings the remaining core
 (store + ordering + closeness math + basic list view + Refresh) down
@@ -848,7 +838,7 @@ toward a solid **M**, at the cost of a slightly less rich per-row display.
 
 - **No M38 work package currently targets Log/Plan History/Crafting
   Ranker/About/Settings** (confirmed by the full read of `m38-plan/
-  m38-cleanup-plan.md` this session) - this feature is genuinely
+  m38-cleanup-plan.md`) - this feature is genuinely
   greenfield relative to the cleanup wave and can start independently of
   it, same conclusion D3/D5 both reached.
 - **Sequence coin-cell rendering after WP-21/22** (`CoinCurrencyRenderer`
@@ -864,12 +854,11 @@ toward a solid **M**, at the cost of a slightly less rich per-row display.
   null` shape WP-16 is standardizing across the other stores, so this
   isn't a store retrofitted later).
 - **No dependency on `m37-homestead`/`m37-audit-fixes`** in-flight
-  branches, and in fact **already moot**: this session's own reads of
-  current `master` (`Services/CraftingPlanPipeline.cs`, `Models/
+  branches, and in fact **already moot**: reads of current `master` (`Services/CraftingPlanPipeline.cs`, `Models/
   OwnMaterialsMode.cs`, `Services/ModuleSettings.cs`) show
   `HomesteadEfficiencyTiers`/`OwnMaterialsMode` already present in the
   exact signatures this proposal calls - homestead's relevant surface is
-  already on `master` as of this proposal (MEASURED, current session).
+  already on `master` as of this proposal (MEASURED).
 - **Low risk, but D5 recommends waiting for Wave C (WP-11/12/13/15) to
   settle before its own "Do Next" layer ships**, reasoning that building
   against a pipeline mid-refactor invites churn. D4's dependency is
@@ -896,10 +885,9 @@ toward a solid **M**, at the cost of a slightly less rich per-row display.
 
 ## 14. Prior art (dev-time web research; gw2efficiency is reference-only, never called at runtime)
 
-- `gw2efficiency.com` was **unreachable during this research session**
+- `gw2efficiency.com` was **unreachable during this research**
   (redirects to a maintenance page, `maintenance.gw2efficiency.com`, live
-  as of this session) - its current live UI could not be directly
-  observed. All findings below are from secondary sources (its own
+  at the time) - its current live UI could not be directly observed. All findings below are from secondary sources (its own
   GitHub issue tracker, and a community-built alternative), not a direct
   screenshot/read of the page.
 - The original 2016 feature-request issue for gw2efficiency's own
@@ -915,31 +903,29 @@ toward a solid **M**, at the cost of a slightly less rich per-row display.
   expected UX: *"a nice big percentage progress bar"* plus a hierarchical
   breakdown of quantities gathered vs. needed, state shareable via a URL
   hash. Explicitly **single-legendary only** - no multi-item comparison,
-  ordering, or prioritization concept at all (its own README, fetched this
-  session).
+  ordering, or prioritization concept at all (its own README).
 - **Echo-worthy** (well-established, low-risk to copy the *idea*, not the
   code): a per-item percentage/closeness readout paired with a
   remaining-materials breakdown is exactly what both the gw2e ecosystem
   and this proposal converge on independently - Section 2's design is not
   inventing an unfamiliar pattern.
-- **Original ground** (not found in any prior-art source checked this
-  session): a persisted, priority-ordered, multi-item watchlist that
+- **Original ground** (not found in any prior-art source checked): a persisted, priority-ordered, multi-item watchlist that
   feeds a downstream "what to finish first" decision. Neither
   gw2efficiency's own legendaries overview (per its originating feature
   request) nor the community `GW2-Legendary` tool models more than one
-  tracked item at a time. This is the genuinely novel half of the user's
-  two-fold ask, and Section 4's priority-ordering UX has no direct prior
+  tracked item at a time. This is the genuinely novel half of the two-fold
+  requirement, and Section 4's priority-ordering UX has no direct prior
   art to lean on beyond gw2efficiency's own (deferred-in-this-repo)
   `moveRecipe` up/down-arrow idiom for a *different* feature (the input
   strip, not a watchlist).
 
-Sources consulted this session: `gw2efficiency.com/crafting/legendaries`
+Sources consulted: `gw2efficiency.com/crafting/legendaries`
 (redirected to maintenance), `github.com/gw2efficiency/issues/issues/617`,
 `github.com/davidyell/GW2-Legendary`.
 
 ---
 
-## 15. Open questions for the maintainer
+## 15. Open questions
 
 1. **Cross-proposal reconciliation with D5 (Section 0/13, highest
    priority to resolve before either starts)**: confirm both proposals
@@ -948,8 +934,8 @@ Sources consulted this session: `gw2efficiency.com/crafting/legendaries`
    independent `data/ranker.json` guess - neither is load-bearing yet,
    pick one), and one entry shape.
 2. Is the coin-denominated remaining/total ratio (Section 2.1-2.2) the
-   right primary metric, or does the maintainer want the blended-
-   currency-valuation variant despite its dependency on a user-guessed
+   right primary metric, or is the blended-currency-valuation variant
+   preferred despite its dependency on a user-guessed
    `CurrencyValuation` rate (Section 2.1's rejected candidate)?
 3. Duplicate-add behavior (Section 3.2): update quantity in place (this
    proposal's recommendation), prompt the user, or allow multiple rows
@@ -961,20 +947,19 @@ Sources consulted this session: `gw2efficiency.com/crafting/legendaries`
    permanently, with the standing caption (7.2) as the sole mitigation?
 5. Sequential vs. parallel Refresh solves (Section 5.3): sequential is
    this proposal's default for simplicity; worth measuring parallel
-   fan-out as a follow-up, or is sequential clearly fine given the
-   watchlist sizes the maintainer expects (unknown - no data on expected
-   watchlist size exists anywhere in this session)?
+   fan-out as a follow-up, or is sequential clearly fine given expected
+   watchlist sizes (unknown - no data on expected watchlist size exists)?
 6. Percentage-cell visual (Section 9.4): text-only percentage (this
    proposal's v1 recommendation) or invest in the faked two-`Panel` bar
    from the start?
-7. Should the maintainer run a Harness `--profile` measurement against a
-   real legendary/precursor item (Section 5.2) before this ships, to
+7. Should a Harness `--profile` measurement be run against a real
+   legendary/precursor item (Section 5.2) before this ships, to
    confirm the Exordium-derived cost numbers generalize? This proposal
    flags the need but has not performed that measurement itself.
 8. Tab ordering: `Tab.OrderPriority`'s default/tie-break behavior is
    unproven from code (same open gap D3 independently flagged) - once
-   the Ranker stops being a placeholder, does the maintainer want it
-   pinned to an explicit `OrderPriority`?
+   the Ranker stops being a placeholder, should it be pinned to an
+   explicit `OrderPriority`?
 9. Is a watchlist size cap (Section 10) wanted preemptively, or only if
    real usage shows it growing large (this proposal's default: don't add
    a setting speculatively)?

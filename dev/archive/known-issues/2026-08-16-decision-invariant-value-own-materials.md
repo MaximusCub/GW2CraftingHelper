@@ -357,4 +357,4 @@ re-reducing re-solve. Build: `dotnet build GW2CraftingHelper.csproj
 -p:Platform=x64` - clean, 0 errors. Tests: 1428 passed, 0 failed (1425
 + the 3 new `PlanStoreTests` facts above).
 
-Gate: PASS 2026-08-16 (orchestrator live desktop session). Inline toggle renders next to Use Own Materials (checked default); schema-v2 one-time plan reset consumed the old v1 file cleanly (strip showed Ready, no restored plan); decision behavior suite-covered.
+Gate: PASS 2026-08-16 (live desktop session). Inline toggle renders next to Use Own Materials (checked default); schema-v2 one-time plan reset consumed the old v1 file cleanly (strip showed Ready, no restored plan); decision behavior suite-covered.

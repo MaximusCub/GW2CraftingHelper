@@ -6,7 +6,7 @@ using Xunit;
 namespace TaimisToolbench.Tests.Services
 {
     // TextWrapMath is the Blish-free half of the Plan Notes wrapping fix
-    // (audit finding M14) and of LabelHelpers.EllipsizeToWidth, which is now
+    // and of LabelHelpers.EllipsizeToWidth, which is now
     // a font adapter over Ellipsize below. Every test drives the real
     // production entry points through the same Func<string,int>
     // measurement seam the renderer passes a BitmapFont through.

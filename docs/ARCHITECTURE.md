@@ -470,13 +470,12 @@ already has.
 **`CostTileLabelToValueGap` used to be a residual.** Both Total Cost bands
 bottom-anchored their amount inside a fixed row height, so the space under
 the caption was whatever the height arithmetic happened to leave over - 1px
-on the profit band, which the field report called cramped ("'Sell Value'
-and the gold line are a little cramped"). Anchoring the amount *under* the
-caption instead makes that gap one named constant at every band, and the
-two bands can no longer drift apart. Its value, 8, is derived from the
-caption tier's own metrics rather than chosen by eye; the derivation is in
-the constant's own doc comment, because the number is the thing a caller
-has to get right.
+on the profit band, which the field report called cramped. Anchoring the
+amount *under* the caption instead makes that gap one named constant at
+every band, and the two bands can no longer drift apart. Its value, 8, is
+derived from the caption tier's own metrics rather than chosen by eye; the
+derivation is in the constant's own doc comment, because the number is the
+thing a caller has to get right.
 
 **`MultiRootTreeFlowHeight` and the multi-root render.** gw2efficiency
 renders N independent top-level recipe trees, its synthetic wrapper node
@@ -1981,7 +1980,7 @@ one. The bounded window is armed once, at drag settle.
 `SuspendLayout`/`ResumeLayout` around the replay is about comparison cost.
 For a long shopping list or a deep tree, replaying dozens of per-row closures
 in a single tick without it would trigger that many redundant full sibling
-reflows in the same frame (the `O(rows^2)` risk raised as m2 risk 2). The
+reflows in the same frame - an `O(rows^2)` risk. The
 coalesced reflow is a no-op for vertical position anyway, because these
 writes only ever touch `Width`/`X` - row heights stay fixed, and
 `SingleTopToBottom` flow positions children from cumulative `Height`.
@@ -2261,7 +2260,7 @@ which simulation confirms is immune (0/5000 vanishes) for every
 (`rowHeight`, scale) pair tested - proven, not merely observed clean at one
 scale.
 
-The tier-2 re-run, after the owner icon ruling grew the plan tab's icon-led
+The tier-2 re-run, after the tier-2 icon change grew the plan tab's icon-led
 rows to 45px (Used Materials / Shopping / Required Recipes: flush tier-2 frame
 plus divider) and 52px (Crafting Steps): the simulation, re-derived from the
 decompiled `ScaleBy` floor/ceil semantics and validated by reproducing the
@@ -2288,7 +2287,7 @@ no rasterized scanline survives the scissor.
 The model earns its authority over the shipped geometry by first reproducing
 the measured past: the vulnerable 44px and 32px rows at the 0.897 "Normal"
 scale and the then-30px section header at the 0.81 "Small" scale (the scale of
-that session's live pixel scans), at the same ~10.2% vanish rates published
+the live pixel scans), at the same ~10.2% vanish rates published
 above, and the immune 36px rows. A model that cannot reproduce the
 live-verified past has no authority over the present.
 
@@ -2888,7 +2887,7 @@ exceeds it - a fixed floor (`ShoppingColumnMath.TotalMinWidth`), a
 header-width floor (every band in the module is floored at its own label so
 the label fits), or a reserve shared by several columns and sized by the
 widest of them (`SummarySectionLayoutMath`'s one `NumberColumnWidth` across
-Required/Have/Needed). Measured on the owner's 2026-08-28 capture: the
+Required/Have/Needed). Measured on a 2026-08-28 capture: the
 Recipe Tree's "Source" header centred at x~797 over a badge run occupying
 700..765, and the currency table's "Have" header sat over neither its own
 numbers' right edge nor their centre.
@@ -2906,8 +2905,8 @@ is the column's right edge whenever the band ends there, so the clamp fires
 for every header wider than its column's ink - which is most of them, since
 every band is floored at its own header label - and pins the header's right
 edge to the values' right edge. That is right-alignment: precisely what the
-centring was added to remove, and what the owner measured on the 2026-08-29
-capture, where Required/Have/Needed sat 17, 12 and 15px left of their ink -
+centring was added to remove, and what the 2026-08-29 capture measured,
+where Required/Have/Needed sat 17, 12 and 15px left of their ink -
 exactly half of each header's excess over the numbers under it.
 
 A band is not a boundary. What a header must not reach is the *neighbouring
@@ -2940,7 +2939,7 @@ band still tracks the content.
 
 `Services/ItemIconTiers.cs` and `Services/CurrencyIconTiers.cs` hold two
 sizes each, matched to the game's own two inventory and two wallet tiers
-(owner rulings, 2026-08-26 and 2026-08-27). Both are Blish-free so the
+(decided 2026-08-26 and 2026-08-27). Both are Blish-free so the
 layout math that reserves room for an icon and the view that draws it read
 the same number.
 
@@ -2972,7 +2971,7 @@ half the size. That is the rule the renderers spell as
 `iconYOffset = (textHeight - iconSize) / 2`, recorded here so it need not be
 re-derived from a screenshot.
 
-**The coins are the exception**, ruled by the owner on 2026-09-04: gold,
+**The coins are the exception**, decided 2026-09-04: gold,
 silver and copper seat their *art* on the number's ink bottom
 (`CoinIconY`, in `Services/CoinSegmentMath.cs`), because a centred *box* leaves the
 padded coin art reading high against the digits. Two paddings sit between
@@ -3004,7 +3003,7 @@ SoulBindOnUse), which is what rules out a most-specific ladder. Within a
 dimension the stronger flag wins - live3 almonds 12337 and fury-scorched
 86967 both carry AccountBound *and* AccountBindOnUse and render one account
 line. Five captures carry a bind-on-acquire flag and read bare: Gift of
-Twilight 19648 (the 2026-08-27 owner A/B, the same item hovered in the
+Twilight 19648 (the 2026-08-27 A/B, the same item hovered in the
 module and in the game), heart-of-destroyer 67017 and holographic-wings
 79157 - all AccountBound + AccountBindOnUse, all bare "Account Bound" -
 relic-livingcity 104938, and red-festival-lantern 68638 (SoulbindOnAcquire +
@@ -3141,7 +3140,7 @@ true rate is not a whole number, and rather than round - inventing data the
 spec does not ask for - the amount carries a literal "N for M" bundle label.
 
 `ResolveTreeNodeUnitAmounts` answers the same question for a single tree row
-(`TreeSectionController`'s "Unit price:" tooltip line, field-test finding B),
+(`TreeSectionController`'s "Unit price:" tooltip line, a field-test finding),
 where the true batch rate is simply not present: `OutputCount` and
 `CurrencyCostLinesPerBatch` exist only on `PlanStep`, threaded there by
 `VendorBatchSolver.FinalizeVendorBatches` for the merged shopping list - a
@@ -3388,7 +3387,7 @@ calls about substitutability, which is a property the game itself decides:
 different questions about the same rows, and a row's answer under one says
 nothing about its answer under the other. Keeping only the last mode's set
 made every toggle a full recompute, including a toggle straight back to
-numbers the session had already paid for (owner ruling, 2026-08-27).
+numbers the session had already paid for (decided 2026-08-27).
 
 ### S2.3 Column and section geometry (Q-Z)
 
@@ -3672,9 +3671,9 @@ section 9 reproduces the method and every anchor figure of that report's own
 
 1378, not the 1232 the like-for-like depth-14 arithmetic gives on its own:
 1232 accepts that a row combining a forced-craft dust chain with a vendor
-currency run ellipsizes, and the maintainer declined that trade - "we are
-designing for a minimum resolution of 1920x1080, so cramming down to a
-smaller min-size that will result in cramped renders seems bad". The +154
+currency run ellipsizes, and that trade was declined: the module is
+designed against a minimum resolution of 1920x1080, and a smaller minimum
+window size produces cramped renders. The +154
 rider is what buys "a two-currency vendor run always fits at the floor".
 
 Down from 1478, which fitted the depth-23 "+24 Agony Infusion" chain
@@ -3691,7 +3690,7 @@ trailing padding - under 700px all told, half of what the tree needs.
 ### S2.10 Wiki link launch
 
 **`WikiLinkLauncher` - the first external-URL launch.** This is the module's
-first launch of an external URL, a deliberate maintainer decision. The
+first launch of an external URL, a deliberate decision. The
 try/catch exists because ShellExecute can throw for reasons outside the
 module's control - `Win32Exception` for no registered URL handler, a
 locked-down environment, and so on. The `Task.Run` offload was a later

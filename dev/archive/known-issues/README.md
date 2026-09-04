@@ -23,9 +23,10 @@ the full record.
 
 ## What has been changed since the move, and why it is not an edit
 
-Three carve-outs from "never edit an archived record". None of them changes
-what a record says; all three exist because a grep or a click has to keep
-working. A reviewer diffing this directory against
+Four carve-outs from "never edit an archived record". None of them changes
+what a record found; the first two exist because a grep or a click has to
+keep working, and the third because this directory is public. A reviewer
+diffing this directory against
 `git show 3caf935:docs/KNOWN-ISSUES.md` should expect exactly these
 differences and no others.
 
@@ -44,6 +45,14 @@ differences and no others.
    deeper directory broke; the `docs/archive` -> `dev/archive` move
    re-pointed the `docs/KNOWN-ISSUES.md` and `docs/research/` links in the
    files that carried them. Link *text* is untouched in every case.
-3. Nothing else. Backticked paths in the prose of a record still name
+3. **Private-conversation material removed.** These records are published;
+   the working conversation behind them is not. A sanitization pass replaced
+   quoted personal speech, attribution of a decision to a named individual,
+   and agent-process residue with the impersonal technical fact each
+   carried, and deleted the sentence where it carried none. Only prose of
+   that kind changed. No measurement, derivation, date, file or line
+   reference, test count, commit SHA, finding, heading or link was altered,
+   so every claim a record makes about the code still reads as it did.
+4. Nothing else. Backticked paths in the prose of a record still name
    `docs/archive/...` where the record said so at the time - that is what
    the record said, and the banner is what marks it historical.

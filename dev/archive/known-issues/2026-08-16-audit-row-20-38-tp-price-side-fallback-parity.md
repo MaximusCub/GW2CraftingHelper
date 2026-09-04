@@ -230,4 +230,4 @@ history - `TreeSectionController.cs` is Blish-bound and outside this
 repo's test-runnable surface, same constraint every UI-adjacent entry
 in this file notes.
 
-Gate: PARTIAL PASS 2026-08-16 (orchestrator live desktop session). Fallback pricing exercised implicitly throughout live plans; the caveat tooltip's specific fallen-back shape did not occur in the tested plans - suite-covered, visual slice deferred.
+Gate: PARTIAL PASS 2026-08-16 (live desktop session). Fallback pricing exercised implicitly throughout live plans; the caveat tooltip's specific fallen-back shape did not occur in the tested plans - suite-covered, visual slice deferred.

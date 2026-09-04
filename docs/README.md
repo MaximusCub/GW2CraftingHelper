@@ -33,13 +33,13 @@ are in tells you whether a page is safe to edit.
   today, measured, including what still does not exist.
 - [`RENAMING.md`](RENAMING.md) - the runbook for the finale of the
   Taimi's Toolbench rename: GitHub repo rename, local folder and
-  junction gymnastics, and the owner's Blish install migration. Current
+  junction gymnastics, and the live Blish install migration. Current
   state until those steps are executed and verified; a frozen record
   after.
 - [`gw2e-parity-spec.md`](gw2e-parity-spec.md) - the normative
   gw2efficiency behavior the solver targets, per rule.
-- [`gw2e-considerations.md`](gw2e-considerations.md) - the maintainer's
-  rulings on each convergence row: adopt, preserve, or already equivalent.
+- [`gw2e-considerations.md`](gw2e-considerations.md) - the decision on
+  each convergence row: adopt, preserve, or already equivalent.
 
 ## Durable why
 

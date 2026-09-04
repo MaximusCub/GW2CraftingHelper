@@ -106,7 +106,7 @@ namespace TaimisToolbench.Services
         //
         // The cost band's result tile is the one number a user comes to
         // this section for. It used to say so with a promoted DefaultFont32
-        // amount; the maintainer's field test replaced that with a tinted,
+        // amount; a field test replaced that with a tinted,
         // semi-transparent highlight box around the result tile, so all
         // three tiles now share ONE amount font and the band reads as one
         // formula again. The band's height is therefore no longer a

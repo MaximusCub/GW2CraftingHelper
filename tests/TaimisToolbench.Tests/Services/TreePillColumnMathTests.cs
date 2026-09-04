@@ -362,7 +362,7 @@ namespace TaimisToolbench.Tests.Services
         private const int ChestNodeId = 1;
         private const int ShardNodeId = 2;
 
-        private static List<CraftingTreeNode> OwnerPlanNodes()
+        private static List<CraftingTreeNode> ReportedPlanNodes()
         {
             return new List<CraftingTreeNode>
             {
@@ -391,26 +391,26 @@ namespace TaimisToolbench.Tests.Services
         /// <summary>The depth-8 row's name origin: indent 24 a level plus
         /// the caret, icon and name columns (PlanRelayoutMathTests's
         /// TreeNameX).</summary>
-        private static int OwnerNameX()
+        private static int ReportedNameX()
         {
             return 8 * 24 + 58;
         }
 
         /// <summary>
-        /// The leftward half of the owner's rule: with no cost-side slack,
-        /// the short row fits whole - no chip, no tightened padding - as
-        /// soon as the measured run fits the surplus, and while it claims
-        /// the pill column's left edge, and so every name budget, holds
+        /// The leftward half of the rule: with no cost-side slack, the
+        /// short row fits whole - no chip, no tightened padding - as soon
+        /// as the measured run fits the surplus, and while it claims the
+        /// pill column's left edge, and so every name budget, holds
         /// exactly where the minimum window put it.
         /// </summary>
         [Fact]
-        public void TheOwnersShortRow_FitsWhole_WhenTheSurplusFitsTheRun()
+        public void TheReportedShortRow_FitsWhole_WhenTheSurplusFitsTheRun()
         {
-            var roots = OwnerPlanNodes();
+            var roots = ReportedPlanNodes();
             int required = ScannedRequired(roots);
 
             var atMinimum = PlanRelayoutMath.ComputeTreeColumnEdges(
-                MinPanel(), OwnerNameX(), 0, PlanRelayoutMath.TreePillColumnWidth, 150, 8);
+                MinPanel(), ReportedNameX(), 0, PlanRelayoutMath.TreePillColumnWidth, 150, 8);
 
             int panel = MinPanel() + 63;
             int affordable = TreePillColumnMath.Affordable(
@@ -427,7 +427,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(0, fit.WidthReduction);
 
             var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
-                panel, OwnerNameX(), 0, column, 150, 8);
+                panel, ReportedNameX(), 0, column, 150, 8);
             Assert.Equal(atMinimum.PillColX, edges.PillColX);
             Assert.Equal(atMinimum.NameMaxWidth, edges.NameMaxWidth);
         }
@@ -442,11 +442,11 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void TheOwnersShortRow_FitsWhole_WhenTheRoomComesFromTheCostColumnsSlack()
         {
-            var roots = OwnerPlanNodes();
+            var roots = ReportedPlanNodes();
             int required = ScannedRequired(roots);
 
             var atMinimum = PlanRelayoutMath.ComputeTreeColumnEdges(
-                MinPanel(), OwnerNameX(), 0, PlanRelayoutMath.TreePillColumnWidth, 150, 8);
+                MinPanel(), ReportedNameX(), 0, PlanRelayoutMath.TreePillColumnWidth, 150, 8);
 
             int panel = MinPanel() + 43;
             int costSlack = 20;
@@ -464,7 +464,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(0, fit.WidthReduction);
 
             var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
-                panel, OwnerNameX(), 0, column, 150 - claim, 8);
+                panel, ReportedNameX(), 0, column, 150 - claim, 8);
             Assert.Equal(atMinimum.PillColX, edges.PillColX);
             Assert.Equal(atMinimum.NameMaxWidth, edges.NameMaxWidth);
         }
@@ -478,7 +478,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void OnceTheRunsAreSatisfied_EveryFurtherPixelGoesToTheNameColumn()
         {
-            int required = ScannedRequired(OwnerPlanNodes());
+            int required = ScannedRequired(ReportedPlanNodes());
 
             int column = TreePillColumnMath.ColumnWidth(
                 required, PlanRelayoutMath.TreePillColumnWidth,
@@ -488,9 +488,9 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(required, column);
 
             var atMinimum = PlanRelayoutMath.ComputeTreeColumnEdges(
-                MinPanel(), OwnerNameX(), 0, PlanRelayoutMath.TreePillColumnWidth, 150, 8);
+                MinPanel(), ReportedNameX(), 0, PlanRelayoutMath.TreePillColumnWidth, 150, 8);
             var satisfied = PlanRelayoutMath.ComputeTreeColumnEdges(
-                MinPanel() + 400, OwnerNameX(), 0, column, 150, 8);
+                MinPanel() + 400, ReportedNameX(), 0, column, 150, 8);
 
             Assert.True(satisfied.NameMaxWidth > atMinimum.NameMaxWidth);
         }
@@ -504,7 +504,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void AtTheMinimumWindow_WithNoRoomOnEitherSide_TheShortRowStillChips()
         {
-            int required = ScannedRequired(OwnerPlanNodes());
+            int required = ScannedRequired(ReportedPlanNodes());
 
             int affordable = TreePillColumnMath.Affordable(
                 MinPanel(), PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 0);
@@ -529,7 +529,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void AtTheMinimumWindow_TheCostColumnsSlackStillFitsTheRow_Tightened()
         {
-            int required = ScannedRequired(OwnerPlanNodes());
+            int required = ScannedRequired(ReportedPlanNodes());
 
             int affordable = TreePillColumnMath.Affordable(
                 MinPanel(), PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 45);
@@ -739,7 +739,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(94, slack);
 
             var resolved = TreePillColumnMath.Resolve(
-                ScannedRequired(OwnerPlanNodes()), 0, Floor, MinPanel(), MinPanel(), slack);
+                ScannedRequired(ReportedPlanNodes()), 0, Floor, MinPanel(), MinPanel(), slack);
 
             var fit = Fit(ShardRun(), ToggleSlot(), resolved.Width);
             Assert.Equal(3, fit.VisibleCount);
@@ -765,12 +765,12 @@ namespace TaimisToolbench.Tests.Services
             int slack = TreeCostColumnMath.RightSlack(costWidths, CostFloor);
 
             var resolved = TreePillColumnMath.Resolve(
-                ScannedRequired(OwnerPlanNodes()), 0, Floor, MinPanel(), MinPanel(), slack);
+                ScannedRequired(ReportedPlanNodes()), 0, Floor, MinPanel(), MinPanel(), slack);
 
             var unclaimed = PlanRelayoutMath.ComputeTreeColumnEdges(
-                MinPanel(), OwnerNameX(), 0, Floor, reserve, 8);
+                MinPanel(), ReportedNameX(), 0, Floor, reserve, 8);
             var claimed = PlanRelayoutMath.ComputeTreeColumnEdges(
-                MinPanel(), OwnerNameX(), 0, resolved.Width,
+                MinPanel(), ReportedNameX(), 0, resolved.Width,
                 TreeCostColumnMath.WidthAfterClaim(costWidths, CostFloor, resolved.CostClaim), 8);
 
             Assert.Equal(resolved.CostClaim, resolved.Width - Floor);

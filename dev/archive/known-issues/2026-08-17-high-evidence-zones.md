@@ -4,7 +4,7 @@
 ## High-evidence zones: policy rewrite + PlanContentHeightMath dead-code sweep (high-evidence-zones, 2026-08-17)
 
 Two-part change, the first application of the new high-evidence-zone
-policy (maintainer, 2026-08-17, replacing the M38-era DO-NOT-TOUCH
+policy (2026-08-17, replacing the M38-era DO-NOT-TOUCH
 freeze - see this file's own policy note near the top).
 
 **Part 1 (policy docs).** Swept `docs/KNOWN-ISSUES.md` and
@@ -103,8 +103,8 @@ Repo Invariants Checklist:
 
 Not pushed; not committed to `master`. This branch does not attempt the
 larger `SummarySectionLayoutMath`/`PlanContentHeightMath` fold-back - that
-remains a real behavior-bearing change awaiting the audit fleet's
-architecture findings, per this task's own instruction.
+remains a real behavior-bearing change awaiting the architecture audit
+findings, and is out of scope here.
 
 Gate: PASS (non-visual change: docs policy rewrite plus dead-code
 deletion, so no desktop gate applies; evidence is the unreachability

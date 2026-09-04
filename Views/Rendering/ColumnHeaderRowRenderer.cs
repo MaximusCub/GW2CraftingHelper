@@ -46,7 +46,7 @@ namespace TaimisToolbench.Views.Rendering
     // only where the word is drawn changes.
     //
     // Chrome (band color, font, label color, height, label y) comes from
-    // the shared HeaderBands - see that class for the L3 inventory and
+    // the shared HeaderBands - see that class for the inventory and
     // the reason the band, rather than the Shopping List's lighter
     // treatment, is the one every plan table now uses.
     //

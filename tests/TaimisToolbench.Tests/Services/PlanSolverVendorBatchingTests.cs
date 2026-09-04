@@ -695,8 +695,8 @@ namespace TaimisToolbench.Tests.Services
         }
 
         // --- Characterization: AllocateVendorNodeCosts' pre-fix
-        // bounded-divergence largest-remainder apportionment (quorum
-        // verdict C6, merged-ceil-remainder stream) ---
+        // bounded-divergence largest-remainder apportionment
+        // (merged-ceil-remainder stream) ---
         //
         // AllocateVendorNodeCosts (VendorBatchSolver.cs) used to give
         // every occurrence EXCEPT the last exactly UnitCost * quantity

@@ -99,4 +99,4 @@ assertions.
 PASS, 0 errors (pre-existing StyleCop warnings only, none in
 edited files).
 
-Gate: not yet run live - queued for the next desktop session. Merged after the full review pipeline resolved every finding, under the maintainer's standing merge directive (2026-08-16).
+Gate: not yet run live - queued for the next desktop session. Merged after the full review pipeline resolved every finding, under the standing merge directive (2026-08-16).

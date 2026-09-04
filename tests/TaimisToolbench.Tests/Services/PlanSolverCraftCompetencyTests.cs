@@ -523,7 +523,7 @@ namespace TaimisToolbench.Tests.Services
 
         // --- Characterization: CompetencyOpportunityCalculator is a real
         // downstream consumer of AllocateVendorNodeCosts' merged-ceil
-        // remainder shape (quorum verdict C6, merged-ceil-remainder
+        // remainder shape (merged-ceil-remainder
         // stream). Item 200 has two tree occurrences (qty 1 each) of the
         // SAME "100 for 1000c" bulk vendor offer used by the VendorBatchSolver-
         // level characterization above, each also eligible for the SAME

@@ -34,9 +34,9 @@ namespace TaimisToolbench.Views.Rendering
     // stronger property that the number cannot drift from what was built
     // because it IS what was built.
     //
-    // Wrapping replaced single-line ellipsis truncation (audit finding
-    // M14): at ~830px usable a note was cut near 100 characters into a
-    // hover-only tooltip, and the maintainer's UI law routes every
+    // Wrapping replaced single-line ellipsis truncation: at ~830px
+    // usable a note was cut near 100 characters into a
+    // hover-only tooltip, and the module's UI rule routes every
     // opportunity and complex consideration into this section. Ellipsis
     // survives only as the last-resort tail of a note that exceeds
     // TextWrapMath.MaxWrappedLines, which keeps the full text on the row

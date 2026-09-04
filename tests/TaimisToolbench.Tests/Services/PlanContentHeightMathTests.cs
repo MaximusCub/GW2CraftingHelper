@@ -205,8 +205,8 @@ namespace TaimisToolbench.Tests.Services
 
         // --- SectionBodyHeight: simple per-row-count sections ---
 
-        // Used Materials gained an Item/Amount header in audit batch J's
-        // chrome unification, and the Shopping List's own 22px unbanded
+        // Used Materials gained an Item/Amount header in the chrome
+        // unification, and the Shopping List's own 22px unbanded
         // header became the shared 26px band. Both are counted the way the
         // two column-header tables already were - unconditionally,
         // because all four renderers emit the header before looking at

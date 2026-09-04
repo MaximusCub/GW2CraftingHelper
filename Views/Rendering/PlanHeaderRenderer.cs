@@ -42,7 +42,7 @@ namespace TaimisToolbench.Views.Rendering
         /// </summary>
         internal void Render(PlanViewModel vm, FlowPanel contentPanel, int panelWidth)
         {
-            // Tier 1 of the two-tier icon system (owner ruling): the plan's
+            // Tier 1 of the two-tier icon system: the plan's
             // heading item carries in-game bag-slot-sized art, like the
             // Snapshot grid and the Ranker rows. The frame thickness comes
             // from the tier now, not from a local constant - this header

@@ -3,7 +3,7 @@
 
 ## Audit batch E: tree interaction honesty (audit-de-cost-tree)
 
-Four maintainer-approved UX-audit findings, all one story: a pill's
+Four UX-audit findings, all one story: a pill's
 appearance should tell you whether you can click it, and the tree's
 actions should be reachable when you need them.
 
@@ -150,7 +150,7 @@ What the desktop gate should look at:
 
 Gate: PASS (2026-08-22 evening desktop batch, branch build at the
 review-fix HEAD, captures preflight/gDE1-gDE4) - this is the live
-desktop verification the maintainer required before this batch may
+desktop verification required before this batch may
 merge. Verified on the restored Mystic Clover x77 plan: (1) plan
 header as one left-aligned Font32 "Mystic Clover x 42 needed" line,
 no in-scroll timestamp; (2) promoted Actual Cost to Craft tile with

@@ -3,8 +3,8 @@
 
 # M38 Cleanup Analysis — Lens: Test Suite Quality
 
-Scope: `tests/GW2CraftingHelper.Tests` (854 tests measured, prompt said 848 —
-small drift, not investigated) and `tests/VendorOfferUpdater.Tests` (67
+Scope: `tests/GW2CraftingHelper.Tests` (854 tests measured against an
+expected 848 - small drift, not investigated) and `tests/VendorOfferUpdater.Tests` (67
 tests). Read-only analysis against current `master`
 (`85a738e`). No files modified, no git state changed.
 
@@ -82,7 +82,7 @@ confirmed by reading the test file against its target class:
   `Services/WheelDeltaSanitizer.Classify`/`SanitizeScrollLines` statics and
   matches `docs/KNOWN-ISSUES.md` item #12's derivation almost line-for-line.
   This is exactly the "essential complexity pinned by a loud test" pattern
-  the milestone brief asks for — nothing to change here.
+  the milestone asks for - nothing to change here.
 - `StatusUpdateGuardTests` (33 lines, 3 cases) directly pins the M34-B1 #4
   race fix (`StatusUpdateGuard.ShouldApply`) with the three states that
   matter (current/not-closed, stale/either, current/closed). Small and
@@ -91,9 +91,9 @@ confirmed by reading the test file against its target class:
   lines, 12 cases), `PlanRelayoutMathTests` (240 lines, 20 cases) all call
   the real `Services/PlanContentHeightMath` / `ScrollMath` /
   `PlanRelayoutMath` statics that back the scroll-restore and resize-drag
-  machinery documented in KNOWN-ISSUES #12-#19. The maintainer's practice of
+  machinery documented in KNOWN-ISSUES #12-#19. The practice of
   extracting Blish-free pure-math classes specifically so they're testable
-  is working as intended — this is the right structural pattern and the
+  is working as intended - this is the right structural pattern and the
   cleanup pass should preserve it, not "simplify" it away.
 - `AchievementBitDedupPrePassTests`, `OwnedMaterialsForceBuyPrePassTests`,
   `PlanSolverTests`'s aggregate-before-ceil section (below) all build a real
@@ -251,8 +251,8 @@ in a separate earlier pass, there is a real, plausible ordering question —
 ignored, or fully-owned AND ignored?" — that no test currently answers. If
 that combination ever regresses, nothing in the suite would fail loudly. Not
 proposing what the *correct* behavior should be (that's a product decision,
-out of scope for this lens) — flagging that it's currently unobserved by any
-test, which is exactly the "would fail loudly" bar the milestone brief set.
+out of scope for this lens) - flagging that it's currently unobserved by any
+test, which is exactly the "would fail loudly" bar the milestone set.
 
 **Finding T7 (moderate): three of the four real shipped `ref/*.json` data
 files have zero "does the real file still parse" test; the fourth (largest,

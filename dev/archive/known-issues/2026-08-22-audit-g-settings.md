@@ -4,7 +4,7 @@
 ## Audit batch G: Settings restructure (audit-g-settings)
 
 Commits on audit-g-settings off master 47bb2c5, covering the three
-maintainer-approved UX audit findings against Views/SettingsTabContent.
+UX audit findings against Views/SettingsTabContent.
 cs (M4 currency-list density, M5 save buttons + empty heading, M6
 visual structure), plus the review round that followed them. Persistence semantics are untouched - every setting
 is written by the same code, with the same validation, the same
@@ -15,7 +15,7 @@ placement and the confirmation surface changed.
 **Supersedes B14** (backlog-cleanup, gate PASS 2026-08-17): that batch
 deduplicated the four per-section save rows into one AddSaveRow helper
 and live-verified all four rendering identically with their green
-dated "Saved" labels. Under the maintainer-approved M5 the four rows
+dated "Saved" labels. Under M5 the four rows
 and their four status labels are gone entirely, replaced by one Save,
 so that gate observation no longer describes the shipping UI. The
 dated green confirmation pattern itself is kept, once.

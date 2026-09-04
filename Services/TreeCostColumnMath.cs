@@ -295,8 +295,8 @@ namespace TaimisToolbench.Services
         /// around it: neither the tree's fixed column floor
         /// (TreeSectionController.EffectiveCostColumnWidth) nor
         /// <see cref="TotalWidth"/>, which sums per-denomination maxima
-        /// that no one row draws together. On the owner's 2026-08-28
-        /// capture the two differed by 106px - the whole width of a
+        /// that no one row draws together. In a field capture the two
+        /// differed by 106px - the whole width of a
         /// currency band every coin-only row collapses.
         /// <para>
         /// <paramref name="room"/> is the gap to the pill column on one

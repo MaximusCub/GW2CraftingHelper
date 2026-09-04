@@ -410,7 +410,7 @@ namespace TaimisToolbench.Views
             // computed displays instantly from its own answer set above;
             // one it has not is computed now, for the rows that need it,
             // rather than parked behind a Refresh press the user has no
-            // reason to expect (owner ruling, 2026-08-27).
+            // reason to expect.
             if (Entries.Count > 0 && !_results.IsComplete(mode, Entries))
             {
                 StartRefresh(mode, recomputeAll: false);
@@ -517,8 +517,8 @@ namespace TaimisToolbench.Views
 
             // The comparison mode is a two-option, mutually exclusive
             // choice and BOTH options should read at all times, which a
-            // dropdown cannot do - it hides the alternative behind a click
-            // (owner ruling, 2026-08-27). Blish ships no radio control, so
+            // dropdown cannot do - it hides the alternative behind a click.
+            // Blish ships no radio control, so
             // this is the smallest honest one: the game's own indicator dot
             // plus a label, both clickable, both always visible. The dot is
             // art rather than a U+25CF/U+25CB pair, neither of which exists
@@ -777,7 +777,7 @@ namespace TaimisToolbench.Views
         /// rather than a badge trailing the item name: trailing the name put
         /// it at a different x on every row, so the one mark the table exists
         /// to be scanned for was the only thing in it that could not be
-        /// scanned (owner report, 2026-08-28).
+        /// scanned.
         /// </summary>
         private static readonly string[] ColumnHeaders =
         {
@@ -1781,8 +1781,8 @@ namespace TaimisToolbench.Views
         /// <para>
         /// TWO TOGGLES, both off by default: the headline row is the
         /// comparison and everything here is the explanation, and a user
-        /// comparing twenty rows wants the comparison on screen at once
-        /// (owner ruling, 2026-08-28). Nothing is lost - each half is one
+        /// comparing twenty rows wants the comparison on screen at once.
+        /// Nothing is lost - each half is one
         /// toggle away, and the headline itself still hovers with the
         /// breakdown. The NOTES travel with the category strip because that
         /// is what they explain: a discipline gap, a contested claim, a

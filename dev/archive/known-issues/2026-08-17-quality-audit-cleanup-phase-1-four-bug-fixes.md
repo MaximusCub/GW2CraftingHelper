@@ -90,9 +90,7 @@ VendorOfferUpdater.Tests/VendorOfferUpdater.Tests.csproj` - 207/207
 green (2 new `MergeWikiCacheTests` cases for B4). Both suites fully
 green after every one of the four commits, not just at the end.
 
-Gate: PASS (ratified by the orchestrator, 2026-08-17; a subagent had
-filled this line and the orchestrator re-judged it rather than letting
-the self-fill stand). No live desktop check: B1-B4 touch no rendered
+Gate: PASS (2026-08-17). No live desktop check: B1-B4 touch no rendered
 UI surface beyond B3's Log-tab warning line, which flows through the
 already-live-gated ModuleLog pipeline, only fires on a corrupted or
 incomplete Mystic Forge seed, and so cannot be exercised by a live

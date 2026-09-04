@@ -163,7 +163,7 @@ Section 2.2 for wiki confirmation these are documented **game** anomalies, not u
 authoring mistakes, which is presumably why gw2efficiency's own comments call them "Bug"
 without reference to their own code.
 
-### 1.3 Where/how the user actually sets the tier (the "toggle" the task asked about)
+### 1.3 Where/how the user actually sets the tier
 
 **Not on the Crafting Calculator's own settings panel.** I fetched the live bundle
 (`https://gw2efficiency.com/scripts/application.js?cb=1783715316`, 4.22MB, **MEASURED**
@@ -575,7 +575,7 @@ directly reusable templates for the new setting (Section 4).
 
 ### 3.6 Ground-truthed effect on plans: Exordium is unaffected; Klobjarne Geirr (a real, currently-generatable legendary) is affected
 
-Per the task's explicit instruction not to assume, I loaded `ref/recipes_seed.json`
+Rather than assume, I loaded `ref/recipes_seed.json`
 (14,732 recipes, UTF-8-BOM) and did a full BFS ingredient closure from Exordium's item id
 (`90551`, confirmed via WebSearch -> `gw2efficiency.com/crafting/calculator/90551-Exordium`).
 **168 distinct items are reachable from Exordium's tree in the module's own recipe seed, and
@@ -664,8 +664,8 @@ every `HomesteadTier`-tagged offer from `EvaluateVendorOffers`'s candidate set e
 used by already-progressed players; this module runs inside the live GW2 client for anyone,
 including players who have never touched Janthir Wilds, and recommending a purchase path the
 player cannot execute is a worse in-client UX failure than it is on a website. This is a
-judgment call, not a research finding - it should be confirmed with the user/maintainer
-before implementation, since it is a deliberate divergence from the researched upstream
+judgment call, not a research finding - it needs an explicit decision before
+implementation, since it is a deliberate divergence from the researched upstream
 behavior, not an echo of it.
 
 ### 4.3 Settings UI
@@ -791,15 +791,15 @@ nice-to-have.
 - `api.guildwars2.com/v2/items/{id}` for every item id named in this report (102306, 102205,
   103049, 12142, 12135, 19699, 19697, 19698, 19700, 19701, 19702, 19703, 19722-19727, 103242,
   103587, 102376, 90551 via search, 103815 via `ref/item_name_seed.json`).
-- Module source (read directly this session): `ref/vendor_offers.json`, `ref/recipes_seed.json`,
+- Module source (read directly): `ref/vendor_offers.json`, `ref/recipes_seed.json`,
   `ref/item_name_seed.json`, `Models/VendorOffer.cs`, `Models/VendorOfferDataset.cs`,
   `Models/CraftingPlan.cs`, `Models/PlanStep.cs`, `Models/PlanSolveContext.cs`,
   `Models/CurrencyValuation.cs`, `Models/TimegatedItem.cs`, `Models/AcquisitionSource.cs`,
   `Services/PlanSolver.cs`, `Services/ModuleSettings.cs`, `Services/CurrencyValuationSerializer.cs`,
   `Views/SettingsTabContent.cs`, `tools/VendorOfferUpdater/*.cs`.
 - `docs/gw2e-parity-spec.md`, `docs/KNOWN-ISSUES.md` (project references, ground rules and
-  prior findings I was told to start from - re-verified rather than blindly trusted where the
-  task asked me to establish something specific, per Section 1.4).
+  prior findings this report starts from - re-verified rather than blindly trusted
+  wherever something specific had to be established, per Section 1.4).
 - WebSearch: "Guild Wars 2 wiki Homestead refinement station tier efficiency..." (used only
   to locate wiki page URLs and the Klobjarne Geirr / Gift of the Homesteader relationship,
   cross-checked against the module's own recipe seed and the GW2 API rather than trusted on
@@ -818,7 +818,7 @@ nice-to-have.
 3. Should the Black Market path (Section 2.4, entirely unseeded) be added in the same change
    as the tier work, or tracked separately? It's independent of tiers (no efficiency
    interaction) but shares the "Homestead" identity and the same three output items.
-4. Confirm with the user/maintainer whether the recommended `HomesteadUnlocked` master gate
+4. Decide whether the recommended `HomesteadUnlocked` master gate
    (Section 4.2) - a deliberate divergence from gw2e, which has no such gate - is wanted, or
    whether pure tier-0-default parity (still a large improvement over today's unconditional
    best-tier blending) is preferred for v1.

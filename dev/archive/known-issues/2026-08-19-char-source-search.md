@@ -3,10 +3,10 @@
 
 ## Per-character source checkboxes + character-name search (char-source-search)
 
-Maintainer directive, verbatim: *"i want per character source checkboxes
-and search matching character labels"* - which resolves d1-snapshot-about-
-settings.md Feature 1's Open Questions 1 and 2 (both recorded as RESOLVED
-in that proposal, against their original opposite choices).
+Per-character source checkboxes, plus search matching character labels -
+which resolves d1-snapshot-about-settings.md Feature 1's Open Questions 1
+and 2 (both recorded as RESOLVED in that proposal, against their original
+opposite choices).
 
 - **Per-character checkboxes (commit 1):** the Snapshot tab's single
   "Characters" checkbox is replaced by one checkbox per character in the

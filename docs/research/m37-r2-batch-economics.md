@@ -417,7 +417,7 @@ ground-truth table to reproduce here. The relevant "ground truth" is:
 
 All read directly from the working tree at
 the repo root (not the `.claude/worktrees/*` copies,
-which are other agents' sandboxes and were not inspected).
+which were not inspected).
 
 ### 3.1 `Models/CraftingPlanResult.cs`
 Four fields exist for sell-side economics, all documented as "stay at
@@ -751,8 +751,9 @@ across-items quantity rather than one item's own production count):
   today for `n(e)` (Section 1.1).
 - `docs/KNOWN-ISSUES.md` sections 21 ("M35: gw2efficiency parity -
   multi-item plans", especially 21.3) and 25 ("Multi-item sell-side
-  economics") - task framing and the M35 doc-comment pointer.
-- Live fetch, 2026-07-21 (this session):
+  economics") - the framing for this report and the M35 doc-comment
+  pointer.
+- Live fetch, 2026-07-21:
   - `https://gw2efficiency.com/scripts/application.js?cb=1783715316`
     (4,220,941 bytes) - `n()`/`o()` functions, `craftedComponentsBreakdown`,
     the cost-breakdown call site, `refreshFromListings`, `DAILY_COOLDOWNS.tradable`.
@@ -780,7 +781,7 @@ across-items quantity rather than one item's own production count):
 
 1. **`component.tradable` / `step.tradable` exact derivation** -
    UNVERIFIED (Section 1.4). I found only consumers, not the definition,
-   within the time budget. If a future session needs to be byte-exact
+   within the time budget. If a future pass needs to be byte-exact
    about which items this module should treat as "tradable" for gating
    purposes, it should rely on this module's own existing tradability
    signal (GW2 API commerce-listing presence, i.e. `ItemPrice.SellInstant
@@ -793,7 +794,7 @@ across-items quantity rather than one item's own production count):
    `Plan.TotalCoinCost` (the tree nodes clearly carry *a* per-node price
    for their own pill display, per `CraftingTreeBuilder`, but I did not
    open that file to confirm the exact field name/type to reuse). The
-   implementing session must open `Services/CraftingTreeBuilder.cs` /
+   implementer must open `Services/CraftingTreeBuilder.cs` /
    `Models/CraftingTreeNode.cs` first and use whatever field the tree
    renderer already reads for a node's own price pill - do not compute a
    parallel/duplicate costing pass.
@@ -801,15 +802,15 @@ across-items quantity rather than one item's own production count):
    (`profit_sell`/"list and wait") for the batch, given the single-item
    path already deliberately shows only one. Recommendation in Section
    4.1.3 is "no, stay consistent with the existing single-item design",
-   but this is a product call, not a mechanically-forced one - flag for
-   the implementing session/user if they want the second number anyway.
+   but this is a product call, not a mechanically-forced one - flagged
+   here in case the second number is wanted anyway.
 4. Whether "which items count" (4.1) should be a Settings toggle
    (mirroring gw2e's literal craft-only behavior for users who want exact
    upstream parity) rather than a fixed module default. Not recommended
    given this module already has no analogous single-item toggle, but
    noted as a possible follow-up if user feedback wants it.
-5. No live in-game verification was performed for this report (research
-   task only, per the task framing) - once implemented, this feature
+5. No live in-game verification was performed for this report (desk
+   research only) - once implemented, this feature
    should go through the same screenshot-loop live-verification the M35
    multi-item UI already received (KNOWN-ISSUES #21.3's "LIVE-VERIFIED
    2026-07-21" note) before being marked resolved.

@@ -225,7 +225,7 @@ namespace TaimisToolbench.Tests.Services
                 StatusText.ForRefreshFailure(SnapshotFailureKind.Unknown, failedSourceCount: 0, totalSourceCount: 0));
         }
 
-        // ---- Stamp (audit batch J, M10): the ONE shape every timestamped
+        // ---- Stamp: the ONE shape every timestamped
         // status line in the module uses. Four sites wrote it by hand with
         // two different separators before this. ----
         [Fact]

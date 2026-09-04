@@ -173,4 +173,4 @@ entry in this file notes. The Notes section's real on-screen layout
 collapse/expand) has not been visually confirmed in a running Blish HUD
 client.
 
-Gate: PASS (hidden-when-empty) 2026-08-16 (orchestrator live desktop session). Verified hidden on two plans that generate zero notes - correct per design; positive note rendering is suite-covered (cooldown notice, a sibling feature, rendered live); a notes-generating live fixture rides the next natural field test.
+Gate: PASS (hidden-when-empty) 2026-08-16 (live desktop session). Verified hidden on two plans that generate zero notes - correct per design; positive note rendering is suite-covered (cooldown notice, a sibling feature, rendered live); a notes-generating live fixture rides the next natural field test.

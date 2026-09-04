@@ -20,11 +20,11 @@ both live on `legendary-research-docs` (commits `30e6ec2` and `7716c2e`).
 Their repo-relative citations above resolve only against that branch today.
 This matters for merge order, not for the design: nothing proposed here
 loads or reads those files. Every claim about *current module behaviour*
-below is re-verified in this session against the working tree and cited to
+below is re-verified against the working tree and cited to
 `file:line` here, not quoted from either document.
 
 Claims are tagged **MEASURED** (read directly out of a file cited by path
-and line in this session, or - where marked - queried live against
+and line, or - where marked - queried live against
 `api.guildwars2.com`), **INFERRED** (reasoned from something measured, not
 itself printed anywhere) or **PROPOSED** (a design decision, with no code
 behind it). Where a decision has real alternatives, they are listed with a
@@ -34,8 +34,8 @@ recommendation and the reason.
 
 ## 0. The scope line, in one paragraph
 
-The owner's ruling is that the module is *"a project planner WITH a price
-optimizer"*, and that the goal is to help with all aspects of crafting.
+The module is a project planner WITH a price optimizer, and the goal is to
+help with all aspects of crafting.
 Under the previous framing an unpriceable route was out of scope by
 definition. It is now in scope. P1 does not make earned routes cheaper,
 faster or costed - **it makes them nameable, and gives them a home**. The
@@ -48,7 +48,7 @@ complete when part of the project is effort rather than gold.
 
 ## 1. What the module does today
 
-MEASURED, all of it, in this session.
+MEASURED, all of it.
 
 ### 1.1 The vocabulary
 
@@ -179,8 +179,8 @@ the file says.** Its `reason` field is:
 The exclusion is a claim that **the wiki is wrong about the game**, hand
 verified 2026-08-25 with a source URL, and the file's own header comment
 says each entry is exactly that. It is correct on its own merits and stays
-correct after P1 ships. See 6.1 - this is the one place where the brief's
-premise does not survive contact with the file.
+correct after P1 ships. See 6.1 - this is the one place where the premise
+does not survive contact with the file.
 
 ---
 
@@ -188,8 +188,8 @@ premise does not survive contact with the file.
 
 ### 2.1 What the API can and cannot tell us
 
-**MEASURED by live query against `api.guildwars2.com`** (queried by the
-coordinating agent, 2026-08-29; not recalled). This unevenness is the single
+**MEASURED by live query against `api.guildwars2.com`** (queried live
+2026-08-29; not recalled). This unevenness is the single
 most important input to the model, so it comes before the types.
 
 | Tier | What the API gives | Endpoints | Example |
@@ -359,8 +359,8 @@ a quarter.
   exactly: a maintainer-side tool under `tools/` emits a `ref/*.json` seed,
   as `tools/VendorOfferUpdater` already does for vendor offers. That single
   tool supplies `AchievementId` and `Tier = Live` for the entire achievement
-  class - including the owner's SotO lantern case - with no hand curation
-  at all.
+  class - including the SotO lantern-collection case - with no hand
+  curation at all.
 - **The work list.** Run the existing solver over a target and collect every
   node committing the terminal decision. The capability audit's section 8
   nominates `tools/TaimisToolbench.Harness` for precisely this and notes the
@@ -506,10 +506,10 @@ the summary footnote points from one to the other (4.4).
 
 ## 4. What the user sees: the Prerequisites section
 
-### 4.1 The owner's framing, and why it beats scattering pills
+### 4.1 Why a section beats scattering pills
 
-The owner's shape is: *a Prerequisites section - "achievements, currencies,
-WvW rewards, etc."* That is how a player thinks about a legendary project:
+The shape: a Prerequisites section, listing achievements, currencies, WvW
+rewards and the like. That is how a player thinks about a legendary project:
 **here is the gold part, and here is the list of things you must go and do.**
 
 An earned component scattered as a pill three levels deep in a collapsed
@@ -571,9 +571,9 @@ node - the same posture every other optional section takes.
 
 ### 4.3 The achievement chain, end to end
 
-The owner's example - *"stuff you get from map completion or doing lighting
-lanterns and getting an achievement in SotO for a reward"* - is the tier-1
-case and it is fully expressible (2.1, MEASURED):
+The motivating case - an item obtained from map completion, or from lighting
+lanterns for a SotO achievement reward - is the tier-1 case and it is fully
+expressible (2.1, MEASURED):
 
 1. The seed (generated, 2.5) says item 70598 is paid out by achievement 2258.
 2. `/v2/achievements/2258` declares the payout and the 7 bits.
@@ -618,9 +618,9 @@ the reader now knows those components exist and the total still does not
 mention them.
 
 **(ii) Plan Notes is NOT used for this.** An earlier draft of this proposal
-put earned components in Plan Notes to avoid new chrome. The owner's framing
-overrides that, and on inspection the instinct was wrong: Plan Notes is
-explicitly the home for *caveats about facts shown elsewhere*
+put earned components in Plan Notes to avoid new chrome. That instinct was
+wrong: Plan Notes is explicitly the home for *caveats about facts shown
+elsewhere*
 (`Models/PlanViewModel.cs:14-24`), and a prerequisite is a fact in its own
 right. Plan Notes keeps exactly the note kinds it has.
 
@@ -754,7 +754,7 @@ derived from "a hint row exists" - see 7.1.
 
 ### 6.4 Persistence: what moves and what does not
 
-This is the constraint the brief flags, and the answer is favourable.
+This is the constraint to check, and the answer is favourable.
 
 MEASURED from `Models/PersistedPlan.cs:41,60-61`: `CurrentSchemaVersion` is
 **3** and `SchemaShapeHash` is a SHA-256 over the persisted graph's public
@@ -870,7 +870,7 @@ concern of its own, and not one stage one should carry.
 Prerequisites section listing Gift of Battle, Gift of Exploration and the
 rest with a real sentence each, instead of those items being invisible
 `UNKNOWN` leaves three levels down a collapsed tree. That is the gap
-analysis's stated bar, met with the owner's shape.
+analysis's stated bar, met with the Prerequisites shape.
 
 **Known wart it leaves:** three of the ten rows are barter purchases and will
 read as earned (6.3). Acceptable for one stage - "you must go get this, we
@@ -904,7 +904,7 @@ calls; and `Live`-tier rows with real bit progress (4.3).
 
 **Why last:** it is the only stage that changes what the module asks users to
 grant, and it needs the tier contract from stage two to have somewhere to
-land. It is also the stage that delivers the owner's lantern example
+land. It is also the stage that delivers the lantern-collection case
 literally.
 
 **Degradation, specified now so it is not improvised later:** a `Live` row

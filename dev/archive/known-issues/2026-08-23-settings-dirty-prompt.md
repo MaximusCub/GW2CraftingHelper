@@ -3,9 +3,9 @@
 
 ## Settings dirty prompt (settings-dirty-prompt)
 
-Maintainer field-test directive, verbatim: "if settings have been edited
-before tabbing away.. it should prompt the user to ask if they want to
-save the changes they have made or discard before proceeding." The
+Field-test requirement: if settings have been edited before tabbing
+away, the module must prompt the user to save or discard those changes
+before proceeding. The
 Settings tab has one Save button covering four sections, and nothing
 told a user who typed a currency override and then clicked another tab
 that the override was about to evaporate - the tab is rebuilt from

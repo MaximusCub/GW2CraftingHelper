@@ -3,10 +3,9 @@
 
 ## Sortable plan tables (sortable-tables)
 
-Maintainer field-test directive, verbatim: "the used materials section
-should be column sortable by clicking the column headers and have visual
-indicators - sort by item, sort by amount. shopping list too - column
-sortable."
+Field-test requirement: the Used Materials section must be column
+sortable by clicking its column headers, with visual indicators, sorting
+by item and by amount; the Shopping List must be column sortable too.
 
 Both tables' column headers are now their own sort controls. Used
 Materials sorts on Item/Amount, the Shopping List on Item/Amount/Each/
@@ -84,8 +83,8 @@ the plan's own, with no indicator drawn anywhere.
   ~~It lives on the view for the session (never persisted), unlike
   `_sectionExpansion`, which a new Generate deliberately resets to the
   section defaults.~~ **Superseded by the font-and-polish round** - the
-  maintainer's field test asked for "reset to defaults when you gen a new
-  plan", and the claim above was the behaviour being complained about. It
+  field test asked for sort state to reset to defaults when a new plan is
+  generated, and the claim above was the behaviour objected to. It
   now has exactly `_sectionExpansion`'s lifetime and resets in the same
   place: a re-sort, a tree pill override and a re-solve all keep it (they
   re-render the same plan and never reach TriggerGenerate's commit

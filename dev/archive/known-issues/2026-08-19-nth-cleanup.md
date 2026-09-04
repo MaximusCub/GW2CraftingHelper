@@ -62,7 +62,7 @@ deliberately skipped:
 - **Character-search minimum query length:** a one-character query still
   walks every source of every non-matching item. Left as is; the worst
   case is still bounded by the empty-search rebuild. **CLOSED
-  (char-search-min2):** the maintainer set a 2-character minimum, for
+  (char-search-min2):** a 2-character minimum was set, for
   the result-list reason rather than the perf one - see that section
   below.
 - **Tri-state master checkbox:** the two-state quirk recorded in the
@@ -79,6 +79,6 @@ with the Delete Log File / Copy / Clear view buttons, with the "No
 log entries yet." empty state below it. Everything else in the batch
 is comments/docs, a constant hoist, allocation removal (pinned by 2
 new Blish-free tests), and the resize early-out + reader hoists,
-which are code-review-verified (the verify pass caught and the
-orchestrator fixed a third un-hoisted reader in ApplyTopRegionLayout
-before release). Suite 1886/1886.
+which are code-review-verified (the verify pass caught a third
+un-hoisted reader in ApplyTopRegionLayout, fixed before release).
+Suite 1886/1886.

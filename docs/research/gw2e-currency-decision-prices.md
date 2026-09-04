@@ -16,7 +16,7 @@ Every claim below is labeled **CONFIRMED** (directly observed in fetched/read by
 ### 1a. As compiled into the live production bundle (first-hand, this run)
 
 **CONFIRMED.** Extracted from `application.js`, a copy of which was already present at
-`scratchpad/gw2e/application.js` from a prior session. Freshness was verified first-hand this
+`scratchpad/gw2e/application.js` from an earlier fetch. Freshness was verified first-hand this
 run: `curl -sI "https://gw2efficiency.com/scripts/application.js?cb=1"` returned
 `etag: W/"6a7c925c-407446"` and `last-modified: Wed, 12 Aug 2026 15:33:48 GMT`. The etag's hex
 suffix `407446` = **4224070 bytes**, which is byte-for-byte the size of the cached local copy
@@ -273,7 +273,7 @@ Read from `Models/Gw2Constants.cs` (`KnownCurrencyNames`, ids used by `CurrencyV
 | 79 | Rare Rift Essence | **not in gw2e's table at all** | " |
 | 80 | Masterwork Rift Essence | **not in gw2e's table at all** | " |
 
-**Straightforward answer for the maintainer's decision-table import:** of the module's
+**Straightforward answer for the decision-table import:** of the module's
 currently-surfaced ids, gw2e supplies a usable (non-`undefined`) decision price for
 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 32, 33,
 34, 45, 62, plus the id-36/49/50/58/59/60 slots once correctly relabeled (see 3b - the gw2e
@@ -300,9 +300,9 @@ to the live GW2 API:
 
 Pluralization-only differences (e.g. module's "Shards of Zhaitan" vs API's singular "Shard of
 Zhaitan") are cosmetic and not flagged here - only cases where the module's id points at a
-*different currency entirely* are listed. Recommend the maintainer track this as a separate
+*different currency entirely* are listed. Recommend tracking this as a separate
 follow-up; it affects `ResolveCurrencyName` display text and would also affect which currency
-the maintainer intends to seed a default decision value for at those ids if this table is
+a default decision value gets seeded for at those ids if this table is
 imported id-for-id without noticing the mislabeling.
 
 ### 3c. Duplicate currency name in the live API (not a gw2e or module issue - a GW2 API quirk)
@@ -310,8 +310,8 @@ imported id-for-id without noticing the mislabeling.
 **CONFIRMED.** The live API has *two different currency ids* both named "Gaeting Crystal":
 id 39 (`"Earned from bosses and events inside Path of Fire raids."`) and id 77
 (`"Earned from bosses and events inside Janthir Wilds raids... "`). gw2e's table only has a
-row for id 39 (3600 copper); id 77 has no row (postdates their table). If the maintainer's
-import logic ever resolves gw2e prices by *name* instead of id, id 39 and id 77 would collide -
+row for id 39 (3600 copper); id 77 has no row (postdates their table). If the import
+logic ever resolves gw2e prices by *name* instead of id, id 39 and id 77 would collide -
 another reason id-keyed import (as gw2e itself does) is the only safe approach.
 
 **Resolved 2026-08-29: id 39 is deliberately NOT imported.** It is the only row in gw2e's
@@ -331,7 +331,7 @@ evidence in `dev/records/gaeting-crystal-duplicate-ids.md`.
 `.../1856A01E331452E4C14E4C9CF4F818E3FAEF9B79/3124964.png`. This is almost certainly a stray/
 placeholder id on ArenaNet's side, not a real currency - **Astral Acclaim's real, correctly-
 named id is 63**, which is what the module already uses (confirmed correct - the "74?" guess
-in the task brief does not match the live API and should be disregarded).
+that prompted this check does not match the live API and should be disregarded).
 
 ### 3e. Removed/legacy currencies in gw2e's table absent from the live API
 
@@ -347,8 +347,8 @@ rows for ids that don't exist. There is no evidence of gw2e carrying a stale/rem
 plus 63 and 66 noted above): 63 Astral Acclaim, 66 Ancient Coin, 71 Jade Miner's Keycard,
 72 Static Charge, 73 Pinch of Stardust, 75 Calcified Gasp, 76 Ursus Oblige, 77 Gaeting Crystal
 (second one, see 3c), 78 Fine Rift Essence, 79 Rare Rift Essence, 80 Masterwork Rift Essence,
-81 Antiquated Ducat, 82 Testimony of Castoran Heroics, 83 Aether-Rich Sap. If the maintainer
-wants full current-content coverage, these ids will need maintainer-supplied defaults or will
+81 Antiquated Ducat, 82 Testimony of Castoran Heroics, 83 Aether-Rich Sap. For full
+current-content coverage, these ids will need locally-chosen defaults or will
 simply remain unvalued (consistent with the repo invariant "do not invent data when APIs are
 missing" - gw2e itself doesn't invent values for these either, it just doesn't mention them).
 
@@ -424,12 +424,12 @@ etag/last-modified match, live-refetched TS source) all agree.
   as published to GitHub/npm. It does **not** follow that the gw2efficiency.com web
   application as a whole, or `application.js` as a compiled artifact, is under any open
   license - that is a separate, unconfirmed question this research did not find evidence to
-  answer either way, and the task's warning not to assume main-site-source = MIT is correct:
+  answer either way, and the warning not to assume main-site-source = MIT is correct:
   no such assumption is made here.
 
 ---
 
-## Summary for the maintainer
+## Summary
 
 - The table is genuinely complete: 64 currency ids, each keyed by the real GW2 API currency
   id, values in copper, `undefined` meaning "gw2e assigns no decision value" (not zero).
@@ -437,7 +437,7 @@ etag/last-modified match, live-refetched TS source) all agree.
   is the same currency under a colloquial vs. formal label - "Gold" vs. "Coin").
 - Our module's Karma/Laurels/Spirit Shards/Gems/etc. (most of `KnownCurrencyNames`) get usable
   gw2e values directly. Astral Acclaim (63) and all three Rift Essences (78/79/80) have **no**
-  gw2e value at all (table doesn't reach that far) and will need the maintainer's own default
+  gw2e value at all (table doesn't reach that far) and will need a locally-chosen default
   or remain unvalued.
 - Independently discovered and flagged (not fixed): our own `Gw2Constants.KnownCurrencyNames`
   has 5-6 ids paired with the wrong currency name (36, 49, 50, 58, 59, 60) - worth a follow-up

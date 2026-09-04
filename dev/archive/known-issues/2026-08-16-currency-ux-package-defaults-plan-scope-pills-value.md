@@ -3,7 +3,7 @@
 
 ## Currency UX package: defaults, plan-scope pills, value-detail hover (2026-08-16)
 
-Three maintainer-approved currency-UX features shipped as one coherent
+Three approved currency-UX features shipped as one coherent
 package on branch `currency-ux-package`, in three feature-sized commits.
 
 **Feature 1 - default currency decision values.** Ships gw2efficiency's
@@ -11,7 +11,7 @@ package on branch `currency-ux-package`, in three feature-sized commits.
 `Models/CurrencyDecisionDefaults.cs`'s header comment and
 `docs/research/gw2e-currency-decision-prices.md`'s full provenance writeup
 from the extraction run) as curated default decision-only currency
-valuations - a maintainer-ratified, one-time waiver of the "no invented
+valuations - a deliberate, one-time waiver of the "no invented
 data" rule for this specific table only. `CurrencyValuation` gained a
 three-state precedence (user-set value, else explicit clear, else
 curated default, else none) via `TryGetEffectiveCopperValue` and a
@@ -42,7 +42,7 @@ existing test needed a currency-id swap to avoid an unintended default) -
 scoped to Feature 1 alone; see the correction below for the package as a
 whole, since Feature 2 did intentionally rewrite one pre-existing test.
 
-**Feature 2 - plan-scope currency pills (maintainer's own design).**
+**Feature 2 - plan-scope currency pills.**
 Every currency leaf row in the Recipe Tree (ordinary `Currency`-decision
 nodes and W4B vendor cost-component currency leaves alike) now gets a
 `HAVE {have}/{planTotal} TOTAL` pill alongside its existing `CURRENCY`
@@ -66,7 +66,7 @@ node's decision-only comparison figure diverges from its displayed real
 gold cost, its committed CRAFT/VENDOR pill gains a hover block
 ("Crafting gold price" / "Currencies" delta with its opportunity-cost
 caption / "Optimization price", plus a "Vendor cap: N per day/week" line
-when the winning vendor offer carries one - maintainer-ratified #21
+when the winning vendor offer carries one - per the #21
 resolution). Plumbing: `SolverDecision`/`CraftingTreeNode` each gained a
 `ComparisonValue`/`DecisionValue` passthrough of an internal figure
 `PlanSolver.Evaluate` already computed and discarded (`Decision.
@@ -155,4 +155,4 @@ value already behaves in a saved snapshot (both are frozen at solve time),
 so it is arguably correct snapshot semantics rather than a bug - noted
 here so it is not rediscovered as one.
 
-Gate: PASS with one deferred slice 2026-08-16 (orchestrator live desktop session). Plan-scope currency pills verified live in collapsed full-coverage form (plain HAVE on all covered leaves incl. W4B component leaves - the unified vocabulary); Settings defaults suite-covered; value-detail hover: all three suppression paths verified live correct (unvalued ARE, component leaves, non-diverging rows) but no positive render occurred in the tested shapes - a propagation question (vendor-child currency valuations folding into a craft root's DecisionValue) is under investigation on branch gate-fixes.
+Gate: PASS with one deferred slice 2026-08-16 (live desktop session). Plan-scope currency pills verified live in collapsed full-coverage form (plain HAVE on all covered leaves incl. W4B component leaves - the unified vocabulary); Settings defaults suite-covered; value-detail hover: all three suppression paths verified live correct (unvalued ARE, component leaves, non-diverging rows) but no positive render occurred in the tested shapes - a propagation question (vendor-child currency valuations folding into a craft root's DecisionValue) is under investigation on branch gate-fixes.

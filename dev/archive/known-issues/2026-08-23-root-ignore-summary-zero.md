@@ -3,13 +3,13 @@
 
 ## Root ignore suppression and the zero-cost band (root-ignore-summary-zero)
 
-Two maintainer findings from the same field-test round, both about what
+Two findings from the same field-test round, both about what
 the plan shows once nothing is left to buy.
 
 ### 1. The root row must not offer IGNORE
 
-"You should probably not be able to IGNORE the top level item in the
-recipe tree." The Ignore pill means "treat this item as already in hand
+The top-level item in the recipe tree should not be IGNORE-able. The
+Ignore pill means "treat this item as already in hand
 tree-wide"; on the plan's own target that is a request to plan nothing,
 and gw2e offers it only because gw2e's tree has no separate target row.
 
@@ -169,13 +169,12 @@ plans; children keep their IGNORE pills). The regenerate-confirm
 backdrop also demonstrably ate mispositioned clicks (batch-J modality
 working). PARTIALS: the all-ignored zero band, un-ignore restoration,
 the pre-ignored root's IGNORED escape hatch, and the unpriced-zero
-profit-band suppression were not reachable live this session - the
+profit-band suppression were not reachable live in that gate - the
 sandbox's known synthetic-input decay (M33/M38 class) killed keyboard
 then clicks before the multi-step flows completed. All four stand on
 real-production-path tests (PlanRootIgnoreTests end-to-end through
 CraftingPlanPipeline + the three zero-band viewmodel cases + the
-profit-band assertion) and are one-hover checks on the maintainer's
-live install.
+profit-band assertion) and are one-hover checks on a live install.
 Morning re-run (2026-08-24, screens awake, captures preflight/gM1-gM8):
 those partials are now LIVE-VERIFIED - a fresh-generated root also
 offers no IGNORE pill; ignoring the sole child rendered the FULL

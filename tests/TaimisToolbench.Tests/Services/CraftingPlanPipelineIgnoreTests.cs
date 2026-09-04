@@ -56,7 +56,7 @@ namespace TaimisToolbench.Tests.Services
         public async Task ResolveWithOverrides_IgnoredItemIds_ManualOverrideOnSameNodeStillApplies()
         {
             // Ignore and the craft/buy override pill are documented as
-            // orthogonal (r2 report Section 3.2) - overriding the ROOT to
+            // orthogonal - overriding the ROOT to
             // BuyFromTp while its ingredient is separately ignored must
             // still switch the root to BuyFromTp; the two mechanisms key
             // off different things (NodeId vs ItemId) and must not collide.

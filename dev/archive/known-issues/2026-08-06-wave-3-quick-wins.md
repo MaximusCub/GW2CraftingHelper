@@ -3,13 +3,13 @@
 
 ## Wave-3 quick wins (2026-08-06)
 
-Four user-directed changes from the same 2026-08-06 field-testing session,
+Four changes from the same 2026-08-06 field-testing session,
 implemented in the isolated `wt-wave3a` worktree off master (4ac5461,
 includes PR #102) on branch `wave3a-quick-wins`. One commit per item.
 
 **1. Use Own Materials defaults to checked.** The Crafting Plan strip's
 "Use Own Materials" checkbox (`CraftingPlanView._useOwnMaterials`) now
-starts `true` for a fresh session, per explicit maintainer direction - a
+starts `true` for a fresh session - a
 deliberate divergence from gw2efficiency's own unchecked default. The
 field is purely in-memory session state, never read from or written to
 `ModuleSettings`, so only the fresh-session starting point changes; there
@@ -77,7 +77,7 @@ code (`CraftingPlanView`'s checkbox wiring, `LogTabContent`'s
 constructor-injected delegates, `Module`'s tab-factory wiring) has no new
 tests per the Blish-free-tests invariant.
 
-Live desktop gate: PASS (orchestrator, 2026-08-06, live branch-build
+Live desktop gate: PASS (2026-08-06, live branch-build
 sandbox session, captures w3a_01-06 in preflight/captures):
 - Use Own Materials starts CHECKED with zero interaction (fresh module
   session, capture w3a_01).

@@ -297,7 +297,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void ItemTooltipWrapCap_BreaksGiftOfTwilightWhereTheGameDoes()
         {
-            // The 2026-08-27 owner A/B: item 19648 hovered in the module
+            // The A/B: item 19648 hovered in the module
             // and in the live game. The game wrapped its description after
             // "greatsword" and kept the Mystic Forge line whole - the two
             // break decisions the cap is derived to reproduce, asserted

@@ -3,7 +3,7 @@
 
 ## Audit batch H: table density (audit-h-density)
 
-Two maintainer-approved UX-audit findings, one premise: every data table
+Two UX-audit findings, one premise: every data table
 in the module splits the name (pinned far left) from the numbers (pinned
 far right), so widening the window widens an empty band down the middle
 of every row 1:1 rather than making the table more readable. The audit

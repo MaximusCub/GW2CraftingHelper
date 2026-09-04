@@ -39,8 +39,8 @@ tier/competency-resolved pair the Craft commit sites use. Test:
 `PlanSolverForceBuyOnlyTests.
 CostDiagnostics_CompetencyResolved_UsesCompetentRecipeNotCheapestOverall`.
 
-**3 - Weighted subdued on a 1-copper margin; brief says "decisive".**
-Round-1 deferred this to maintainer sign-off and shipped the bare
+**3 - Weighted subdued on a 1-copper margin; the margin must be
+decisive.** Round 1 deferred this decision and shipped the bare
 strictly-positive-margin behavior live (not merely "documented as
 deferred"), so a genuinely near-equal alternative rendered in Locked's
 muted gray and was told it was "more expensive". Gated with an
@@ -50,7 +50,7 @@ the margin must clear BOTH a 100-copper (1 silver) absolute floor AND a
 (not either) is the more conservative reading, since a margin that only
 clears one measure (e.g. 101c on a 10g/100000c purchase - past the
 absolute floor but only 0.1%) still is not "decisive" by the other. No
-maintainer-specified numbers exist for either constant - these are a
+specified numbers exist for either constant - these are a
 deliberately modest, easily-tunable starting point, not a precisely-
 derived figure. Tests: `PillSubduingEvaluatorTests.
 Weighted_OneCopperMarginOnMultiGoldPurchase_NotDecisive_NotSubdued`,
@@ -130,7 +130,7 @@ still commits `bestComparableRecipeId`/`bestComparableCraftRealCost`
 breakdown uses `autoPickCraftOption` (the competent one) - a real
 display/commit mismatch, but changing WHICH recipe a manual override
 commits is a behavioral decision, not a display-only fix, and needs
-explicit maintainer sign-off before changing; Plan Notes wording for
+an explicit decision before changing; Plan Notes wording for
 MinRating 0 / 3+ disciplines joined by "or" (`PlanViewModelBuilder.cs` -
 untouched this round); persisted-plan JSON size (`PlanStoreHelpers.cs` -
 untouched this round, still unmeasured); per-render
@@ -157,4 +157,4 @@ Gate: not yet run live - Blish-bound rendering (Plan Notes rows for the
 two newly-reported competency shapes, the now-gated Weighted subduing
 tooltip) has not been visually confirmed in a running Blish HUD client,
 same constraint every UI-adjacent entry in this file notes.
-Gate: not yet run live - scheduled for tonight's 7:15 PM batched desktop session (recipe-sheet savings row and seasonal-tip negative check are explicit scenarios). Merged after the full review pipeline resolved every finding (verification's docs-staleness hold corrected in 30d66de), under the maintainer's standing merge directive (2026-08-16).
+Gate: not yet run live - queued for the next batched desktop session (recipe-sheet savings row and seasonal-tip negative check are explicit scenarios). Merged after the full review pipeline resolved every finding (verification's docs-staleness hold corrected in 30d66de), under the standing merge directive (2026-08-16).

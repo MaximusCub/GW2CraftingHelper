@@ -15,7 +15,7 @@ namespace TaimisToolbench.Services
     {
         public const int Inset = 16;
 
-        // Tier 1 of the module's two-tier icon system (owner ruling): the
+        // Tier 1 of the module's two-tier icon system: the
         // Ranker's rows carry in-game bag-slot-sized item art, like the
         // Snapshot grid and the plan heading.
         public const int IconSize = ItemIconTiers.BagSlotIconSize;
@@ -279,10 +279,10 @@ namespace TaimisToolbench.Services
         /// Remaining take one each.
         /// <para>
         /// This is SummarySectionLayoutMath's currency-table idiom, applied
-        /// for the reason the owner gave for asking: the four data columns
-        /// used to huddle against the buttons at the right edge, leaving the
-        /// centre of a 2400px row empty and the eye with nothing to follow
-        /// from a row's name to its numbers.
+        /// here because the four data columns used to huddle against the
+        /// buttons at the right edge, leaving the centre of a 2400px row
+        /// empty and the eye with nothing to follow from a row's name to
+        /// its numbers.
         /// </para>
         /// <para>
         /// The name gets two tracks rather than one because it is the row's
@@ -479,8 +479,8 @@ namespace TaimisToolbench.Services
         /// The label band is one width for all five cells rather than each
         /// cell's own label width, so the bars start at the same offset in
         /// every cell and the strip reads as five gauges rather than five
-        /// sentences. The gap it fills is exactly the dead space the owner
-        /// flagged between a gate's name and its right-aligned percentage.
+        /// sentences. The gap it fills is exactly the dead space between a
+        /// gate's name and its right-aligned percentage.
         /// </para>
         /// </summary>
         public static void GateBar(
@@ -700,9 +700,9 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// The breakdown's currency entries draw at the game's wallet LIST
-        /// tier (owner ruling, 2026-08-27: "I would like to try getting away
-        /// with the larger icons"), which is why a currency line has a pitch
-        /// of its own rather than sharing the text sub-line's 20px. The
+        /// tier, deliberately the larger icons, which is why a currency line
+        /// has a pitch of its own rather than sharing the text sub-line's
+        /// 20px. The
         /// Remaining cell's inline gold/silver/copper run stays on the BAR
         /// tier: that one really is an inline coin run inside a sentence,
         /// which is what the bar tier is for.

@@ -3,7 +3,7 @@
 
 # KNOWN-ISSUES item 29 - owned-materials UI live verification (M37)
 
-Ground-work deliverables for the main session to execute. Read-only research
+Ground-work deliverables for the live verification run. Read-only research
 was performed against the real production code paths listed below; nothing
 in the repo working tree was modified.
 
@@ -198,9 +198,9 @@ raw offer JSON, so 1 needed Bloodstone Shard = 200 Spirit Shards total.
 - **Could not run the offline Harness to cross-check these quantities**
   against the actual solved tree (would require building
   `tools/GW2CraftingHelper.Harness` via `dotnet build`, which was avoidable
-  given the seed-data derivation above was sufficient and other agents are
-  concurrently using the working tree - skipped per the task's own
-  allowance). All quantities above were instead derived by hand-walking
+  given the seed-data derivation above was sufficient and the working tree
+  was concurrently in use - skipped). All quantities above were instead
+  derived by hand-walking
   `ref/recipes_seed.json` with a script that reproduces
   `RecipeService.BuildNodeAsync`'s exact `craftsNeeded`/ingredient-scaling
   formula, and cross-checked against `InventoryReducer`'s reduction math

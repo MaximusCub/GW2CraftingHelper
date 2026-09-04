@@ -387,7 +387,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(0, treeNode.Quantity);
             Assert.False(treeNode.IsReferenceBranch);
             Assert.Empty(treeNode.Children);
-            Assert.False(treeNode.IsIgnored); // genuine ownership, not the M34-B2b Ignore toggle
+            Assert.False(treeNode.IsIgnored); // genuine ownership, not the Ignore toggle
             Assert.False(treeNode.IsAchievementBitDeduped); // genuine ownership, not the dedup flag
         }
 

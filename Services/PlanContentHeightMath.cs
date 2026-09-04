@@ -47,7 +47,7 @@ namespace TaimisToolbench.Services
         // the pre-tier-2 heights. The two 28px rows put a single line at
         // y=4 (ink 25) and y=7 (ink 26) with no divider beneath either.
 
-        // --- Tier-2 icon-row geometry (owner ruling, 2026-08-26): every
+        // --- Tier-2 icon-row geometry: every
         // row-level item icon in the Crafting Plan tab renders at the
         // in-game bag-SIDEBAR size, ItemIconTiers.BagSidebarIconSize. ---
 
@@ -159,8 +159,8 @@ namespace TaimisToolbench.Services
         // 36, not 32: this row's two labels sit at y=7 and y=9, whose
         // Font16/Font14 ink (28) landed on the 32px row's divider top (29).
         // NOT moved to the tier-2 icon-row height: this is the plan tab's
-        // one text-only table row (no item icon), so the owner's icon-size
-        // ruling does not reach it, and 36 is on
+        // one text-only table row (no item icon), so the icon-size rule
+        // does not reach it, and 36 is on
         // LabelHelpers.CreateRowDivider's proven-immune list.
         public const int DisciplineRowHeight = 36;
 

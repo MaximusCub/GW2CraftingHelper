@@ -3,7 +3,7 @@
 
 ## W4B: Vendor cost-component leaves (2026-08-15)
 
-User-designed after live field observation: an "Amalgamated Rift Essence"
+Designed after live field observation: an "Amalgamated Rift Essence"
 node inside an Endless Summer plan showed a vendor offer costing 3 wallet
 currencies PLUS Globs of Ectoplasm (a TP-valued item). `CraftingPlanPipeline.
 AugmentWithVendorCostPricesAsync` already TP-values an offer's Item cost
@@ -372,7 +372,7 @@ solver decision, only the cosmetic HAVE pill a display leaf reads
 afterward.
 
 **Pre-gate addendum (2026-08-15): "OWN n"/"CURRENCY" badge wording pass.**
-Maintainer field-testing found the component leaves' informational HAVE/
+Field testing found the component leaves' informational HAVE/
 "HAVE x/y NEEDED" pill (Section "Decision pills stay decision-free" above)
 misleading: that vocabulary means "your stock covers this need and reduced
 the plan cost" everywhere else in the tree, but a component leaf's
@@ -435,4 +435,4 @@ references in tests; the extended/added tests exercise the real
 fake-logic tests. Item/currency/vendor IDs remain internal-only (badge text
 is `"OWN n"`/`"CURRENCY"` only, never an id).
 
-Live desktop gate: Gate: PASS 2026-08-16 (orchestrator live sandbox session, combined wave-4 staging build). Verified on the real Amalgamated Rift Essence vendor path: component leaves render under the vendor-selected root (ecto leaf's gold share exactly equals the parent's collapsed total; three currency leaves blank-cost with CURRENCY badges), OWN badges show the RAW wallet holding (300/150/100 against 250/100/50 needs) after the gate-found clamp fix in this branch, no OWN badge at zero holding, manual override to VENDOR re-solves and the overridden state survives module restart via the persisted plan, tree-button tooltips render live (Best Path text verified verbatim). Known composition note: component leaves and the dimmed what-crafting-would-cost reference branch both render under a vendor root with a recipe - as designed; a visual separator is a queued UX question.
+Live desktop gate: Gate: PASS 2026-08-16 (live sandbox session, combined wave-4 staging build). Verified on the real Amalgamated Rift Essence vendor path: component leaves render under the vendor-selected root (ecto leaf's gold share exactly equals the parent's collapsed total; three currency leaves blank-cost with CURRENCY badges), OWN badges show the RAW wallet holding (300/150/100 against 250/100/50 needs) after the gate-found clamp fix in this branch, no OWN badge at zero holding, manual override to VENDOR re-solves and the overridden state survives module restart via the persisted plan, tree-button tooltips render live (Best Path text verified verbatim). Known composition note: component leaves and the dimmed what-crafting-would-cost reference branch both render under a vendor root with a recipe - as designed; a visual separator is a queued UX question.

@@ -2,9 +2,9 @@
 
 Research-only, dev-time. No solver/model code was changed based on this
 note; it documents what the wiki/scrape actually encode for Wizard's
-Vault-style tiered pricing, per the task's instruction to report rather than
-force data. All findings measured live against `wiki.guildwars2.com`'s SMW
-`action=ask` API and raw wikitext (`action=raw`) on 2026-07-22.
+Vault-style tiered pricing. All findings measured live against
+`wiki.guildwars2.com`'s SMW `action=ask` API and raw wikitext
+(`action=raw`) on 2026-07-22.
 
 ## Question
 

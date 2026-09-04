@@ -40,7 +40,7 @@
 Validation per commit: module build 0 errors; suite green throughout -
 1847 baseline -> 1851 (IsStale tests) -> 1854 (DeleteFileAndReset
 tests) -> 1854 (commit 3 is view-only). Two rendered surfaces await
-the orchestrator's desktop check: the Log tab's new Delete Log File
+the desktop check: the Log tab's new Delete Log File
 button (placement left of Copy/Clear view; confirm dialog shows a
 "Delete" button; post-confirm the view shows only the trace entry) and
 the Snapshot staleness label recoloring against a changed

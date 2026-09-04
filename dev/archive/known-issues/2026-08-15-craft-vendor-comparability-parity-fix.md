@@ -3,7 +3,7 @@
 
 ## Craft/vendor comparability parity fix (2026-08-15)
 
-Root-caused via user-approved investigation: `Services/PlanSolver.cs`'s
+Root-caused via investigation: `Services/PlanSolver.cs`'s
 craft-cost path (the recipe loop inside `Evaluate`) silently valued
 UNVALUED currency ingredients at ZERO coin while still letting the craft
 option compete fully on coin cost in `PickCheapest` - the opposite of how

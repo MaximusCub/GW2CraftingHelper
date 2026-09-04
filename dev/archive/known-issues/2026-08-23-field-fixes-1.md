@@ -3,8 +3,8 @@
 
 ## Field-test fixes wave 1 (field-fixes-1)
 
-The first feedback from outside the build loop: the maintainer ran v0.2.0
-as a user, in game, and reported five defects in their own words. Every
+The first feedback from outside the build loop: v0.2.0 was run in game
+as a player would, and five defects came back from the field. Every
 one was reproduced from the code before it was touched, and three of them
 are visible in the existing gate captures - which is the useful lesson of
 this wave. The captures had them all along; nobody was looking for them,
@@ -17,7 +17,7 @@ because each gate was reading for the item it was staged to prove.
   shows "ched account snapshot? It can only be rebuilt when the GW2 A".
   The 400px window additionally squeezed WindowBase2's left title-bar
   texture into ~200px, which rasterizes as coloured streaks behind the
-  title - the "title seems poorly aligned too" half of the report. Both
+  title - the misaligned-title half of the report. Both
   are fixed by adopting `ApiAccessDialog`'s proven geometry and text
   handling: 560x170 and a wrap against the content width. Blish draws
   the title itself at a fixed 80px indent in DefaultFont32 with no
@@ -180,4 +180,4 @@ unchanged. (5) Zoomed crop confirms full descenders on "Log",
 "Augur's" and "Mystic" where the ph01 capture shows clipping.
 Blish's fixed 80px title indent (title cannot be centered without
 reimplementing window chrome) is recorded as the accepted limit;
-the Emblem option noted for a future maintainer call.
+the Emblem option noted for a future decision.

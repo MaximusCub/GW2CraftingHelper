@@ -181,7 +181,7 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// One gate's cell in the breakdown sub-line: "82%", or 100% for a
         /// gate the item does not have - nothing is outstanding behind a
-        /// barrier that is not there (owner ruling, 2026-08-28).
+        /// barrier that is not there.
         /// <para>
         /// The cell is NOT a term of the headline. An inapplicable gate is
         /// dropped from the weighted mean entirely (see <see cref="Compute"/>),

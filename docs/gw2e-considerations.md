@@ -26,10 +26,10 @@ full evidence trail lives there) by matrix row number.
 new, entries 7 and 11 had wording corrected in place. See the Summary at the
 bottom for what changed and why.*
 
-*Entry headings carrying a `[DECIDED 2026-08-16: ...]` tag were ruled on by
-the maintainer in the walkthrough recorded in "Orchestrator checksum
-verdicts and decisions (2026-08-16)" at the bottom of this file. The bodies
-below still read as open questions because they are the original record;
+*Entry headings carrying a `[DECIDED 2026-08-16: ...]` tag were settled in
+the walkthrough recorded in "Checksum verdicts and decisions (2026-08-16)"
+at the bottom of this file. The bodies below still read as open questions
+because they are the original record;
 the tag is what tells you not to re-litigate. Entry numbers are a citation
 namespace (KNOWN-ISSUES and the convergence matrix both cite them) - never
 renumber them.*
@@ -192,8 +192,8 @@ craft/vendor tie). Is our tie-break rule the right one?
 
 **The question**: should the Ignore pill (which zeroes a node's cost/quantity
 tree-wide) be available all the time, or only when you're actively valuing
-owned materials / connected to an account? You've already seen this question
-once and deferred it (`docs/KNOWN-ISSUES.md`'s DEFERRED list: "Ignore-pill
+owned materials / connected to an account? This question was raised once
+already and deferred (`docs/KNOWN-ISSUES.md`'s DEFERRED list: "Ignore-pill
 cascade semantics + own-materials gating divergences (#20.4): revisit only on
 user feedback") - this entry restates it with fresher supporting evidence, it
 is not a new discovery. An earlier pass of this log described the gating half
@@ -293,7 +293,7 @@ field-test finding, not a fresh question.
 
 ---
 
-## 11. Owned-currency display: per-node pill vs aggregate-only summary [DECIDED 2026-08-16: REPLACED by the maintainer design]
+## 11. Owned-currency display: per-node pill vs aggregate-only summary [DECIDED 2026-08-16: REPLACED by a third design]
 
 **The question**: should owned-currency coverage show on every tree node
 where that currency appears, or only once in the summary?
@@ -311,9 +311,9 @@ where that currency appears, or only once in the summary?
   fully settled.
 - **A loose end worth flagging**: the code comment in `AccountCurrencyIndex.cs`
   cites an older internal report claiming gw2e "only ever nets owned
-  currency out at the summary layer" - a live fetch this session shows that
-  claim is not accurate (gw2e does have a per-node pill). **Resolved**
-  (audit row 56 PART B #3, 2026-08-16; refined 2026-08-16): the comment was
+  currency out at the summary layer" - a live fetch shows that claim is not
+  accurate (gw2e does have a per-node pill). **Resolved**
+  (2026-08-16, refined the same day): the comment was
   corrected in place to "at least via a per-node display pill" rather than
   claiming both a pill and a summary layer - only the pill is measured
   evidence from the live fetch, and the pill is scoped to display only
@@ -346,7 +346,7 @@ where that currency appears, or only once in the summary?
   provenance claim doesn't hold up. No such concept, and no matching CSS
   class, exists anywhere in gw2e's current live templates. This looks like
   either a stale claim or a reference to something gw2e has since removed.
-- **Resolved** (audit row 56 PART B #3, 2026-08-16): the comment at
+- **Resolved** (2026-08-16): the comment at
   `TreeSectionController.cs` (now near line 895) was corrected in place to
   say this is a module-original enhancement rather than a gw2e port. No
   behavior change.
@@ -681,58 +681,56 @@ pointer, respectively) without changing their underlying verdicts.
 
 ---
 
-## Orchestrator checksum verdicts and decisions (2026-08-16)
+## Checksum verdicts and decisions (2026-08-16)
 
-1. ADOPT-row checksum outcomes: Row 5 GuildUpgrade CONFIRMED by the
-   orchestrator's own live API fetch (recipe 12002 returns a
-   GuildUpgrade-typed ingredient) and repo reads - queued for
-   implementation. Row 17 resolved by the shipped comparability fix
-   (conservative direction; entry 22 ratified conservative by the
-   maintainer). Row 20/38 TP other-side fallback CONFIRMED twice
-   first-hand (research agent + the orchestrator's own fetch of
-   gw2efficiency's live application.js: preferred side first, same-item
-   cross-side fallback when missing/zero, unpriced only when both sides
-   empty) - queued. Row 31 InventoryReducer price-blind ordering
-   CONFIRMED (Reduce before Solve in CraftingPlanPipeline) - queued with
-   a design round; the design will also deliver a "Value own materials"
-   toggle matching gw2e's valueOwnItems (default true) semantics, per
-   the maintainer. Row 56 craft-cooldowns gap CONFIRMED - queued. Row 59
-   achievement-gated recipes DEMOTED: three of the audit's four named
-   examples (The North Wind 73037, Ydalir 69817, Glint's Bastion 75482)
-   are achievement REWARDS auto-granted on collection completion, not
-   recipes; the ~283 count is unverifiable from primary sources;
-   Zap-class LearnedFromItem precursor recipes are ordinary /v2/recipes
-   members already covered by the seed regeneration; the genuine
-   residue is Mystic-Forge-only legendary FINAL assemblies (e.g. Bolt
-   30699), re-scoped as a possible expansion of the existing
+1. ADOPT-row checksum outcomes: Row 5 GuildUpgrade CONFIRMED by a live
+   API fetch (recipe 12002 returns a GuildUpgrade-typed ingredient) and
+   repo reads - queued for implementation. Row 17 resolved by the
+   shipped comparability fix (conservative direction; entry 22 ratified
+   conservative). Row 20/38 TP other-side fallback CONFIRMED twice
+   first-hand (two independent fetches of gw2efficiency's live
+   application.js: preferred side first, same-item cross-side fallback
+   when missing/zero, unpriced only when both sides empty) - queued.
+   Row 31 InventoryReducer price-blind ordering CONFIRMED (Reduce
+   before Solve in CraftingPlanPipeline) - queued with a design round;
+   the design will also deliver a "Value own materials" toggle matching
+   gw2e's valueOwnItems (default true) semantics. Row 56
+   craft-cooldowns gap CONFIRMED - queued. Row 59 achievement-gated
+   recipes DEMOTED: three of the audit's four named examples (The North
+   Wind 73037, Ydalir 69817, Glint's Bastion 75482) are achievement
+   REWARDS auto-granted on collection completion, not recipes; the ~283
+   count is unverifiable from primary sources; Zap-class
+   LearnedFromItem precursor recipes are ordinary /v2/recipes members
+   already covered by the seed regeneration; the genuine residue is
+   Mystic-Forge-only legendary FINAL assemblies (e.g. Bolt 30699),
+   re-scoped as a possible expansion of the existing
    mystic_forge_recipes.json curated seed (wiki {{Recipe}} templates are
-   machine-parseable) - awaiting an explicit maintainer go.
+   machine-parseable) - not queued pending an explicit go-ahead.
 
-2. Maintainer decisions on this log's entries (2026-08-15/16
-   walkthrough): #1 ADOPT gw2e's currency decision-value table as
-   shipped defaults (decision-only, overridable and clearable, labeled
-   estimates with attribution; the no-invented-data rule is explicitly
-   waived for this table by the maintainer); a derived-from-real-data
-   valuation engine is backlogged. #4 keep exact-amount buy billing;
-   surface craft-batch excess and its net reclaim value in the planned
-   Crafting Plan Notes section. #6 keep vendor-wins-ties (vendor
-   guarantees exact quantity at fixed price; craft-then-sell reclaim
-   carries market risk and effort). #8 keep the opportunity-cost
-   display; gw2e has no display-framing option (their Value Own
-   Materials toggle is decision-behavior, not display - see verdict on
-   row 31 above). #11 REPLACED by the maintainer's own design: currency
-   leaves get a plan-scope "HAVE {have}/{planTotal} TOTAL" pill (both
-   numbers plan-level facts, truthful at every occurrence, no per-row
-   allocation), collapsing to plain HAVE at full coverage - supersedes
-   both gw2e's per-node pill and our aggregate-only status quo. #13 keep
-   root-plus-children expansion. #14 ADOPT a per-row wiki link
-   (placement at the implementer's discretion first pass). #19
-   guild-decoration support backlogged. #20 ratified demoted (cooldown
-   toggle is a follow-on once row 56's data exists). #21 ratified
-   preserve, with cap info folded into the planned price-detail
-   tooltip. #22 ratified conservative. New maintainer-requested
-   convergence item: duplicate gw2e's crafting-pill value-detail
-   tooltip (rows: crafting gold price / currencies estimated
-   opportunity cost with explanatory note / optimization price; shown
-   only when the two diverge) - spec extracted verbatim from their
-   componentTree.html template.
+2. Decisions on this log's entries (2026-08-15/16 walkthrough): #1
+   ADOPT gw2e's currency decision-value table as shipped defaults
+   (decision-only, overridable and clearable, labeled estimates with
+   attribution; the no-invented-data rule is explicitly waived for this
+   table); a derived-from-real-data valuation engine is backlogged. #4
+   keep exact-amount buy billing; surface craft-batch excess and its
+   net reclaim value in the planned Crafting Plan Notes section. #6
+   keep vendor-wins-ties (vendor guarantees exact quantity at fixed
+   price; craft-then-sell reclaim carries market risk and effort). #8
+   keep the opportunity-cost display; gw2e has no display-framing
+   option (their Value Own Materials toggle is decision-behavior, not
+   display - see verdict on row 31 above). #11 REPLACED by a third
+   design: currency leaves get a plan-scope
+   "HAVE {have}/{planTotal} TOTAL" pill (both numbers plan-level facts,
+   truthful at every occurrence, no per-row allocation), collapsing to
+   plain HAVE at full coverage - supersedes both gw2e's per-node pill
+   and our aggregate-only status quo. #13 keep root-plus-children
+   expansion. #14 ADOPT a per-row wiki link (placement at the
+   implementer's discretion first pass). #19 guild-decoration support
+   backlogged. #20 ratified demoted (cooldown toggle is a follow-on
+   once row 56's data exists). #21 ratified preserve, with cap info
+   folded into the planned price-detail tooltip. #22 ratified
+   conservative. New convergence item: duplicate gw2e's crafting-pill
+   value-detail tooltip (rows: crafting gold price / currencies
+   estimated opportunity cost with explanatory note / optimization
+   price; shown only when the two diverge) - spec extracted verbatim
+   from their componentTree.html template.

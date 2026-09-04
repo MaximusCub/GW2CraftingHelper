@@ -179,10 +179,9 @@ namespace TaimisToolbench.Views.Rendering
         /// <see cref="DigitSeat"/>'s twin for a GOLD, SILVER or COPPER run,
         /// which seats the coin's art on the digits' ink bottom rather than
         /// centring its box (<see cref="CoinSegmentMath.CoinIconY"/>). The
-        /// owner ruled on 2026-09-04 that the coins alone move and every
-        /// other inline currency icon keeps the centred seat, so folding the
-        /// two back together undoes a decision rather than tidying a
-        /// duplicate.
+        /// coins alone move; every other inline currency icon keeps the
+        /// centred seat, so folding the two back together undoes a decision
+        /// rather than tidying a duplicate.
         /// <para>
         /// A face with no '0' keeps the CENTRED fallback: a bottom seat is a
         /// statement about the baseline, and a line box - all a font reports

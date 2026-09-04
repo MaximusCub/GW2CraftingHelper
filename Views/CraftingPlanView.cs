@@ -288,7 +288,7 @@ namespace TaimisToolbench.Views
         // row set, so an inherited sort silently re-orders rows the user
         // never sorted, and the header indicator on a table they did not
         // touch this plan reads as the module's own doing rather than
-        // theirs (maintainer decision, field-test round). The reset sits at
+        // theirs (field-test round). The reset sits at
         // TriggerGenerate's commit point, which the override/re-solve paths
         // do not run through at all - see ResetPerPlanSortState.
         //
@@ -1684,7 +1684,7 @@ namespace TaimisToolbench.Views
                 {
                     frame++;
 
-                    // Directive C: yield hardening. Any wheel event observed
+                    // Yield hardening. Any wheel event observed
                     // since this window armed is real user input landing
                     // inside a live verify window - never contest it,
                     // regardless of what the scrollbar currently reads.

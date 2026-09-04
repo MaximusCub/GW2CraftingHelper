@@ -5,11 +5,10 @@ using Xunit;
 namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
-    /// The maintainer's report: "when you load for the first time we
-    /// should trigger a snapshot immediately ... otherwise everything is
-    /// empty and requires either waiting 10mins OR clicking manually".
-    /// The rule Module.Update applies, exercised here away from Blish's
-    /// timer.
+    /// A first load triggers a snapshot immediately: without it every
+    /// panel stays empty until the 10-minute timer fires or a manual
+    /// refresh is clicked. The rule Module.Update applies, exercised here
+    /// away from Blish's timer.
     /// </summary>
     public class FirstLoadSnapshotGateTests
     {

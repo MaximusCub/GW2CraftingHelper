@@ -3,7 +3,7 @@
 
 ## W3B: Generation progress + rich logging (2026-08-08)
 
-User-directed, field-test feedback: Generate Plan gave zero feedback while
+Field-test feedback: Generate Plan gave zero feedback while
 running (a static "Generating..." for the whole ~19s a real plan can take)
 and the log said nothing more useful than "Generation started (1 item)" /
 "Generation finished in 19036ms". Implemented in the isolated `wt-w3b`
@@ -171,7 +171,7 @@ every new test exercises real production code (`CraftingPlanPipeline`,
 `PlanPhaseTimingSummary`, `PhaseOrdinalGuard`, a real
 `ModuleLog`/`ModuleLogStore`) with no contract-mirror/fake-logic tests.
 
-Live desktop gate round 1 (2026-08-08, orchestrator session) - core
+Live desktop gate round 1 (2026-08-08, live session) - core
 behaviors PASSED:
 
 - Live phase text with trailing spinner observed in the plan strip
@@ -352,7 +352,7 @@ Validation: `dotnet build -p:Platform=x64` clean (0 errors, 0 warnings from
 any touched file). Module test suite - 1218 passed (was 1210; +8 new: 6
 `PlanStripTickDecisionTests`, 2 added to `PlanStripStatusBoardTests`).
 
-Live desktop gate round 2: PASS (2026-08-08, orchestrator session,
+Live desktop gate round 2: PASS (2026-08-08, live session,
 fresh sandbox on the fixed build). All three scenarios verified:
 
 - Normal untouched completion: strip ended at "Plan generated - Aug 8,

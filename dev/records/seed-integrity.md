@@ -3,8 +3,8 @@
 
 ## Seed integrity: the reseeder silently deleted hand-authored recipes (seed-integrity)
 
-Found while investigating the maintainer's "Gift of Rays shows UNKNOWN"
-report, by running the RecipeSeeder into a scratch directory and diffing
+Found while investigating the field report that Gift of Rays showed
+UNKNOWN, by running the RecipeSeeder into a scratch directory and diffing
 its output against the shipped seed rather than trusting either.
 
 **The defect.** `ref/recipes_seed.json` ships 1,595 negative-id recipes:

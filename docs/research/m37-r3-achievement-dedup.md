@@ -371,7 +371,7 @@ MEASURED, today (2026-07-21): `https://github.com/gw2efficiency/custom-recipes`,
 `https://raw.githubusercontent.com/gw2efficiency/custom-recipes/master/recipes.json`,
 and `https://api.github.com/repos/gw2efficiency/custom-recipes` all return
 HTTP 404 right now - the repo is genuinely gone from GitHub, confirming
-the task's premise and `docs/gw2e-parity-spec.md`'s own July-2026 finding
+this report's premise and `docs/gw2e-parity-spec.md`'s own July-2026 finding
 (Section 3.1/"Known gaps").
 
 Recovered via the Wayback Machine CDX API
@@ -983,7 +983,7 @@ IS a constructed test scenario (the "second target" half is a deliberate
 choice to make the bug reproducible, not itself independently notable
 content). If a genuinely single-item, no-multi-item-plan-needed repro is
 required instead, none currently exists in the recoverable gw2efficiency
-data - stating this explicitly rather than inventing one, per the task's
+data - stating this explicitly rather than inventing one, per this repo's
 hard rule against invented data.
 
 ---

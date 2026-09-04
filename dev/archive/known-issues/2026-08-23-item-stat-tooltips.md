@@ -140,7 +140,7 @@ currency half of a barter offer - the item half carries its gold value).
 
 ### What is stubbed, and behind which judgment call
 
-The design pass left 14 numbered judgment calls for the maintainer.
+The design pass left 14 numbered judgment calls open.
 This branch built only what is unambiguous and applied the recommended
 default wherever it was cheap and reversible. Everything below is a
 deliberate stub, not an oversight:
@@ -272,6 +272,6 @@ line. Materials-with-null-details tooltips (Q2a default) and the
 plan-header surface share the same composer path; the cross-domain
 id gate (the review's Critical - currency/guild-upgrade ids must
 never be looked up as item ids) is pinned by its Blish-free tests.
-Judgment calls Q1-Q14 ride to the maintainer unresolved beyond the
+Judgment calls Q1-Q14 remain unresolved beyond the
 implemented cheap-reversible defaults.
 ---

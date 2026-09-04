@@ -8,7 +8,7 @@ note to one `PlanContentHeightMath.FallbackTextRowHeight` (28px) row and
 ellipsized it with `LabelHelpers.EllipsizeToWidth`, with a DEBUG assert
 forbidding any child from exceeding that height. At ~830px usable that
 capped a note near 100 characters before the rest became hover-only
-tooltip text - while the maintainer's UI law routes every opportunity and
+tooltip text - while the module's UI law routes every opportunity and
 every complex consideration into exactly this section.
 
 ### Reconciliation: M14's one-row claim vs. the live capture's three lines

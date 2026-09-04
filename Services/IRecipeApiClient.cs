@@ -35,7 +35,7 @@ namespace TaimisToolbench.Services
         public int OutputItemCount { get; set; }
 
         // Optional fractional expected-output count (Mystic Clover-style
-        // recipes, gw2e's output_item_count=0.31 - see r2 report). Null
+        // recipes, gw2e's output_item_count=0.31). Null
         // means "no EV override": RecipeService defaults this to
         // OutputItemCount, making it a no-op for every ordinary recipe.
         // Kept separate from OutputItemCount (which stays an integer used

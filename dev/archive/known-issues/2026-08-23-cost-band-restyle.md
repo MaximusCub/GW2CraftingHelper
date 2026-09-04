@@ -4,14 +4,13 @@
 ## Cost band restyle (cost-band-restyle)
 
 Revises audit-D's promotion of the Total Cost section's result tile,
-from the maintainer's live field test: "the currency table under total
-cost in craftin plan needs to be centered. the size of the
-gold/silver/copper text for total materials value and your materials
-used is not the same as for Actual cost to craft - they should be the
-same. if you want to visually highlight actual cost to craft, draw a box
-around it and give it a colored tint and semi transparency so the
-background texture still peeks through.. this will draw the eye to focus
-there while keeping overall visual balance."
+against a live field test. The requirement: centre the currency table
+under Total Cost; render the gold/silver/copper text at the SAME size
+for Total Materials Value, Your Materials Used and Actual Cost to Craft;
+and, to highlight Actual Cost to Craft, draw a box around it with a
+coloured tint and semi-transparency so the background texture still
+shows through - drawing the eye there while keeping the band's overall
+visual balance.
 
 ### What audit-D did, and why it is being undone
 
@@ -34,9 +33,10 @@ slice, and a three-denomination run (`123g 45s 67c`, six controls) is
 already close to that slice at Font16, so growing every tile's font
 would push all three toward overlapping their neighbours at ordinary
 window widths rather than only the one that overflows today. And the
-emphasis is now carried by the box, which is exactly what the directive
-asked for ("No font-size-based emphasis") - a larger shared font would
-be re-introducing a weaker version of the thing being removed.
+emphasis is now carried by the box, which is exactly what the
+requirement asked for (no font-size-based emphasis) - a larger shared
+font would be re-introducing a weaker version of the thing being
+removed.
 
 **The highlight box.** The result tile's caption, its `+ N currencies
 required` disclosure line and its coin run are wrapped in a box: a warm
@@ -44,10 +44,9 @@ gold tint (`214, 176, 96`) at alpha 0.14 for the fill and 0.5 for the
 1px border, both scaled from one tint with the same premultiplied
 `Color * f` idiom `FullCoverageFill` already uses. Blish composites a
 Panel's `BackgroundColor` over what is behind it, so the window's
-parchment texture reads through the fill - that is the "semi
-transparency so the background texture still peeks through" the
-directive asked for, and it is the reason the fill is not simply a solid
-dark swatch.
+parchment texture reads through the fill - that is the semi-transparency
+the requirement asked for, and it is the reason the fill is not simply a
+solid dark swatch.
 
 Structurally the box is a real `Panel` and the result tile's controls
 are its CHILDREN, not its siblings. That buys two things: the fill is

@@ -3,7 +3,7 @@
 
 ## Comment-minimalism sweep (repo-wide, comment-minimalism-sweep branch)
 
-Repo-wide pass applying the maintainer's comment bar: a comment survives
+Repo-wide pass applying the repo's comment bar: a comment survives
 only if it states a constraint the code cannot express, once, in 1-2
 lines. Review-round narration, gate/round markers, dates, milestone
 tags, and superseded-design retellings deleted; genuine invariants kept

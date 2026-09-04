@@ -7,8 +7,8 @@ Branched from the unmerged `tooltip-authenticity` head, so its deferred
 rich-tooltip facility is part of this work's baseline - the ellipsis
 plus full-name idiom below is stamped through `TooltipFacility`.
 
-Built from `/mnt/c/Dev/Blish/plan-redesign/`: `spec.md` (build order,
-phases 0-4), `decisions.md` (the maintainer's rulings, which override
+Built from the `plan-redesign` research set: `spec.md` (build order,
+phases 0-4), `decisions.md` (the decisions taken, which override
 the spec where they touch), and the four dossiers `typography.md`,
 `layout.md`, `minwidth.md`, `status-ux.md`. Where a dossier and the spec
 disagree the spec's cross-check wins; where anything and `decisions.md`
@@ -19,10 +19,9 @@ disagree, `decisions.md` wins.
 **Tables justify, they do not pull in.** Audit batch H pulled every
 table's right-hand block LEFT to sit one 24px breathing room past the
 widest name it rendered. The recovered space landed to the RIGHT of the
-block, which is what the maintainer's field test rejected: *"columns
-start off being smushed over to the left rather than justifying out to
-take up the available space dynamically... it leaves stranded dead
-space."* Every block is now pinned at
+block, which the field test rejected: columns bunched to the left
+instead of justifying out to take the available width dynamically,
+leaving stranded dead space. Every block is now pinned at
 `PlanRelayoutMath.PinnedRightEdge(P) = P - 8`, the name column is the
 only one that flexes, and ellipsis plus a full-text tooltip is the sole
 overflow idiom.
@@ -57,8 +56,8 @@ be clipped where the pull-in guaranteed they could not:
 **The type ramp is named once.** `Services/TypeRampMetrics` holds the
 measured Menomonia ink for every size the module draws in and names the
 two promoted tiers: ColumnHeader 20 bold, SectionTitle 24 bold - JC-1
-resolved to Alternative B, maintainer: *"lets try 20/24 for now and if
-its too big we can go 18/22"*. The retreat is a two-line swap there,
+resolved to Alternative B, 20/24, with 18/22 held as the retreat if
+that reads too big. The retreat is a two-line swap there,
 with the height constants and their tests following from it.
 `Views/Rendering/UiFonts` turns that into a `BitmapFont` and nothing
 else; an unmapped point size throws at the seam rather than rendering at
@@ -95,13 +94,14 @@ measured at Menomonia 16 against the installed XNBs
 ---- 1252 tab panel  +126 chrome  ==== 1378
 ```
 
-The +154 rider is JC-5, and it is the maintainer's call: the
+The +154 rider is JC-5, a judgment call: the
 like-for-like depth-14 figure is **1232**, which accepts that a row
 combining a forced-craft dust chain with a vendor currency run
-ellipsizes. Declined - *"We are designing for a minimum resolution of
-1920x1080, so cramming down to a smaller min-size that will result in
-cramped renders seems bad... Full HD is on everything people game on."*
-A two-currency vendor run now always fits at the floor. The agony chain
+ellipsizes. Declined - the module designs for a 1920x1080 minimum
+resolution, so shrinking the floor further to buy a size that renders
+cramped is the wrong trade when Full HD is effectively universal on
+gaming displays. A two-currency vendor run now always fits at the
+floor. The agony chain
 reads whole to depth 19 and ellipsizes from depth 20, six levels past
 the deepest realistic plan; that boundary is pinned by a test so the
 accepted degradation cannot quietly get worse. The controls row's own
@@ -347,9 +347,9 @@ rule:
 
 ### Phase 3 - status, chips, confirms
 
-Maintainer correction, verbatim: *"1 is about the status of actions and
-the other is about the state of your own edits... they are not
-connected."*
+A correction taken here: the status of ACTIONS and the state of the
+reader's own EDITS are two separate things and must not be presented as
+one.
 
 The status line carried both. `Decisions updated (3 override(s))` mixed
 an EVENT - a re-solve just finished - with STATE, how many decisions
@@ -391,7 +391,7 @@ re-solves, and that is exactly what clearing does - the solver's own
 choices ARE the cheapest plan it can find. The two differ only in the
 status line they write and the dialog they ask. Both shipped as
 specified rather than one being silently dropped, and the finding is
-recorded here for the maintainer: either Best Path is renamed, or one
+recorded here: either Best Path is renamed, or one
 of the two goes.
 
 **Wording**, per the status dossier's table: the failure verb splits
@@ -447,8 +447,8 @@ move.
    matters is structural (no dispose/rebuild of icons, names, carets,
    row panels or child containers), and it is taken either way.
 8. **Clear Overrides ships despite being the same action as Best
-   Path.** See the phase 3 finding above: implementing the maintainer's
-   stated design, and recording that the code says the two are one, is
+   Path.** See the phase 3 finding above: implementing the design as
+   stated, and recording that the code says the two are one, is
    more useful than inventing a difference to justify the second
    button.
 9. **`Views/Rendering/HoverChainResync` does not restore
@@ -635,7 +635,7 @@ handler on a matched row, and only the `List<Panel>` the hover guard
 closes over survives. The frame-shortening half is the real argument and
 the whole of it. The clause is deleted rather than softened - the
 surrounding prose is a measured argument, so a wrong sentence in it
-carries a wrong constant's weight, and this is the sentence a maintainer
+carries a wrong constant's weight, and this is the sentence a reader
 would trust if the field test still reported dropped clicks.
 `HoverChainResync` states the mechanism correctly and is now the wording
 of record, pointed at from here.

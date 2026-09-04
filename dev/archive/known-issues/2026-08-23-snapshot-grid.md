@@ -3,9 +3,9 @@
 
 ## Snapshot item grid (snapshot-grid)
 
-Maintainer field test: "wondering if we should consider multiple column
-display for snapshot window. a single column list seems wasteful of
-screen realestate at the moment". It was: at the 1436px window minimum a
+Field test: the Snapshot window should consider a multiple-column
+display, because a single-column list wastes screen real estate. It did:
+at the 1436px window minimum a
 Snapshot result row spanned the whole 1330px content panel to show a name
 line that needs roughly 420px of it, and the row below it started 52px
 further down whatever was left over.

@@ -170,8 +170,8 @@ changed and two new tabs shipped since the README screenshots were taken.
 ### PROPOSAL, not executed: rehearse the workflow with v0.3.0-rc.1
 
 The release workflow has never run, and the three items above are only
-provable by a pushed tag. The owner can choose to make the first pushed
-tag a rehearsal instead of the release:
+provable by a pushed tag. The first pushed tag can be a rehearsal
+instead of the release:
 
 1. On a throwaway commit (not necessarily on `master`): set
    `manifest.json` to `0.3.0-rc.1` and add a one-line

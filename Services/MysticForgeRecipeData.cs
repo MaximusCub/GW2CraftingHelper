@@ -128,7 +128,7 @@ namespace TaimisToolbench.Services
                 }
 
                 // Optional fractional expected-output count (Mystic
-                // Clover-style recipes, e.g. 0.31 - see r2 report). Absent
+                // Clover-style recipes, e.g. 0.31). Absent
                 // is valid (most recipes have none); present-but-invalid
                 // (<= 0) is a data error, so the recipe is skipped rather
                 // than silently treated as absent.

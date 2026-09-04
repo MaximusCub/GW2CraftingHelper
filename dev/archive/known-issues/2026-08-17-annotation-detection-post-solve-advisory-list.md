@@ -153,7 +153,7 @@ Gate: not run live this pass - annotation-calculator wiring and B8
 shape fixes carry no new rendered surface; the previously-unpinned
 call shapes are now suite-pinned by the characterization tests this
 branch adds (the mutation that silently deleted all four annotation
-passes now fails the suite). Merged under the maintainer's standing
+passes now fails the suite). Merged under the standing
 merge directive (2026-08-16).
 
 ---

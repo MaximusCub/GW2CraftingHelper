@@ -441,7 +441,7 @@ tree re-flagging, rounding*
   disqualify its recipe from comparison too, the same way an unvalued
   vendor offer is disqualified today. Per this audit's own decision rules,
   a resolution direction that conflicts with a hard constraint goes to
-  `docs/gw2e-considerations.md` for the maintainer to work through, rather
+  `docs/gw2e-considerations.md` to be worked through, rather
   than being asserted as the ADOPT; the asymmetry finding itself remains an
   ADOPT action item independent of that open question.
 
@@ -688,7 +688,7 @@ hard constraint).
 ### 31. Sequencing: WHEN reduction happens relative to the craft-vs-buy decision
 
 - gw2e (measured, `cheapestTree.ts:46-71` and `calculateTreeQuantity.ts:70-73`,
-  fetched directly this session): computes prices/craft-flags FIRST (a
+  fetched directly): computes prices/craft-flags FIRST (a
   price-only pass), then re-runs `calculateTreeQuantity` a SECOND time using
   those now-fixed craft flags: `ignoreAvailable = (tree.craft === false) ||
   usedQuantity === 0 || ignoreAvailable`, propagating to every descendant.
@@ -1065,7 +1065,7 @@ KNOWN-ISSUES #20.4.
 - Rationale: a UI convenience, not core craft-vs-buy correctness, so it does
   not meet the ADOPT bar. Adding it would be the module's first external-
   URL-launch affordance - a small but real scope expansion worth a
-  deliberate maintainer decision (feasible in Blish HUD via Process.Start,
+  deliberate decision (feasible in Blish HUD via Process.Start,
   low risk) rather than an automatic follow-up package. Considerations entry
   added.
 
@@ -1137,7 +1137,7 @@ mechanics, decorations/guild upgrades*
 ### 53. Tree-node display of an item with no TP price at all (account-bound legendary-crafting trophies, gem-store-locked, etc.)
 
 - gw2e (measured, `gw2e-parity-spec.md` Section 5.1/5.3; fresh corroboration
-  this session via `api.guildwars2.com/v2/items/19678` and
+  via `api.guildwars2.com/v2/items/19678` and
   `api.gw2efficiency.com/items?ids=19678`): Gift of Battle has flags
   AccountBound/NoSalvage/etc and no buy/sell price fields at all; gw2e's
   live calculator would show it as a bare, unexplained unpriceable leaf -
@@ -1176,7 +1176,7 @@ mechanics, decorations/guild upgrades*
 
 ### 55. Vendor daily/weekly/seasonal purchase caps: do they gate the craft/buy/vendor decision, or are they purely a post-solve notice? [already implemented]
 
-- gw2e (measured, full re-fetch this session of
+- gw2e (measured, full re-fetch of
   `raw.githubusercontent.com/gw2efficiency/recipe-calculation/master/src/helpers/dailyCooldowns.ts`,
   byte-identical to the prior fetch): the `dailyCooldowns()` function only
   writes into a plain breakdown map, is never imported by any of
@@ -1190,7 +1190,7 @@ mechanics, decorations/guild upgrades*
   seeded per KNOWN-ISSUES #20.2/#28/#33.
 - Verdict: **EQUIVALENT**
 - Rationale: already fully implemented and gw2e-parity-correct,
-  independently re-confirmed against fresh upstream source this session
+  independently re-confirmed against fresh upstream source
   with zero drift. No action needed.
 
 ### 56. Intrinsic recipe-level daily crafting cooldowns (e.g. Deldrimor Steel Ingot / Spool of Silk Weaving Thread-style ascended materials limited to ~1 craft per account per day, enforced server-side, no vendor offer involved)
@@ -1272,13 +1272,13 @@ mechanics, decorations/guild upgrades*
 ### 59. Legendary/precursor achievement-collection recipes (multi-ingredient recipes gated behind a collection achievement rather than a crafting discipline - e.g. Gift of the Catalyst, The North Wind, Ydalir, Glint's Bastion)
 
 - gw2e (measured, `docs/research/m37-r3-achievement-dedup.md` Section
-  2.3/2.4, this session cross-checked the same recovered custom-recipes.json
+  2.3/2.4, cross-checked against the same recovered custom-recipes.json
   snapshot with no drift): 283 of 8,962 recipes carry a recipe-level
   `achievement_id`; confirmed named legendary-precursor examples include The
   North Wind (output 73037, achievement_id 2418), Ydalir (69817, 2452),
   Glint's Bastion (75482, 2621), each an ordinary 13-ingredient flat Item
   recipe.
-- Ours (measured this session, python scan of `ref/recipes_seed.json`,
+- Ours (measured, python scan of `ref/recipes_seed.json`,
   14,736 entries): exactly ONE Achievement-discipline recipe exists in the
   entire seed - the Infinite Trebuchet Blueprint (#26's verification
   target). Zero legendary/precursor achievement-collection recipes anywhere
@@ -1319,7 +1319,7 @@ mechanics, decorations/guild upgrades*
   represent probabilistic output either, structurally excluding these combos
   from both the official-API-derived and custom-recipes-derived data the
   live calculator consumes.
-- Ours (measured this session, python scan of
+- Ours (measured, python scan of
   `ref/mystic_forge_recipes.json`, 1,591 entries): zero entries with
   "precursor" or "random" anywhere in the wiki-sourced `comment` field.
   `Services/MysticForgeRecipeData.cs`'s schema has no probability concept
@@ -1356,7 +1356,7 @@ mechanics, decorations/guild upgrades*
   from the tree via `compact()` - the source itself carries the
   maintainer's own unresolved TODO: "Return `component` (type=
   'GuildUpgrade'), and handle that in the frontend."
-- Ours (measured this session, python scan of `ref/recipes_seed.json`):
+- Ours (measured, python scan of `ref/recipes_seed.json`):
   ingredient `type` values present are exactly {Item, Currency} - no
   GuildUpgrade concept anywhere. Structurally, the official GW2 API's
   `/v2/recipes` endpoint cannot expose guild-upgrade "recipes" at all -
@@ -1428,8 +1428,8 @@ cross-referenced elsewhere in this document and in
   (gw2e has none either, per `m37-r1-homestead.md` Section 1.5). This is
   exactly the kind of taste/architecture divergence this audit's own
   decision rules route to PRESERVE-plus-considerations rather than ADOPT,
-  and the task brief's already-known list said as much before this audit
-  began. Recorded here only because the mechanism was otherwise entirely
+  and it was already a known divergence before this audit began.
+  Recorded here only because the mechanism was otherwise entirely
   absent from this matrix's coverage, which risked implying it had never
   been compared. Considerations entry added, cross-referencing the existing
   M37/`m37-r1-homestead.md`/KNOWN-ISSUES #24 record rather than re-litigating

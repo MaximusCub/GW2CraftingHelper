@@ -19,7 +19,7 @@ namespace TaimisToolbench.Views.Rendering
     // ellipsis shape (see IconNameRowHelpers' own doc comment for why
     // Crafting Steps/Disciplines/Recipes rows do not).
     //
-    // sortState/onSortChanged carry the maintainer-requested clickable
+    // sortState/onSortChanged carry the clickable
     // column headers: this renderer only reads the state (to order its
     // rows and mark the active header) and asks the view to re-render when
     // a header is clicked - the state itself outlives every render, so a

@@ -21,7 +21,7 @@ namespace TaimisToolbench.Services
     /// the same plan - a re-sort, a tree pill override, a re-solve - keeps
     /// whatever sort the user last clicked. Arriving at a DIFFERENT plan
     /// calls <see cref="Reset"/> instead: the sort described a table that
-    /// no longer exists (maintainer decision, field-test round; see
+    /// no longer exists (field-test round; see
     /// CraftingPlanView.ResetPerPlanSortState, which lists the sites).
     /// <para>
     /// One click cycle per column: None -> Ascending -> Descending -> None.

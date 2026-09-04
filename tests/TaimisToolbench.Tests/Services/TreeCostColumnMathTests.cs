@@ -361,7 +361,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(TreeCostColumnMath.TotalWidth(widths), edges.TotalWidth);
         }
 
-        // --- ScanColumns name extent (audit batch H: dead gutters) ---
+        // --- ScanColumns name extent (dead gutters) ---
         private static CraftingTreeNode NamedNode(
             int nodeId, string name, int quantity = 0, IReadOnlyList<CraftingTreeNode> children = null)
         {
@@ -381,7 +381,7 @@ namespace TaimisToolbench.Tests.Services
             return TreeCostColumnMath.ScanColumns(roots, MeasureByLength, _ => 0);
         }
 
-        // --- ScanColumns node count (audit batch J, L2: the Recipe Tree
+        // --- ScanColumns node count (the Recipe Tree
         // section header's parenthesised count) ---
         [Fact]
         public void ScanColumns_NodeCount_CountsEveryNodeAtEveryDepth()

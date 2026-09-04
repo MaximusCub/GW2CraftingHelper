@@ -3,7 +3,7 @@
 
 ## W3D: Plan persistence across module restarts (2026-08-09)
 
-User-directed, field-test feedback: a generated plan started empty every
+Field-test feedback: a generated plan started empty every
 session - the Crafting Plan tab had no memory of the last plan across a
 module close/reopen. Implemented in the isolated `wt-w3d` worktree off
 `master` (`63a4824`) on branch `w3d-plan-persistence`.
@@ -652,7 +652,7 @@ tests, no fake file I/O. Item/currency/vendor IDs remain internal-only.
 Pricing/solve logic itself is untouched - this pass only widens the
 existing round-4 validation gate to cover one more field.
 
-Live desktop gate: PASS (2026-08-15, orchestrator session, fresh
+Live desktop gate: PASS (2026-08-15, live session, fresh
 sandbox, three scenarios across a real Blish restart cycle):
 
 - Generate + persist: a real Zojja's Claymore generation (4.2s)
@@ -679,7 +679,7 @@ sandbox, three scenarios across a real Blish restart cycle):
   and zero exceptions in the Blish log.
 
 **Post-W3D quick fix: gzip-compress the on-disk plan file
-(2026-08-15).** User-directed, "quick and dirty" scope: the ~700 KB
+(2026-08-15).** Deliberately minimal scope: the ~700 KB
 plan.json this section measured above is now written gzip-compressed
 instead of as plain compact JSON. `PlanStore.Save` gzips the same
 serialized JSON bytes it always produced (`PlanStoreHelpers.
@@ -716,11 +716,11 @@ All 30 `PlanStoreTests` and the full 1273-test module suite (was 1269
 before this pass; +4 new tests) pass.
 
 No live desktop gate for this pass - container-encoding-only change,
-user-sanctioned quick fix, validated by real-file unit round-trip
+quick fix, validated by real-file unit round-trip
 tests instead (see above).
 
-**Recipe Tree header button tooltips (2026-08-15).** Small user-requested
-diff, riding along with the W4A cost-section gate: the five Recipe Tree
+**Recipe Tree header button tooltips (2026-08-15).** Small diff, riding
+along with the W4A cost-section gate: the five Recipe Tree
 section header buttons (`Views/Rendering/TreeSectionController.cs`,
 `CreateTreeSection` - Best Path, Craft All, Buy All, Expand All, Collapse
 All) now set `BasicTooltipText` directly on the `StandardButton` itself
@@ -744,4 +744,4 @@ touched, no new tests (out of the Blish-free test scope for pure
 BasicTooltipText strings on Blish controls; hover text is covered by the
 live desktop gate).
 
-Live desktop gate: PASS 2026-08-16 (orchestrator live sandbox session, combined wave-4 staging build; shipped via the W4B PR #109 which stacks on this branch). Verified: hovering Best Path renders its handler-derived tooltip verbatim ("Clears every manual override, including Craft All/Buy All, and re-solves for the solver's cheapest plan. Ignore selections are left unchanged.").
+Live desktop gate: PASS 2026-08-16 (live sandbox session, combined wave-4 staging build; shipped via the W4B PR #109 which stacks on this branch). Verified: hovering Best Path renders its handler-derived tooltip verbatim ("Clears every manual override, including Craft All/Buy All, and re-solves for the solver's cheapest plan. Ignore selections are left unchanged.").

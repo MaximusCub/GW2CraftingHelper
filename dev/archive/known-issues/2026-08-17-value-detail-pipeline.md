@@ -143,5 +143,5 @@ Gate: not run live this pass - test-and-docs change with no runtime
 code touched; pipeline-level behaviour is suite-pinned (mutation-checked
 per the review record above) and the live hover re-check stays on the
 next desktop gate batch, where fallback-tier propagation is the first
-thing to rule out. Merged under the maintainer's standing merge
+thing to rule out. Merged under the standing merge
 directive (2026-08-16).

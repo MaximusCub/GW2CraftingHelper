@@ -4,7 +4,7 @@ The repository content was renamed from GW2 Crafting Helper /
 `GW2CraftingHelper` to Taimi's Toolbench / `TaimisToolbench` in the
 `taimis-toolbench-v2` branch (see the CHANGELOG 0.3.0 entry). This file
 is the runbook for everything the content sweep could NOT do: steps that
-touch GitHub, the local dev environment, and the owner's live Blish HUD
+touch GitHub, the local dev environment, and the live Blish HUD
 install. Execute top to bottom, after the rename PR merges.
 
 (An earlier sweep of the same rename shipped as PR #200 on the
@@ -90,13 +90,6 @@ Update the `C:\Dev\Blish\GW2CraftingHelper` paths (and any
 sandbox's own `blish-preflight-settings/logs/*.log` also carry the old
 name; they are dated logs and need no edit.
 
-Claude memory continuity: the project memory directory is keyed to the
-opened folder path, so the rename forks it. Old:
-`~/.claude/projects/-mnt-c-Dev-Blish-GW2CraftingHelper/memory/`. After
-the first session in the renamed folder, leave a pointer note in BOTH
-the old MEMORY.md and the new one, and copy the memory files across so
-the new key starts with the full history.
-
 ## 3. Deploy the new .bhm
 
 Build from the renamed clone:
@@ -110,7 +103,7 @@ before the rename, delete `bin/` and `obj/` first: an incremental
 OutDir keeps the pre-rename `GW2CraftingHelper.dll` beside the new one
 and packs both into the `.bhm`.
 
-## 4. Blish install migration (owner's live install)
+## 4. Blish install migration (a live install)
 
 Blish HUD must NOT be running for any of this.
 

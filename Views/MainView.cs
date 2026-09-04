@@ -2458,7 +2458,7 @@ namespace TaimisToolbench.Views
             };
 
             // The module's one icon component, at tier 1 of the two-tier
-            // icon system (owner ruling): in-game bag-slot-sized art in the
+            // icon system: in-game bag-slot-sized art in the
             // tier's frame, filling the 56px item row.
             //
             // ONE resolved rarity feeds the frame below and the name colour
@@ -2579,7 +2579,7 @@ namespace TaimisToolbench.Views
         /// <summary>
         /// The row's source breakdown as one line, or "". NOT the Amount
         /// column's prefix notation, and the one deliberate exemption from
-        /// M9's sweep: these labels are LOCATIONS. "20x Bank" parses as
+        /// it: these labels are LOCATIONS. "20x Bank" parses as
         /// twenty banks, and "10x Character: Maximus Test" collides with
         /// the label's own colon.
         /// </summary>

@@ -203,8 +203,8 @@ namespace TaimisToolbench.Services
         // The floor disclosure. A plan can carry a real cost that reaches
         // the coin total as a zero - a node nothing could price or craft,
         // or a barter item whose units are the price - and the band still
-        // renders every tile (the maintainer's call: a band that loses its
-        // cells reads as a broken section), so the fact that one of those
+        // renders every tile (a band that loses its cells reads as a
+        // broken section), so the fact that one of those
         // figures was never measured has to be stated instead of implied
         // by a missing tile. UnpricedTileMarker ties the marked tiles to
         // the footnote that explains them. The wording says "nothing that
@@ -313,9 +313,9 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Formula band 1 ("Total Materials Value - Your Materials Used
-        /// = Actual Cost to Craft"). All three tiles ALWAYS render: the
-        /// maintainer's ruling, twice, is that a term worth zero shows a
-        /// zero rather than removing itself, because a lone tile with the
+        /// = Actual Cost to Craft"). All three tiles ALWAYS render: a term
+        /// worth zero shows a zero rather than removing itself, because a
+        /// lone tile with the
         /// formula gone around it reads as a broken section. Actual Cost
         /// to Craft is result.Plan.TotalCoinCost; the price-basis
         /// qualifier lives in this tile's tooltip.

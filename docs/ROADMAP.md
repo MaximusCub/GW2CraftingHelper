@@ -16,7 +16,7 @@
   [`docs/gw2e-parity-spec.md`](gw2e-parity-spec.md). The August 2026
   convergence audit
   ([`docs/research/gw2e-convergence-matrix.md`](research/gw2e-convergence-matrix.md)
-  plus the maintainer's rulings in
+  plus the per-row decisions in
   [`docs/gw2e-considerations.md`](gw2e-considerations.md)) then found a
   queue of genuine ADOPT gaps against the live calculator; those are what
   the current wave of branches is implementing.
@@ -54,8 +54,8 @@
   CHANGELOG bumped, tag not yet pushed, pending the field-test pass -
   see [`CHANGELOG.md`](../CHANGELOG.md) and
   [`docs/RELEASING.md`](RELEASING.md). Work arrives as one branch per
-  milestone, each ending in a live desktop gate; the feedback loop is the
-  maintainer field-testing the deployed build. The queue is driven by the
+  milestone, each ending in a live desktop gate; the feedback loop is
+  field-testing the deployed build. The queue is driven by the
   convergence matrix's ADOPT rows and by field-test findings, not by a
   fixed milestone plan.
 

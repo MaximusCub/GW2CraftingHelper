@@ -143,7 +143,7 @@ is called, the order Blish raises two of its own events in, and a walk
 over `Container.Children`. The testable-looking residue is a three-bool
 predicate that would only mirror the implementation, which this repo does
 not accept. It stands on the desktop gate. Neither second-pass change has
-a scripted repro - the dead keyboard the user reported is exercised by
+a scripted repro - the reported dead keyboard is exercised by
 step 1, and step 6 is a regression check on the discriminator itself,
 which is the only part of this pass with behaviour a gate operator can
 observe.

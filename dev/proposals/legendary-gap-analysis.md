@@ -149,7 +149,7 @@ example. Worth scoping only after P1-P4.
 
 ## 5. Two fixes that need no decision
 
-Both are uncontroversial and I intend to do them unless told otherwise.
+Both are uncontroversial and low-risk.
 
 1. **Empty cost-line guard.** MEASURED: 1,896 shipped offers (3.2%) have an
    empty `costLines` array. `VendorBatchSolver.cs:264` folds over

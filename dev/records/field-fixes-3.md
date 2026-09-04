@@ -3,15 +3,15 @@
 
 ## Zero-band retention, scroll anchoring, click default, MF recipes, first-load snapshot (field-fixes-3)
 
-Five independent maintainer reports from one live 0.2.3 session.
+Five independent field reports from one live 0.2.3 session.
 
 ### 1. The zero band keeps its cells even when a term is unmeasured
 
-"The Total Cost section can make it ONLY display the 'Actual Cost to
-Craft' section if everything in the recipe tree that requires
-ingredients or purchases ends up ignored. It should retain the other
-cells in the section and just show them with 0s rather than making them
-disappear."
+Reported in the field: the Total Cost section can end up displaying only
+the "Actual Cost to Craft" tile when everything in the recipe tree that
+requires ingredients or purchases ends up ignored. It should retain the
+other cells in the section and show them as 0 rather than making them
+disappear.
 
 This overrides the v0.2.2 rule recorded in the
 `root-ignore-summary-zero` section above, which kept the collapsed lone
@@ -19,7 +19,7 @@ tile whenever `PlanViewModelBuilder.HasUnpricedNode` was true. The
 argument for that (a zero nobody measured must not be dressed as a
 priced equation) was sound about the NUMBER and wrong about the
 MECHANISM: real plans routinely carry UNKNOWN nodes (Globs of Dark
-Matter, account-bound gifts), so the maintainer met the collapsed band
+Matter, account-bound gifts), so the collapsed band turned up
 constantly, and a section that drops cells reads as broken rather than
 as careful.
 
@@ -51,7 +51,7 @@ mode with owned materials consumed** still collapses to the lone tile
 known-vs-absent-zero paragraph).
 
 The profit band's own absence is nonetheless the same complaint one band
-lower - the maintainer's state ("only the Actual Cost to Craft section")
+lower - the reported state, only the Actual Cost to Craft section,
 is a Total Cost section with the cost band collapsed AND no Sell
 Value / Profit tiles - so it is now accounted for in text rather than
 left as two missing cells: a third `SummaryFootnote` row,
@@ -65,9 +65,9 @@ on the page.
 
 ### 2. Scroll anchoring across a re-solve
 
-"When you toggle IGNORE on stuff in the recipe tree - it can adjust
-which currencies show up in the Total section at the top and cause the
-current location under you to 'move' as the view reflows."
+Reported in the field: toggling IGNORE on a row in the recipe tree can
+adjust which currencies show up in the Total section at the top, which
+makes the content under the cursor "move" as the view reflows.
 
 `CraftingPlanView.PreserveScrollAcross` preserved the scroll OFFSET,
 which holds the view still only while the content ABOVE the viewport
@@ -98,7 +98,7 @@ where a missing row "would" be.
 ### 3. Click sound default 75 -> 35
 
 The field test that the click-volume section above was waiting on
-returned: "I found 35% or so is a reasonable click default volume."
+returned 35% or so as a reasonable click default volume.
 `ClickSoundVolume.DefaultPercent` is now 35 - 1.75x Blish's 0.2 fixed
 volume (+4.9 dB), 0.875x its 0.4 absolute ceiling (-1.2 dB), putting the
 asset's own 0.357 peak at -18.1 dBFS. The setting is persisted, so a
@@ -108,9 +108,9 @@ than the old ceiling" (true of 75, not of 35) were both restated.
 
 ### 4. UNKNOWN Mystic Forge gifts - measured: not the build bump, and mostly not a defect
 
-Report: "Gift of Rays, Gift of the Survivors and Gift of the People and
-Gift of the Hylek all show UNKNOWN in the recipe tree", alongside the
-per-generation log line "Recipe seed built for build 205505; current
+Reported in the field: Gift of Rays, Gift of the Survivors, Gift of the
+People and Gift of the Hylek all show UNKNOWN in the recipe tree,
+alongside the per-generation log line "Recipe seed built for build 205505; current
 build 205780; seed negative entries will fall back to API."
 
 **That log line is not about negative recipe ids.** "Negative entries"
@@ -128,14 +128,14 @@ recipes in `ref/mystic_forge_recipes.json` are already present in
 a non-empty `ref/recipe_search_seed.json` row that already lists that MF
 id (0 missing on each count). 107040 -> `[-1587]` is one of them.
 
-**The parent plan is Endless Summer (107022)**, named by the
-maintainer's own `module_log.jsonl` and `plan.json`, not Orrax: 107040
+**The parent plan is Endless Summer (107022)**, named by the field
+session's own `module_log.jsonl` and `plan.json`, not Orrax: 107040
 is an ingredient of -1586, and the other three gifts are its siblings.
 `MysticForgeSeedStalenessTests.RealShippedSeed_EndlessSummerGifts_...`
 plans that exact parent through the REAL shipped seed under a build
 bump: **Gift of Rays resolves to Craft on recipe -1587**. The reported
-UNKNOWN for it was not reproduced by any route. The maintainer's own
-persisted `plan.json` from that session carries
+UNKNOWN for it was not reproduced by any route. The persisted
+`plan.json` from that session carries
 `IgnoredItemIds: [107040]` and renders the row `IsIgnored` - the IGNORE
 pill is offered on every non-root item row, so an ignored row is not
 evidence of an UNKNOWN one, and an ignored row reads IGNORED, not
@@ -159,7 +159,7 @@ cost line whose item has no Trading Post price sets `priceable = false`
 and discards the WHOLE offer. These are barter offers paid in
 account-bound tokens, which can never have a TP price, so every offer
 for the node is discarded, nothing comparable and no fallback survives,
-and `PlanSolver` commits `UnknownSource` - exactly what the maintainer's
+and `PlanSolver` commits `UnknownSource` - exactly what that
 `plan.json` records (Source `UnknownSource`, RecipeId 0, for all three).
 `AcquisitionHintSeedVendorAgreementTests.ShippedBarterOffer_...` proves
 it on the real solver path with the real shipped offer.
@@ -341,15 +341,15 @@ gAN1-gAN3, gFL1-gFL2, gMF1; display-sleep inhibitor held the session).
    above), clicked IGNORE on "3x Deldrimor Steel Ingot" with the cursor
    resting on it: that row and every one of the eight rows above it held
    their EXACT pixel y across the re-solve, while the row's own subtree
-   collapsed and new content flowed in below. This is the maintainer's
-   reported gesture, and the jar is gone.
+   collapsed and new content flowed in below. This is the reported
+   gesture, and the jar is gone.
 3. CLICK DEFAULT: ClickSoundVolume.DefaultPercent is 35. Live check
    confirmed the other half of the contract - a persisted 78 from an
    earlier session survived the change, so only new installs take 35.
-4. MYSTIC FORGE UNKNOWN: live PASS on the maintainer's own report -
+4. MYSTIC FORGE UNKNOWN: live PASS on the field report -
    "Gift of Rays" now generates a complete plan (legendary-purple
    header, 892g 88s 38c, eight currency requirements listed) where it
-   previously rendered UNKNOWN. Note the orchestrator's stale-build lead
+   previously rendered UNKNOWN. Note the stale-build lead
    was DISPROVEN by this round's tests; the defect actually fixed was
    the empty-seed-row cache hit, and this is its live proof.
 5. FIRST-LOAD SNAPSHOT: PARTIAL by environment. With the cached snapshot
@@ -358,11 +358,11 @@ gAN1-gAN3, gFL1-gFL2, gMF1; display-sleep inhibitor held the session).
    ready". The half that IS verifiable passed and was the actual risk:
    the module log stayed EMPTY across the whole session, so the blocked
    gate neither spends its one shot nor re-probes per frame. Firing on a
-   real key belongs to the maintainer's install.
+   real key belongs to an install that has one.
 
-FOLLOW-UP within the same session (maintainer, watching the Gift of Rays
-capture): "Actual Cost to Craft is all that that screen is showing... it
-should have 3 fields". The band still collapsed whenever the middle term
+FOLLOW-UP within the same session, from the Gift of Rays capture: Actual
+Cost to Craft was all that screen showed, where it should carry three
+fields. The band still collapsed whenever the middle term
 was zero - the ORIGINAL "no middle term to subtract" rule, older than
 this round's zero-plan work, and the ordinary case for any plan whose
 materials you do not already own. Rule deleted: all three tiles now

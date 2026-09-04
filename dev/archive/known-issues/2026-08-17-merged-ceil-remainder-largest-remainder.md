@@ -6,7 +6,7 @@
 **Milestone goal:** quorum verdict C6 (TARGETED_FIX_ONLY plus the
 judge's own new finding) on the `merged-ceil-remainder` stream, which
 enters `VendorBatchSolver` - a former high-evidence/freeze zone
-(maintainer-retired 2026-08-17) - so per that retirement's own terms,
+(retired 2026-08-17) - so per that retirement's own terms,
 characterize the current behavior in tests BEFORE changing it, then
 fix, then prove improved-X/regressed-nothing.
 
@@ -169,16 +169,16 @@ fix, then prove improved-X/regressed-nothing.
 
 **Risks / follow-ups:** none new. The C6(b) correction (item 4) is
 recorded here as the authoritative verdict since no prior claim was
-locatable to edit in place; if the orchestrator has the original claim
-in a stream this session could not see, that record should be updated
-to point back here rather than restate the (incorrect) claim.
+locatable to edit in place; if the original claim exists elsewhere,
+that record should be updated to point back here rather than restate
+the (incorrect) claim.
 `VendorBatchSolver.cs:409`'s comment recounting a past review's own
 "one of the six DO-NOT-TOUCH merged-ceil batching methods" wording was
 left as-is (it accurately describes history at the time, not a present-
 tense claim about current code) - flagged here in case a future sweep
 disagrees.
 
-**Merge note (orchestrator, post-review):** `origin/master` had moved
+**Merge note (post-review):** `origin/master` had moved
 (the `high-evidence-zones` stream immediately above this entry, deleting
 5 dead/vacuous tests unrelated to this stream's own changes) since this
 stream's own 1775/1775 count above was measured at its pre-merge HEAD
@@ -204,9 +204,9 @@ this entry's own "Validation performed" section above, which remains
 accurate as a historical record of this stream's state at `81598bf`
 before the merge.
 
-Gate: not applicable - quorum-verdict cleanup with characterization-first proof where the high-evidence zone was entered; suite-pinned. Merged under the maintainer's standing merge directive (2026-08-16).
+Gate: not applicable - quorum-verdict cleanup with characterization-first proof where the high-evidence zone was entered; suite-pinned. Merged under the standing merge directive (2026-08-16).
 
-**Second merge note (orchestrator):** `origin/master` moved again (PR #131,
+**Second merge note:** `origin/master` moved again (PR #131,
 `value-detail-pipeline`, the entry immediately above this one - test-and-
 docs only, no runtime code touched) while this branch's own PR #130 was
 polling CI. Merged with `git merge origin/master` a second time; again only

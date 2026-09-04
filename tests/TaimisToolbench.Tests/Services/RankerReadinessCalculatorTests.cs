@@ -177,7 +177,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void AGateTheItemDoesNotHave_Reads100PercentWithoutJoiningTheBlend()
         {
-            // The owner's ruling: nothing is outstanding behind a barrier the
+            // The rule: nothing is outstanding behind a barrier the
             // item does not have, so its cell reads 100% rather than a dash.
             // The cell is NOT a term of the mean, and this row is what proves
             // it - four of the five gates read 100% while the headline stays
@@ -209,7 +209,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void NinetyFivePercentByCoinWithThirtyDaysOfDailiesLeft_IsNotNinetyFivePercent()
         {
-            // The owner's worked case. 0.5*(0.95) + 0.5*(1 - 30/32) = 0.506.
+            // The worked case. 0.5*(0.95) + 0.5*(1 - 30/32) = 0.506.
             var cooldowns = Cooldowns(MithrilliumId);
             var baseline = Result(coin: 20000, steps: Craft(MithrilliumId, 32), cooldowns: cooldowns);
             var owned = Result(coin: 1000, steps: Craft(MithrilliumId, 30), cooldowns: cooldowns);

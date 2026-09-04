@@ -40,7 +40,7 @@ HUD references in tests; the new test exercises real production code
 (`PlanViewModelBuilder.Build`/`FormatDisciplineSublabel`) with no
 contract-mirror/fake-logic tests.
 
-Live desktop gate: PASS (orchestrator, 2026-08-06, same session as the
+Live desktop gate: PASS (2026-08-06, same session as the
 wave-1 gate above): the corrected sublabel path rendered live - recipes
 whose only source is the forge show "Mystic Forge" with no level, and
 the mixed-discipline safeguard is additionally covered by the end-to-end
@@ -94,10 +94,10 @@ entry points); `ApiAccessDialog`/`MainView` are Blish HUD UI code with no
 test net (repo invariant: tests must stay Blish-free) - not yet visually
 verified in a live Blish session.
 
-**Live gate:** PASS (orchestrator, 2026-08-06, live branch-build sandbox
+**Live gate:** PASS (2026-08-06, live branch-build sandbox
 session, captures pop_01-03 in preflight/captures): Refresh Now with no
 API key raised the classified ApiAccessNotReady dialog - title "GW2 API
-access is not ready", the three maintainer-specified checks rendered
+access is not ready", the three checks rendered
 verbatim (in-world character with the Mumble explanation, key registered
 in Blish, module permission path), Retry re-fired the refresh (status
 timestamp advanced behind the still-open dialog on repeat failure),
@@ -172,10 +172,10 @@ passing, unchanged (this pass does not touch that tool). Both floors
 (1101+/135) cleared. `ApiAccessDialog`/`Module.cs` remain untested-by-
 design UI/host code - not yet visually verified in a live Blish session.
 
-**Live gate:** PASS (orchestrator, 2026-08-06, live branch-build sandbox
+**Live gate:** PASS (2026-08-06, live branch-build sandbox
 session, captures pop_01-03 in preflight/captures): Refresh Now with no
 API key raised the classified ApiAccessNotReady dialog - title "GW2 API
-access is not ready", the three maintainer-specified checks rendered
+access is not ready", the three checks rendered
 verbatim (in-world character with the Mumble explanation, key registered
 in Blish, module permission path), Retry re-fired the refresh (status
 timestamp advanced behind the still-open dialog on repeat failure),

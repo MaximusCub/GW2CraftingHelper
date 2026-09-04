@@ -381,7 +381,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void LineX_CentresEveryLineOnTheSameContentCentre()
         {
-            // The V7 property: a shorter second line lands centred under the
+            // Centring: a shorter second line lands centred under the
             // first rather than starting where the first one started.
             const int contentWidth = 500;
 

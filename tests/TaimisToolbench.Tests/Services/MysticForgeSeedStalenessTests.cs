@@ -13,8 +13,8 @@ using Xunit;
 namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
-    /// The maintainer's field report: "Gift of Rays ... shows UNKNOWN in
-    /// the recipe tree", with the module logging "Recipe seed built for
+    /// A field report: Gift of Rays shows UNKNOWN in the recipe tree,
+    /// with the module logging "Recipe seed built for
     /// build 205505; current build 205780; seed negative entries will fall
     /// back to API" on every generation.
     ///
@@ -147,7 +147,7 @@ namespace TaimisToolbench.Tests.Services
 
         /// <summary>
         /// The whole plan the field report came from - Endless Summer
-        /// (107022), the parent the maintainer's own module_log and
+        /// (107022), the parent the reported module_log and
         /// persisted plan.json name - run through the REAL shipped seed
         /// against a build the seed does not match.
         /// <para>

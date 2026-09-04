@@ -638,7 +638,7 @@ namespace TaimisToolbench.Tests.Services
         // ---- Cost-component leaves - informational-only pill
         // vocabulary ----
         //
-        // Maintainer's field-test finding: the earlier HAVE/
+        // Field-test finding: the earlier HAVE/
         // "HAVE x/y NEEDED" vocabulary was replaced by a subdued "OWN n"
         // badge (PillKind.OwnedInfo, the same muted-gold kind the ordinary
         // partial-ownership annotation uses) showing the raw

@@ -820,8 +820,8 @@ namespace TaimisToolbench.Tests.Services
 
         // ---------------------------------------------------------------
         // The gate strip's bars. Each cell is a fixed label band, then a
-        // bar filling the rest of the cell - the dead space the owner
-        // flagged between a gate's name and its right-aligned percentage.
+        // bar filling the rest of the cell - the dead space between a
+        // gate's name and its right-aligned percentage.
         // ---------------------------------------------------------------
         private const int GateLabelBand = 84;
 

@@ -55,8 +55,8 @@ one-off.
 carefully):** `ref/wiki_vendor_cache.json` did not exist on disk in this
 worktree (dev-local, gitignored) at the start of this pass, so a full
 from-scratch re-scrape was explicitly NOT performed (would be an
-unbounded, many-thousand-page live operation, and is not what this
-follow-up asked for). Instead, a SCOPED live run
+unbounded, many-thousand-page live operation, and is outside this
+follow-up's scope). Instead, a SCOPED live run
 (`--query` restricted to the known festival vendor list +
 `--tag-seasonal-festivals` + `--merge-into ref/vendor_offers.json`)
 live-tagged the six OTHER known festival vendor NPC pages: Dragon Bash
@@ -280,7 +280,7 @@ fully green.
     them.
   - Live desktop verification for (a)/(b) above has not yet been
     performed as part of this review-fix pass either - flagging it here
-    so the orchestrator's gate step (below) covers it rather than
+    so the gate step (below) covers it rather than
     treating this as settled.
 - **Per-vendor tag coverage is internally inconsistent for three of the
   seven vendors this pass touched (2026-08-18 review finding).** A
@@ -368,7 +368,7 @@ fully green.
   it (with `{{Temporary}}` kept as the authority where the two disagree)
   would give dataset-wide coverage with no separate opt-in fetch pass and
   no `--max-seasonal-pages` trap - worth a future pass, out of scope here
-  since this pass was explicitly asked for `{{Temporary}}` parsing.
+  since this pass was scoped to `{{Temporary}}` parsing.
 - **Accepted limitation of the 2026-08-20 tag harvest (recorded, not
   fixed): a shipped `seasonalFestival` tag is now sticky, and a vendor
   that genuinely stops being seasonal will not un-tag itself.**
@@ -448,4 +448,4 @@ above was measured pre-merge; master added 90 tests of its own).
 `VendorOfferUpdater.Tests` - 205/205 green. `ref/vendor_offers.json`
 untouched by the merge, 57 `seasonalFestival` tags intact.
 
-Gate: not yet run live - updater-side tooling verified by suite; the 57 seasonal tags and solver exclusion were live-gated 2026-08-16. Merged after the full review pipeline (three verification rounds) resolved every finding, under the maintainer's standing merge directive (2026-08-16).
+Gate: not yet run live - updater-side tooling verified by suite; the 57 seasonal tags and solver exclusion were live-gated 2026-08-16. Merged after the full review pipeline (three verification rounds) resolved every finding, under the standing merge directive (2026-08-16).

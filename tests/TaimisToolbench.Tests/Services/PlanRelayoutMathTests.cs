@@ -323,7 +323,7 @@ namespace TaimisToolbench.Tests.Services
         // kinds) and draws its whole currency run inline in the cost
         // column. Measured against ref/vendor_offers.json at this tree's
         // quantities: the widest is a two-currency bulk offer, +154px.
-        // The maintainer's minimum buys room for it rather than letting
+        // The minimum buys room for it rather than letting
         // such rows ellipsize.
         private const int WidestVendorCurrencyRunWidth = 154;
 

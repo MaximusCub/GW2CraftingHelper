@@ -3,11 +3,9 @@
 
 ## Vendor data refresh, and the stale row it tried to ship (vendor-refresh)
 
-The maintainer authorised running the vendor updater unattended - "i have
-never run it by hand or supervised it before so i will not be planning to
-start now. if you have concerns about it.. do work to mitigate your
-concerns first" - so the concerns were mitigated first, and one of them
-turned out to be real.
+The vendor updater is run unattended, so any concern about running it that
+way is mitigated before the run rather than watched for during it. The
+concerns were mitigated first, and one of them turned out to be real.
 
 **Method.** Dedicated branch; the 13MB baseline copied outside the repo
 before anything ran; the WRAPPER script rather than a manual invocation,
@@ -22,7 +20,7 @@ scratch (~15 min, rate-limited).
 lines - rows the previous pass could not resolve and which no consumer
 could price. 581 items became purchasable that were not before, including
 **Gift of the Survivors (106712) from Castaway Agnes** - one of the four
-items the maintainer reported as UNKNOWN, and the one this data could
+items reported in the field as UNKNOWN, and the one this data could
 actually fix (it is a Visions of Eternity vendor item, not a recipe).
 Seasonal tags went 57 -> 597.
 
@@ -70,7 +68,7 @@ gate could not add.
 
 A follow-up asked for the refresh again, on the premise that Gift of the
 Survivors (106712), Gift of the People (105804) and Gift of the Hylek
-(106986) are "absent from every shipped seed" and that a
+(106986) are absent from every shipped seed and that a
 `tools/VendorOfferUpdater` + wiki-cache refresh was the outstanding fix.
 Both halves of that premise are wrong, and no wiki traffic was spent on
 re-testing them.

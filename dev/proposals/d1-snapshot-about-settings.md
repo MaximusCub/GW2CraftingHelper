@@ -1,7 +1,7 @@
 # D1 - Snapshot Search, About, Settings Audit
 
 Design proposal only. No production code was changed to produce this document
-(read-only session against `master`, no build or test run). Covers three of the seven module tabs: **Snapshot**
+(read-only against `master`, no build or test run). Covers three of the seven module tabs: **Snapshot**
 (redesign), **About** (new), **Settings** (extend + audit). Log, Plan History,
 and Crafting Ranker are explicitly out of scope for this document (assumed to
 be separate proposals in this same wave) and are referenced only where they
@@ -10,22 +10,22 @@ create a sequencing or naming collision worth flagging.
 ## Epistemic legend
 
 - **MEASURED** - read directly from this repo's source, or independently
-  re-verified this session against a real Blish HUD artifact (source file,
-  shipped assembly).
+  re-verified against a real Blish HUD artifact (source file, shipped
+  assembly).
 - **INFERRED** - a reasoned conclusion from measured evidence, not itself
   directly observed (e.g. "this property probably lives on that type").
 - **GUESS** - no supporting evidence gathered; flagged as such wherever used
   (rare in this document; open questions are used instead of guessing).
 
-No time/memory/duration estimates appear anywhere below, per instruction.
+No time/memory/duration estimates appear anywhere below.
 Effort is classified S/M/L/XL with a one-line reason only.
 
 ---
 
 ## Cross-cutting findings (apply to more than one feature below)
 
-These came out of this session's own reading and are load-bearing for more
-than one section, so they are stated once here rather than repeated.
+These are load-bearing for more than one section, so they are stated once
+here rather than repeated.
 
 ### Tab views are rebuilt from scratch on every visit, not cached (MEASURED)
 
@@ -72,9 +72,9 @@ of Snapshot/About/Settings need a `TabChanged` subscription, because
 
 ### `FrameTicker` is private to `CraftingPlanView`, not a shared primitive (MEASURED correction)
 
-The scout summary's "FrameTicker for multi-frame work" reads as a shared
-module primitive. Reading `Views/CraftingPlanView.cs` directly shows
-`private sealed class FrameTicker : Control` is a **nested private class
+"FrameTicker for multi-frame work" reads like a shared module primitive.
+Reading `Views/CraftingPlanView.cs` directly shows `private sealed class
+FrameTicker : Control` is a **nested private class
 inside `CraftingPlanView` itself** (line 457), instantiated three times for
 its own scroll/resize machinery. There is no reusable `FrameTicker` service
 elsewhere in `Services/` or `Views/`. None of the three features below need
@@ -100,7 +100,7 @@ view's own lazy recompute at `Build()` time.
 
 ### Problem/intent
 
-User directive (verbatim): *"a way to search your bag, banks, etc."*
+Intent: a way to search the account's bags, bank and other storage.
 
 Today (MEASURED, `Views/MainView.cs`, 449 lines): the Snapshot tab has a
 header row, a 3-item content-type `Dropdown` (All/Items/Wallet), an
@@ -119,8 +119,8 @@ character > `SharedInventory` > `Bank` > other characters, alphabetically).
 It already has a real, Blish-free test file
 (`tests/.../Services/AccountItemIndexTests.cs`).
 
-I also traced a concrete, confirmed bug that the brief asked this design to
-"subsume a fix for" - see the dedicated subsection below.
+I also traced a concrete, confirmed bug whose fix this design subsumes - see
+the dedicated subsection below.
 
 ### Proposed UX
 
@@ -193,8 +193,8 @@ in-place redesign of `MainView.cs`, not a new file):
 
 #### Why not reuse `SuggestionPanel`/`AutocompleteTextBox`/`IItemSearchProvider` wholesale
 
-The brief asks to reuse the Crafting Plan tab's suggestion/search UI "where
-sensible." I read `Views/SuggestionPanel.cs` (383 lines),
+Reusing the Crafting Plan tab's suggestion/search UI here was considered.
+I read `Views/SuggestionPanel.cs` (383 lines),
 `Views/AutocompleteTextBox.cs` (44 lines), and
 `Contracts/IItemSearchProvider.cs` in full before deciding. That machinery
 is shaped for a **different** interaction: type a few characters, get a
@@ -276,9 +276,9 @@ guidance argues against.
 
 #### The disk-restored-snapshot bug (confirmed; fix required as a companion change)
 
-The brief asked this design to "subsume" a known gap: a disk-restored
-snapshot not reaching the tab display until a refresh. I traced this in
-`Module.cs` rather than take it on faith:
+A known gap this design subsumes: a disk-restored snapshot not reaching the
+tab display until a refresh. I traced this in `Module.cs` rather than take
+it on faith:
 
 ```csharp
 protected override async Task LoadAsync()
@@ -361,8 +361,8 @@ triggered more often than a `Dropdown`/`Checkbox` change would be. The
 total row count is bounded by the account's own item-entry count, which is
 itself bounded by GW2's own fixed storage-slot limits (bank/material
 storage/shared inventory/character bag slots are all capped by the game
-itself - **INFERRED**, I did not verify the exact numeric caps against a
-live API doc this session). A per-keystroke `O(n)` substring scan plus an
+itself - **INFERRED**; the exact numeric caps were not verified against a
+live API doc). A per-keystroke `O(n)` substring scan plus an
 `O(k)` row rebuild (`k` = the filtered subset, typically far smaller than
 `n`) is well inside a single frame's budget - the same order of work
 `CraftableItemSearchProvider` already performs synchronously and instantly
@@ -415,10 +415,10 @@ explicit perf note for.
 3. Exact GW2 structural slot-count caps (flagged INFERRED above) - worth an
    implementer double-checking if the "no debounce needed" perf conclusion
    is to be trusted on the largest realistic accounts.
-4. Does the maintainer actually want session-sticky search/filter state, or
-   would a clean reset to "show everything" on every tab visit be
-   preferred? This proposal defaults to sticky because it is nearly free
-   given the cross-cutting finding above, but it is a real preference call.
+4. Is session-sticky search/filter state wanted, or would a clean reset to
+   "show everything" on every tab visit be preferred? This proposal defaults
+   to sticky because it is nearly free given the cross-cutting finding above,
+   but it is a real preference call.
 
 ---
 
@@ -426,10 +426,10 @@ explicit perf note for.
 
 ### Problem/intent
 
-User directive (verbatim): *"information on the app itself - version,
-project source location, author details."* Brief additionally asks for
-licenses/attributions (Blish HUD, GW2 API terms), a "built against Blish
-1.3.0" note, and diagnostics info (module data directory).
+Intent: information on the module itself - version, project source location,
+author details - plus licenses/attributions (Blish HUD, GW2 API terms), a
+"built against Blish 1.3.0" note, and diagnostics info (module data
+directory).
 
 Today (MEASURED, `Module.cs` line ~409): the About tab renders
 `Module.BuildPlaceholder` - a single gray "Coming Soon" label. No view class
@@ -479,9 +479,9 @@ plain selectable text) - closer in spirit and size to `LogTabContent.cs`
 - "Built with Blish HUD 1.3.0" row: a static string for v1 (see Data &
   architecture - the dynamic alternative is possible but unverified).
 - Licenses & Attributions: two short lines (Blish HUD's MIT credit, and a
-  GW2-API/ArenaNet fan-content disclaimer) - **both need the maintainer's
-  sign-off on exact wording before shipping**, flagged explicitly below,
-  not silently assumed correct.
+  GW2-API/ArenaNet fan-content disclaimer) - **both need their exact wording
+  confirmed before shipping**, flagged explicitly below, not silently
+  assumed correct.
 - Diagnostics: the module's own data directory path
   (`DirectoriesManager.GetFullDirectoryPath("data")`), useful for a user
   filing a bug report who needs to attach `snapshot.json`/`status.json`/etc.
@@ -494,9 +494,9 @@ plain selectable text) - closer in spirit and size to `LogTabContent.cs`
   like `SettingsTabContent` (`_aboutContent = new AboutTabContent(...)`;
   tab registration swaps `BuildPlaceholder` for
   `c => _aboutContent.Build(c)`).
-- **Manifest reachability - MEASURED this session, going one step further
-  than the scout notes:** I could not find a real `Blish HUD.exe` inside
-  this repo's own NuGet package (`packages/BlishHUD.1.3.0/lib/net472/` ships
+- **Manifest reachability - MEASURED:** I could not find a real `Blish
+  HUD.exe` inside this repo's own NuGet package
+  (`packages/BlishHUD.1.3.0/lib/net472/` ships
   only the XML doc and satellite resource DLLs, not the main assembly), but
   I located a real installed copy of the same 1.3.0 assembly elsewhere on
   this machine
@@ -510,14 +510,13 @@ plain selectable text) - closer in spirit and size to `LogTabContent.cs`
   ```
 
   All nine compiled property accessors exist somewhere in the real shipped
-  1.3.0 assembly - this **independently reconfirms** the scout's claim
-  rather than just repeating it. What I could **not** confirm without full
-  IL disassembly is that they hang together as
+  1.3.0 assembly. What I could **not** confirm without full IL disassembly
+  is that they hang together as
   `ModuleParameters.Manifest.{Name,Version,Url,Description,Author,
   Contributors,Package,Dependencies}` in exactly that shape (**INFERRED**,
-  strong but not proven). Recommend the same one-line `Logger.Info` smoke
-  test the scout already flagged, as the literal first step of
-  implementation, before writing the rest of the tab around it.
+  strong but not proven). Recommend a one-line `Logger.Info` smoke test as
+  the literal first step of implementation, before writing the rest of the
+  tab around it.
 - **Fallback (removes the risk of the above being wrong):** if any Manifest
   read throws, returns null, or is empty, fall back to hand-parsing the
   module's own `manifest.json` via
@@ -551,18 +550,18 @@ plain selectable text) - closer in spirit and size to `LogTabContent.cs`
   on which name is correct.
 - **Licenses & Attributions text - both lines need explicit sign-off,
   not silent assumption:**
-  - *Blish HUD:* confirmed **MEASURED via WebSearch** this session that
+  - *Blish HUD:* confirmed **MEASURED via WebSearch** that
     `blish-hud/Blish-HUD` is MIT licensed (its own GitHub `LICENSE` file).
     A short credit line + link ("Built on Blish HUD (MIT License) -
     github.com/blish-hud/Blish-HUD") is the common pattern for MIT
     attribution in an About screen; I did not attempt to reproduce the
-    full MIT license text inline, and whether a short credit line
-    satisfies the maintainer's own bar (as opposed to bundling the full
-    license text) is a judgment call for them, not something I resolved.
+    full MIT license text inline, and whether a short credit line suffices
+    (as opposed to bundling the full license text) is a judgment call this
+    document does not resolve.
   - *GW2 API / ArenaNet content disclaimer:* I attempted to fetch
     ArenaNet's own Content Terms of Use
     (`arena.net/en/legal/content-terms-of-use`) and the GW2 wiki's API
-    Terms of Use page directly this session; neither fetch returned
+    Terms of Use page directly; neither fetch returned
     usable rendered text (both appear to be JS-rendered pages that did not
     convert to readable content through automated fetch). The line shown
     in the wireframe above is the **INFERRED**, widely-used community-
@@ -570,9 +569,8 @@ plain selectable text) - closer in spirit and size to `LogTabContent.cs`
     not a verified quote of ArenaNet's current required wording) - it is
     explicitly a draft, not something to ship as-is. This repo's own "do
     not invent data" posture argues for treating exact current wording as
-    a required verification step (a maintainer or a follow-up research
-    session with better access to those legal pages), not something this
-    proposal resolves.
+    a required verification step (a follow-up research pass with better
+    access to those legal pages), not something this proposal resolves.
 - **Threading:** none. Pure static/derived text, read once at `Build()`
   time, no awaits, no cross-thread surface.
 
@@ -624,8 +622,8 @@ it does not push this into Medium.
 3. **Get the exact, current ArenaNet-required disclaimer wording verified**
    against ArenaNet's own legal pages - this proposal's draft text is
    explicitly a starting point, not a verified quote.
-4. Does the maintainer want a clickable "open in browser" affordance for
-   the source URL at all, contingent on confirming `Process.Start` (or a
+4. Is a clickable "open in browser" affordance for the source URL wanted at
+   all, contingent on confirming `Process.Start` (or a
    Blish-provided equivalent, if one exists and I simply didn't find it) is
    safe and functional from inside the GW2 overlay?
 5. Which branding (MaximusCub vs. Lachlan Mulcahy) is authoritative - this
@@ -639,9 +637,8 @@ it does not push this into Medium.
 
 ### Problem/intent
 
-User directive (verbatim): *"any useful settings that a user might need."*
-This is framed by the brief as an audit task first, additions second, with
-an explicit warning against settings soup.
+Intent: surface any useful settings a user might need. This is an audit task
+first, additions second, with settings soup as the thing to avoid.
 
 ### Audit of the existing settings surface (MEASURED, `ModuleSettings.cs` + `SettingsTabContent.cs`)
 
@@ -670,18 +667,18 @@ an explicit warning against settings soup.
    apply, the exact `ValueOwnMaterials` idiom, copy-paste shape). The
    setting already exists and is documented as instrumentation-only
    ("never changes scroll/guard/restore behavior") - the only gap is
-   discoverability. A user asked by the maintainer to help diagnose a
-   scroll-jank report currently has to be walked through hand-editing the
+   discoverability. A user helping diagnose a scroll-jank report currently
+   has to be walked through hand-editing the
    persisted settings JSON; that is a real, avoidable support-friction
    problem given the setting is otherwise safe to expose.
 
 ### Considered and explicitly REJECTED
 
 1. **Default price basis / default target quantity / tree default
-   expansion depth** (the brief's own named examples). **Rejected for this
+   expansion depth**. **Rejected for this
    proposal** - not because the ideas are bad, but because consuming any of
-   them requires a read inside `CraftingPlanView.cs`, which the brief
-   itself and the M38 plan both mark out of scope (WP-25's tree-controller
+   them requires a read inside `CraftingPlanView.cs`, which the M38 plan
+   marks out of scope (WP-25's tree-controller
    extraction is explicitly classified high-risk in the M38 plan; even a
    small new default-quantity/default-expansion-depth read is still an
    edit to a 4812-line file under active decomposition). Deferred to a
@@ -718,7 +715,7 @@ an explicit warning against settings soup.
 6. **A visible "Reset all settings to defaults" button.** **Considered,
    rejected.** `ModuleSettings.ResetToDefaults()` already exists in the
    codebase (MEASURED) but is called from **no View and no test anywhere**
-   in the main tree today - it is dead code as of this session's read.
+   in the main tree today - it is dead code.
    Wiring a button to it is straightforward, but Blish HUD's own generic
    per-module settings screen already exposes a module-level reset/
    uninstall path at the platform level; duplicating that inside this
@@ -792,7 +789,7 @@ threading, no new persistence mechanism.
 
 1. Section grouping/title for the new setting - a new standalone
    "Snapshot" section (this proposal's lean) vs. folding it elsewhere - a
-   naming/taste call for the maintainer.
+   naming/taste call.
 2. Should the newly-visible `ScrollDiagnosticsEnabled` checkbox get its own
    "Diagnostics" section (potentially shared later with whatever the Log
    tab proposal adds), or stay a single standalone row for now? A
@@ -804,7 +801,7 @@ threading, no new persistence mechanism.
 
 ---
 
-## Appendix: files read this session (grounding for MEASURED claims above)
+## Appendix: files consulted (grounding for MEASURED claims above)
 
 `Module.cs` (full), `Views/MainView.cs` (full), `Views/SettingsTabContent.cs`
 (full), `Views/SuggestionPanel.cs` (full), `Views/AutocompleteTextBox.cs`
@@ -818,8 +815,7 @@ threading, no new persistence mechanism.
 `tests/GW2CraftingHelper.Tests/Services/AccountItemIndexTests.cs` (excerpt),
 `m38-cleanup-plan.md` WP-16/17/21/22/27/28 sections, `Views/CraftingPlanView.cs` (targeted greps for `FrameTicker`),
 plus a repo-wide grep for `ResetToDefaults` (main tree only - worktrees
-under `.claude/worktrees` excluded from consideration per this session's
-constraints).
+under `.claude/worktrees` excluded).
 
 External, dev-time-only research (never called at runtime by the module):
 `blish-hud/Blish-HUD` GitHub repo (`TabbedWindow2.cs` source, `dev` branch,

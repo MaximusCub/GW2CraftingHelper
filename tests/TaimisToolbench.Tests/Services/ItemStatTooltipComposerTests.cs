@@ -89,10 +89,10 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public async Task GiftOfTwilight_MatchesTheOwnerABCaptureLineForLine()
+        public async Task GiftOfTwilight_MatchesTheInGameCaptureLineForLine()
         {
-            // The 2026-08-27 A/B: the owner hovered item 19648 in the
-            // module and in the live game and captured both. The game's box
+            // The A/B: item 19648 hovered in the module and in the live
+            // game, both captured. The game's box
             // reads header, description paragraph, blank, forge line, four
             // bullets, blank, "Trophy", "Account Bound", 6s 40c - and the
             // bound line is BARE, which is what this capture corrected.

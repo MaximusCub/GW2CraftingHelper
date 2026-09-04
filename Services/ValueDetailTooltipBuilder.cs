@@ -119,7 +119,7 @@ namespace TaimisToolbench.Services
             builder.EndLine();
             builder.Text("Optimization price: ").Coin(decisionTotal, CoinSegmentMath.GameStyleText(decisionTotal));
 
-            // Maintainer-ratified #21 resolution: append the winning
+            // KNOWN-ISSUES #21 resolution: append the winning
             // vendor offer's purchase cap, when this node's item has one -
             // informational only, matching TimegatedItem's own doc comment
             // (never gates or reroutes the decision).

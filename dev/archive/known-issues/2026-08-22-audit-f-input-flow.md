@@ -3,7 +3,7 @@
 
 ## Audit batch F: input flow (audit-f-input-flow)
 
-Four maintainer-approved UX-audit findings on the Crafting Plan tab's
+Four UX-audit findings on the Crafting Plan tab's
 input flow, plus one regression the first of them exposed.
 
 - **H4, stale resolved item (the correctness bug):** a row's item id was

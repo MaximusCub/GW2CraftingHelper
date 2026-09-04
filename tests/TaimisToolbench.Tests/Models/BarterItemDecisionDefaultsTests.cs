@@ -68,7 +68,7 @@ namespace TaimisToolbench.Tests.Models
             Assert.Equal(0, copperPerUnit);
         }
 
-        // Maintainer decision: the Black Lion family is gem-store RNG-chest
+        // The Black Lion family is gem-store RNG-chest
         // currency and its gold worth is personal, so no rate is suggested
         // for it - the same posture Astral Acclaim already gets (see
         // CurrencyDecisionDefaultsTests). These are the highest-usage

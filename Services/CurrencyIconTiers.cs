@@ -68,7 +68,7 @@ namespace TaimisToolbench.Services
         /// box y114..129 against ink y115..126, within a pixel at half the
         /// size. CoinSegmentMath.InlineIconY is that half.
         /// <para>
-        /// The coins are the exception, ruled by the owner on 2026-09-04:
+        /// The coins are the exception:
         /// gold, silver and copper seat their ART on the number's ink bottom
         /// (CoinSegmentMath.CoinIconY), because centring the BOX leaves the
         /// padded art reading high against the digits. Non-coin currencies

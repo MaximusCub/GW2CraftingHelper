@@ -90,7 +90,7 @@ current behavior BEFORE the change (for visual/geometry code: the
 pixel-scanner and a live desktop check), the standard adversarial review
 pipeline, and an explicit statement of what improved with evidence of zero
 regression. The burden of proof scales with the file's regression history;
-it never becomes prohibition. (Policy set by the maintainer 2026-08-17,
+it never becomes prohibition. (Policy set 2026-08-17,
 replacing the M38-era freeze.)
 
 Numbered items below that still say "DO-NOT-TOUCH" are historical records
@@ -227,7 +227,7 @@ in that same pass - **this gap was closed by item 30 below** (M37 live
 desktop session, 2026-07-22, scanned Required Disciplines directly and
 confirmed the same clean result the simulation predicted).
 
-Tier-2 re-run (2026-08-27, icon-tier2 branch): the owner's icon ruling
+Tier-2 re-run (2026-08-27, icon-tier2 branch): the tier-2 icon change
 grew the plan tab's icon-led rows to 45px (Used Materials / Shopping /
 Required Recipes) and 52px (Crafting Steps). The M36b simulation was
 re-derived from the decompiled `ScaleBy` floor/ceil semantics, validated
@@ -371,7 +371,7 @@ test double were deleted: `Module.cs` always constructed the pipeline with
 `resolver: null`, so every branch guarded on it was unreachable by
 construction. Superseded by the static seed-store path
 (`VendorOfferLoader`/`VendorOfferStore`, populated offline). Recorded
-dissent: the architecture analyst argued for keep-and-comment instead of
+dissent: keep-and-comment was argued for instead of
 delete; deletion was chosen (also removed the test suite's single largest
 real-time cost - retry/backoff `Task.Delay`s). A clean `git revert`
 restores the seam if a live-wiki resolve mode is wanted again.
@@ -564,9 +564,9 @@ of which the repo invariants permit or require test coverage for).
 invariant: tests must stay Blish-free) - the fix is proven by construction
 (every racing path is now provably main-thread-only, and gated against
 acting before Build's own tail has landed where relevant) plus the live
-orchestrator gate below.
+gate below.
 
-**Live gate:** PASS (orchestrator, 2026-08-06, live branch-build sandbox
+**Live gate:** PASS (2026-08-06, live branch-build sandbox
 session under the hardened desktop protocol, captures logfix_01_empty.png /
 logfix_02_search.png):
 - Empty-state placeholder renders exactly ONCE on first Log-tab open
@@ -901,13 +901,13 @@ with no schema change. Full record:
 MEASURED: `TreeToolbarCommands.BestPath` and the Overrides chip's clear
 action do byte-for-byte the same work - clear the same dictionary, re-solve
 - and differ only in the status line they write and the dialog they ask.
-Recorded as a finding for the maintainer rather than papered over at the
+Recorded as a finding rather than papered over at the
 seam. Full record:
 `dev/archive/known-issues/2026-08-23-plan-view-redesign.md`.
 
 ### 60. Field-test fixes wave 3 (field-fixes-3)
 
-Five independent maintainer reports from one live 0.2.3 session: zero-band
+Five independent field reports from one live 0.2.3 session: zero-band
 retention, scroll anchoring across a re-solve, the click-sound default, the
 Mystic Forge UNKNOWN investigation (item 4 - measured: not the build bump,
 and mostly not a defect), and the first-load snapshot. Full record:
@@ -1000,17 +1000,17 @@ genuinely open item, not just the ones originally filed under a
   plate, black ink, sRGB relative luminance): **4.90:1 at full strength,
   1.87:1 over a black backdrop and 2.04:1 over the row's own dark one.**
   White ink in the dimmed state alone would read 4.41:1 / 4.04:1. It is
-  not changed because the owner's ruling on this glyph was that it is
-  black, and inverting it in one state is a design call for him, not a
-  correctness fix. The rule that used to encode exactly this inversion
+  not changed because the glyph is specified black, and inverting it in
+  one state is a design decision rather than a correctness fix. The rule
+  that used to encode exactly this inversion
   (`PillColors.GlyphColor`) went dead when the hand-drawn toggle became a
   `FeedbackButton` and has been deleted; this entry is where the argument
   it carried now lives.
-- Localization (en/de/fr/es via API lang param): user-deferred backlog,
-  "not core functionality". Full-milestone scale when picked up.
+- Localization (en/de/fr/es via API lang param): deferred as not core
+  functionality. Full-milestone scale when picked up.
 - Upstream Blish HUD issue/PR for the wheel-delta wrap: REMOVED from the
-  backlog entirely by user decision (2026-07-22) - no upstream posts are
-  planned. The module-side sanitizer stays until a fixed Blish release
+  backlog entirely (2026-07-22) - no upstream posts are planned. The
+  module-side sanitizer stays until a fixed Blish release
   ships, then can be retired at leisure.
 - Ignore-pill cascade semantics + own-materials gating divergences
   (#20.4): revisit only on user feedback.
@@ -1047,7 +1047,7 @@ genuinely open item, not just the ones originally filed under a
   matching v1's fixed design decision. A prior research draft flagged a
   divergence option (default-off master gate, since this module runs
   in-client for players who may never have touched Janthir Wilds) -
-  recorded as a future confirm-with-maintainer option, not implemented.
+  recorded as a future option pending confirmation, not implemented.
 - Homestead Black Market path (#24): 300 purchases of 25/week per
   station, coin-only, tier-independent - confirmed still entirely
   unseeded (the live re-scrape used for tier tagging failed wiki
@@ -1132,8 +1132,8 @@ open, so they live here rather than only in the archive:
   precedent for the shape: `LogToolbarLayout.SearchMaxWidth` caps at 400
   and lets the rest become space. Open questions when picked up: the cap
   value (measure the widest legitimate row content rather than guess) and
-  whether capped content centres or left-aligns. Maintainer deferred it
-  2026-08-28 as a distraction.
+  whether capped content centres or left-aligns. Deferred 2026-08-28 as a
+  distraction.
 
 ---
 
@@ -1240,7 +1240,7 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
   `dev/archive/known-issues/2026-08-17-quality-phase4a-tracker.md`
 - **Quality-audit phase 4b: pure parameter bundling (B10, quality-phase4b-bundling)** - gate PASS.
   `dev/archive/known-issues/2026-08-17-quality-phase4b-bundling.md`
-- **Desktop gate batch: value-detail closure + partial currency coverage (2026-08-17, orchestrator live session)** - gate: see record.
+- **Desktop gate batch: value-detail closure + partial currency coverage (2026-08-17, live session)** - gate: see record.
   `dev/archive/known-issues/2026-08-17-desktop-gate-batch-value-detail-closure-partial.md`
 - **Backlog cleanup batch (B8/B11/B13/B14/B15 + solver ctor hardening, backlog-cleanup)** - gate PASS 2026-08-17.
   `dev/archive/known-issues/2026-08-17-backlog-cleanup.md`
@@ -1342,6 +1342,6 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **The Battle Historian: a removed WvW vendor pricing legendary materials at zero (2026-08-29)** - gate not required (dev-tool and data change; verified by a byte-identical round trip and a `--diff-summary` showing 49 removed and nothing else touched).
   Cited as: w5-deadvendors.
   `dev/records/w5-deadvendors.md`
-- **Two "Gaeting Crystal" currency ids: one is retired (2026-08-29)** - gate not required (retired currency 39 and item 86094 removed, live currency 77 named; answers FEEDBACK-BACKLOG R1).
+- **Two "Gaeting Crystal" currency ids: one is retired (2026-08-29)** - gate not required (retired currency 39 and item 86094 removed, live currency 77 named).
   Cited as: gaeting-crystal-duplicate-ids.
   `dev/records/gaeting-crystal-duplicate-ids.md`

@@ -5,16 +5,16 @@
 
 Read-only audit phase for KNOWN-ISSUES item 31 (three never-formally-swept
 reviews recorded there as verification debt). Three independent audit
-agents each swept one area of the codebase for classified findings; every
+passes each swept one area of the codebase for classified findings; every
 blocking (Critical/MustFix) finding was then independently re-checked by a
-separate adversarial refutation agent before being handed to the fix pass
+separate adversarial refutation pass before being handed to the fix pass
 recorded in KNOWN-ISSUES.md item 31's "FIXED in M37" note. No files were
 modified during this phase - inventory only. All three summaries below are
-reproduced verbatim from each audit agent's own report.
+reproduced verbatim from each audit's own report.
 
 Totals across all three audits: **9 confirmed, 0 refuted, 2 nice-to-have.**
 Every confirmed finding was adversarially re-walked against the real code
-by a second agent and held up (zero findings were refuted on review).
+by a second pass and held up (zero findings were refuted on review).
 
 ---
 
@@ -193,7 +193,7 @@ generate/re-solve/refresh (`Services/TradingPostService.cs`).
 >   batch-economics companion (ApplyBatchSellSideEconomics) read ONLY this
 >   snapshot and never call back into TradingPostService/_cache at all -
 >   confirmed by reading both methods end to end. This means the local
->   re-solve / batch-economics-recompute path named in the task brief is,
+>   re-solve / batch-economics-recompute path under audit here is,
 >   by construction, decoupled from the cache and cannot race it; the real
 >   overlap risk is strictly between concurrent Generate-family calls
 >   (GenerateAsync L102, GenerateStructuredAsync L270,
@@ -270,6 +270,6 @@ eviction policy).
 ## Disposition
 
 All 9 confirmed findings and nice-to-have 31a-F3 were fixed in the
-same M37 session that produced this report - see KNOWN-ISSUES.md item 31's
+same M37 work that produced this report - see KNOWN-ISSUES.md item 31's
 "FIXED in M37" record for the per-finding fix summary, tests added, and
 the accepted M38 candidate (31c-2, deferred, not implemented).

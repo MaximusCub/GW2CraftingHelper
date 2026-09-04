@@ -395,7 +395,7 @@ namespace TaimisToolbench.Tests.Services
         public void Load_ExpectedOutputCount_ParsedAsFractionalDouble()
         {
             // Mystic Clover shape: nominal outputItemCount=1, real gw2e
-            // expected yield 0.31 (r2 report).
+            // expected yield 0.31.
             var json = @"{
                 ""schemaVersion"": 1,
                 ""recipes"": [

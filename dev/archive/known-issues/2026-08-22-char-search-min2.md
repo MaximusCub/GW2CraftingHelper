@@ -3,7 +3,7 @@
 
 ## Character-name search minimum query length (char-search-min2)
 
-Maintainer decision, closing the "Character-search minimum query length"
+Decision closing the "Character-search minimum query length"
 item the nth-cleanup batch left open by choice. The reason is the result
 list, not the per-keystroke cost: with one-letter matching, typing "ar"
 on the way to an item name first passes through "a", which surfaces
@@ -49,5 +49,5 @@ character); adding "h" ("th", matched by no item name) returned
 exactly Green Wood Log via Third Wheel / Ranger Of The North (the
 floor lifting at two). The reviewer's noted empty-state wording gap
 (a one-letter query's message does not mention the character-label
-floor) was observed as accurate-but-unexplained live; left as the
-recorded maintainer call.
+floor) was observed as accurate-but-unexplained live; left as
+recorded.
