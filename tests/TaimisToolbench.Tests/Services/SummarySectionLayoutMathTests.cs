@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using TaimisToolbench.Models;
 using TaimisToolbench.Services;
 using Xunit;
@@ -14,6 +15,15 @@ namespace TaimisToolbench.Tests.Services
         private static PlanRowViewModel Row(PlanRowType type)
         {
             return new PlanRowViewModel { RowType = type };
+        }
+
+        private static PlanRowViewModel BarterRow()
+        {
+            return new PlanRowViewModel
+            {
+                RowType = PlanRowType.CurrencyCost,
+                IsBarterItemCost = true,
+            };
         }
 
         // --- BodyHeight ---
@@ -78,8 +88,10 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void BodyHeight_CurrencyRows_HeaderPlusOnePerRow()
+        public void BodyHeight_CurrencyRows_HeaderPlusGroupHeadingPlusOnePerRow()
         {
+            // Three wallet currencies are ONE group, so the table costs one
+            // group heading however many rows sit under it.
             var rows = new List<PlanRowViewModel>
             {
                 Row(PlanRowType.CostFormulaTile),
@@ -91,9 +103,36 @@ namespace TaimisToolbench.Tests.Services
 
             int expected = SummarySectionLayoutMath.CostBandHeight(true)
                 + SummarySectionLayoutMath.CurrencyTableTopGap
-                + PlanContentHeightMath.ColumnHeaderRowHeight + 3 * PlanContentHeightMath.CurrencyRowHeight
+                + PlanContentHeightMath.ColumnHeaderRowHeight
+                + SummarySectionLayoutMath.NonCoinGroupHeadingHeight
+                + 3 * PlanContentHeightMath.CurrencyRowHeight
                 + PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, SummarySectionLayoutMath.BodyHeight(rows));
+        }
+
+        [Fact]
+        public void BodyHeight_BothKinds_ReservesOneHeadingPerGroup()
+        {
+            // The same two rows, one of each kind: two groups, so two
+            // headings - the height a one-group table would have plus one
+            // more heading.
+            var oneGroup = new List<PlanRowViewModel>
+            {
+                Row(PlanRowType.CostFormulaTile),
+                Row(PlanRowType.CurrencyCost),
+                Row(PlanRowType.CurrencyCost),
+            };
+            var twoGroups = new List<PlanRowViewModel>
+            {
+                Row(PlanRowType.CostFormulaTile),
+                Row(PlanRowType.CurrencyCost),
+                BarterRow(),
+            };
+
+            Assert.Equal(
+                SummarySectionLayoutMath.BodyHeight(oneGroup)
+                    + SummarySectionLayoutMath.NonCoinGroupHeadingHeight,
+                SummarySectionLayoutMath.BodyHeight(twoGroups));
         }
 
         [Fact]
@@ -148,7 +187,9 @@ namespace TaimisToolbench.Tests.Services
             int expected = SummarySectionLayoutMath.CostBandHeight(true)
                 + PlanContentHeightMath.CostTileRowHeight
                 + SummarySectionLayoutMath.CurrencyTableTopGap
-                + PlanContentHeightMath.ColumnHeaderRowHeight + 2 * PlanContentHeightMath.CurrencyRowHeight
+                + PlanContentHeightMath.ColumnHeaderRowHeight
+                + SummarySectionLayoutMath.NonCoinGroupHeadingHeight
+                + 2 * PlanContentHeightMath.CurrencyRowHeight
                 + 2 * PlanContentHeightMath.FallbackTextRowHeight;
             Assert.Equal(expected, SummarySectionLayoutMath.BodyHeight(rows));
         }
@@ -335,6 +376,7 @@ namespace TaimisToolbench.Tests.Services
                 SummarySectionLayoutMath.CostBandHeight(true)
                     + SummarySectionLayoutMath.CurrencyTableTopGap
                     + PlanContentHeightMath.ColumnHeaderRowHeight
+                    + SummarySectionLayoutMath.NonCoinGroupHeadingHeight
                     + PlanContentHeightMath.CurrencyRowHeight,
                 SummarySectionLayoutMath.BodyHeight(oneRow));
         }
@@ -495,6 +537,7 @@ namespace TaimisToolbench.Tests.Services
             int currencyTableHeight =
                 SummarySectionLayoutMath.CurrencyTableTopGap
                 + PlanContentHeightMath.ColumnHeaderRowHeight
+                + SummarySectionLayoutMath.NonCoinGroupHeadingHeight
                 + PlanContentHeightMath.CurrencyRowHeight;
 
             Assert.Equal(
@@ -541,6 +584,128 @@ namespace TaimisToolbench.Tests.Services
         {
             Assert.Equal("+ 5 Currencies and Items Required",
                 SummarySectionLayoutMath.CurrencyRequirementNote(NonCoinRows(3, 2)));
+        }
+
+        // --- GroupNonCoinRows ---
+        [Fact]
+        public void GroupNonCoinRows_WalletCurrenciesLeadTheBarterItems()
+        {
+            var rows = new List<PlanRowViewModel>
+            {
+                new PlanRowViewModel
+                {
+                    RowType = PlanRowType.CurrencyCost, IsBarterItemCost = true, Label = "Token",
+                },
+                new PlanRowViewModel { RowType = PlanRowType.CurrencyCost, Label = "Karma" },
+            };
+
+            var groups = SummarySectionLayoutMath.GroupNonCoinRows(rows);
+
+            Assert.Equal(2, groups.Count);
+            Assert.Equal(SummarySectionLayoutMath.WalletGroupHeading, groups[0].Heading);
+            Assert.Equal("Karma", Assert.Single(groups[0].Rows).Label);
+            Assert.Equal(SummarySectionLayoutMath.InventoryGroupHeading, groups[1].Heading);
+            Assert.Equal("Token", Assert.Single(groups[1].Rows).Label);
+        }
+
+        [Fact]
+        public void GroupNonCoinRows_KeepsTheOrderItWasHandedInsideAGroup()
+        {
+            // The builder sorts once across both kinds; a grouping that did
+            // not preserve relative order would cost each group that sort.
+            var rows = new List<PlanRowViewModel>
+            {
+                new PlanRowViewModel { RowType = PlanRowType.CurrencyCost, Label = "Ascalonian Tears" },
+                new PlanRowViewModel
+                {
+                    RowType = PlanRowType.CurrencyCost, IsBarterItemCost = true, Label = "Ancient Coin",
+                },
+                new PlanRowViewModel { RowType = PlanRowType.CurrencyCost, Label = "Spirit Shards" },
+                new PlanRowViewModel
+                {
+                    RowType = PlanRowType.CurrencyCost, IsBarterItemCost = true, Label = "Blue Prophet Shard",
+                },
+            };
+
+            var groups = SummarySectionLayoutMath.GroupNonCoinRows(rows);
+
+            Assert.Equal(
+                new[] { "Ascalonian Tears", "Spirit Shards" },
+                groups[0].Rows.Select(r => r.Label).ToArray());
+            Assert.Equal(
+                new[] { "Ancient Coin", "Blue Prophet Shard" },
+                groups[1].Rows.Select(r => r.Label).ToArray());
+        }
+
+        [Fact]
+        public void GroupNonCoinRows_OneKindOnly_YieldsOnlyThatGroup()
+        {
+            var walletOnly = SummarySectionLayoutMath.GroupNonCoinRows(NonCoinRows(2, 0));
+            Assert.Equal(
+                SummarySectionLayoutMath.WalletGroupHeading,
+                Assert.Single(walletOnly).Heading);
+
+            var inventoryOnly = SummarySectionLayoutMath.GroupNonCoinRows(NonCoinRows(0, 2));
+            Assert.Equal(
+                SummarySectionLayoutMath.InventoryGroupHeading,
+                Assert.Single(inventoryOnly).Heading);
+        }
+
+        [Fact]
+        public void GroupNonCoinRows_SameNameEitherSide_StillLandsInItsOwnGroup()
+        {
+            // A currency and a barter item can resolve to the same display
+            // name; the group a row belongs to is its KIND, never its label.
+            var rows = new List<PlanRowViewModel>
+            {
+                new PlanRowViewModel { RowType = PlanRowType.CurrencyCost, Label = "Spirit Shards" },
+                new PlanRowViewModel
+                {
+                    RowType = PlanRowType.CurrencyCost, IsBarterItemCost = true, Label = "Spirit Shards",
+                },
+            };
+
+            var groups = SummarySectionLayoutMath.GroupNonCoinRows(rows);
+
+            Assert.Equal(2, groups.Count);
+            Assert.False(Assert.Single(groups[0].Rows).IsBarterItemCost);
+            Assert.True(Assert.Single(groups[1].Rows).IsBarterItemCost);
+        }
+
+        [Fact]
+        public void GroupNonCoinRows_IgnoresEveryOtherRowKind()
+        {
+            // BodyHeight hands this a whole section, footnotes and formula
+            // tiles included - none of which is a cost row.
+            var rows = new List<PlanRowViewModel>
+            {
+                Row(PlanRowType.CostFormulaTile),
+                Row(PlanRowType.ProfitFormulaTile),
+                Row(PlanRowType.MultiItemNote),
+                Row(PlanRowType.SummaryFootnote),
+                null,
+            };
+
+            Assert.Empty(SummarySectionLayoutMath.GroupNonCoinRows(rows));
+            Assert.Empty(SummarySectionLayoutMath.GroupNonCoinRows(null));
+            Assert.Empty(SummarySectionLayoutMath.GroupNonCoinRows(new List<PlanRowViewModel>()));
+        }
+
+        [Fact]
+        public void NonCoinTableRowsHeight_IsOneHeadingPerGroupPlusOneRowPerCostRow()
+        {
+            var groups = SummarySectionLayoutMath.GroupNonCoinRows(NonCoinRows(2, 1));
+
+            Assert.Equal(
+                2 * SummarySectionLayoutMath.NonCoinGroupHeadingHeight
+                    + 3 * PlanContentHeightMath.CurrencyRowHeight,
+                SummarySectionLayoutMath.NonCoinTableRowsHeight(groups));
+
+            Assert.Equal(0, SummarySectionLayoutMath.NonCoinTableRowsHeight(null));
+            Assert.Equal(
+                0,
+                SummarySectionLayoutMath.NonCoinTableRowsHeight(
+                    SummarySectionLayoutMath.GroupNonCoinRows(null)));
         }
 
         [Fact]

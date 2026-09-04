@@ -80,10 +80,10 @@ namespace TaimisToolbench.Views.Rendering
             public int[] TextWidths;
 
             /// <summary>
-            /// Extra y applied to the ICONS only, so the icon box centres
-            /// on the digits' ink rather than sitting on the top edge of
-            /// the number's line box - see
-            /// <see cref="CoinSegmentMath.InlineIconY"/>. Cached on the
+            /// Extra y applied to the ICONS only, so an icon seats against
+            /// the digits rather than against the top edge of the number's
+            /// line box - a coin run by <see cref="CoinDigitSeat"/>, a
+            /// wallet-currency run by <see cref="DigitSeat"/>. Cached on the
             /// handle so RepositionSegments reproduces the same offset
             /// without the caller having to remember it.
             /// </summary>
@@ -118,7 +118,7 @@ namespace TaimisToolbench.Views.Rendering
         /// dims the number labels (not the icons - Panel has no tint
         /// property) for dimmed not-crafted subtree rows. The icons' own y
         /// is this method's to decide, not the caller's - see
-        /// <see cref="DigitSeat"/>.
+        /// <see cref="CoinDigitSeat"/>.
         /// </summary>
         internal static SegmentLayoutHandle LayoutCoinSegments(
             Panel parent, List<CoinSegmentMath.CoinSegmentSpec> segments, int startX, int y, BitmapFont font,
@@ -127,7 +127,7 @@ namespace TaimisToolbench.Views.Rendering
             var controls = new (Label, Panel)[segments.Count];
             var widths = new int[segments.Count];
             int effectiveIcon = iconSize > 0 ? iconSize : CoinSegmentMath.CoinIconSize;
-            int iconYOffset = DigitSeat(font, effectiveIcon);
+            int iconYOffset = CoinDigitSeat(font, effectiveIcon);
             int x = startX;
             for (int i = 0; i < segments.Count; i++)
             {
@@ -148,11 +148,11 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// Where this run's icons sit against its digits. THE one place an
-        /// inline coin or currency icon's y is decided, so every value cell
-        /// in the module seats identically and no call site can leave its
-        /// icons stuck to the top edge of the number's line box - which is
-        /// what all but two of them did.
+        /// Where a WALLET CURRENCY run's icons sit against its digits. THE
+        /// one place a non-coin inline icon's y is decided, so every value
+        /// cell in the module seats identically and no call site can leave
+        /// its icons stuck to the top edge of the number's line box - which
+        /// is what all but two of them did.
         /// <para>
         /// Read off the face itself, not off a table: the digits' ink top
         /// and height come from the '0' region, so a run drawn at any size
@@ -173,6 +173,28 @@ namespace TaimisToolbench.Views.Rendering
             return zero == null
                 ? CoinSegmentMath.InlineIconY(0, font.LineHeight, iconSize)
                 : CoinSegmentMath.InlineIconY(zero.YOffset, zero.Height, iconSize);
+        }
+
+        /// <summary>
+        /// <see cref="DigitSeat"/>'s twin for a GOLD, SILVER or COPPER run,
+        /// which seats the coin's art on the digits' ink bottom rather than
+        /// centring its box (<see cref="CoinSegmentMath.CoinIconY"/>). The
+        /// owner ruled on 2026-09-04 that the coins alone move and every
+        /// other inline currency icon keeps the centred seat, so folding the
+        /// two back together undoes a decision rather than tidying a
+        /// duplicate.
+        /// <para>
+        /// A face with no '0' keeps the CENTRED fallback: a bottom seat is a
+        /// statement about the baseline, and a line box - all a font reports
+        /// for a glyph it does not have - carries none.
+        /// </para>
+        /// </summary>
+        private static int CoinDigitSeat(BitmapFont font, int iconSize)
+        {
+            var zero = font?.GetCharacterRegion('0');
+            return zero == null
+                ? DigitSeat(font, iconSize)
+                : CoinSegmentMath.CoinIconY(zero.YOffset, zero.Height, iconSize);
         }
 
         /// <summary>
@@ -584,7 +606,7 @@ namespace TaimisToolbench.Views.Rendering
                 var controls = new (Label, Panel)[coinSegments.Count];
                 var widths = new int[coinSegments.Count];
                 var assetIds = new int[coinSegments.Count];
-                int iconYOffset = DigitSeat(font, CoinSegmentMath.CoinIconSize);
+                int iconYOffset = CoinDigitSeat(font, CoinSegmentMath.CoinIconSize);
                 for (int i = 0; i < coinSegments.Count; i++)
                 {
                     var seg = coinSegments[i];

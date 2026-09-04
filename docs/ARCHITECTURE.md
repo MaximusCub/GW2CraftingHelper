@@ -2972,6 +2972,21 @@ half the size. That is the rule the renderers spell as
 `iconYOffset = (textHeight - iconSize) / 2`, recorded here so it need not be
 re-derived from a screenshot.
 
+**The coins are the exception**, ruled by the owner on 2026-09-04: gold,
+silver and copper seat their *art* on the number's ink bottom
+(`CoinIconY`, in `Services/CoinSegmentMath.cs`), because a centred *box* leaves the
+padded coin art reading high against the digits. Two paddings sit between
+the two numbers a caller holds. A Menomonia glyph box is one pixel taller
+than its ink at each edge, the faces being built with `outline="1"
+spacing="1,1"` - measured on the shipped 14-regular, 16-regular, 20-bold and
+32-regular pages, every `0` inks exactly rows 1..height-2 of its own box. And
+the three 32x32 coin textures ink rows 5..26 (gold 156904, silver 156907) and
+4..26 (copper 156902), so their shared bottom edge is row 26 and copper's
+extra row at the top never enters a bottom seat. Every other inline currency
+icon keeps the centred seat: they measured centred to within half a pixel in
+the same capture that reported the coin defect, and were left alone
+deliberately.
+
 ### S1.4 Item tooltips: what the API says and what the game shows
 
 `Services/ItemStatBlockFactory.cs` is where every "what does an absent field

@@ -89,7 +89,7 @@ Services/AchievementBitDedupPrePass.cs                                          
 Services/AcquisitionHintService.cs                                                      75
 Services/BoundedConcurrency.cs                                                          51
 Services/ClickSoundVolume.cs                                                            90
-Services/CoinSegmentMath.cs                                                             226
+Services/CoinSegmentMath.cs                                                             302
 Services/ColumnBoardLayout.cs                                                           130
 Services/ColumnHeaderLabelMath.cs                                                       43
 Services/CompetencyOpportunityCalculator.cs                                             83
@@ -180,7 +180,7 @@ Services/PlanStripStatusBoard.cs                                                
 Services/PlanStripTickDecision.cs                                                       97
 Services/PlanStructuralValidator.cs                                                     597
 Services/PlanTableSorter.cs                                                             261
-Services/PlanViewModelBuilder.cs                                                        1692
+Services/PlanViewModelBuilder.cs                                                        1703
 Services/RankerPriorityCascade.cs                                                       364
 Services/RankerPriorityOrdering.cs                                                      183
 Services/RankerRarityAdoption.cs                                                        87
@@ -247,7 +247,7 @@ Services/StatusStore.cs                                                         
 Services/StatusText.cs                                                                  286
 Services/StatusUpdateGuard.cs                                                           38
 Services/StickyHeaderLayout.cs                                                          117
-Services/SummarySectionLayoutMath.cs                                                    724
+Services/SummarySectionLayoutMath.cs                                                    852
 Services/TableSortState.cs                                                              114
 Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
@@ -292,7 +292,7 @@ Views/PlanHistoryTabContent.cs                                                  
 Views/RankerTabContent.cs                                                               3025
 Views/Rendering/ClickSound.cs                                                           197
 Views/Rendering/CloseKeyButton.cs                                                       119
-Views/Rendering/CoinCurrencyRenderer.cs                                                 649
+Views/Rendering/CoinCurrencyRenderer.cs                                                 671
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              221
 Views/Rendering/CraftStepsSectionRenderer.cs                                            264
 Views/Rendering/DisciplinesSectionRenderer.cs                                           288
@@ -324,7 +324,7 @@ Views/Rendering/SortableHeaderBlock.cs                                          
 Views/Rendering/SortableHeaderCells.cs                                                  249
 Views/Rendering/SortableHeaderLabel.cs                                                  38
 Views/Rendering/StickyHeaderHost.cs                                                     404
-Views/Rendering/SummarySectionRenderer.cs                                               1054
+Views/Rendering/SummarySectionRenderer.cs                                               1107
 Views/Rendering/TextRowRenderer.cs                                                      36
 Views/Rendering/TooltipFacility.cs                                                      288
 Views/Rendering/TreeSectionController.cs                                                2530
@@ -376,7 +376,7 @@ tests/TaimisToolbench.Tests/Services/BoundedConcurrencyTests.cs                 
 tests/TaimisToolbench.Tests/Services/ClickSoundVolumeTests.cs                           131
 tests/TaimisToolbench.Tests/Services/ClipTopSlipSimulationTests.cs                      158
 tests/TaimisToolbench.Tests/Services/CoinFormattingTests.cs                             211
-tests/TaimisToolbench.Tests/Services/CoinSegmentMathTests.cs                            367
+tests/TaimisToolbench.Tests/Services/CoinSegmentMathTests.cs                            498
 tests/TaimisToolbench.Tests/Services/ColumnBoardLayoutTests.cs                          193
 tests/TaimisToolbench.Tests/Services/CompetencyOpportunityCalculatorTests.cs            205
 tests/TaimisToolbench.Tests/Services/CompositeRecipeApiClientTests.cs                   221
@@ -564,7 +564,7 @@ tests/TaimisToolbench.Tests/Services/StatusStoreTests.cs                        
 tests/TaimisToolbench.Tests/Services/StatusTextTests.cs                                 345
 tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                          33
 tests/TaimisToolbench.Tests/Services/StickyHeaderLayoutTests.cs                         266
-tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                   1162
+tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                   1327
 tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                             198
 tests/TaimisToolbench.Tests/Services/GlyphButtonMetricsTests.cs                         111
 tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                        332

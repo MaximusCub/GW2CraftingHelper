@@ -608,14 +608,65 @@ namespace TaimisToolbench.Views.Rendering
             // above it.
             var scan = ScanCurrencyColumns(rows);
 
+            // Wallet currencies and barter items are checked in two
+            // different places, so the table draws them as two groups, each
+            // under a heading naming the place. The grouping is derived
+            // here rather than carried as extra rows: a heading is not a
+            // cost, and a heading ROW would be one missed RowType check
+            // away from being counted as one by the plan-level totals, the
+            // column scan or the height math.
+            var groups = SummarySectionLayoutMath.GroupNonCoinRows(rows);
+
             CreateCurrencyTableTopGap(parent, panelWidth);
             CreateCurrencyTableHeaderRow(
                 parent, panelWidth, scan, SummarySectionLayoutMath.NonCoinNameHeader(rows),
-                rows.Count);
-            for (int i = 0; i < rows.Count; i++)
+                SummarySectionLayoutMath.NonCoinTableRowsHeight(groups));
+            for (int g = 0; g < groups.Count; g++)
             {
-                CreateCurrencyTableRow(rows[i], parent, panelWidth, scan);
+                CreateNonCoinGroupHeadingRow(groups[g].Heading, parent, panelWidth);
+                var groupRows = groups[g].Rows;
+                for (int i = 0; i < groupRows.Count; i++)
+                {
+                    CreateCurrencyTableRow(groupRows[i], parent, panelWidth, scan);
+                }
             }
+        }
+
+        // The group headings are labels over data, not data: the same grey
+        // the formula band's own tile captions wear.
+        private static readonly Color NonCoinGroupHeadingColor = BandCaptionColor;
+
+        /// <summary>
+        /// One group heading inside the non-coin table. Left-anchored on
+        /// the table's own icon gutter, so the section keeps one left edge,
+        /// and drawn at the height
+        /// SummarySectionLayoutMath.NonCoinTableRowsHeight prices it at.
+        /// </summary>
+        private void CreateNonCoinGroupHeadingRow(
+            string text, FlowPanel parent, int panelWidth)
+        {
+            const int rowHeight = SummarySectionLayoutMath.NonCoinGroupHeadingHeight;
+            var rowPanel = new ClippedPanel()
+            {
+                Size = new Point(panelWidth, rowHeight),
+                Parent = parent,
+            };
+            LabelHelpers.WithDescenderClearance(new Label()
+            {
+                Text = text,
+                Font = UiFonts.Caption,
+                TextColor = NonCoinGroupHeadingColor,
+                AutoSizeWidth = true,
+                AutoSizeHeight = true,
+                Location = new Point(
+                    SummarySectionLayoutMath.CurrencyIconX,
+                    SummarySectionLayoutMath.NonCoinGroupHeadingTextY),
+                Parent = rowPanel,
+            });
+
+            // Fixed left-anchored text: only the row's own cosmetic width
+            // tracks the panel, the same as CreateFootnoteRow.
+            _sink.AddRelayout(w => rowPanel.Size = new Point(w, rowHeight));
         }
 
         /// <summary>
@@ -794,7 +845,7 @@ namespace TaimisToolbench.Views.Rendering
 
         private void CreateCurrencyTableHeaderRow(
             FlowPanel parent, int panelWidth, CurrencyColumnScan scan, string nameHeaderText,
-            int rowCount)
+            int rowsHeight)
         {
             var flowBand = HeaderBands.CreateColumnHeaderBandInFlow(parent, panelWidth);
             var band = flowBand.Band;
@@ -848,9 +899,11 @@ namespace TaimisToolbench.Views.Rendering
             // Unlike every other plan table this one does NOT run to the
             // end of its section: the multi-item note and the footnotes
             // flow below it, so the band has to leave with its own last
-            // currency row rather than with the section.
-            _sink.TrackStickyBand(
-                flowBand, () => rowCount * CurrencyRowHeight);
+            // currency row rather than with the section. The height is
+            // captured, not measured live: nothing in this table changes
+            // height without a rebuild, and the sink reads this closure on
+            // every placed frame.
+            _sink.TrackStickyBand(flowBand, () => rowsHeight);
         }
 
         /// <summary>

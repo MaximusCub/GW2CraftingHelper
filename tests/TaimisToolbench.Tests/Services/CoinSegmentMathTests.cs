@@ -21,13 +21,14 @@ namespace TaimisToolbench.Tests.Services
         private const int LabelIconGap = CoinSegmentMath.CoinLabelIconGap;
         private const int SegmentGap = CoinSegmentMath.CoinSegmentGap;
 
-        // --- InlineIconY ---
-
-        // The reported defect: the icon beside a coin figure sat above the
-        // digits' optical centre. Every inline run but two passed a seat of
-        // 0, which puts the icon box on the top edge of the number's line
-        // box - and a line box carries ascender and descender space the
-        // digits never reach.
+        // --- InlineIconY: the WALLET CURRENCY seat ---
+        //
+        // The reported defect: the icon beside a figure sat above the digits'
+        // optical centre. Every inline run but two passed a seat of 0, which
+        // puts the icon box on the top edge of the number's line box - and a
+        // line box carries ascender and descender space the digits never
+        // reach. Gold, silver and copper have since left this seat for
+        // CoinIconY's; everything else still centres here.
         [Theory]
         [InlineData(3, 14, CoinSegmentMath.CoinIconSize)]
         [InlineData(2, 13, CoinSegmentMath.CoinIconSize)]
@@ -48,8 +49,8 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void TheInlineIconSeat_IsNotTheTopOfTheLineBox()
         {
-            // Menomonia 16's cap ink, the face every table cell's coin run
-            // draws in. A seat of 0 here is the defect returning.
+            // Menomonia 16's cap ink, the face every table cell's inline
+            // run draws in. A seat of 0 here is the defect returning.
             Assert.NotEqual(
                 0,
                 CoinSegmentMath.InlineIconY(
@@ -67,6 +68,136 @@ namespace TaimisToolbench.Tests.Services
             // Centring one would start it above the label's own top, and
             // the row above reserved its height from that line box.
             Assert.Equal(0, CoinSegmentMath.InlineIconY(digitInkTop, digitInkHeight, iconSize));
+        }
+
+        // --- CoinIconY ---
+        //
+        // The face every inline coin run draws in: UiFonts.Body is
+        // DefaultFont16, menomonia-16-regular, and the seat is read off its
+        // '0' region, which declares yoffset 2 height 15. MEASURED off that
+        // face's shipped texture page: the '0' inks rows 3..15 of the 20px
+        // line box, so the digits' ink stops at the exclusive edge 16 while
+        // the declared box runs one row past it.
+        private const int BodyZeroYOffset = 2;
+        private const int BodyZeroHeight = 15;
+        private const int BodyDigitInkBottom = 16;
+
+        // The three shipped 32x32 coin textures, ink rows MEASURED: gold and
+        // silver 5..26, copper 4..26. Copper alone starts a row higher, and
+        // the seat must not care.
+        private const int CoinArtSourceSize = 32;
+
+        [Theory]
+        [InlineData(CoinSegmentMath.GoldAssetId, 5, 26)]
+        [InlineData(CoinSegmentMath.SilverAssetId, 5, 26)]
+        [InlineData(CoinSegmentMath.CopperAssetId, 4, 26)]
+        public void TheCoinSeat_HangsEveryDenominationsInkUnderTheDigitsInkBottom(
+            int assetId, int firstInkRow, int lastInkRow)
+        {
+            int iconSize = CoinSegmentMath.CoinIconSize;
+            int y = CoinSegmentMath.CoinIconY(BodyZeroYOffset, BodyZeroHeight, iconSize);
+
+            // Where this denomination's own measured ink lands once its
+            // source rows are point-sampled into the icon box the run draws.
+            int inkBottom = y + ((lastInkRow * iconSize) / CoinArtSourceSize) + 1;
+            int inkTop = y + ((firstInkRow * iconSize) / CoinArtSourceSize);
+
+            // NOT flush with the baseline. The game hangs the coin one row
+            // under it, which is what the bar tier capture behind
+            // CurrencyIconTiers.VerticalAlignmentRule measures: box y114..129
+            // against digit ink y115..126 puts the art's last inked row at
+            // y127. Flush was the first reading of the owner's words; the
+            // game he asked to match is a row lower.
+            Assert.Equal(
+                BodyDigitInkBottom + CoinSegmentMath.CoinInkBelowBaseline, inkBottom);
+            Assert.True(inkTop < inkBottom, "coin " + assetId + " has no ink");
+            Assert.True(inkTop >= 0, "coin " + assetId + " overdraws the row above");
+        }
+
+        [Fact]
+        public void TheCoinSeat_SitsLowerThanTheCurrencySeatItUsedToShare()
+        {
+            // The owner's ruling: gold, silver and copper move DOWN onto the
+            // digits' ink bottom; every other inline currency icon keeps the
+            // centred box. A change that folds the two seats back together
+            // fails here.
+            int iconSize = CoinSegmentMath.CoinIconSize;
+
+            int coin = CoinSegmentMath.CoinIconY(BodyZeroYOffset, BodyZeroHeight, iconSize);
+            int currency = CoinSegmentMath.InlineIconY(BodyZeroYOffset, BodyZeroHeight, iconSize);
+
+            Assert.True(coin > currency, "coin " + coin + " is not below currency " + currency);
+        }
+
+        [Fact]
+        public void TheCurrencySeat_IsUnchangedForTheShippedFaceAndTier()
+        {
+            // Deliberately left alone: the non-coin icons measured centred
+            // to within half a pixel in the same capture that reported the
+            // coin defect. This is the value they have always had.
+            Assert.Equal(
+                1, CoinSegmentMath.InlineIconY(BodyZeroYOffset, BodyZeroHeight, CoinSegmentMath.CoinIconSize));
+        }
+
+        [Theory]
+        [InlineData(CoinSegmentMath.CoinIconSize, 14)]
+        [InlineData(CurrencyIconTiers.WalletListIconSize, 27)]
+        [InlineData(12, 10)]
+        public void TheCoinArtsInkBottom_ScalesWithTheIconBox(int iconSize, int expected)
+        {
+            // The art's bottom padding is a fraction of the texture, not a
+            // constant, so a run drawn at another size cannot inherit the
+            // 16px answer.
+            Assert.Equal(expected, CoinSegmentMath.CoinArtInkBottom(iconSize));
+        }
+
+        [Theory]
+        [InlineData(CurrencyIconTiers.WalletListIconSize)]
+        [InlineData(24)]
+        public void ACoinTallerThanTheDigits_StaysInsideTheLineBox(int iconSize)
+        {
+            // Same guard the centred seat carries: seating this one by its
+            // ink would start it above the label's own top, and the row
+            // above reserved its height from that line box.
+            Assert.Equal(0, CoinSegmentMath.CoinIconY(BodyZeroYOffset, BodyZeroHeight, iconSize));
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-4)]
+        public void ACoinWithNoSize_SeatsAtTheTopOfTheLineBox(int iconSize)
+        {
+            // Nothing is drawn, so there is no ink to put on a baseline.
+            Assert.Equal(0, CoinSegmentMath.CoinIconY(BodyZeroYOffset, BodyZeroHeight, iconSize));
+            Assert.Equal(0, CoinSegmentMath.CoinArtInkBottom(iconSize));
+        }
+
+        [Fact]
+        public void TheCoinSeat_ReadsWhicheverFaceItIsGiven()
+        {
+            // menomonia-32-regular's '0' declares yoffset 6 height 25, so
+            // its ink stops at 30 - MEASURED off the shipped face, the same
+            // way the 16 numbers above were. A seat hard-coded for
+            // DefaultFont16 would answer 2 here.
+            int y = CoinSegmentMath.CoinIconY(6, 25, CurrencyIconTiers.WalletListIconSize);
+
+            Assert.Equal(
+                30 - CoinSegmentMath.CoinArtInkBottom(CurrencyIconTiers.WalletListIconSize)
+                    + CoinSegmentMath.CoinInkBelowBaseline,
+                y);
+            Assert.Equal(4, y);
+        }
+
+        [Fact]
+        public void TheGlyphBoxInkPad_IsTheOutlineTheFaceDeclares()
+        {
+            // The declared box is one pixel taller than its ink at each
+            // edge: '0' yoffset 2 height 15 against ink rows 3..15, 'H'
+            // yoffset 3 height 14 against ink rows 4..15. Without the pad
+            // the coins would seat a pixel low.
+            Assert.Equal(
+                BodyDigitInkBottom,
+                BodyZeroYOffset + BodyZeroHeight - CoinSegmentMath.GlyphBoxInkPad);
         }
 
         // --- Split ---

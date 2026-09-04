@@ -11,13 +11,13 @@ namespace TaimisToolbench.Services
     /// </para>
     /// <para>
     /// WHERE THE ICON SITS, measured at both tiers: always to the RIGHT of
-    /// the number (the repo's coin invariant, confirmed by the game itself),
-    /// with its box centred on the number's INK rather than on the baseline -
-    /// the rule the renderers already spell as
-    /// <c>iconYOffset = (textHeight - iconSize) / 2</c>. The measured gap
-    /// between the last glyph pixel and the icon box is 5px at list tier and
-    /// 3px at bar tier, which CoinSegmentMath.CoinLabelIconGap approximates.
-    /// Derivation: docs/ARCHITECTURE.md section S1.3.
+    /// the number (the repo's coin invariant, confirmed by the game itself).
+    /// A wallet currency's box is centred on the number's INK rather than on
+    /// the baseline; a gold, silver or copper coin instead seats its ART on
+    /// the number's ink bottom - see <see cref="VerticalAlignmentRule"/>. The
+    /// measured gap between the last glyph pixel and the icon box is 5px at
+    /// list tier and 3px at bar tier, which CoinSegmentMath.CoinLabelIconGap
+    /// approximates. Derivation: docs/ARCHITECTURE.md section S1.3.
     /// </para>
     /// </summary>
     internal static class CurrencyIconTiers
@@ -61,17 +61,23 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// Where the icon sits relative to the number it marks. MEASURED at
         /// both tiers: the icon is always to the RIGHT of the number (the
-        /// repo's coin invariant, confirmed by the game itself), and its box
-        /// is centred on the number's ink rather than sitting on its
-        /// baseline - list tier, icon box y178..209 (centre 193.5) against
-        /// the "841" glyph ink y188..198 (centre 193.0); bar tier, box
-        /// y114..129 against ink y115..126, within a pixel at half the size.
-        /// This is the rule the renderers already spell as
-        /// <c>iconYOffset = (textHeight - iconSize) / 2</c>; it is recorded
-        /// here so the next reader does not have to re-derive it from a
-        /// screenshot.
+        /// repo's coin invariant, confirmed by the game itself), and a wallet
+        /// currency's box is centred on the number's ink rather than sitting
+        /// on its baseline - list tier, icon box y178..209 (centre 193.5)
+        /// against the "841" glyph ink y188..198 (centre 193.0); bar tier,
+        /// box y114..129 against ink y115..126, within a pixel at half the
+        /// size. CoinSegmentMath.InlineIconY is that half.
+        /// <para>
+        /// The coins are the exception, ruled by the owner on 2026-09-04:
+        /// gold, silver and copper seat their ART on the number's ink bottom
+        /// (CoinSegmentMath.CoinIconY), because centring the BOX leaves the
+        /// padded art reading high against the digits. Non-coin currencies
+        /// were measured centred to within half a pixel in the same capture
+        /// and were left alone deliberately.
+        /// </para>
         /// </summary>
         public const string VerticalAlignmentRule =
-            "icon box centred on the number's ink, icon to the right of the number";
+            "icon to the right of the number; a wallet currency's box centred on the " +
+            "number's ink, a coin's art seated on the number's ink bottom";
     }
 }

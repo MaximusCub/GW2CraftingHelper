@@ -40,8 +40,8 @@ namespace TaimisToolbench.Services
         ///   - at most one CostTileRowHeight-tall row for the profit formula
         ///     band, present only when ProfitFormulaTile rows exist (always 3);
         ///   - one CurrencyTableTopGap spacer plus one ColumnHeaderRowHeight
-        ///     header plus one CurrencyRowHeight row per CurrencyCost row, only
-        ///     when at least one exists;
+        ///     header plus NonCoinTableRowsHeight for the grouped table below
+        ///     it, only when at least one CurrencyCost row exists;
         ///   - one FallbackTextRowHeight row per MultiItemNote row, and one for
         ///     the SummaryFootnote row - summed rather than assumed so an
         ///     absent footnote degrades gracefully instead of desyncing.
@@ -52,9 +52,13 @@ namespace TaimisToolbench.Services
 
             bool hasCostBand = false;
             bool hasProfitBand = false;
-            int currencyRowCount = 0;
             int noteRowCount = 0;
             int footnoteRowCount = 0;
+
+            // The same grouping the renderer draws from, over the same
+            // rows - the table's height is a property of its groups now,
+            // not of a row count.
+            var groups = GroupNonCoinRows(rows);
 
             foreach (var row in rows)
             {
@@ -65,9 +69,6 @@ namespace TaimisToolbench.Services
                         break;
                     case PlanRowType.ProfitFormulaTile:
                         hasProfitBand = true;
-                        break;
-                    case PlanRowType.CurrencyCost:
-                        currencyRowCount++;
                         break;
                     case PlanRowType.MultiItemNote:
                         noteRowCount++;
@@ -81,7 +82,7 @@ namespace TaimisToolbench.Services
             int height = 0;
             if (hasCostBand)
             {
-                height += CostBandHeight(currencyRowCount > 0);
+                height += CostBandHeight(groups.Count > 0);
             }
 
             if (hasProfitBand)
@@ -89,11 +90,11 @@ namespace TaimisToolbench.Services
                 height += PlanContentHeightMath.CostTileRowHeight;
             }
 
-            if (currencyRowCount > 0)
+            if (groups.Count > 0)
             {
                 height += CurrencyTableTopGap
                     + PlanContentHeightMath.ColumnHeaderRowHeight
-                    + currencyRowCount * PlanContentHeightMath.CurrencyRowHeight;
+                    + NonCoinTableRowsHeight(groups);
             }
 
             height += noteRowCount * PlanContentHeightMath.FallbackTextRowHeight;
@@ -356,6 +357,133 @@ namespace TaimisToolbench.Services
                     currencies++;
                 }
             }
+        }
+
+        /// <summary>
+        /// The non-coin table's group headings. A wallet currency is
+        /// checked in the wallet and a barter item in inventory, so one
+        /// alphabetical list of both sends the eye to the wrong screen for
+        /// half of its rows; the headings name the place, because where the
+        /// reader goes to check a row is what separates the two kinds.
+        /// </summary>
+        public const string WalletGroupHeading = "From your wallet";
+
+        /// <summary>Inventory twin of <see cref="WalletGroupHeading"/>.</summary>
+        public const string InventoryGroupHeading = "From your inventory";
+
+        /// <summary>
+        /// One group of the non-coin table: its heading and its rows.
+        /// </summary>
+        public readonly struct NonCoinRowGroup
+        {
+            public readonly string Heading;
+            public readonly IReadOnlyList<PlanRowViewModel> Rows;
+
+            internal NonCoinRowGroup(string heading, IReadOnlyList<PlanRowViewModel> rows)
+            {
+                Heading = heading;
+                Rows = rows;
+            }
+        }
+
+        /// <summary>
+        /// The non-coin cost rows split into their groups, in draw order:
+        /// wallet currencies, then barter items. Relative order inside a
+        /// group is the caller's, so rows handed in alphabetically stay
+        /// alphabetical within their own group.
+        /// <para>
+        /// An empty group produces no entry, so a plan that spends only
+        /// currency draws one heading and no empty second one. Anything
+        /// that is not a <see cref="PlanRowType.CurrencyCost"/> row is
+        /// ignored, which is what lets BodyHeight hand this a whole
+        /// section's rows and the renderer hand it just the table's.
+        /// </para>
+        /// </summary>
+        public static IReadOnlyList<NonCoinRowGroup> GroupNonCoinRows(
+            IReadOnlyList<PlanRowViewModel> rows)
+        {
+            List<PlanRowViewModel> wallet = null;
+            List<PlanRowViewModel> inventory = null;
+            for (int i = 0; rows != null && i < rows.Count; i++)
+            {
+                var row = rows[i];
+                if (row == null || row.RowType != PlanRowType.CurrencyCost)
+                {
+                    continue;
+                }
+
+                if (row.IsBarterItemCost)
+                {
+                    if (inventory == null)
+                    {
+                        inventory = new List<PlanRowViewModel>();
+                    }
+
+                    inventory.Add(row);
+                }
+                else
+                {
+                    if (wallet == null)
+                    {
+                        wallet = new List<PlanRowViewModel>();
+                    }
+
+                    wallet.Add(row);
+                }
+            }
+
+            var groups = new List<NonCoinRowGroup>(2);
+            if (wallet != null)
+            {
+                groups.Add(new NonCoinRowGroup(WalletGroupHeading, wallet));
+            }
+
+            if (inventory != null)
+            {
+                groups.Add(new NonCoinRowGroup(InventoryGroupHeading, inventory));
+            }
+
+            return groups;
+        }
+
+        /// <summary>
+        /// A group heading is one line of caption text in its own row, at
+        /// the single-line row height the section's footnote already draws
+        /// at - aliased rather than restated, for the reason this class's
+        /// own doc comment gives.
+        /// </summary>
+        public const int NonCoinGroupHeadingHeight = PlanContentHeightMath.FallbackTextRowHeight;
+
+        /// <summary>
+        /// Baseline-box y of a group heading's label: its Caption line box
+        /// centred in the heading row, the same rule
+        /// <see cref="CurrencyRowTextY"/> centres a data row by.
+        /// </summary>
+        public static int NonCoinGroupHeadingTextY =>
+            (NonCoinGroupHeadingHeight - TypeRampMetrics.CaptionInk.LineHeight) / 2;
+
+        /// <summary>
+        /// Height of everything the non-coin table draws BELOW its
+        /// column-header band: one heading row per group plus one row per
+        /// cost row. BodyHeight and the renderer both size the table from
+        /// this one function over the same groups, so neither can price a
+        /// heading differently from the other.
+        /// </summary>
+        public static int NonCoinTableRowsHeight(IReadOnlyList<NonCoinRowGroup> groups)
+        {
+            if (groups == null)
+            {
+                return 0;
+            }
+
+            int height = 0;
+            for (int i = 0; i < groups.Count; i++)
+            {
+                height += NonCoinGroupHeadingHeight
+                    + groups[i].Rows.Count * PlanContentHeightMath.CurrencyRowHeight;
+            }
+
+            return height;
         }
 
         /// <summary>

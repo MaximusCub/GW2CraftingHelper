@@ -570,18 +570,19 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// The Total Cost section's non-coin table: one row per wallet
         /// currency AND one per barter item the plan spends. Label is the
-        /// resolved name, rows sort alphabetically by it, and
-        /// CurrencyOwnedQuantity is the raw unclamped wallet holding.
-        /// Needed/FullyCovered are derived here so the column-header table
+        /// resolved name, CurrencyOwnedQuantity the raw unclamped wallet
+        /// holding; Needed/FullyCovered are derived here so the table
         /// renderer stays a dumb read of computed fields.
         /// <para>
         /// Both kinds share <see cref="PlanRowType.CurrencyCost"/> and this
         /// one table because they are one statement to the reader - what
         /// this plan costs that is not coin - and because the coin total
-        /// excludes both for the same reason. IsBarterItemCost is what
-        /// keeps the two apart where it matters (an item id is not a
-        /// currency id, and only a currency has a wallet holding or
-        /// /v2/currencies prose).
+        /// excludes both for the same reason. IsBarterItemCost keeps them
+        /// apart where it matters: an item id is not a currency id, only a
+        /// currency has a wallet holding, and it is what
+        /// SummarySectionLayoutMath.GroupNonCoinRows groups the table by.
+        /// Emitting the rows already grouped keeps BuildNonCoinCostTotals,
+        /// which projects in row order, in the order the table shows.
         /// </para>
         /// </summary>
         private static void BuildCurrencyTableRows(PlanSectionViewModel section, CraftingPlanResult result)
@@ -598,8 +599,13 @@ namespace TaimisToolbench.Services
             // unknown currency ids both fall back to the same generic
             // "Currency" display name (CurrencyDisplayResolver), and an
             // unstable sort could reorder that tied pair nondeterministically
-            // run to run.
-            section.Rows.AddRange(currencyRows.OrderBy(r => r.Label, StringComparer.Ordinal));
+            // run to run. Grouping preserves relative order, so sorting once
+            // across both kinds leaves each group alphabetical.
+            var ordered = currencyRows.OrderBy(r => r.Label, StringComparer.Ordinal).ToList();
+            foreach (var group in SummarySectionLayoutMath.GroupNonCoinRows(ordered))
+            {
+                section.Rows.AddRange(group.Rows);
+            }
         }
 
         private static void AddCurrencyCostRows(
@@ -684,6 +690,11 @@ namespace TaimisToolbench.Services
         /// aggregation, so the plan-level figure and the table a reader
         /// checks it against cannot drift apart. Null (not empty) when the
         /// plan spends nothing but coin.
+        /// <para>
+        /// Grouping the table changed the ORDER these rows arrive in and
+        /// nothing else. A second aggregation - one per group - is what
+        /// would put that drift back.
+        /// </para>
         /// </summary>
         private static IReadOnlyList<CurrencyAmountViewModel> BuildNonCoinCostTotals(
             PlanSectionViewModel summarySection)
