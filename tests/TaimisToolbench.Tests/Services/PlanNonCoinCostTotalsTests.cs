@@ -24,7 +24,9 @@ namespace TaimisToolbench.Tests.Services
     {
         private const int Target = 1;
         private const int BarterToken = 99;
+        private const int SecondBarterToken = 98;
         private const int SpiritShardCurrency = 23;
+        private const int AscalonianTearsCurrency = 5;
 
         /// <summary>
         /// Item 1 has no recipe and no Trading Post price, so the vendor
@@ -40,6 +42,7 @@ namespace TaimisToolbench.Tests.Services
             var builder = PipelineBuilder.Create()
                 .WithItem(Target, "Vendor Only Widget", "widget.png")
                 .WithItem(BarterToken, "Blue Prophet Shard", "shard.png")
+                .WithItem(SecondBarterToken, "Ancient Coin", "coin.png")
                 .WithInventoryReducer();
 
             using (var tmp = new TempDirectory())
@@ -69,6 +72,21 @@ namespace TaimisToolbench.Tests.Services
         private static IEnumerable<CostLine> BarterOnly(int count)
         {
             yield return new CostLine { Type = "Item", Id = BarterToken, Count = count };
+        }
+
+        private static IEnumerable<CostLine> CurrencyOnly(int count)
+        {
+            yield return new CostLine { Type = "Currency", Id = SpiritShardCurrency, Count = count };
+        }
+
+        /// <summary>
+        /// The table's rows as the renderer and the height math see them:
+        /// through the one production grouping both of them draw from.
+        /// </summary>
+        private static IReadOnlyList<SummarySectionLayoutMath.NonCoinRowGroup> Groups(PlanViewModel vm)
+        {
+            return SummarySectionLayoutMath.GroupNonCoinRows(
+                vm.Sections.Single(s => s.SectionType == PlanSectionType.Summary).Rows);
         }
 
         private static List<PlanRowViewModel> NonCoinRows(PlanViewModel vm)
@@ -178,14 +196,126 @@ namespace TaimisToolbench.Tests.Services
             var vm = new PlanViewModelBuilder().Build(result);
             var rows = NonCoinRows(vm);
             Assert.Equal(2, rows.Count);
-            Assert.Single(rows, r => r.IsBarterItemCost);
-            Assert.Single(rows, r => !r.IsBarterItemCost);
 
-            // Sorted by name across BOTH kinds, and the plan-level list is
-            // that same order - it is projected from these very rows.
+            // Grouped, not interleaved: the wallet currency leads even
+            // though the barter item's name sorts ahead of it, because the
+            // two are checked in two different places.
+            Assert.False(rows[0].IsBarterItemCost);
+            Assert.Equal("Spirit Shards", rows[0].Label);
+            Assert.True(rows[1].IsBarterItemCost);
+            Assert.Equal("Blue Prophet Shard", rows[1].Label);
+            Assert.True(
+                string.CompareOrdinal(rows[1].Label, rows[0].Label) < 0,
+                "the case is only interesting while the barter name sorts first");
+
+            // The plan-level list is that same order - it is projected from
+            // these very rows.
             Assert.Equal(
                 rows.Select(r => r.Label).ToList(),
                 vm.NonCoinCostTotals.Select(t => t.Name).ToList());
+        }
+
+        [Fact]
+        public async Task CurrencyAndBarter_SplitIntoTheWalletAndInventoryGroups()
+        {
+            var result = await GenerateAsync(new[]
+            {
+                new CostLine { Type = "Item", Id = BarterToken, Count = 2 },
+                new CostLine { Type = "Currency", Id = SpiritShardCurrency, Count = 5 },
+            });
+
+            var vm = new PlanViewModelBuilder().Build(result);
+            var groups = Groups(vm);
+
+            Assert.Equal(2, groups.Count);
+            Assert.Equal(SummarySectionLayoutMath.WalletGroupHeading, groups[0].Heading);
+            Assert.Equal("Spirit Shards", Assert.Single(groups[0].Rows).Label);
+            Assert.Equal(SummarySectionLayoutMath.InventoryGroupHeading, groups[1].Heading);
+            Assert.Equal("Blue Prophet Shard", Assert.Single(groups[1].Rows).Label);
+        }
+
+        /// <summary>
+        /// A plan with nothing to check in inventory must not grow an
+        /// inventory heading with no rows under it, and vice versa.
+        /// </summary>
+        [Fact]
+        public async Task OneKindOnly_DrawsThatGroupsHeadingAndNoOther()
+        {
+            var barterVm = new PlanViewModelBuilder()
+                .Build(await GenerateAsync(BarterOnly(3), requestQuantity: 2));
+            var barterGroup = Assert.Single(Groups(barterVm));
+            Assert.Equal(SummarySectionLayoutMath.InventoryGroupHeading, barterGroup.Heading);
+            Assert.Equal("Blue Prophet Shard", Assert.Single(barterGroup.Rows).Label);
+
+            var currencyVm = new PlanViewModelBuilder()
+                .Build(await GenerateAsync(CurrencyOnly(5)));
+            var currencyGroup = Assert.Single(Groups(currencyVm));
+            Assert.Equal(SummarySectionLayoutMath.WalletGroupHeading, currencyGroup.Heading);
+            Assert.Equal("Spirit Shards", Assert.Single(currencyGroup.Rows).Label);
+        }
+
+        /// <summary>
+        /// Grouping did not cost the table its alphabetical order - it
+        /// moved it inside each group.
+        /// </summary>
+        [Fact]
+        public async Task EachGroupIsAlphabeticalWithinItself()
+        {
+            var result = await GenerateAsync(new[]
+            {
+                new CostLine { Type = "Currency", Id = SpiritShardCurrency, Count = 5 },
+                new CostLine { Type = "Item", Id = BarterToken, Count = 2 },
+                new CostLine { Type = "Currency", Id = AscalonianTearsCurrency, Count = 7 },
+                new CostLine { Type = "Item", Id = SecondBarterToken, Count = 1 },
+            });
+
+            var vm = new PlanViewModelBuilder().Build(result);
+            var groups = Groups(vm);
+            Assert.Equal(2, groups.Count);
+            Assert.Equal(
+                new[] { "Ascalonian Tears", "Spirit Shards" },
+                groups[0].Rows.Select(r => r.Label).ToArray());
+            Assert.Equal(
+                new[] { "Ancient Coin", "Blue Prophet Shard" },
+                groups[1].Rows.Select(r => r.Label).ToArray());
+        }
+
+        /// <summary>
+        /// The one aggregation, still one: NonCoinCostTotals is exactly the
+        /// table's cost rows, in the table's own grouped order, with the
+        /// same amounts. Nothing a group heading contributed can appear
+        /// here, because a heading is not a row.
+        /// </summary>
+        [Fact]
+        public async Task NonCoinCostTotals_AreExactlyTheGroupedCostRows()
+        {
+            var result = await GenerateAsync(new[]
+            {
+                new CostLine { Type = "Currency", Id = SpiritShardCurrency, Count = 5 },
+                new CostLine { Type = "Item", Id = BarterToken, Count = 2 },
+                new CostLine { Type = "Currency", Id = AscalonianTearsCurrency, Count = 7 },
+                new CostLine { Type = "Item", Id = SecondBarterToken, Count = 1 },
+            });
+
+            var vm = new PlanViewModelBuilder().Build(result);
+            var rows = NonCoinRows(vm);
+            var grouped = Groups(vm).SelectMany(g => g.Rows).ToList();
+
+            // Every cost row is in exactly one group, and the section's own
+            // row order already IS the grouped order.
+            Assert.Equal(rows, grouped);
+            Assert.Equal(4, rows.Count);
+
+            Assert.Equal(
+                rows.Select(r => r.Label).ToList(),
+                vm.NonCoinCostTotals.Select(t => t.Name).ToList());
+            Assert.Equal(
+                rows.Select(r => (long)r.Quantity).ToList(),
+                vm.NonCoinCostTotals.Select(t => t.Amount).ToList());
+            Assert.DoesNotContain(
+                vm.NonCoinCostTotals,
+                t => t.Name == SummarySectionLayoutMath.WalletGroupHeading
+                    || t.Name == SummarySectionLayoutMath.InventoryGroupHeading);
         }
 
         /// <summary>
@@ -273,6 +403,7 @@ namespace TaimisToolbench.Tests.Services
 
             var vm = new PlanViewModelBuilder().Build(result);
             Assert.Empty(NonCoinRows(vm));
+            Assert.Empty(Groups(vm));
             Assert.Null(vm.NonCoinCostTotals);
 
             var footnote = Assert.Single(Footnotes(vm));
