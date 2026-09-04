@@ -63,6 +63,21 @@ namespace TaimisToolbench.Views.Rendering
         void RequestRerenderAfterSettle();
 
         /// <summary>
+        /// Hands one table's column-header band to the tab's sticky-header
+        /// host, which pins it to the top of the viewport while any of that
+        /// table's rows are still in view
+        /// (Views/Rendering/StickyHeaderHost.cs).
+        /// <para>
+        /// <paramref name="rowsHeight"/> is the height of the rows BELOW
+        /// the band and is read live, not sampled: the recipe tree's rows
+        /// change height when a node is expanded, without a rebuild, and a
+        /// band pinned over a height that no longer matches leaves with the
+        /// wrong row.
+        /// </para>
+        /// </summary>
+        void TrackStickyBand(HeaderBands.FlowBand band, Func<int> rowsHeight);
+
+        /// <summary>
         /// How many relayout closures are registered right now - read by
         /// TreeSectionController's DEBUG must-register assert.
         /// </summary>

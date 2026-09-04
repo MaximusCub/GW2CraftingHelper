@@ -499,7 +499,12 @@ namespace TaimisToolbench.Views.Rendering
                             out _, out var costRoom);
                         return TreeCostColumnMath.HeaderX(
                             edges.CostRightEdge, headerCostWidths, costHeaderWidth, costRoom);
-                    });
+                    },
+                    // The flow's own settled height less the header row,
+                    // which is how MultiRootTreeFlowHeight composes it.
+                    // Live, because expanding a node changes it without
+                    // rebuilding the header.
+                    rowsHeight: () => treeFlow.Height - HeaderBands.RowHeight);
             }
 
 #if DEBUG

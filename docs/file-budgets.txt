@@ -277,7 +277,7 @@ Services/WindowSizing.cs                                                        
 Views/AboutTabContent.cs                                                                1000
 Views/ApiAccessDialog.cs                                                                231
 Views/AutocompleteTextBox.cs                                                            45
-Views/CraftingPlanView.cs                                                               5097
+Views/CraftingPlanView.cs                                                               5185
 Views/FocusRelease.cs                                                                   159
 Views/ItemInputRowStrip.cs                                                              465
 Views/ItemRowState.cs                                                                   39
@@ -291,15 +291,15 @@ Views/PlanHistoryTabContent.cs                                                  
 Views/RankerTabContent.cs                                                               3014
 Views/Rendering/ClickSound.cs                                                           197
 Views/Rendering/CoinCurrencyRenderer.cs                                                 649
-Views/Rendering/ColumnHeaderRowRenderer.cs                                              214
+Views/Rendering/ColumnHeaderRowRenderer.cs                                              221
 Views/Rendering/CraftStepsSectionRenderer.cs                                            264
 Views/Rendering/DisciplinesSectionRenderer.cs                                           288
 Views/Rendering/EmptyPlanStateRenderer.cs                                               81
 Views/Rendering/FeedbackButton.cs                                                       265
-Views/Rendering/HeaderBands.cs                                                          154
+Views/Rendering/HeaderBands.cs                                                          207
 Views/Rendering/HeaderCellPlan.cs                                                       99
 Views/Rendering/HoverChainResync.cs                                                     75
-Views/Rendering/ISectionRelayoutSink.cs                                                 75
+Views/Rendering/ISectionRelayoutSink.cs                                                 86
 Views/Rendering/ITreePlanHost.cs                                                        88
 Views/Rendering/IconControls.cs                                                         304
 Views/Rendering/IconNameRowHelpers.cs                                                   182
@@ -312,7 +312,7 @@ Views/Rendering/PlanHeaderRenderer.cs                                           
 Views/Rendering/PressFeedback.cs                                                        118
 Views/Rendering/RankerReadinessColors.cs                                                99
 Views/Rendering/RarityColors.cs                                                         199
-Views/Rendering/RecipesSectionRenderer.cs                                               357
+Views/Rendering/RecipesSectionRenderer.cs                                               362
 Views/Rendering/RichTooltipSurface.cs                                                   607
 Views/Rendering/RowRelayoutHelpers.cs                                                   72
 Views/Rendering/ShoppingBadgeColors.cs                                                  72
@@ -322,7 +322,7 @@ Views/Rendering/SortableHeaderBlock.cs                                          
 Views/Rendering/SortableHeaderCells.cs                                                  249
 Views/Rendering/SortableHeaderLabel.cs                                                  38
 Views/Rendering/StickyHeaderHost.cs                                                     404
-Views/Rendering/SummarySectionRenderer.cs                                               1041
+Views/Rendering/SummarySectionRenderer.cs                                               1050
 Views/Rendering/TextRowRenderer.cs                                                      36
 Views/Rendering/TooltipFacility.cs                                                      288
 Views/Rendering/TreeSectionController.cs                                                2530
@@ -330,7 +330,7 @@ Views/Rendering/TreeToolbarCommands.cs                                          
 Views/Rendering/UiFonts.cs                                                              248
 Views/Rendering/GlyphFont.cs                                                            123
 Views/Rendering/UiMetrics.cs                                                            60
-Views/Rendering/UsedMaterialsSectionRenderer.cs                                         222
+Views/Rendering/UsedMaterialsSectionRenderer.cs                                         223
 Views/ResizableTabbedWindow.cs                                                          250
 Views/SettingsTabContent.cs                                                             2936
 Views/SuggestionPanel.cs                                                                504
@@ -561,7 +561,7 @@ tests/TaimisToolbench.Tests/Services/SourceFilterFlowLayoutTests.cs             
 tests/TaimisToolbench.Tests/Services/StatusStoreTests.cs                                116
 tests/TaimisToolbench.Tests/Services/StatusTextTests.cs                                 345
 tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                          33
-tests/TaimisToolbench.Tests/Services/StickyHeaderLayoutTests.cs                         221
+tests/TaimisToolbench.Tests/Services/StickyHeaderLayoutTests.cs                         266
 tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                   1162
 tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                             198
 tests/TaimisToolbench.Tests/Services/GlyphButtonMetricsTests.cs                         79

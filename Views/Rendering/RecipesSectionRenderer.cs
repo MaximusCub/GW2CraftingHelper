@@ -126,6 +126,9 @@ namespace TaimisToolbench.Views.Rendering
                     e.StatusRightEdge, statusInk, statusHeaderWidth, statusRoom);
             };
 
+            Func<int> rowsHeight =
+                () => section.Rows.Count * PlanContentHeightMath.RecipeRowHeight;
+
             if (anyDiscipline)
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
@@ -139,13 +142,15 @@ namespace TaimisToolbench.Views.Rendering
                         return JustifiedColumnTracks.CenteredOverContent(
                             e.DisciplineX, disciplineInk, disciplineHeaderWidth, disciplineRoom);
                     },
-                    rightLabelXForWidth: statusLabelX);
+                    rightLabelXForWidth: statusLabelX,
+                    rowsHeight: rowsHeight);
             }
             else
             {
                 ColumnHeaderRowRenderer.CreateColumnHeaderRow(
                     contentFlow, panelWidth, RecipeHeaderText, NameX, StatusHeaderText, _sink,
-                    rightLabelXForWidth: statusLabelX);
+                    rightLabelXForWidth: statusLabelX,
+                    rowsHeight: rowsHeight);
             }
 
             for (int i = 0; i < section.Rows.Count; i++)

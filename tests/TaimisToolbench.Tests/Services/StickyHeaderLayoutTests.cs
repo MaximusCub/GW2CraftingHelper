@@ -187,6 +187,51 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void ATableWithMoreOfItsSectionBelowIt_LeavesWithItsOwnLastRow()
+        {
+            // The Total Cost section's currency table is the one plan table
+            // that is not the last thing in its container - a multi-item
+            // note and any footnotes flow below it. The band's extent is
+            // its own rows, so it is gone for the whole of that tail rather
+            // than riding it down to the section's end.
+            const int HeaderTop = 140;
+            const int Rows = 3;
+            const int RowHeight = 26;
+            int tableBottom = HeaderTop + HeaderHeight + (Rows * RowHeight);
+
+            Assert.True(At(tableBottom - 1, HeaderTop, Rows, RowHeight).Pinned);
+
+            for (int scroll = tableBottom; scroll <= tableBottom + 200; scroll++)
+            {
+                Assert.False(At(scroll, HeaderTop, Rows, RowHeight).Pinned);
+            }
+        }
+
+        [Fact]
+        public void ATableThatShrinksUnderAPinnedBand_LeavesWithTheRowsItLost()
+        {
+            // Collapsing a Recipe Tree node moves the table's bottom UP
+            // with no scroll at all, which is the one way a plan table
+            // changes height without being rebuilt. The band has to be
+            // pushed out by that, exactly as the end of a scroll pushes it
+            // out, rather than outliving the rows it labels.
+            const int HeaderTop = 100;
+            const int RowHeight = 30;
+            const int Scroll = 400;
+
+            Assert.True(At(Scroll, HeaderTop, rowCount: 40, rowHeight: RowHeight).Pinned);
+            Assert.False(At(Scroll, HeaderTop, rowCount: 2, rowHeight: RowHeight).Pinned);
+
+            // Pinned for exactly as long as a row is still below the
+            // viewport top, at every size the collapse could land on.
+            for (int rows = 40; rows >= 0; rows--)
+            {
+                int tableBottomY = HeaderTop + HeaderHeight + (rows * RowHeight) - Scroll;
+                Assert.Equal(tableBottomY > 0, At(Scroll, HeaderTop, rows, RowHeight).Pinned);
+            }
+        }
+
+        [Fact]
         public void DegenerateInputs_PinNothing()
         {
             Assert.False(StickyHeaderLayout.Compute(-50, 0, 500, 400).Pinned);

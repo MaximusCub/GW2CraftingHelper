@@ -164,7 +164,7 @@ namespace TaimisToolbench.Views.Rendering
             var scan = new ColumnScan(
                 maxEachWidth, maxTotalWidth, maxQtyWidth, sourceColumnWidth, maxNameWidth,
                 maxQtyInk, maxSourceInk);
-            CreateShoppingListHeaderRow(contentFlow, panelWidth, scan);
+            CreateShoppingListHeaderRow(contentFlow, panelWidth, scan, rows.Count);
             for (int i = 0; i < rows.Count; i++)
             {
                 CreateShoppingRow(rows[i], contentFlow, panelWidth, scan, i == rows.Count - 1);
@@ -218,10 +218,11 @@ namespace TaimisToolbench.Views.Rendering
         // Column edges come from Render()'s shared pre-scan, so the header
         // lands on the same x as the rows below it.
         private void CreateShoppingListHeaderRow(
-            FlowPanel parent, int panelWidth, ColumnScan scan)
+            FlowPanel parent, int panelWidth, ColumnScan scan, int rowCount)
         {
             var edges = scan.EdgesFor(panelWidth);
-            var rowPanel = HeaderBands.CreateColumnHeaderBand(parent, panelWidth);
+            var flowBand = HeaderBands.CreateColumnHeaderBandInFlow(parent, panelWidth);
+            var rowPanel = flowBand.Band;
             var font = HeaderBands.Font;
             var color = HeaderBands.LabelColor;
 
@@ -282,7 +283,7 @@ namespace TaimisToolbench.Views.Rendering
             // call).
             _sink.AddRelayout(w =>
             {
-                rowPanel.Size = new Point(w, HeaderBands.RowHeight);
+                flowBand.Resize(w);
                 PlaceDataHeaders(
                     blocks, scan, scan.EdgesFor(w),
                     sourceHeaderWidth, amountHeaderWidth, eachHeaderWidth, totalHeaderWidth);
@@ -293,6 +294,9 @@ namespace TaimisToolbench.Views.Rendering
                 ApplyHeaderBoundaries(plan, scan, w, boundaries);
                 plan.Sync(rowPanel.Width);
             });
+
+            _sink.TrackStickyBand(
+                flowBand, () => rowCount * PlanContentHeightMath.ShoppingRowHeight);
         }
 
         /// <summary>

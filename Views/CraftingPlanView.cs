@@ -73,8 +73,16 @@ namespace TaimisToolbench.Views
         /// cutoff (Views/Rendering/ClipCutoff.cs) still does the work of
         /// keeping rows out of the strip ABOVE the rule, which no control
         /// paints over.
+        /// <para>
+        /// One ABOVE <c>StickyHeaderHost.ClipZIndex</c>, not equal to it. A
+        /// pinned band's clip sits at the viewport's top edge, which IS the
+        /// rule, so the two overlap by the rule's own 2px; at a tie the
+        /// order would fall to sibling index, and the rule has to keep
+        /// painting last over a pinned band exactly as it does over a
+        /// scrolled row.
+        /// </para>
         /// </summary>
-        private const int SeparatorZIndex = 10;
+        private const int SeparatorZIndex = 11;
 
         // Aliased, not duplicated: the band height, its title y and its
         // caret y are one piece of arithmetic against the section-title
@@ -356,6 +364,18 @@ namespace TaimisToolbench.Views
         private Panel _separator;
         private FlowPanel _contentPanel;
 
+        // Pinned column headers for this tab's tables. The bands the
+        // sections below build, not copies of them - see
+        // Views/Rendering/StickyHeaderHost.
+        private StickyHeaderHost _stickyHeaders;
+
+        // How to put the TREE's band back after a preserving rebuild. Only
+        // the tree needs one: every other section re-registers its band as
+        // it re-renders it, and the tree is the one whose controls a
+        // preserving rebuild keeps - the same reason _treeRelayoutActions
+        // is a separate registry.
+        private readonly List<Action> _treeStickyBandRegistrations = new List<Action>();
+
         // Recipe Tree toolbar row. The five buttons sit in the
         // non-scrolling strip, not in the tree's section header inside the
         // scroll flow, so a long plan cannot scroll Collapse All away at the
@@ -429,7 +449,45 @@ namespace TaimisToolbench.Views
             _rerenderAfterSettlePending = true;
         }
 
+        void ISectionRelayoutSink.TrackStickyBand(HeaderBands.FlowBand band, Func<int> rowsHeight)
+        {
+            StickyBandRegistration(band, rowsHeight)?.Invoke();
+        }
+
         int ISectionRelayoutSink.RelayoutCount => _relayoutActions.Count;
+
+        /// <summary>
+        /// One band's registration with the sticky host, returned rather
+        /// than performed so the caller that has to REPLAY it - the tree,
+        /// whose controls a preserving rebuild keeps - can keep the same
+        /// closure the first registration used. Null when there is nothing
+        /// to track.
+        /// <para>
+        /// The geometry it hands the host is a live read on every placed
+        /// frame: the band's own width tracks the panel, and a section the
+        /// reader collapses is hidden rather than emptied, so its flow's
+        /// visibility is what says the table is not on screen. Without
+        /// that, a collapsed section would pin a band over a table nobody
+        /// can see.
+        /// </para>
+        /// </summary>
+        private Action StickyBandRegistration(HeaderBands.FlowBand band, Func<int> rowsHeight)
+        {
+            if (band.Band == null || band.Spacer == null || rowsHeight == null)
+            {
+                return null;
+            }
+
+            return () => _stickyHeaders?.Track(
+                band.Band, band.Spacer,
+                () =>
+                {
+                    var flow = band.Spacer.Parent;
+                    return new StickyHeaderHost.BandGeometry(
+                        flow != null && flow.Visible, 0, 0, band.Band.Width,
+                        HeaderBands.RowHeight, HeaderBands.RowHeight + rowsHeight());
+                });
+        }
 
         // ITreePlanHost implementation - explicit-interface for the same
         // reason as ISectionRelayoutSink above: TreeSectionController gets
@@ -492,6 +550,18 @@ namespace TaimisToolbench.Views
             public void AddReellipsis(Action<int> closure) => _view._treeReellipsisActions.Add(closure);
 
             public void RequestRerenderAfterSettle() => _view._rerenderAfterSettlePending = true;
+
+            public void TrackStickyBand(HeaderBands.FlowBand band, Func<int> rowsHeight)
+            {
+                var register = _view.StickyBandRegistration(band, rowsHeight);
+                if (register == null)
+                {
+                    return;
+                }
+
+                _view._treeStickyBandRegistrations.Add(register);
+                register();
+            }
 
             public int RelayoutCount => _view._treeRelayoutActions.Count;
         }
@@ -2063,6 +2133,7 @@ namespace TaimisToolbench.Views
             _treeSectionControls = null;
             _treeRelayoutActions.Clear();
             _treeReellipsisActions.Clear();
+            _treeStickyBandRegistrations.Clear();
 
             var layout = ComputeTopRegionLayout(w);
 
@@ -2223,19 +2294,19 @@ namespace TaimisToolbench.Views
                 ZIndex = SeparatorZIndex,
             };
 
-            // Scrollable content area - full width so scrollbar sits at the window edge.
-            // Children use (Width - RightEdgePadding) to keep content clear of the scrollbar.
-            // ClipAuthorityFlowPanel, not FlowPanel: this panel's top edge
-            // is the separator rule itself (layout.ContentY == SeparatorY),
-            // so rows clip flush against it - SeparatorToContentGap. The
-            // rule's own 2px are covered by SeparatorZIndex painting it
-            // last, NOT by the cutoff, whose reach is a slip budget above
-            // the line it publishes. It is the only control that can
-            // publish that line for its own subtree - see
-            // Views/Rendering/ClipCutoff.cs. Every container built inside
-            // it re-asserts the line, which is what makes the cutoff
-            // independent of how deep the recipe tree nests.
-            _contentPanel = new ClipAuthorityFlowPanel()
+            // Scrollable content area, full width so the scrollbar sits at
+            // the window edge (children use Width - RightEdgePadding). The
+            // one control that can publish the cutoff line for its own
+            // subtree (Views/Rendering/ClipCutoff.cs); every container built
+            // inside re-asserts it, which is what makes the cutoff
+            // independent of how deep the recipe tree nests. Its top edge IS
+            // the separator rule (layout.ContentY == SeparatorY), so rows
+            // clip flush and the rule's 2px are covered by SeparatorZIndex
+            // painting last, not by the cutoff, whose reach is a slip budget
+            // above the line it publishes. The Sticky subclass rides a
+            // pinned band's live bottom edge instead of that top edge, off a
+            // delegate read lazily so the host below is the one it sees.
+            _contentPanel = new StickyClipAuthorityFlowPanel(() => _stickyHeaders?.PinnedBandBottom)
             {
                 Size = new Point(w, buildPanel.ContentRegion.Height - layout.TopRegionHeight),
                 Location = new Point(0, layout.ContentY),
@@ -2243,6 +2314,10 @@ namespace TaimisToolbench.Views
                 CanScroll = true,
                 Parent = buildPanel,
             };
+
+            // On the tab panel rather than inside the viewport: the clip a
+            // pinned band is drawn in must not scroll.
+            _stickyHeaders = new StickyHeaderHost(buildPanel, _contentPanel);
 
             // Unconditional wheel-recency tracking StartScrollVerify
             // depends on, plus the diagnostic-only tap. _contentPanel is
@@ -4304,6 +4379,7 @@ namespace TaimisToolbench.Views
                 _treeController.ResetTreeRenderState();
                 _treeRelayoutActions.Clear();
                 _treeReellipsisActions.Clear();
+                _treeStickyBandRegistrations.Clear();
                 _treeSectionControls = null;
             }
 
@@ -4326,6 +4402,11 @@ namespace TaimisToolbench.Views
             {
                 return;
             }
+
+            // BEFORE both the detach and the sweep: a pinned band is not a
+            // child of the panel being emptied, so giving it back to its
+            // spacer is what lets the sweep dispose it at all.
+            _stickyHeaders?.Clear();
 
             // Detached, not disposed, and BEFORE the sweep: a preserved
             // tree's controls are children of the very panel being emptied.
@@ -4460,6 +4541,13 @@ namespace TaimisToolbench.Views
                 foreach (var control in _treeSectionControls)
                 {
                     control.Parent = _contentPanel;
+                }
+
+                // The host was cleared with everything else, and the tree's
+                // own band is not rebuilt on this path.
+                for (int i = 0; i < _treeStickyBandRegistrations.Count; i++)
+                {
+                    _treeStickyBandRegistrations[i]();
                 }
             }
             else if (treeRoots != null)
