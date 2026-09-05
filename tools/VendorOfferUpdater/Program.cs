@@ -62,7 +62,9 @@ namespace VendorOfferUpdater
             int maxDepth = 2;
             int maxRequests = 2000;
             int maxRuntimeMinutes = 30;
-            int delayMs = 250;
+            int delayMs = QueryOptions.DefaultDelayBetweenRequestsMs;
+            int maxAttempts = QueryOptions.DefaultMaxAttempts;
+            bool allowCoverageDrop = false;
             bool tagSeasonalFestivals = false;
             int maxSeasonalPages = 500;
             string? diffSummaryBefore = null;
@@ -123,6 +125,14 @@ namespace VendorOfferUpdater
                 {
                     mergeIntoPath = args[++i];
                 }
+                else if (args[i] == "--max-attempts" && i + 1 < args.Length)
+                {
+                    maxAttempts = int.Parse(args[++i]);
+                }
+                else if (args[i] == "--allow-coverage-drop")
+                {
+                    allowCoverageDrop = true;
+                }
                 else if (args[i] == "--tag-seasonal-festivals")
                 {
                     tagSeasonalFestivals = true;
@@ -158,12 +168,20 @@ namespace VendorOfferUpdater
                 return await RunDiffSummaryAsync(diffSummaryBefore, diffSummaryAfter);
             }
 
+            if (maxAttempts <= 0)
+            {
+                Console.Error.WriteLine(
+                    $"ERROR: --max-attempts must be a positive integer, got {maxAttempts}.");
+                return 1;
+            }
+
             var queryOptions = new QueryOptions
             {
                 MaxPrefixDepth = maxDepth,
                 MaxTotalRequests = maxRequests,
                 MaxRuntime = TimeSpan.FromMinutes(maxRuntimeMinutes),
                 DelayBetweenRequestsMs = delayMs,
+                MaxAttempts = maxAttempts,
                 DryRun = dryRun,
             };
 
@@ -184,12 +202,18 @@ namespace VendorOfferUpdater
                 $"Limits: maxDepth={queryOptions.MaxPrefixDepth}, " +
                 $"maxRequests={queryOptions.MaxTotalRequests}, " +
                 $"maxRuntime={queryOptions.MaxRuntime.TotalMinutes:F0}min, " +
-                $"delay={Math.Max(200, queryOptions.DelayBetweenRequestsMs)}ms");
+                $"delay={Math.Max(200, queryOptions.DelayBetweenRequestsMs)}ms, " +
+                $"maxAttempts={queryOptions.MaxAttempts}");
             Console.WriteLine();
 
             using var httpClient = new HttpClient();
+
+            // MediaWiki's User-Agent policy asks for a way to contact whoever
+            // is running the client. Without one, an operator who wants this
+            // traffic to stop has no option but to block the address.
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
-                "TaimisToolbench-VendorOfferUpdater/1.0");
+                "TaimisToolbench-VendorOfferUpdater/1.0 " +
+                "(+https://github.com/MaximusCub/TaimisToolbench)");
 
             // Step 1: Load currency mappings from GW2 API
             if (!dryRun)
@@ -308,7 +332,8 @@ namespace VendorOfferUpdater
                         Console.WriteLine(
                             $"Resolving {unknownCurrencyNames.Count} item-based currencies via wiki...");
                         var freshResolved =
-                            await wikiClient.ResolveItemGameIdsAsync(unknownCurrencyNames, ct);
+                            await wikiClient.ResolveItemGameIdsAsync(
+                                unknownCurrencyNames, ct, queryOptions);
                         Console.WriteLine(
                             $"  Resolved {freshResolved.Count} of {unknownCurrencyNames.Count} item names.");
 
@@ -523,6 +548,39 @@ namespace VendorOfferUpdater
                     Console.WriteLine();
                 }
 
+                // Step 5d: Report what the wiki never answered, and leave a
+                // sidecar naming those sections so the next run can re-target
+                // them by condition instead of scraping everything again.
+                var unresolved = wikiClient.UnresolvedSections;
+                PrintUnresolvedSections(unresolved);
+
+                string? sidecarPath = await UnresolvedSectionFile.SaveAsync(outputPath, unresolved);
+                if (sidecarPath != null)
+                {
+                    Console.WriteLine($"Written unresolved-section report to {sidecarPath}");
+                    Console.WriteLine();
+                }
+
+                // Step 5e: Coverage check. Rows a run never fetched are
+                // invisible to the merge guard above, which only protects rows
+                // already in the baseline.
+                var previousOffers = await LoadOffersForCoverageAsync(outputPath);
+                var coverage = CoverageGate.Evaluate(
+                    previousOffers,
+                    finalOffers,
+                    unresolved,
+                    CoverageGate.DefaultMaxDropFraction,
+                    allowCoverageDrop);
+                Console.Write(CoverageGate.Format(coverage));
+                Console.WriteLine();
+
+                if (coverage.Blocked)
+                {
+                    Console.Error.WriteLine(
+                        $"ERROR: coverage check blocked the write to {outputPath}.");
+                    return 3;
+                }
+
                 // Step 6: Write output
                 var dataset = new VendorOfferDataset
                 {
@@ -569,6 +627,69 @@ namespace VendorOfferUpdater
                 var (_, stats) =
                     await wikiClient.QueryVendorItemsAsync(queryCondition, queryOptions, ct);
                 return 0;
+            }
+        }
+
+        /// <summary>
+        /// Lists every section the wiki never answered, with the reason and
+        /// the query. A count alone was what made this class of loss
+        /// invisible, so each section is named.
+        /// </summary>
+        private static void PrintUnresolvedSections(IReadOnlyList<UnresolvedSection> unresolved)
+        {
+            if (unresolved.Count == 0)
+            {
+                Console.WriteLine("Unresolved sections: none.");
+                Console.WriteLine();
+                return;
+            }
+
+            Console.WriteLine($"=== UNRESOLVED SECTIONS ({unresolved.Count}) ===");
+            Console.WriteLine(
+                "  These were asked for and never answered. They are NOT empty, and the");
+            Console.WriteLine(
+                "  rows they hold are missing from this run's dataset.");
+            foreach (var section in unresolved)
+            {
+                Console.WriteLine(
+                    $"  - {section.Kind} [{section.Label}] after {section.Attempts} attempt(s): " +
+                    $"{section.ErrorCode}");
+                Console.WriteLine($"      reason: {section.Reason}");
+                Console.WriteLine($"      query:  {section.Condition}");
+            }
+
+            Console.WriteLine();
+        }
+
+        /// <summary>
+        /// Reads the dataset a write would replace, for the coverage check.
+        /// A missing or unreadable file is a first run, not a coverage
+        /// failure, so it yields no offers rather than an error.
+        /// </summary>
+        private static async Task<List<VendorOffer>> LoadOffersForCoverageAsync(string path)
+        {
+            if (!File.Exists(path))
+            {
+                return new List<VendorOffer>();
+            }
+
+            try
+            {
+                string existingJson = await File.ReadAllTextAsync(path);
+                var readOptions = new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    PropertyNameCaseInsensitive = true,
+                };
+                var existing = JsonSerializer.Deserialize<VendorOfferDataset>(existingJson, readOptions);
+                return existing?.Offers ?? new List<VendorOffer>();
+            }
+            catch (JsonException ex)
+            {
+                Console.WriteLine(
+                    $"  WARNING: could not read {path} for the coverage check ({ex.Message}). " +
+                    "Treating this run as the first.");
+                return new List<VendorOffer>();
             }
         }
 

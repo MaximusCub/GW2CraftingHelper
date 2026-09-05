@@ -21,23 +21,39 @@ namespace VendorOfferUpdater
     {
         private const string WikiApiUrl = "https://wiki.guildwars2.com/api.php";
         private const int QueryLimit = 500;
-        private const int MaxRetries = 3;
+
+        // Asks the server to refuse the query while its database replicas are
+        // more than this many seconds behind, which is MediaWiki's documented
+        // way of shedding load before it starts blocking a client outright.
+        // A refused maxlag query is an ordinary retryable API error here.
+        private const int MaxLagSeconds = 5;
 
         private readonly HttpClient _httpClient;
 
-        // Per-query state (set at the start of each QueryVendorItemsAsync
-        // call; null-forgiven here rather than made nullable since every
-        // other method that reads them is only ever called from within a
-        // QueryVendorItemsAsync call, after this initial assignment).
-        private QueryOptions _options = null!;
+        // Sections the wiki never answered. Accumulated across every call on
+        // this client, including ResolveItemGameIdsAsync, which has no
+        // QueryStats of its own.
+        private readonly List<UnresolvedSection> _unresolved = new List<UnresolvedSection>();
+
+        // Per-query state. _options carries a default so a client method
+        // reached without a QueryVendorItemsAsync call first still throttles
+        // and still retries; _stats and _stopwatch are null-forgiven because
+        // only the pagination path reads them.
+        private QueryOptions _options = new QueryOptions();
         private QueryStats _stats = null!;
         private Stopwatch _stopwatch = null!;
-        private int _effectiveDelay;
+        private int _effectiveDelay = QueryOptions.DefaultDelayBetweenRequestsMs;
 
         public WikiSmwClient(HttpClient httpClient)
         {
             _httpClient = httpClient;
         }
+
+        /// <summary>
+        /// Sections this client asked for and never got an answer to. Empty
+        /// on a clean run. Each entry carries the query that failed.
+        /// </summary>
+        public IReadOnlyList<UnresolvedSection> UnresolvedSections => _unresolved;
 
         // Characters used as prefixes when partitioning queries that exceed
         // the wiki's ~5500 result offset limit.
@@ -177,6 +193,7 @@ namespace VendorOfferUpdater
             int partitionRowsAdded = 0;
             int partitionHttpRequests = 0;
             bool hitOffsetLimit = false;
+            bool sectionUnresolved = false;
             int offset = 0;
 
             while (true)
@@ -188,26 +205,47 @@ namespace VendorOfferUpdater
                     $"|limit={QueryLimit}" +
                     $"|offset={offset}";
 
-                var url = $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(query)}&format=json";
+                var url = BuildAskUrl(query);
 
                 _stats.TotalHttpRequests++;
                 partitionHttpRequests++;
 
-                var response = await FetchWithRetryAsync(url, ct);
+                string response;
+                try
+                {
+                    response = await FetchWithRetryAsync(url, label, condition, ct);
+                }
+                catch (HttpRequestException ex)
+                {
+                    RecordUnresolved("partition", label, vendorPrefix, condition, ex);
+                    sectionUnresolved = true;
+                    break;
+                }
+
                 using var doc = JsonDocument.Parse(response);
+                var reading = WikiAskResponse.Read(doc.RootElement);
+
+                if (reading.Shape == WikiAskShape.NoRows)
+                {
+                    break;
+                }
+
+                if (reading.Shape != WikiAskShape.Rows)
+                {
+                    // Neither rows nor an empty result set. Not proof this
+                    // section is empty, so it is recorded, not skipped.
+                    RecordUnresolved(
+                        "partition",
+                        label,
+                        vendorPrefix,
+                        condition,
+                        reading.Error ?? UnreadableResponse());
+                    sectionUnresolved = true;
+                    break;
+                }
+
                 var root = doc.RootElement;
-
-                if (!root.TryGetProperty("query", out var queryElement) ||
-                    !queryElement.TryGetProperty("results", out var results))
-                {
-                    break;
-                }
-
-                // Empty results come back as [] instead of {}
-                if (results.ValueKind != JsonValueKind.Object)
-                {
-                    break;
-                }
+                var results = reading.Results;
 
                 int batchAdded = 0;
                 foreach (var resultProp in results.EnumerateObject())
@@ -263,6 +301,14 @@ namespace VendorOfferUpdater
             };
             _stats.Partitions.Add(pStats);
 
+            if (sectionUnresolved)
+            {
+                Console.WriteLine(
+                    $"  [{label}] UNRESOLVED: kept {partitionRowsAdded} row(s) already " +
+                    "collected, continuing with the rest of the run.");
+                return;
+            }
+
             if (!hitOffsetLimit)
             {
                 Console.WriteLine(
@@ -286,6 +332,7 @@ namespace VendorOfferUpdater
 
             // Probe + paginate sub-partitions (KEEP all rows already collected)
             int skippedEmpty = 0;
+            var emptyPrefixes = new List<string>();
             foreach (var prefix in PartitionPrefixes)
             {
                 string subPrefix = (vendorPrefix ?? "") + prefix;
@@ -295,31 +342,51 @@ namespace VendorOfferUpdater
 
                 string probeCondition = baseCondition + $"[[Has vendor::~{subPrefix}*]]";
                 string probeQuery = probeCondition + "|limit=1|offset=0";
-                string probeUrl =
-                    $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(probeQuery)}&format=json";
+                string probeUrl = BuildAskUrl(probeQuery);
 
                 _stats.TotalHttpRequests++;
 
-                string probeResponse = await FetchWithRetryAsync(probeUrl, ct);
-                await Task.Delay(_effectiveDelay, ct);
-
-                bool hasResults = false;
-                using (var probeDoc = JsonDocument.Parse(probeResponse))
+                string probeResponse;
+                try
                 {
-                    var probeRoot = probeDoc.RootElement;
-                    if (probeRoot.TryGetProperty("query", out var pq) &&
-                        pq.TryGetProperty("results", out var pr) &&
-                        pr.ValueKind == JsonValueKind.Object)
-                    {
-                        // Check if there's at least one result
-                        using var enumerator = pr.EnumerateObject();
-                        hasResults = enumerator.MoveNext();
-                    }
+                    probeResponse = await FetchWithRetryAsync(
+                        probeUrl, $"probe {subPrefix}", probeCondition, ct);
+                }
+                catch (HttpRequestException ex)
+                {
+                    RecordUnresolved("probe", subPrefix, subPrefix, probeCondition, ex);
+                    await Task.Delay(_effectiveDelay, ct);
+                    continue;
                 }
 
-                if (!hasResults)
+                await Task.Delay(_effectiveDelay, ct);
+
+                WikiAskShape probeShape;
+                WikiApiError? probeError;
+                using (var probeDoc = JsonDocument.Parse(probeResponse))
+                {
+                    var probeReading = WikiAskResponse.Read(probeDoc.RootElement);
+                    probeShape = probeReading.Shape;
+                    probeError = probeReading.Error;
+                }
+
+                if (probeShape == WikiAskShape.NoRows)
                 {
                     skippedEmpty++;
+                    emptyPrefixes.Add(subPrefix);
+                    continue;
+                }
+
+                if (probeShape != WikiAskShape.Rows)
+                {
+                    // The whole defect this guard exists for: an unreadable
+                    // probe used to skip the prefix as if it held no vendors.
+                    RecordUnresolved(
+                        "probe",
+                        subPrefix,
+                        subPrefix,
+                        probeCondition,
+                        probeError ?? UnreadableResponse());
                     continue;
                 }
 
@@ -328,9 +395,12 @@ namespace VendorOfferUpdater
                     baseCondition, subPrefix, depth + 1, allResults, seenKeys, ct);
             }
 
+            // The prefixes are named, not just counted: a count alone cannot
+            // tell "36 prefixes hold no vendors" from "36 probes were refused".
             Console.WriteLine(
                 $"  [{label}] sub-partitions done, " +
-                $"{skippedEmpty}/{PartitionPrefixes.Length} empty prefixes skipped");
+                $"{skippedEmpty}/{PartitionPrefixes.Length} empty prefixes skipped" +
+                (emptyPrefixes.Count > 0 ? $": {string.Join(" ", emptyPrefixes)}" : string.Empty));
         }
 
         private void CheckSafetyLimits(
@@ -367,6 +437,7 @@ namespace VendorOfferUpdater
             Console.WriteLine($"  Max total requests: {_options.MaxTotalRequests}");
             Console.WriteLine($"  Max runtime:        {_options.MaxRuntime.TotalMinutes:F0} min");
             Console.WriteLine($"  Delay between reqs: {_effectiveDelay} ms");
+            Console.WriteLine($"  Attempts per ask:   {Math.Max(1, _options.MaxAttempts)}");
             Console.WriteLine();
             Console.WriteLine("Traversal structure:");
             Console.WriteLine($"  Level 0: 1 root partition");
@@ -406,9 +477,32 @@ namespace VendorOfferUpdater
             return $"{r.GameId}|{r.OutputQuantity ?? 1}|{merchant}|{string.Join(";", costs)}|{r.Requirement ?? ""}";
         }
 
-        private async Task<string> FetchWithRetryAsync(string url, CancellationToken ct)
+        /// <summary>
+        /// Issues one ask and returns its body, retrying the failures the
+        /// wiki is expected to produce: HTTP 403, 429 and 5xx, and an HTTP
+        /// 200 whose body is an API error rather than a result set. The last
+        /// of those is the reason this returns a body only when the body
+        /// holds an answer: every earlier caller had to decide for itself
+        /// what a refusal meant, and both decided it meant "no rows".
+        /// </summary>
+        /// <param name="url">The request URL.</param>
+        /// <param name="section">The section this request belongs to.</param>
+        /// <param name="condition">The query condition, for the log.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <param name="retryApiErrors">
+        /// Whether an HTTP 200 API error is retried and then thrown. False
+        /// returns the error body to the caller instead.
+        /// </param>
+        private async Task<string> FetchWithRetryAsync(
+            string url,
+            string section,
+            string condition,
+            CancellationToken ct,
+            bool retryApiErrors = true)
         {
-            for (int attempt = 0; attempt <= MaxRetries; attempt++)
+            int maxAttempts = Math.Max(1, _options.MaxAttempts);
+
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 ct.ThrowIfCancellationRequested();
 
@@ -421,15 +515,15 @@ namespace VendorOfferUpdater
                     {
                         // 403 is often a temporary block from the wiki.
                         // Use a long cooldown (30s base) with exponential backoff + jitter.
-                        if (attempt >= MaxRetries)
+                        if (attempt >= maxAttempts)
                         {
                             throw new HttpRequestException(
-                                $"HTTP 403 Forbidden after {MaxRetries + 1} attempts. " +
+                                $"HTTP 403 Forbidden after {maxAttempts} attempts. " +
                                 "The wiki may be rate-limiting this IP. " +
                                 "Try increasing --delay or waiting before retrying.");
                         }
 
-                        int cooldownMs = 30_000 * (1 << attempt);
+                        int cooldownMs = BackoffMs(attempt) * 30;
                         if (response.Headers.RetryAfter?.Delta is TimeSpan delta403)
                         {
                             cooldownMs = Math.Max(cooldownMs, (int)delta403.TotalMilliseconds);
@@ -443,45 +537,148 @@ namespace VendorOfferUpdater
                         Console.WriteLine(
                             $"    WARNING: HTTP 403 (possible rate-limit block), " +
                             $"cooling down {cooldownMs / 1000}s " +
-                            $"(attempt {attempt + 1}/{MaxRetries})...");
+                            $"(attempt {attempt}/{maxAttempts})...");
                         await Task.Delay(cooldownMs, ct);
                         continue;
                     }
 
                     if (statusCode == 429 || statusCode >= 500)
                     {
-                        if (attempt >= MaxRetries)
+                        if (attempt >= maxAttempts)
                         {
                             response.EnsureSuccessStatusCode();
                         }
 
-                        int backoffMs = 1000 * (1 << attempt);
+                        int backoffMs = BackoffMs(attempt);
                         if (response.Headers.RetryAfter?.Delta is TimeSpan delta)
                         {
                             backoffMs = Math.Max(backoffMs, (int)delta.TotalMilliseconds);
                         }
 
+                        // maxlag refusals arrive as 503 with the reason in the
+                        // body, so the body is read here too rather than only
+                        // on the 200 path.
+                        string failureBody = await response.Content.ReadAsStringAsync();
+                        var statusError = WikiAskResponse.ReadApiError(failureBody);
+
                         Console.WriteLine(
                             $"    HTTP {statusCode}, retrying in {backoffMs}ms " +
-                            $"(attempt {attempt + 1}/{MaxRetries})...");
+                            $"(attempt {attempt}/{maxAttempts})...");
+                        if (statusError != null)
+                        {
+                            LogApiError(statusError, section, condition, attempt, maxAttempts);
+                        }
+
                         await Task.Delay(backoffMs, ct);
                         continue;
                     }
 
                     response.EnsureSuccessStatusCode();
-                    return await response.Content.ReadAsStringAsync();
+                    string body = await response.Content.ReadAsStringAsync();
+
+                    var apiError = WikiAskResponse.ReadApiError(body);
+                    if (apiError == null || !retryApiErrors)
+                    {
+                        return body;
+                    }
+
+                    LogApiError(apiError, section, condition, attempt, maxAttempts);
+
+                    if (attempt >= maxAttempts)
+                    {
+                        throw new WikiApiErrorException(apiError, section, maxAttempts);
+                    }
+
+                    await Task.Delay(BackoffMs(attempt), ct);
                 }
-                catch (HttpRequestException) when (attempt < MaxRetries)
+                catch (WikiApiErrorException)
                 {
-                    int backoffMs = 1000 * (1 << attempt);
+                    throw;
+                }
+                catch (HttpRequestException) when (attempt < maxAttempts)
+                {
+                    int backoffMs = BackoffMs(attempt);
                     Console.WriteLine(
                         $"    Request failed, retrying in {backoffMs}ms " +
-                        $"(attempt {attempt + 1}/{MaxRetries})...");
+                        $"(attempt {attempt}/{maxAttempts})...");
                     await Task.Delay(backoffMs, ct);
                 }
             }
 
-            throw new HttpRequestException($"Failed after {MaxRetries + 1} attempts: {url}");
+            throw new HttpRequestException($"Failed after {maxAttempts} attempts: {url}");
+        }
+
+        private int BackoffMs(int attempt)
+        {
+            return Math.Max(0, _options.RetryBackoffBaseMs) * (1 << (attempt - 1));
+        }
+
+        private static string BuildAskUrl(string query)
+        {
+            return $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(query)}" +
+                   $"&format=json&maxlag={MaxLagSeconds}";
+        }
+
+        private static WikiApiError UnreadableResponse()
+        {
+            return new WikiApiError(
+                "unreadable-response",
+                "The response was neither a result set nor an API error.");
+        }
+
+        /// <summary>
+        /// Prints the refusal in full. Nothing recorded what these errors
+        /// actually say before this, so the code, the text, the query and the
+        /// attempt all go to the log rather than a summary count.
+        /// </summary>
+        private static void LogApiError(
+            WikiApiError error, string section, string condition, int attempt, int maxAttempts)
+        {
+            Console.WriteLine(
+                $"    WIKI API ERROR [{section}] attempt {attempt}/{maxAttempts}: code={error.Code}");
+            Console.WriteLine($"      info:  {error.Info}");
+            Console.WriteLine($"      query: {condition}");
+        }
+
+        private void RecordUnresolved(
+            string kind, string label, string? prefix, string condition, WikiApiError error)
+        {
+            RecordUnresolved(
+                kind, label, prefix, condition, error.Code, error.Info, Math.Max(1, _options.MaxAttempts));
+        }
+
+        private void RecordUnresolved(
+            string kind, string label, string? prefix, string condition, HttpRequestException ex)
+        {
+            bool refused = ex is WikiApiErrorException;
+            string code = refused ? ((WikiApiErrorException)ex).Error.Code : "transport";
+            int attempts = refused
+                ? ((WikiApiErrorException)ex).Attempts
+                : Math.Max(1, _options.MaxAttempts);
+            RecordUnresolved(kind, label, prefix, condition, code, ex.Message, attempts);
+        }
+
+        private void RecordUnresolved(
+            string kind,
+            string label,
+            string? prefix,
+            string condition,
+            string code,
+            string reason,
+            int attempts)
+        {
+            _unresolved.Add(new UnresolvedSection
+            {
+                Kind = kind,
+                Label = label,
+                Prefix = prefix,
+                Condition = condition,
+                ErrorCode = code,
+                Reason = reason,
+                Attempts = attempts,
+            });
+
+            Console.WriteLine($"    UNRESOLVED {kind} [{label}]: {code} - {reason}");
         }
 
         private static WikiVendorResult? ParseResult(string pageName, JsonElement element)
@@ -620,10 +817,24 @@ namespace VendorOfferUpdater
         /// rather than matching on property values, which is more reliable across
         /// redirects and naming variants.
         /// Names are batched using [[A||B||C]] OR syntax to minimize requests.
+        /// <para>
+        /// Pass <paramref name="options"/> on a run that never called
+        /// QueryVendorItemsAsync: this method is the whole of the
+        /// --resolve-item-currencies-only pass, and without them it would use
+        /// the built-in delay and attempt count rather than the run's.
+        /// </para>
         /// </summary>
         public async Task<Dictionary<string, int>> ResolveItemGameIdsAsync(
-            IEnumerable<string> itemNames, CancellationToken ct = default)
+            IEnumerable<string> itemNames,
+            CancellationToken ct = default,
+            QueryOptions? options = null)
         {
+            if (options != null)
+            {
+                _options = options;
+                _effectiveDelay = options.DelayBetweenRequestsMs;
+            }
+
             var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var names = itemNames.ToList();
 
@@ -641,7 +852,8 @@ namespace VendorOfferUpdater
                 var condition = "[[" + string.Join("||", batch) + "]]";
                 var query = condition + "|?Has game id";
 
-                var url = $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(query)}&format=json";
+                var url = BuildAskUrl(query);
+                string label = $"item batch {i / batchSize + 1}";
 
                 Console.WriteLine(
                     $"  Resolving batch {i / batchSize + 1} ({batch.Count} items)...");
@@ -649,10 +861,26 @@ namespace VendorOfferUpdater
                 string response;
                 try
                 {
-                    response = await FetchWithRetryAsync(url, ct);
+                    response = await FetchWithRetryAsync(url, label, condition, ct);
+                }
+                catch (WikiApiErrorException ex)
+                {
+                    // A refusal is one batch's problem. The next batch is a
+                    // different query and may well be answered, so the run
+                    // continues and this batch is recorded for a re-target.
+                    RecordUnresolved("item-batch", label, null, condition, ex);
+                    if (i + batchSize < names.Count)
+                    {
+                        await Task.Delay(delay, ct);
+                    }
+
+                    continue;
                 }
                 catch (HttpRequestException ex)
                 {
+                    // Transport, not refusal: the wiki is unreachable rather
+                    // than unwilling, so pressing on would only add requests.
+                    RecordUnresolved("item-batch", label, null, condition, ex);
                     Console.WriteLine(
                         $"  WARNING: Item resolution interrupted at batch {i / batchSize + 1}: {ex.Message}");
                     Console.WriteLine(
@@ -661,13 +889,11 @@ namespace VendorOfferUpdater
                 }
 
                 using var doc = JsonDocument.Parse(response);
-                var root = doc.RootElement;
+                var reading = WikiAskResponse.Read(doc.RootElement);
 
-                if (root.TryGetProperty("query", out var queryElement) &&
-                    queryElement.TryGetProperty("results", out var results) &&
-                    results.ValueKind == JsonValueKind.Object)
+                if (reading.Shape == WikiAskShape.Rows)
                 {
-                    foreach (var prop in results.EnumerateObject())
+                    foreach (var prop in reading.Results.EnumerateObject())
                     {
                         if (prop.Value.TryGetProperty("printouts", out var printouts) &&
                             printouts.TryGetProperty("Has game id", out var gameIds) &&
@@ -680,6 +906,15 @@ namespace VendorOfferUpdater
                             }
                         }
                     }
+                }
+                else if (reading.Shape != WikiAskShape.NoRows)
+                {
+                    RecordUnresolved(
+                        "item-batch",
+                        label,
+                        null,
+                        condition,
+                        reading.Error ?? UnreadableResponse());
                 }
 
                 if (i + batchSize < names.Count)
@@ -710,9 +945,14 @@ namespace VendorOfferUpdater
         public async Task<string?> FetchWikitextAsync(string pageName, CancellationToken ct = default)
         {
             var url = $"{WikiApiUrl}?action=parse&page={Uri.EscapeDataString(pageName)}" +
-                       "&prop=wikitext&redirects=1&format=json";
+                       $"&prop=wikitext&redirects=1&format=json&maxlag={MaxLagSeconds}";
 
-            string response = await FetchWithRetryAsync(url, ct);
+            // retryApiErrors is off here because "missingtitle" is an ordinary
+            // outcome for this call: a vendor page named by a subobject may
+            // simply not exist, and retrying that five times would spend four
+            // requests to learn what the first answer already said.
+            string response = await FetchWithRetryAsync(
+                url, $"wikitext {pageName}", pageName, ct, retryApiErrors: false);
 
             using var doc = JsonDocument.Parse(response);
             var root = doc.RootElement;

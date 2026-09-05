@@ -20,6 +20,11 @@
 #                       rather than aborting, but the default here is sized
 #                       to cover a full refresh in one run under normal
 #                       conditions.
+#   ALLOW_COVERAGE_DROP Set to any value to pass --allow-coverage-drop to both
+#                       passes, which lets a run write its dataset even though
+#                       the coverage check objected. Unset by default: a run
+#                       that lost merchants, or left a section unresolved,
+#                       should be re-targeted rather than published.
 #
 # Requires: .NET 8 SDK, Git Bash on Windows, internet access.
 # jq is optional - used for offer count in the summary if available.
@@ -70,6 +75,7 @@ for arg in "$@"; do
             echo "  DELAY_PASS1=${DELAY_PASS1:-250}   Delay between wiki requests (ms)"
             echo "  DELAY_PASS2=${DELAY_PASS2:-1500}  Delay between resolution requests (ms)"
             echo "  MAX_SEASONAL_PAGES=${MAX_SEASONAL_PAGES:-2500}  Max new seasonal-tag pages fetched by Pass 1"
+            echo "  ALLOW_COVERAGE_DROP=${ALLOW_COVERAGE_DROP:-}  Write even if the coverage check objects"
             exit 0
             ;;
         *)
@@ -150,6 +156,7 @@ if [[ "$PASS2_ONLY" == false ]]; then
         --max-requests "${MAX_REQUESTS:-2000}" \
         --delay "${DELAY_PASS1:-250}" \
         --max-seasonal-pages "${MAX_SEASONAL_PAGES:-2500}" \
+        ${ALLOW_COVERAGE_DROP:+--allow-coverage-drop} \
         "$OUTPUT"
     echo ""
 else
@@ -177,6 +184,7 @@ dotnet run --project "$PROJ" -c Release --no-build -- \
     --resolve-item-currencies-only \
     "${MERGE_FLAGS[@]+"${MERGE_FLAGS[@]}"}" \
     --delay "${DELAY_PASS2:-1500}" \
+    ${ALLOW_COVERAGE_DROP:+--allow-coverage-drop} \
     "$OUTPUT"
 echo ""
 

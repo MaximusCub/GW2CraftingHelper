@@ -618,6 +618,7 @@ tools/TaimisToolbench.RecipeSeeder/Program.cs                                   
 tools/MysticForgeSeeder/Program.cs                                                      814
 tools/MysticForgeSeeder/WikiRecipeClient.cs                                             627
 tools/Shared/FileMysticForgeRecipeSource.cs                                             39
+tools/VendorOfferUpdater/CoverageGate.cs                                                278
 tools/VendorOfferUpdater/Gw2ApiHelper.cs                                                99
 tools/VendorOfferUpdater/HomesteadTierResolver.cs                                       80
 tools/VendorOfferUpdater/Models/CostLine.cs                                             18
@@ -625,10 +626,11 @@ tools/VendorOfferUpdater/Models/Gw2Constants.cs                                 
 tools/VendorOfferUpdater/Models/VendorOffer.cs                                          62
 tools/VendorOfferUpdater/Models/VendorOfferDataset.cs                                   21
 tools/VendorOfferUpdater/Models/VendorOfferManifest.cs                                  33
-tools/VendorOfferUpdater/Program.cs                                                     1858
-tools/VendorOfferUpdater/QueryOptions.cs                                                17
-tools/VendorOfferUpdater/QueryStats.cs                                                  49
+tools/VendorOfferUpdater/Program.cs                                                     1979
+tools/VendorOfferUpdater/QueryOptions.cs                                                38
+tools/VendorOfferUpdater/QueryStats.cs                                                  79
 tools/VendorOfferUpdater/TemporaryTemplateParser.cs                                     122
 tools/VendorOfferUpdater/VendorOfferDiff.cs                                             435
 tools/VendorOfferUpdater/VendorOfferHasher.cs                                           122
-tools/VendorOfferUpdater/WikiSmwClient.cs                                               808
+tools/VendorOfferUpdater/WikiAskResponse.cs                                             216
+tools/VendorOfferUpdater/WikiSmwClient.cs                                               1036
