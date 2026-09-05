@@ -291,7 +291,7 @@ Views/ModalDialog.cs                                                            
 Views/PlanHistoryTabContent.cs                                                          1487
 Views/RankerTabContent.cs                                                               3025
 Views/Rendering/ClickSound.cs                                                           197
-Views/Rendering/CloseKeyButton.cs                                                       119
+Views/Rendering/CloseKeyButton.cs                                                       64
 Views/Rendering/CoinCurrencyRenderer.cs                                                 671
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              221
 Views/Rendering/CraftStepsSectionRenderer.cs                                            264
@@ -317,6 +317,7 @@ Views/Rendering/RarityColors.cs                                                 
 Views/Rendering/RecipesSectionRenderer.cs                                               365
 Views/Rendering/RichTooltipSurface.cs                                                   609
 Views/Rendering/RowRelayoutHelpers.cs                                                   72
+Views/Rendering/RowActionKey.cs                                                         103
 Views/Rendering/ShoppingBadgeColors.cs                                                  72
 Views/Rendering/ShoppingListSectionRenderer.cs                                          550
 Views/Rendering/SortIndicator.cs                                                        145
