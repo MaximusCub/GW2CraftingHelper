@@ -878,8 +878,11 @@ namespace VendorOfferUpdater
 
                 if (HasStoppedAnswering())
                 {
+                    // Sections, not batches: the count carries over from the
+                    // vendor query on this same client, so a wiki that shut
+                    // during the scrape is not asked 111 more questions here.
                     Console.WriteLine(
-                        $"  WARNING: {_consecutiveUnresolved} batches in a row went " +
+                        $"  WARNING: {_consecutiveUnresolved} section(s) in a row went " +
                         $"unanswered. Stopping with {result.Count} resolved.");
                     break;
                 }
