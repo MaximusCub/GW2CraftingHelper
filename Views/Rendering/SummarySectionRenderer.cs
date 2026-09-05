@@ -632,14 +632,14 @@ namespace TaimisToolbench.Views.Rendering
             }
         }
 
-        // The group headings are labels over data, not data: the same grey
-        // the formula band's own tile captions wear.
-        private static readonly Color NonCoinGroupHeadingColor = BandCaptionColor;
-
         /// <summary>
-        /// One group heading inside the non-coin table. Left-anchored on
-        /// the table's own icon gutter, so the section keeps one left edge,
-        /// and drawn at the height
+        /// One group heading inside the non-coin table: the face and colour
+        /// the column headers above it already wear, on no band of its own.
+        /// A heading has to outrank the rows it labels, and the band is
+        /// what still separates it from the header row that outranks it -
+        /// which tiers get a band is HeaderBands' own doc comment.
+        /// Left-anchored on the table's icon gutter, so the section keeps
+        /// one left edge, and drawn at the height
         /// SummarySectionLayoutMath.NonCoinTableRowsHeight prices it at.
         /// </summary>
         private void CreateNonCoinGroupHeadingRow(
@@ -654,8 +654,8 @@ namespace TaimisToolbench.Views.Rendering
             LabelHelpers.WithDescenderClearance(new Label()
             {
                 Text = text,
-                Font = UiFonts.Caption,
-                TextColor = NonCoinGroupHeadingColor,
+                Font = HeaderBands.Font,
+                TextColor = HeaderBands.LabelColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
                 Location = new Point(
@@ -751,7 +751,7 @@ namespace TaimisToolbench.Views.Rendering
 
         /// <summary>
         /// Have/Needed already read "-" rather than a fabricated number when
-        /// no wallet snapshot exists - see
+        /// no account snapshot exists - see
         /// PlanRowViewModel.CurrencyOwnedQuantity's doc comment. Spelled
         /// once so the pre-scan and the row can never disagree about what
         /// the column actually draws.

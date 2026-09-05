@@ -402,6 +402,7 @@ namespace TaimisToolbench.Services
             // cosmetic only (see BuildOwnedVendorItemComponentAmounts).
             IReadOnlyDictionary<int, int> ownedVendorItemAmounts =
                 BuildOwnedVendorItemComponentAmounts(snapshot, solveResult.Decisions, vendorOffers);
+            result.OwnedVendorItemAmounts = ownedVendorItemAmounts;
 
             BuildCraftingTreeResult(
                 result, treeUsedForSolve, solveResult.Decisions, metadata,
@@ -704,6 +705,7 @@ namespace TaimisToolbench.Services
             result.AcquisitionHints = context.AcquisitionHints;
             result.DailyCooldownItems = context.DailyCooldownItems;
             result.OwnedCurrencyAmounts = context.OwnedCurrencyAmounts;
+            result.OwnedVendorItemAmounts = context.OwnedVendorItemAmounts;
             result.RequestedItems = context.RequestedItems;
             // Cosmetic only, carried forward so a re-solve keeps showing it.
             result.CharacterDisciplines = context.CharacterDisciplines;

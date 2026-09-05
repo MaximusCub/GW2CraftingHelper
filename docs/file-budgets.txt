@@ -33,7 +33,7 @@ Models/CompetencyOpportunity.cs                                                 
 Models/CostLine.cs                                                                      11
 Models/CraftingDecision.cs                                                              73
 Models/CraftingPlan.cs                                                                  31
-Models/CraftingPlanResult.cs                                                            200
+Models/CraftingPlanResult.cs                                                            211
 Models/CraftingTreeNode.cs                                                              235
 Models/CurrencyCost.cs                                                                  9
 Models/CurrencyDecisionDefaults.cs                                                      142
@@ -57,7 +57,7 @@ Models/PlanRequestItem.cs                                                       
 Models/PlanSolveContext.cs                                                              212
 Models/PlanStatus.cs                                                                    11
 Models/PlanStep.cs                                                                      62
-Models/PlanViewModel.cs                                                                 454
+Models/PlanViewModel.cs                                                                 455
 Models/PriceBasis.cs                                                                    32
 Models/RankerRowMetrics.cs                                                              152
 Models/RankerSlotAvailability.cs                                                        59
@@ -97,7 +97,7 @@ Services/CompositeRecipeApiClient.cs                                            
 Services/CostLineValuation.cs                                                           121
 Services/CraftCompetencyEvaluator.cs                                                    125
 Services/CraftableItemSearchProvider.cs                                                 127
-Services/CraftingPlanPipeline.cs                                                        1629
+Services/CraftingPlanPipeline.cs                                                        1631
 Services/CraftingTreeBuilder.cs                                                         626
 Services/CurrencyDisplayResolver.cs                                                     236
 Services/CurrencyMetadataService.cs                                                     159
@@ -180,7 +180,7 @@ Services/PlanStripStatusBoard.cs                                                
 Services/PlanStripTickDecision.cs                                                       97
 Services/PlanStructuralValidator.cs                                                     597
 Services/PlanTableSorter.cs                                                             261
-Services/PlanViewModelBuilder.cs                                                        1703
+Services/PlanViewModelBuilder.cs                                                        1725
 Services/RankerPriorityCascade.cs                                                       364
 Services/RankerPriorityOrdering.cs                                                      183
 Services/RankerRarityAdoption.cs                                                        87
@@ -247,7 +247,7 @@ Services/StatusStore.cs                                                         
 Services/StatusText.cs                                                                  286
 Services/StatusUpdateGuard.cs                                                           38
 Services/StickyHeaderLayout.cs                                                          117
-Services/SummarySectionLayoutMath.cs                                                    852
+Services/SummarySectionLayoutMath.cs                                                    853
 Services/TableSortState.cs                                                              114
 Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
@@ -453,7 +453,7 @@ tests/TaimisToolbench.Tests/Services/PillSubduingEvaluatorTests.cs              
 tests/TaimisToolbench.Tests/Services/PillSubduingTooltipBuilderTests.cs                 130
 tests/TaimisToolbench.Tests/Services/PillTooltipTextComposerTests.cs                    306
 tests/TaimisToolbench.Tests/Services/PlanCompatibilityFixtureTests.cs                   371
-tests/TaimisToolbench.Tests/Services/PlanContentHeightMathTests.cs                      604
+tests/TaimisToolbench.Tests/Services/PlanContentHeightMathTests.cs                      625
 tests/TaimisToolbench.Tests/Services/PlanHistoryBlobStoreTests.cs                       324
 tests/TaimisToolbench.Tests/Services/PlanHistoryDedupKeyTests.cs                        94
 tests/TaimisToolbench.Tests/Services/PlanHistoryLabelsTests.cs                          138

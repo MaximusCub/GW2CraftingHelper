@@ -570,8 +570,9 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// The Total Cost section's non-coin table: one row per wallet
         /// currency AND one per barter item the plan spends. Label is the
-        /// resolved name, CurrencyOwnedQuantity the raw unclamped wallet
-        /// holding; Needed/FullyCovered are derived here so the table
+        /// resolved name, CurrencyOwnedQuantity the raw unclamped holding -
+        /// a wallet balance for a currency, an account-wide item count for
+        /// a barter item; Needed/FullyCovered are derived here so the table
         /// renderer stays a dumb read of computed fields.
         /// <para>
         /// Both kinds share <see cref="PlanRowType.CurrencyCost"/> and this
@@ -625,20 +626,7 @@ namespace TaimisToolbench.Services
                 // any owned amount; ClampToInt keeps the ordering correct.
                 int required = ClampToInt(cc.Amount);
 
-                // Unclamped - the real wallet holding, even when it
-                // exceeds the need. Null (not 0) when no wallet snapshot
-                // was available.
-                int? owned = null;
-                if (result.OwnedCurrencyAmounts != null &&
-                    result.OwnedCurrencyAmounts.TryGetValue(cc.CurrencyId, out int ownedRaw))
-                {
-                    owned = ownedRaw;
-                }
-
-                int? needed = owned.HasValue ? Math.Max(0, required - owned.Value) : (int?)null;
-                bool fullyCovered = owned.HasValue && owned.Value >= required;
-
-                currencyRows.Add(new PlanRowViewModel
+                var row = new PlanRowViewModel
                 {
                     RowType = PlanRowType.CurrencyCost,
                     Label = currencyName,
@@ -646,19 +634,20 @@ namespace TaimisToolbench.Services
                     IconUrl = iconUrl,
                     CurrencyDescription = CurrencyDisplayResolver.ResolveDescription(
                         cc.CurrencyId, result.CurrencyMetadata),
-                    CurrencyOwnedQuantity = owned,
-                    CurrencyNeededQuantity = needed,
-                    CurrencyFullyCovered = fullyCovered,
-                });
+                };
+                ApplyOwnedSplit(row, LookupOwned(result.OwnedCurrencyAmounts, cc.CurrencyId));
+                currencyRows.Add(row);
             }
         }
 
         /// <summary>
-        /// The barter half of the non-coin table. CurrencyOwnedQuantity
-        /// stays NULL on every row: the module reads a wallet, not an
-        /// inventory count for an arbitrary item, so "Have" is genuinely
-        /// unknown here and must render as unknown rather than as zero -
-        /// which is also why CurrencyFullyCovered stays false.
+        /// The barter half of the non-coin table. Its holding comes from
+        /// CraftingPlanResult.OwnedVendorItemAmounts - the same
+        /// account-wide item count the Recipe Tree's cost-component leaf
+        /// draws its own OWN badge from, so the table and the tree can
+        /// never state different holdings for one token. Null (not 0) when
+        /// there is no account snapshot, which is the only case where
+        /// Have/Needed are genuinely unknown.
         /// </summary>
         private static void AddBarterItemCostRows(
             List<PlanRowViewModel> currencyRows, CraftingPlanResult result)
@@ -670,7 +659,7 @@ namespace TaimisToolbench.Services
 
             foreach (var bc in result.Plan.BarterItemCosts)
             {
-                currencyRows.Add(new PlanRowViewModel
+                var row = new PlanRowViewModel
                 {
                     RowType = PlanRowType.CurrencyCost,
                     IsBarterItemCost = true,
@@ -679,8 +668,41 @@ namespace TaimisToolbench.Services
                     Quantity = ClampToInt(bc.Amount),
                     IconUrl = ResolveIconUrl(bc.ItemId, result.ItemMetadata),
                     Rarity = ResolveRarity(bc.ItemId, result.ItemMetadata),
-                });
+                };
+                ApplyOwnedSplit(row, LookupOwned(result.OwnedVendorItemAmounts, bc.ItemId));
+                currencyRows.Add(row);
             }
+        }
+
+        /// <summary>
+        /// The raw holding of one id, or null when the map has no answer.
+        /// Null is load-bearing: it is what separates "no snapshot" from
+        /// "holds none", and every field derived below preserves it.
+        /// </summary>
+        private static int? LookupOwned(IReadOnlyDictionary<int, int> ownedAmounts, int id)
+        {
+            if (ownedAmounts != null && ownedAmounts.TryGetValue(id, out int owned))
+            {
+                return owned;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Seats the Have/Needed/Status trio on a non-coin row from its
+        /// raw, unclamped holding. One derivation for both halves of the
+        /// table, so a wallet currency and a barter item can never answer
+        /// the same coverage question differently. Reads row.Quantity, so
+        /// the caller sets it first.
+        /// </summary>
+        private static void ApplyOwnedSplit(PlanRowViewModel row, int? owned)
+        {
+            row.CurrencyOwnedQuantity = owned;
+            row.CurrencyNeededQuantity = owned.HasValue
+                ? Math.Max(0, row.Quantity - owned.Value)
+                : (int?)null;
+            row.CurrencyFullyCovered = owned.HasValue && owned.Value >= row.Quantity;
         }
 
         /// <summary>
@@ -719,8 +741,8 @@ namespace TaimisToolbench.Services
                     IconUrl = row.IconUrl,
 
                     // Clamped/raw exactly as CurrencyAmountViewModel's own
-                    // two fields define them; both stay null on a barter
-                    // row, whose holding is unknown rather than zero.
+                    // two fields define them; both stay null on any row
+                    // whose holding is unknown rather than zero.
                     OwnedQuantity = row.CurrencyOwnedQuantity.HasValue
                         ? Math.Min(row.CurrencyOwnedQuantity.Value, row.Quantity)
                         : (int?)null,
