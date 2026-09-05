@@ -57,19 +57,51 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void TheCaretsBesideIt_StillFitTheirPlate()
+        public void TheCaretsBesideIt_FitTheKeyPlate()
         {
-            // The carets are still a glyph on a FeedbackButton plate, and
-            // they now take the close key's box rather than setting it. One
-            // pixel of ink past the plate is drawn over the button's own
-            // border art, so this is the floor the shrink had to clear.
+            // The carets draw on the close key's own plate now, so the box
+            // they have to fit is that plate and not a button's. One pixel
+            // of ink past it lands on the key's border art.
             LargestCaretInk(out int inkWidth, out int inkHeight);
 
-            int plateWidth = GlyphButtonMetrics.RowActionWidth - GlyphButtonMetrics.PlateInsetX;
-            int plateHeight = GlyphButtonMetrics.RowActionHeight - GlyphButtonMetrics.PlateInsetY;
+            Assert.True(
+                inkWidth + (2 * GlyphButtonMetrics.GlyphMargin) <= GlyphButtonMetrics.KeyPlateSize);
+            Assert.True(
+                inkHeight + (2 * GlyphButtonMetrics.GlyphMargin) <= GlyphButtonMetrics.KeyPlateSize);
+        }
 
-            Assert.True(plateWidth >= inkWidth + (2 * GlyphButtonMetrics.GlyphMargin));
-            Assert.True(plateHeight >= inkHeight + (2 * GlyphButtonMetrics.GlyphMargin));
+        [Fact]
+        public void TheKeyWithoutItsCross_RebuildsFromSlicesOfItsOwnTexture()
+        {
+            // A caret key keeps the frame at each end of the close key and
+            // repeats one bare plate row between them. Two frames that met
+            // in the middle would leave no room for the fill, and the fill
+            // is the only part of the key a caret can sit on.
+            Assert.True(2 * GlyphButtonMetrics.KeyCapHeight < GlyphButtonMetrics.RowActionHeight);
+
+            // The repeated row and the bottom frame must not be the same
+            // rows of the texture, or the fill would carry frame art.
+            int bottomSourceY = GlyphButtonMetrics.CloseKeySourceY
+                + GlyphButtonMetrics.RowActionHeight - GlyphButtonMetrics.KeyCapHeight;
+            Assert.True(bottomSourceY > GlyphButtonMetrics.KeyPlateRowY);
+
+            // Every slice is sampled from inside the texture; one that
+            // reached past it would pick up the next page of the atlas.
+            Assert.InRange(
+                GlyphButtonMetrics.KeyPlateRowY, 0, GlyphButtonMetrics.CloseKeyTextureSize - 1);
+            Assert.True(
+                bottomSourceY + GlyphButtonMetrics.KeyCapHeight
+                    <= GlyphButtonMetrics.CloseKeyTextureSize);
+        }
+
+        [Fact]
+        public void TheKeyPlate_FitsInsideTheBox()
+        {
+            // The plate is the lit area inside the border, so it has to be
+            // smaller than the box on both axes; a plate as wide as the box
+            // would mean the border had been measured away.
+            Assert.True(GlyphButtonMetrics.KeyPlateSize < GlyphButtonMetrics.RowActionWidth);
+            Assert.True(GlyphButtonMetrics.KeyPlateSize < GlyphButtonMetrics.RowActionHeight);
         }
 
         [Fact]

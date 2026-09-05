@@ -522,7 +522,7 @@ namespace TaimisToolbench.Views
             // this is the smallest honest one: the game's own indicator dot
             // plus a label, both clickable, both always visible. The dot is
             // art rather than a U+25CF/U+25CB pair, neither of which exists
-            // in the bitmap font (see CreateRowButton).
+            // in the bitmap font (Services/UiGlyphs).
             _modeLabel = new Label
             {
                 Font = UiFonts.Body,
@@ -1037,8 +1037,8 @@ namespace TaimisToolbench.Views
             public CoinCurrencyRenderer.ValueCellHandle RemainingCell;
             public Label RemainingDash;
             public int RemainingCellWidth;
-            public FeedbackButton Up;
-            public FeedbackButton Down;
+            public CaretKeyButton Up;
+            public CaretKeyButton Down;
             public CloseKeyButton Remove;
             public readonly List<Label> GateNameLabels = new List<Label>();
             public readonly List<Label> GateValueLabels = new List<Label>();
@@ -1530,9 +1530,9 @@ namespace TaimisToolbench.Views
 
             if (ReorderVisible)
             {
-                row.Up = CreateGlyphRowButton(
+                row.Up = CreateCaretButton(
                     row.Panel, UiGlyphs.CaretUp, bands.UpX, MoveUpTooltip());
-                row.Down = CreateGlyphRowButton(
+                row.Down = CreateCaretButton(
                     row.Panel, UiGlyphs.CaretDown, bands.DownX, MoveDownTooltip());
                 row.Up.Enabled = CanReorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count);
                 row.Down.Enabled = CanReorder && RankerPriorityOrdering.CanMoveDown(row.Index, Entries.Count);
@@ -1595,42 +1595,19 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// A reorder action, and a REAL BUTTON. A
-        /// <see cref="FeedbackButton"/> is a StandardButton, so it inherits
-        /// Blish's own affordance: OnMouseEntered/OnMouseLeft tween the
-        /// public AnimationState 0 -&gt; 8 over 0.25s (Glide, linear, and
-        /// rate-preserving on a reversal), and Paint blits frame
-        /// AnimationState of the nine-frame "common/button-states" atlas
-        /// into the plate - the left-to-right sweep is painted INTO the
-        /// artwork, not computed. Nothing here has to reproduce it;
-        /// deriving from the button is what buys it.
+        /// A reorder action, on the same key its neighbouring X is cut
+        /// from (Views/Rendering/CaretKeyButton). It takes no explicit
+        /// Size for the reason the remove action does not.
         /// </summary>
-        private static FeedbackButton CreateRowButton(Panel parent, int x, string tooltip)
+        private static CaretKeyButton CreateCaretButton(
+            Panel parent, string glyph, int x, string tooltip)
         {
-            var button = new FeedbackButton
+            var button = new CaretKeyButton(glyph)
             {
-                Size = new Point(RankerRowLayout.ButtonWidth, RankerRowLayout.ButtonHeight),
                 Location = new Point(x, MainLineButtonY),
                 Parent = parent,
             };
             TooltipFacility.ApplyPlain(button, tooltip);
-            return button;
-        }
-
-        /// <summary>
-        /// A reorder action, whose whole label is one caret from the
-        /// module's own atlas. StandardButton exposes no Font, which is
-        /// exactly why these could not be buttons before FeedbackButton:
-        /// they need symmetric triangles, and the one face Blish ships has
-        /// none. The standalone glyph face centres its ink in the line box
-        /// rather than seating it on a baseline, which is what a button
-        /// with no neighbouring text wants.
-        /// </summary>
-        private static FeedbackButton CreateGlyphRowButton(
-            Panel parent, string glyph, int x, string tooltip)
-        {
-            var button = CreateRowButton(parent, x, tooltip);
-            button.SetGlyph(glyph);
             return button;
         }
 
@@ -2943,10 +2920,10 @@ namespace TaimisToolbench.Views
             foreach (var row in _rows)
             {
                 bool reorder = enabled && Mode == RankerMode.Cascade;
-                // FeedbackButton draws its own disabled state - a flat
-                // plate, Blish's disabled ink and a dimmed icon - so this is
-                // a click gate only, not a click gate plus a hand-rolled
-                // repaint the way the Image pair needed.
+                // A row action draws its own disabled state - the whole key
+                // fades, plate and mark together - so this is a click gate
+                // only, not a click gate plus a hand-rolled repaint the way
+                // the Image pair needed.
                 if (row.Up != null)
                 {
                     row.Up.Enabled = reorder && RankerPriorityOrdering.CanMoveUp(row.Index, Entries.Count);

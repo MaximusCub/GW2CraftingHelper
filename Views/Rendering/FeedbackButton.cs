@@ -3,7 +3,6 @@ using Blish_HUD.Controls;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Extended.BitmapFonts;
-using TaimisToolbench.Services;
 
 namespace TaimisToolbench.Views.Rendering
 {
@@ -130,27 +129,6 @@ namespace TaimisToolbench.Views.Rendering
         {
             get => _plateTint;
             set => SetProperty(ref _plateTint, value, false, nameof(PlateTint));
-        }
-
-        /// <summary>
-        /// Labels the button with one glyph from the module's own atlas, and
-        /// with the ASCII stand-in when that atlas failed to load. The one
-        /// seam that pairs a glyph with the font that can draw it, for the
-        /// same reason <see cref="Services.UiGlyphs.ExpandCaret"/> is one:
-        /// a call site that chose the glyph and the font separately could
-        /// seat a PUA codepoint on Menomonia, where it draws nothing and
-        /// advances nothing.
-        /// <para>
-        /// Glyph TEXT, not an <see cref="StandardButton.Icon"/>: text takes
-        /// the enabled/disabled ink this button already paints, so a pair of
-        /// carets cannot end up half black text and half tinted texture.
-        /// </para>
-        /// </summary>
-        internal void SetGlyph(string glyph)
-        {
-            bool available = UiFonts.GlyphsAvailable;
-            Font = available ? UiFonts.Glyphs : UiFonts.Caption;
-            Text = available ? glyph : UiGlyphs.AsciiFallback(glyph);
         }
 
         private static Texture2D Face =>
