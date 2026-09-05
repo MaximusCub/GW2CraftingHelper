@@ -39,10 +39,9 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// The empty enrichment socket, /v2/files
-        /// <c>ui_infusion_slot_utility</c> - the pre-2016 utility-infusion
-        /// glyph, enrichments being the renamed utility infusions. INFERRED
-        /// from that rename; no capture of an amulet tooltip exists to
-        /// measure it against, unlike <see cref="InfusionSlotAssetId"/>.
+        /// <c>ui_infusion_slot_utility</c>. The file name is pre-2016:
+        /// utility infusions were renamed enrichments when the infusion
+        /// subtypes were merged away, and the glyph kept its old id.
         /// </summary>
         public const int EnrichmentSlotAssetId = 517204;
 

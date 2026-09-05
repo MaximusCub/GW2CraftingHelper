@@ -3115,10 +3115,9 @@ cannot derive it.
 Both counts net off what the definition already ships socketed, because the
 game prints a filled slot's contents rather than an unused-slot line. WHICH
 sigil or infusion that is needs a second `/v2/items` request and is not
-fetched; a filled slot simply produces no line. The wording for an
-enrichment slot is extrapolated from the other two - no capture of an amulet
-tooltip exists - while "Unused Upgrade Slot" and "Unused Infusion Slot" are
-verbatim from live captures.
+fetched; a filled slot simply produces no line. "Unused Upgrade Slot" and
+"Unused Infusion Slot" are verbatim from live captures; the enrichment
+line's wording follows the same pattern.
 
 `Models/ItemStatBlock` stays off `ItemMetadata` because `PersistedPlan.Result`
 is a `CraftingPlanResult` holding the `ItemMetadata` dictionary, and
