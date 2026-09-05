@@ -195,6 +195,40 @@ namespace VendorOfferUpdater.Tests.Helpers
             return "{\"query\":{\"results\":[]}}";
         }
 
+        /// <summary>
+        /// Builds an api.php error body in MediaWiki's shape: a top-level
+        /// "error" object carrying code, info, the "*" usage line and the
+        /// serving host, with no "query" key at all. Served with HTTP 200.
+        /// </summary>
+        public static string BuildApiError(string code, string info)
+        {
+            using var stream = new System.IO.MemoryStream();
+            using var writer = new Utf8JsonWriter(stream);
+
+            writer.WriteStartObject();
+            writer.WriteStartObject("error");
+            writer.WriteString("code", code);
+            writer.WriteString("info", info);
+            writer.WriteString("*", "See https://wiki.guildwars2.com/api.php for API usage.");
+            writer.WriteEndObject();
+            writer.WriteString("servedby", "mw-api-int-7bcd9f4d4-xk2pl");
+            writer.WriteEndObject();
+
+            writer.Flush();
+            return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+        }
+
+        /// <summary>
+        /// The maxlag refusal, which is the error a client that sends
+        /// maxlag=N is asking the server to send instead of a block.
+        /// </summary>
+        public static string BuildMaxLagError()
+        {
+            return BuildApiError(
+                "maxlag",
+                "Waiting for 10.64.16.79: 6.9 seconds lagged.");
+        }
+
         private class ResultEntry
         {
             public string PageName { get; set; }

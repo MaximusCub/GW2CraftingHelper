@@ -594,12 +594,13 @@ tests/TaimisToolbench.Tests/Services/WindowSizingTests.cs                       
 tests/TaimisToolbench.Tests/Services/ZojjasClaymoreValidationTests.cs                   471
 tests/VendorOfferUpdater.Tests/ApplyExclusionsTests.cs                                  196
 tests/VendorOfferUpdater.Tests/ConvertToOfferTests.cs                                   535
+tests/VendorOfferUpdater.Tests/CoverageGateTests.cs                                     250
 tests/VendorOfferUpdater.Tests/EscapeNonAsciiTests.cs                                   79
 tests/VendorOfferUpdater.Tests/Gw2ApiHelperTests.cs                                     140
 tests/VendorOfferUpdater.Tests/Helpers/FakeHttpHandler.cs                               69
 tests/VendorOfferUpdater.Tests/Helpers/RepoFileLocator.cs                               41
 tests/VendorOfferUpdater.Tests/Helpers/VendorOfferHasherVectorFixture.cs                107
-tests/VendorOfferUpdater.Tests/Helpers/WikiJsonBuilder.cs                               221
+tests/VendorOfferUpdater.Tests/Helpers/WikiJsonBuilder.cs                               255
 tests/VendorOfferUpdater.Tests/HomesteadTierResolverTests.cs                            105
 tests/VendorOfferUpdater.Tests/MergeIntoBaselineTests.cs                                444
 tests/VendorOfferUpdater.Tests/MergeWikiCacheTests.cs                                   224
@@ -612,12 +613,14 @@ tests/VendorOfferUpdater.Tests/VendorOfferDiffTests.cs                          
 tests/VendorOfferUpdater.Tests/VendorOfferHasherGoldenVectorTests.cs                    82
 tests/VendorOfferUpdater.Tests/VendorOfferHasherTests.cs                                365
 tests/VendorOfferUpdater.Tests/VendorOfferManifestTests.cs                              100
+tests/VendorOfferUpdater.Tests/WikiApiRefusalTests.cs                                   304
 tests/VendorOfferUpdater.Tests/WikiSmwClientTests.cs                                    610
 tools/TaimisToolbench.Harness/Program.cs                                                861
 tools/TaimisToolbench.RecipeSeeder/Program.cs                                           724
 tools/MysticForgeSeeder/Program.cs                                                      814
 tools/MysticForgeSeeder/WikiRecipeClient.cs                                             627
 tools/Shared/FileMysticForgeRecipeSource.cs                                             39
+tools/VendorOfferUpdater/CoverageGate.cs                                                278
 tools/VendorOfferUpdater/CoverageGate.cs                                                278
 tools/VendorOfferUpdater/Gw2ApiHelper.cs                                                99
 tools/VendorOfferUpdater/HomesteadTierResolver.cs                                       80
@@ -632,5 +635,6 @@ tools/VendorOfferUpdater/QueryStats.cs                                          
 tools/VendorOfferUpdater/TemporaryTemplateParser.cs                                     122
 tools/VendorOfferUpdater/VendorOfferDiff.cs                                             435
 tools/VendorOfferUpdater/VendorOfferHasher.cs                                           122
+tools/VendorOfferUpdater/WikiAskResponse.cs                                             216
 tools/VendorOfferUpdater/WikiAskResponse.cs                                             216
 tools/VendorOfferUpdater/WikiSmwClient.cs                                               1036
