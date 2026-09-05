@@ -2990,9 +2990,12 @@ seat that counts them hangs three rows of shadow under the digits and leaves
 the visible coin two rows high. `CoinInkBelowBaseline` is read ink against
 ink for the same reason - the icon box's matched position in a bar tier
 capture is a template fit against art the game rescales itself, and it does
-not resolve to the row. Every other inline currency icon keeps the centred
-seat: they measured centred to within half a pixel in the same capture that
-reported the coin defect, and were left alone deliberately.
+not resolve to the row. Reading it *within* one capture also keeps it free
+of that capture's UI size: both edges scale together, so the row count
+carries into a logical constant without a conversion. Every other inline
+currency icon keeps the centred seat: they measured centred to within half a
+pixel in the same capture that reported the coin defect, and were left alone
+deliberately.
 
 ### S1.4 Item tooltips: what the API says and what the game shows
 

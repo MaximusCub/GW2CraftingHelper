@@ -96,10 +96,11 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Rows the game hangs a coin's ink BELOW the digits' ink bottom.
-        /// MEASURED ink against ink on a bar tier capture: the coin's lowest
-        /// drawn row is one below the digits' lowest. Not read off the icon
-        /// box's matched position - that is a template fit against art the
-        /// game rescales itself, and it does not resolve to the row.
+        /// MEASURED ink against ink WITHIN one bar tier capture, so the UI
+        /// size it was taken at cancels and the count reads straight as a
+        /// logical row: the coin's lowest drawn row is one below the
+        /// digits' lowest. Not read off the icon box's matched position,
+        /// which is a template fit and does not resolve to the row.
         /// </summary>
         public const int CoinInkBelowBaseline = 1;
 
