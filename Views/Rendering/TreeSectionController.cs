@@ -2017,14 +2017,15 @@ namespace TaimisToolbench.Views.Rendering
                 runRightEdge = x + fit.OverflowPillWidth;
             }
 
-            int keyRightEdge = pillColX;
             if (anchoredIndex >= 0)
             {
-                int keyX = TreeIgnoreKeyPlacement.SlotX(
-                    maxRightEdge, CostInkX(handle, pillColX), anchoredWidth, PillGap,
-                    pillColX + _planPillRunInk.Widen(node.NodeId, runRightEdge - pillColX));
-                keyRightEdge = keyX + anchoredWidth;
-                placements.Add(new PillPlacement(anchoredIndex, keyX, anchoredWidth, 0));
+                placements.Add(new PillPlacement(
+                    anchoredIndex,
+                    TreeIgnoreKeyPlacement.SlotX(
+                        maxRightEdge, CostInkX(handle, pillColX), anchoredWidth, PillGap,
+                        pillColX + _planPillRunInk.Widen(node.NodeId, runRightEdge - pillColX)),
+                    anchoredWidth,
+                    0));
             }
 
             foreach (var placement in placements)
@@ -2276,8 +2277,7 @@ namespace TaimisToolbench.Views.Rendering
                 pillOffsets.Add(x - pillColX);
             }
 
-            NoteSourceHeaderInk(
-                TreePillRunLayout.HeaderInkWidth(pillColX, runRightEdge, keyRightEdge));
+            NoteSourceHeaderInk(TreePillRunLayout.HeaderInkWidth(pillColX, runRightEdge));
         }
 
         /// <summary>
