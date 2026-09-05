@@ -62,6 +62,21 @@
 > carries the full derivation, rescued from the branch's session-scratch
 > working doc `plan-redesign/minwidth.md`, which was cited by the commit
 > message and the `WindowSizing.cs` comment but committed nowhere.
+>
+> **The action-column term (`w23-ignore-trailing-column`).**
+> `WindowSizing.MinWindowWidth` is **unchanged at 1378**. The ignore button
+> moved out of the decision column into a fixed action column that closes
+> every tree row after Cost, adding a `TreeActionColumnWidth` 21 +
+> `TreeActionColumnGap` 4 term to section 9.4's sum. It is paid for out of
+> `PlanRelayoutMath.TreePillColumnWidth`, which drops 256 -> 231, so the sum
+> is arithmetically identical and no measurement in this report changed.
+> The 25px was already unused reserve inside the 256: that figure was
+> derived to hold `CRAFT / TP / VENDOR / IGNORE` when IGNORE was a 53px
+> text pill, and the button that replaced it is 21px, so the floor had been
+> 44px wider than its own derivation asked for. Every figure section 9
+> derives is exact at 231 + 25 - the designed 24px clearance before the
+> decision column, the depth-19/20 agony boundary, and the +154 currency
+> rider.
 
 ## Answer
 
@@ -318,6 +333,14 @@ and the cost column budget becomes 181 + 154 = 335:
 
 ```
 629 + 24 + 256 + 335 + 8 = 1252  -> window 1378   (shipped MinWindowWidth)
+```
+
+The 256 term is now split in two: the decision column keeps 231 and the
+tree's trailing action column takes 25 (`TreeActionColumnWidth` 21 +
+`TreeActionColumnGap` 4). The sum, and so the window figure, is unchanged.
+
+```
+629 + 24 + 231 + 335 + 25 + 8 = 1252  -> window 1378
 ```
 
 ### 9.5 What the depth-23 agony chain does at 1378

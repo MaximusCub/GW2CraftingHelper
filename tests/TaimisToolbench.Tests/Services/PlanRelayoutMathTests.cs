@@ -177,13 +177,63 @@ namespace TaimisToolbench.Tests.Services
             var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
                 panelWidth, nameX, qtyPrefixWidth, pillColumnWidth: 256, costColumnWidth: 150, rightMargin: 8);
 
-            int expectedPillColX = panelWidth - (8 + 150) - 256;
-            int expectedCostRightEdge = panelWidth - 8;
+            // The action column closes the row: the ignore button takes
+            // the right edge and the cost values end a gap short of it.
+            int expectedActionButtonX =
+                panelWidth - 8 - PlanRelayoutMath.TreeActionColumnWidth;
+            int expectedCostRightEdge =
+                expectedActionButtonX - PlanRelayoutMath.TreeActionColumnGap;
+            int expectedPillColX = expectedCostRightEdge - 150 - 256;
             int expectedNameMax = System.Math.Max(20, expectedPillColX - nameX - 8) - qtyPrefixWidth;
 
             Assert.Equal(expectedPillColX, edges.PillColX);
             Assert.Equal(expectedCostRightEdge, edges.CostRightEdge);
+            Assert.Equal(expectedActionButtonX, edges.ActionButtonX);
             Assert.Equal(expectedNameMax, edges.NameMaxWidth);
+        }
+
+        /// <summary>
+        /// The action column is a pure function of the panel edge, so the
+        /// ignore button sits at one x for every row of a tree and moves
+        /// only when the window does. The two data column widths in front
+        /// of it are per-plan and shift on a re-solve; they cannot reach
+        /// it.
+        /// </summary>
+        [Fact]
+        public void ComputeTreeColumnEdges_ActionButtonX_IgnoresBothDataColumnWidths()
+        {
+            var narrowData = PlanRelayoutMath.ComputeTreeColumnEdges(
+                panelWidth: 1252, nameX: 400, qtyPrefixWidth: 0,
+                pillColumnWidth: 256, costColumnWidth: 150, rightMargin: 8);
+            var wideData = PlanRelayoutMath.ComputeTreeColumnEdges(
+                panelWidth: 1252, nameX: 400, qtyPrefixWidth: 0,
+                pillColumnWidth: 420, costColumnWidth: 335, rightMargin: 8);
+
+            Assert.Equal(narrowData.ActionButtonX, wideData.ActionButtonX);
+            Assert.Equal(narrowData.CostRightEdge, wideData.CostRightEdge);
+            Assert.NotEqual(narrowData.PillColX, wideData.PillColX);
+        }
+
+        /// <summary>
+        /// The ignore button closes the row: clear of the cost values on
+        /// its left, and inside the table's own right margin on its right.
+        /// A button overlapping either would take clicks the column beside
+        /// it owes, or draw off the row panel.
+        /// </summary>
+        [Fact]
+        public void ComputeTreeColumnEdges_ActionButton_SitsBetweenTheCostValuesAndTheMargin()
+        {
+            const int panelWidth = 1252;
+            const int rightMargin = 8;
+            var edges = PlanRelayoutMath.ComputeTreeColumnEdges(
+                panelWidth, nameX: 400, qtyPrefixWidth: 0,
+                pillColumnWidth: 256, costColumnWidth: 150, rightMargin: rightMargin);
+
+            Assert.Equal(
+                PlanRelayoutMath.TreeActionColumnGap, edges.ActionButtonX - edges.CostRightEdge);
+            Assert.Equal(
+                panelWidth - rightMargin,
+                edges.ActionButtonX + PlanRelayoutMath.TreeActionColumnWidth);
         }
 
         [Fact]

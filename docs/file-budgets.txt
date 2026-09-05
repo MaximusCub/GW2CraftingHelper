@@ -171,7 +171,7 @@ Services/PlanHistoryRowLayout.cs                                                
 Services/PlanHistoryStore.cs                                                            155
 Services/PlanHistoryTableSorter.cs                                                      103
 Services/PlanPhaseEvent.cs                                                              73
-Services/PlanRelayoutMath.cs                                                            453
+Services/PlanRelayoutMath.cs                                                            479
 Services/PlanResultBuilder.cs                                                           375
 Services/PlanSolver.cs                                                                  2323
 Services/PlanStore.cs                                                                   219
@@ -464,7 +464,7 @@ tests/TaimisToolbench.Tests/Services/PlanHistoryRowLayoutTests.cs               
 tests/TaimisToolbench.Tests/Services/PlanHistoryStoreTests.cs                           323
 tests/TaimisToolbench.Tests/Services/PlanHistoryTableSorterTests.cs                     177
 tests/TaimisToolbench.Tests/Services/PlanPhaseTimingSummaryTests.cs                     201
-tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                           778
+tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                           828
 tests/TaimisToolbench.Tests/Services/PlanResultBuilderTests.cs                          1103
 tests/TaimisToolbench.Tests/Services/PlanRootIgnoreTests.cs                             412
 tests/TaimisToolbench.Tests/Services/PlanSolverBarterItemValuationTests.cs              425

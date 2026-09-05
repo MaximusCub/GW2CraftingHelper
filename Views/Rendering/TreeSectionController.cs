@@ -168,9 +168,11 @@ namespace TaimisToolbench.Views.Rendering
             /// <summary>
             /// Each pill's x measured from the pill column's own left edge,
             /// in step with <see cref="Pills"/>. The resize pass replays
-            /// these rather than re-flowing the run, so the IGNORE toggle's
-            /// reserved slot (Services/TreePillRunLayout) stays anchored at
-            /// every window width.
+            /// these rather than re-flowing the run. The ignore button is
+            /// carried the same way: every offset in a tree row's grid is
+            /// fixed relative to PillColX
+            /// (PlanRelayoutMath.ComputeTreeColumnEdges), so replaying its
+            /// own puts it back in its column at any window width.
             /// </summary>
             internal readonly List<int> PillOffsets = new List<int>();
 
@@ -251,11 +253,6 @@ namespace TaimisToolbench.Views.Rendering
         // to the window on screen.
         private int _pillColumnWidth = PlanRelayoutMath.TreePillColumnWidth;
         private int _planPillRequiredFloor;
-
-        // Widest pill run each row has drawn while THIS plan has been on
-        // screen. The IGNORE key answers to this rather than to the run
-        // the row currently draws - see Services/TreePillRunInkFloor.
-        private readonly TreePillRunInkFloor _planPillRunInk = new TreePillRunInkFloor();
 
         // How much of THIS render's pill column was claimed from the cost
         // column's reserve above what its rows draw
@@ -340,7 +337,6 @@ namespace TaimisToolbench.Views.Rendering
             // fact and is cleared with it.
             _planCostColumnFloor = TreeCostColumnMath.CostColumnWidths.Empty;
             _planPillRequiredFloor = 0;
-            _planPillRunInk.Clear();
             _pillColumnCostClaim = 0;
             _sourceHeaderInkWidth = 0;
             _lastResult = result;
@@ -983,8 +979,7 @@ namespace TaimisToolbench.Views.Rendering
             {
                 var specs = DecisionPillPlanner.BuildPillSpecs(
                     node, plan?.CurrencyPlanTotals, plan?.OwnedCurrencyAmounts);
-                bool anchored = specs.Count > 0 && specs[specs.Count - 1].Kind == PillKind.Ignore;
-                int leadingCount = anchored ? specs.Count - 1 : specs.Count;
+                int leadingCount = FlowedPillCount(specs);
 
                 leading.Clear();
                 for (int i = 0; i < leadingCount; i++)
@@ -992,8 +987,7 @@ namespace TaimisToolbench.Views.Rendering
                     leading.Add(MeasuredPillWidth(specs[i], measure, toggleSlot));
                 }
 
-                return TreePillColumnMath.RequiredWidth(
-                    leading, PillGap, anchored ? toggleSlot : 0);
+                return TreePillColumnMath.RequiredWidth(leading, PillGap);
             });
 
             // Room the cost column can give back, off _costColumnWidths
@@ -1247,7 +1241,7 @@ namespace TaimisToolbench.Views.Rendering
             // Decision pill column: one pill per feasible source (direct
             // selection - click sets the override and re-solves), or a
             // single locked/HAVE/CURRENCY pill when there is no choice.
-            RenderDecisionPills(handle, node, pillColX, TreeRowPillY, dimmed);
+            RenderDecisionPills(handle, node, pillColX, edges.ActionButtonX, TreeRowPillY, dimmed);
 
             // Cost column: four right-aligned sub-columns (gold, silver,
             // copper, then any non-coin currency), each sized by this
@@ -1757,7 +1751,8 @@ namespace TaimisToolbench.Views.Rendering
             }
 
             DisposePills(handle);
-            RenderDecisionPills(handle, newNode, edges.PillColX, TreeRowPillY, handle.Dimmed);
+            RenderDecisionPills(
+                handle, newNode, edges.PillColX, edges.ActionButtonX, TreeRowPillY, handle.Dimmed);
 
             DisposeValueCell(handle.CostCell);
             RenderCostCell(handle, newNode, edges.CostRightEdge, handle.Dimmed);
@@ -1949,7 +1944,8 @@ namespace TaimisToolbench.Views.Rendering
         /// </para>
         /// </summary>
         private void RenderDecisionPills(
-            TreeRowHandle handle, CraftingTreeNode node, int pillColX, int pillY, bool dimmed)
+            TreeRowHandle handle, CraftingTreeNode node,
+            int pillColX, int actionButtonX, int pillY, bool dimmed)
         {
             var rowPanel = handle.RowPanel;
             var pillPanels = handle.Pills;
@@ -1967,34 +1963,29 @@ namespace TaimisToolbench.Views.Rendering
 
             int maxRightEdge = pillColX + handle.PillColumnWidth - TreePillColumnMath.TrailingClearance;
 
-            // The Ignore key leaves the flowed run for a slot of its own
-            // (Services/TreeIgnoreKeyPlacement) - only when it is last,
-            // which is where DecisionPillPlanner emits it; anywhere else it
-            // stays in the run rather than letting the pills after it be
-            // dropped.
-            int anchoredIndex = specs.Count > 0 && specs[specs.Count - 1].Kind == PillKind.Ignore
-                ? specs.Count - 1
-                : -1;
-            int anchoredWidth = anchoredIndex >= 0 ? ReservedIgnorePillWidth() : 0;
-            int leadingCount = anchoredIndex >= 0 ? anchoredIndex : specs.Count;
+            // The ignore button is not in this column: it draws in the
+            // row's own action column, at actionButtonX. The run therefore
+            // gets the whole decision column.
+            int leadingCount = FlowedPillCount(specs);
+            int anchoredIndex = leadingCount < specs.Count ? specs.Count - 1 : -1;
+            int keyWidth = ReservedIgnorePillWidth();
 
             Func<string, int> measure = text => (int)Math.Ceiling(font.MeasureString(text).Width);
             var pillWidths = new List<int>(leadingCount);
             for (int specIndex = 0; specIndex < leadingCount; specIndex++)
             {
-                pillWidths.Add(MeasuredPillWidth(specs[specIndex], measure, anchoredWidth));
+                pillWidths.Add(MeasuredPillWidth(specs[specIndex], measure, keyWidth));
             }
 
             var fit = PlanRelayoutMath.ComputePillFit(
                 pillWidths, PillPadding - TightPillPadding, PillGap, pillColX,
-                TreePillRunLayout.LeadingLimitX(maxRightEdge, anchoredWidth, PillGap),
-                MeasureOverflowPillWidth);
+                maxRightEdge, MeasureOverflowPillWidth);
 
             int chosenPadding = PillPadding - fit.WidthReduction;
 
             // Where every pill goes, decided before any is built: the
-            // flowed leading run, then the key seated beyond it. The
-            // overflow pill is rendered after the loop, from the x the run
+            // flowed run, then the ignore button in its own column. The
+            // overflow chip is rendered after the loop, from the x the run
             // left.
             var placements = new List<PillPlacement>(fit.VisibleCount + 1);
             for (int specIndex = 0; specIndex < fit.VisibleCount; specIndex++)
@@ -2005,9 +1996,8 @@ namespace TaimisToolbench.Views.Rendering
             }
 
             // Right edge of this row's flowed run, including the "+N" chip
-            // the loop below draws from the same x. Read off the run
-            // rather than off the placements, because the key that
-            // follows is not part of it and is seated against it.
+            // the loop below draws from the same x - the ink the "Source"
+            // header centres over.
             int runRightEdge = pillColX;
             if (fit.VisibleCount > 0)
             {
@@ -2021,13 +2011,7 @@ namespace TaimisToolbench.Views.Rendering
 
             if (anchoredIndex >= 0)
             {
-                placements.Add(new PillPlacement(
-                    anchoredIndex,
-                    TreeIgnoreKeyPlacement.SlotX(
-                        maxRightEdge, CostInkX(handle, pillColX), anchoredWidth, PillGap,
-                        pillColX + _planPillRunInk.Widen(node.NodeId, runRightEdge - pillColX)),
-                    anchoredWidth,
-                    0));
+                placements.Add(new PillPlacement(anchoredIndex, actionButtonX, keyWidth, 0));
             }
 
             foreach (var placement in placements)
@@ -2318,24 +2302,6 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// Leftmost pixel the cost column's values reach on any row of
-        /// this tree, which is the line the IGNORE key may not cross
-        /// (Services/TreeIgnoreKeyPlacement). The scan behind
-        /// LeftmostInkReach measures coin and currency runs only, so a
-        /// tree with nothing priced reports 0 and this yields the column's
-        /// own left edge - conceding the whole reserve to the unmeasured
-        /// dash those rows draw, exactly as EffectiveCostColumnWidth does.
-        /// </summary>
-        private static int CostInkX(TreeRowHandle handle, int pillColX)
-        {
-            int costRightEdge = pillColX + handle.PillColumnWidth + handle.CostColumnWidth;
-            int reach = handle.ColumnWidths.LeftmostInkReach;
-            return reach > 0 && reach < handle.CostColumnWidth
-                ? costRightEdge - reach
-                : costRightEdge - handle.CostColumnWidth;
-        }
-
-        /// <summary>
         /// One pill's resolved geometry: which spec it draws, where it
         /// sits, and how wide its slot and its text are. Text width is
         /// carried separately because a pill's slot includes padding the
@@ -2359,11 +2325,25 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// One pill's slot width. The IGNORE key answers from its own
-        /// reserved slot whatever position it lands in, so a run that ever
-        /// flowed it (it does not - DecisionPillPlanner emits it last, and
-        /// RenderDecisionPills takes it out of the run there) could not
-        /// size it from a word it no longer draws.
+        /// How many of <paramref name="specs"/> flow in the pill column:
+        /// all of them, less a TRAILING ignore button, which draws in the
+        /// row's own action column instead. Only a trailing one is taken
+        /// out - that is where DecisionPillPlanner emits it, and removing
+        /// one from the middle would leave the "+N" chip naming the wrong
+        /// entries, which index the run by position.
+        /// </summary>
+        private static int FlowedPillCount(IReadOnlyList<PillSpec> specs)
+        {
+            return specs.Count > 0 && specs[specs.Count - 1].Kind == PillKind.Ignore
+                ? specs.Count - 1
+                : specs.Count;
+        }
+
+        /// <summary>
+        /// One entry's slot width. The ignore button draws no text in
+        /// either state, so it answers from its own control width rather
+        /// than from a word; only a button left in the run by
+        /// <see cref="FlowedPillCount"/> ever reaches that arm.
         /// <para>
         /// Takes the measurement as a delegate rather than a font because
         /// its two callers need different ones: a row builds one closure
@@ -2371,31 +2351,29 @@ namespace TaimisToolbench.Views.Rendering
         /// whole tree (ScannedPillColumn).
         /// </para>
         /// </summary>
-        private static int MeasuredPillWidth(PillSpec spec, Func<string, int> measureText, int toggleSlot)
+        private static int MeasuredPillWidth(PillSpec spec, Func<string, int> measureText, int keyWidth)
         {
             return spec.Kind == PillKind.Ignore
-                ? toggleSlot
+                ? keyWidth
                 : measureText(spec.Text) + PillPadding;
         }
 
         /// <summary>
-        /// The IGNORE toggle's slot width, which is the control itself:
-        /// Blish's own window close key at its own measured box
-        /// (Services/GlyphButtonMetrics), which is the scale the field
-        /// report benchmarked it against. Nothing is padded on top of that
-        /// edge, because padding outside a filled control is a dead strip
-        /// the row's expand/collapse click would answer - the exact mis-hit
-        /// the reserved slot exists to prevent.
+        /// The ignore button's width, which is the control itself:
+        /// Blish's own window close control at its measured box
+        /// (Services/GlyphButtonMetrics). Nothing is padded on top of that
+        /// edge, because padding outside a filled control is dead space the
+        /// row's expand/collapse click would answer.
         /// <para>
-        /// The width is state-independent by construction: the key draws
+        /// The width is state-independent by construction: the button draws
         /// the same mark plain or amber (CloseKeyButton.Tint), so ignoring
-        /// an item re-renders it at the same size it was clicked at. Its x
-        /// is held still by Services/TreePillRunInkFloor.
+        /// an item re-renders it at the size it was clicked at, in the
+        /// column it was clicked in.
         /// </para>
         /// </summary>
         private static int ReservedIgnorePillWidth()
         {
-            return GlyphButtonMetrics.RowActionWidth;
+            return PlanRelayoutMath.TreeActionColumnWidth;
         }
 
         private const int PillLabelY = 2;
