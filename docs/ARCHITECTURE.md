@@ -3087,6 +3087,39 @@ bracket content is passed through rather than stripped: a blanket
 tag-stripper would silently delete real item text the day the API uses a
 bracket for something that is not markup.
 
+**Equipment slots.** `Services/ItemSlotFacts.cs` answers two questions the
+API answers only half of. Infusion and enrichment slots are read straight
+out of `details.infusion_slots`; the flag vocabulary there is exactly
+`Infusion` and `Enrichment`, one flag per slot at most, which is both what
+the schema says (`https://wiki.guildwars2.com/wiki/API:2/items`, "The array
+contains a maximum of one value") and what a census of all 74,072 items
+found on 2026-09-05: 6,507 `Infusion`, 94 `Enrichment`, nothing else, no
+empty flag array and no slot with two. The four infusion glyphs `/v2/files`
+publishes are pre-2016 artwork: the 2016-07-26 release merged the offensive,
+defensive and agony subtypes into one infusion and renamed utility infusions
+to enrichments, so no live flag distinguishes them. Two of the four are
+byte-identical.
+
+Upgrade slots have no API field. The count comes from the item's type - two
+sigils on a two-handed weapon, one on a one-handed one, one rune per armour
+piece, one jewel per trinket or back item - and from the `NotUpgradeable`
+flag, which is what removes the slot from an ascended trinket or back item
+(their jewel's stats are baked in) and from the Bloodbound and Dreambound
+weapon families at ordinary rarities. Every one of the 705 ascended and
+legendary trinkets and back items in that corpus carries the flag, so keying
+on rarity instead would be strictly worse. `details.secondary_suffix_item_id`
+is non-empty only on the nine two-handed types and would corroborate the
+rule, but it is empty on almost every two-handed weapon in the game, so it
+cannot derive it.
+
+Both counts net off what the definition already ships socketed, because the
+game prints a filled slot's contents rather than an unused-slot line. WHICH
+sigil or infusion that is needs a second `/v2/items` request and is not
+fetched; a filled slot simply produces no line. The wording for an
+enrichment slot is extrapolated from the other two - no capture of an amulet
+tooltip exists - while "Unused Upgrade Slot" and "Unused Infusion Slot" are
+verbatim from live captures.
+
 `Models/ItemStatBlock` stays off `ItemMetadata` because `PersistedPlan.Result`
 is a `CraftingPlanResult` holding the `ItemMetadata` dictionary, and
 `PersistedPlanSchemaMemberSetTests` guards that whole reachable graph against

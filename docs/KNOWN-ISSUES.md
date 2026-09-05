@@ -654,9 +654,30 @@ they appear in `Services/ItemDescriptionSanitizer.cs`,
 Comments that used to cite "spec section N.M" cited a document that is not
 in this repository and never was; they now cite this number, and the
 measurement each one stood on is inlined at the constant. Carries the
-accepted divergence from the game's "Unused Infusion Slot" wording, and the
 warhelm first-band divergence (G15). Full record:
 `dev/archive/known-issues/2026-08-23-tooltip-authenticity.md`.
+
+**Correction (FIXED): the slot lines are not a divergence, and there was
+never a reason for one.** The record above accepted "Infusion Slot" in
+place of the game's "Unused Infusion Slot", on the grounds that what is
+socketed in a player's copy is instance state `/v2/items` cannot know, so
+calling a slot unused would be a guess. That reasoning was wrong.
+`/v2/items` returns an item DEFINITION, not an instance, and a definition
+has nothing socketed in it, so "Unused" is the accurate word. Where a
+definition DOES ship an upgrade - a weapon's `suffix_item_id`, an infusion
+slot carrying an `item_id` - that slot is now left out of the tooltip
+entirely rather than described as unused, which is the same distinction
+drawn correctly. The tooltip also draws the game's own glyph beside each
+slot line, and prints upgrade slots, which it never did before: /v2/items
+has no upgrade-slot field, so the count comes from the item's type and its
+`NotUpgradeable` flag (`Services/ItemSlotFacts.cs`).
+
+The distinction that DOES hold is about the player's own copy. An item a
+player owns can have things socketed in it, and the account endpoints
+report that per stack: `Gw2Sharp.AccountItem` exposes `Upgrades` and
+`Infusions`. `Services/Gw2AccountSnapshotService.cs` reads neither today,
+taking only ids and counts, so the module cannot show a player's own
+sigils and infusions. That is a separate change and is not started.
 
 ### 43. Tooltip text wrapping and Blish's 500px cap (audit batches A+B+C)
 
@@ -1302,9 +1323,9 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
   Cited as: "Font bump and decision-round polish", font-and-polish.
   `dev/archive/known-issues/2026-08-23-font-and-polish.md`
 - **Tooltip authenticity (tooltip-authenticity)** - gate PASS 2026-08-23.
-  Cited as: "Tooltip authenticity", tooltip-authenticity; carries the
-  accepted divergence from the game's "Unused Infusion Slot" wording that
-  `Services/ItemStatTooltipComposer.cs` points here for.
+  Cited as: "Tooltip authenticity", tooltip-authenticity. Its "Infusion
+  Slot" wording divergence has since been corrected; see the correction
+  under entry 42.
   `dev/archive/known-issues/2026-08-23-tooltip-authenticity.md`
 - **Keyboard focus release (kb-focus-release)** - gate PASS 2026-08-23.
   `dev/archive/known-issues/2026-08-23-kb-focus-release.md`

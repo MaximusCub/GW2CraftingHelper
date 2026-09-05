@@ -47,7 +47,7 @@ Models/ItemAttributeLine.cs                                                     
 Models/ItemMetadata.cs                                                                  23
 Models/ItemPrice.cs                                                                     21
 Models/ItemSlotKind.cs                                                                  33
-Models/ItemStatBlock.cs                                                                 131
+Models/ItemStatBlock.cs                                                                 132
 Models/MaterialSourceAllocation.cs                                                      9
 Models/OwnMaterialsMode.cs                                                              43
 Models/PersistedPlan.cs                                                                 173
@@ -117,13 +117,13 @@ Services/GlyphButtonMetrics.cs                                                  
 Services/GridLayout.cs                                                                  93
 Services/Gw2AccountRecipeClient.cs                                                      30
 Services/Gw2AccountSnapshotService.cs                                                   491
-Services/Gw2ItemApiClient.cs                                                            201
+Services/Gw2ItemApiClient.cs                                                            261
 Services/Gw2PriceApiClient.cs                                                           66
 Services/Gw2RecipeApiClient.cs                                                          206
 Services/GzipJsonFile.cs                                                                60
 Services/HeaderCellMath.cs                                                              135
 Services/IAccountRecipeClient.cs                                                        13
-Services/IItemApiClient.cs                                                              137
+Services/IItemApiClient.cs                                                              163
 Services/IMysticForgeRecipeSource.cs                                                    9
 Services/IPriceApiClient.cs                                                             47
 Services/IRecipeApiClient.cs                                                            100
@@ -140,9 +140,9 @@ Services/ItemRowSelection.cs                                                    
 Services/ItemRowTooltipComposer.cs                                                      88
 Services/ItemSearchProviderFactory.cs                                                   61
 Services/ItemSlotFacts.cs                                                               141
-Services/ItemStatBlockFactory.cs                                                        189
+Services/ItemStatBlockFactory.cs                                                        207
 Services/ItemStatMath.cs                                                                64
-Services/ItemStatTooltipComposer.cs                                                     731
+Services/ItemStatTooltipComposer.cs                                                     738
 Services/JsonSeedReader.cs                                                              46
 Services/LogGutterLayout.cs                                                             147
 Services/LogLineFormat.cs                                                               137
@@ -353,7 +353,7 @@ tests/TaimisToolbench.Tests/Helpers/ModelGraphSignatures.cs                     
 tests/TaimisToolbench.Tests/Helpers/PipelineBuilder.cs                                  315
 tests/TaimisToolbench.Tests/Helpers/PlanResultDump.cs                                   192
 tests/TaimisToolbench.Tests/Helpers/RealItemFixtures.cs                                 56
-tests/TaimisToolbench.Tests/Helpers/RealItemJson.cs                                     63
+tests/TaimisToolbench.Tests/Helpers/RealItemJson.cs                                     81
 tests/TaimisToolbench.Tests/Helpers/RecipeNodeBuilders.cs                               97
 tests/TaimisToolbench.Tests/Helpers/RepoFileLocator.cs                                  42
 tests/TaimisToolbench.Tests/Helpers/ShippedSeedManifest.cs                              139
@@ -414,7 +414,7 @@ tests/TaimisToolbench.Tests/Services/ExcessCraftOutputCalculatorTests.cs        
 tests/TaimisToolbench.Tests/Services/FirstLoadSnapshotGateTests.cs                      153
 tests/TaimisToolbench.Tests/Services/GridLawGoldenTests.cs                              100
 tests/TaimisToolbench.Tests/Services/Gw2ApiClient404Tests.cs                            213
-tests/TaimisToolbench.Tests/Services/Gw2ItemApiClientDetailParseTests.cs                147
+tests/TaimisToolbench.Tests/Services/Gw2ItemApiClientDetailParseTests.cs                165
 tests/TaimisToolbench.Tests/Services/Gw2RecipeApiClientHttpTests.cs                     264
 tests/TaimisToolbench.Tests/Services/Gw2RecipeApiClientParseTests.cs                    248
 tests/TaimisToolbench.Tests/Services/HeaderCellMathTests.cs                             221
@@ -425,7 +425,7 @@ tests/TaimisToolbench.Tests/Services/ItemDescriptionSanitizerTests.cs           
 tests/TaimisToolbench.Tests/Services/ItemIconTiersTests.cs                              164
 tests/TaimisToolbench.Tests/Services/ItemInputGridLayoutTests.cs                        356
 tests/TaimisToolbench.Tests/Services/ItemMetadataServiceConcurrencyTests.cs             197
-tests/TaimisToolbench.Tests/Services/ItemMetadataServiceStatCacheTests.cs               214
+tests/TaimisToolbench.Tests/Services/ItemMetadataServiceStatCacheTests.cs               216
 tests/TaimisToolbench.Tests/Services/ItemMetadataServiceTests.cs                        245
 tests/TaimisToolbench.Tests/Services/ItemRarityResolutionTests.cs                       83
 tests/TaimisToolbench.Tests/Services/ItemRowRequestBuilderTests.cs                      132
@@ -433,9 +433,9 @@ tests/TaimisToolbench.Tests/Services/ItemRowSelectionTests.cs                   
 tests/TaimisToolbench.Tests/Services/ItemRowTooltipComposerTests.cs                     126
 tests/TaimisToolbench.Tests/Services/ItemSearchProviderFactoryTests.cs                  84
 tests/TaimisToolbench.Tests/Services/ItemSlotFactsTests.cs                              142
-tests/TaimisToolbench.Tests/Services/ItemStatBlockFactoryTests.cs                       191
+tests/TaimisToolbench.Tests/Services/ItemStatBlockFactoryTests.cs                       255
 tests/TaimisToolbench.Tests/Services/ItemStatMathTests.cs                               74
-tests/TaimisToolbench.Tests/Services/ItemStatTooltipComposerTests.cs                    685
+tests/TaimisToolbench.Tests/Services/ItemStatTooltipComposerTests.cs                    741
 tests/TaimisToolbench.Tests/Services/LayoutConstantCollisionTests.cs                    81
 tests/TaimisToolbench.Tests/Services/LogGutterLayoutTests.cs                            188
 tests/TaimisToolbench.Tests/Services/LogLineFormatTests.cs                              156

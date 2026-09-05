@@ -203,6 +203,7 @@
     <Compile Include="Services\SolverDecision.cs" />
     <Compile Include="Services\SolveResult.cs" />
     <Compile Include="Models\ItemMetadata.cs" />
+    <Compile Include="Models\ItemSlotKind.cs" />
     <Compile Include="Models\ItemStatBlock.cs" />
     <Compile Include="Models\ItemAttributeLine.cs" />
     <Compile Include="Models\CurrencyMetadata.cs" />
@@ -221,6 +222,7 @@
     <Compile Include="Services\ItemRarityResolution.cs" />
     <Compile Include="Services\ItemStatMath.cs" />
     <Compile Include="Services\ItemDescriptionSanitizer.cs" />
+    <Compile Include="Services\ItemSlotFacts.cs" />
     <Compile Include="Services\ItemStatBlockFactory.cs" />
     <Compile Include="Services\ItemStatTooltipComposer.cs" />
     <Compile Include="Services\ItemRowTooltipComposer.cs" />

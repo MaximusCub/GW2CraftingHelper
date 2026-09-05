@@ -11,7 +11,7 @@ namespace TaimisToolbench.Services
     /// DOES (strength/defense, attributes, granted bonuses, or a
     /// consumable's use prompt and effect block), then - on materials,
     /// trophies and consumables - the description as its own block, the
-    /// infusion slots, the identity block (rarity word where the game
+    /// slot lines, the identity block (rarity word where the game
     /// shows one, type, level, equipment's description and flavour, the
     /// binding lines), and last of all, unlabelled and contiguous, the
     /// vendor value.
@@ -28,6 +28,7 @@ namespace TaimisToolbench.Services
     {
         private static readonly IReadOnlyList<ItemAttributeLine> EmptyAttributes = new List<ItemAttributeLine>();
         private static readonly IReadOnlyList<string> EmptyStrings = new List<string>();
+        private static readonly IReadOnlyList<ItemSlotKind> EmptySlots = new List<ItemSlotKind>();
 
         /// <summary>The game's own description string on a piece of gear
         /// whose stats have not been chosen yet (KNOWN-ISSUES #42, gap
@@ -98,7 +99,7 @@ namespace TaimisToolbench.Services
             // and a name-only block never ends on a stray blank row.
             var blocks = new List<TooltipContent>(3);
             AddBlock(blocks, facts);
-            AddBlock(blocks, BuildInfusionSlots(stats));
+            AddBlock(blocks, BuildSlots(stats));
             AddBlock(blocks, BuildIdentityBlock(stats, includeDescription: true));
 
             for (int i = 0; i < blocks.Count; i++)
@@ -395,27 +396,39 @@ namespace TaimisToolbench.Services
         /// infusions each render as blank / block / blank, corroborated on
         /// spire, ascended_comparison LEFT and naptown RIGHT - not one
         /// contiguous run (gap G16, fidelity-audit F8).
+        /// <para>
+        /// Each carries the game's own glyph for its slot, and the game's
+        /// own "Unused" wording, which is a fact about a definition rather
+        /// than a guess about a copy - see KNOWN-ISSUES #42. A slot the
+        /// definition itself fills is already absent from
+        /// <see cref="ItemStatBlock.UnusedSlots"/>.
+        /// </para>
         /// </summary>
-        private static TooltipContent BuildInfusionSlots(ItemStatBlock stats)
+        private static TooltipContent BuildSlots(ItemStatBlock stats)
         {
             var slots = new TooltipContentBuilder();
-
-            // The COUNT, never "unused": what is socketed in the player's
-            // own copy is instance state /v2/items cannot know, and
-            // claiming the slots are empty would be a guess. That wording
-            // difference is an accepted divergence from the game's
-            // "Unused Infusion Slot" - see KNOWN-ISSUES #42.
-            for (int i = 0; i < stats.InfusionSlotCount; i++)
+            var unused = stats.UnusedSlots ?? EmptySlots;
+            for (int i = 0; i < unused.Count; i++)
             {
                 if (i > 0)
                 {
                     slots.Separator();
                 }
 
-                slots.Text("Infusion Slot").EndLine();
+                slots.SlotLine(ItemSlotFacts.SlotArtAssetId(unused[i]), SlotLineText(unused[i]));
             }
 
             return slots.Build();
+        }
+
+        private static string SlotLineText(ItemSlotKind kind)
+        {
+            switch (kind)
+            {
+                case ItemSlotKind.Upgrade: return "Unused Upgrade Slot";
+                case ItemSlotKind.Enrichment: return "Unused Enrichment Slot";
+                default: return "Unused Infusion Slot";
+            }
         }
 
         private static TooltipContent BuildIdentityBlock(ItemStatBlock stats, bool includeDescription)
