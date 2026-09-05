@@ -602,6 +602,7 @@ tests/VendorOfferUpdater.Tests/Helpers/RepoFileLocator.cs                       
 tests/VendorOfferUpdater.Tests/Helpers/VendorOfferHasherVectorFixture.cs                107
 tests/VendorOfferUpdater.Tests/Helpers/WikiJsonBuilder.cs                               255
 tests/VendorOfferUpdater.Tests/HomesteadTierResolverTests.cs                            105
+tests/VendorOfferUpdater.Tests/ItemIdCacheTests.cs                                      239
 tests/VendorOfferUpdater.Tests/MergeIntoBaselineTests.cs                                444
 tests/VendorOfferUpdater.Tests/MergeWikiCacheTests.cs                                   224
 tests/VendorOfferUpdater.Tests/ResolveSeasonalFestivalValuesAsyncTests.cs               730
@@ -613,7 +614,7 @@ tests/VendorOfferUpdater.Tests/VendorOfferDiffTests.cs                          
 tests/VendorOfferUpdater.Tests/VendorOfferHasherGoldenVectorTests.cs                    82
 tests/VendorOfferUpdater.Tests/VendorOfferHasherTests.cs                                365
 tests/VendorOfferUpdater.Tests/VendorOfferManifestTests.cs                              100
-tests/VendorOfferUpdater.Tests/WikiApiRefusalTests.cs                                   334
+tests/VendorOfferUpdater.Tests/WikiApiRefusalTests.cs                                   343
 tests/VendorOfferUpdater.Tests/WikiSmwClientTests.cs                                    610
 tools/TaimisToolbench.Harness/Program.cs                                                861
 tools/TaimisToolbench.RecipeSeeder/Program.cs                                           724
@@ -624,12 +625,13 @@ tools/VendorOfferUpdater/CoverageGate.cs                                        
 tools/VendorOfferUpdater/CoverageGate.cs                                                278
 tools/VendorOfferUpdater/Gw2ApiHelper.cs                                                99
 tools/VendorOfferUpdater/HomesteadTierResolver.cs                                       80
+tools/VendorOfferUpdater/ItemIdCache.cs                                                 297
 tools/VendorOfferUpdater/Models/CostLine.cs                                             18
 tools/VendorOfferUpdater/Models/Gw2Constants.cs                                         77
 tools/VendorOfferUpdater/Models/VendorOffer.cs                                          62
 tools/VendorOfferUpdater/Models/VendorOfferDataset.cs                                   21
 tools/VendorOfferUpdater/Models/VendorOfferManifest.cs                                  33
-tools/VendorOfferUpdater/Program.cs                                                     1979
+tools/VendorOfferUpdater/Program.cs                                                     1993
 tools/VendorOfferUpdater/QueryOptions.cs                                                47
 tools/VendorOfferUpdater/QueryStats.cs                                                  79
 tools/VendorOfferUpdater/TemporaryTemplateParser.cs                                     122
@@ -637,4 +639,4 @@ tools/VendorOfferUpdater/VendorOfferDiff.cs                                     
 tools/VendorOfferUpdater/VendorOfferHasher.cs                                           122
 tools/VendorOfferUpdater/WikiAskResponse.cs                                             216
 tools/VendorOfferUpdater/WikiAskResponse.cs                                             216
-tools/VendorOfferUpdater/WikiSmwClient.cs                                               1076
+tools/VendorOfferUpdater/WikiSmwClient.cs                                               1106

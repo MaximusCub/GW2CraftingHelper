@@ -269,10 +269,19 @@ namespace VendorOfferUpdater.Tests
             var names = Enumerable.Range(1, 10).Select(n => "Item " + n).ToList();
             names.Add("Mystic Coin");
 
-            var resolved = await client.ResolveItemGameIdsAsync(
+            var resolution = await client.ResolveItemGameIdsAsync(
                 names, default, FastOptions());
 
-            Assert.Equal(19976, resolved["Mystic Coin"]);
+            Assert.Equal(19976, resolution.Resolved["Mystic Coin"]);
+
+            // The refused batch's ten names were never answered for. The
+            // caller needs that apart from "the wiki has no such page", which
+            // it caches permanently.
+            Assert.Contains("Mystic Coin", resolution.Answered);
+            foreach (var name in names.Where(n => n != "Mystic Coin"))
+            {
+                Assert.DoesNotContain(name, resolution.Answered);
+            }
 
             var section = Assert.Single(client.UnresolvedSections);
             Assert.Equal("item-batch", section.Kind);

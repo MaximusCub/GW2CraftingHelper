@@ -16,6 +16,9 @@ namespace VendorOfferUpdater
 {
     internal class Program
     {
+        /// <summary>Cap on deferred names listed by name. Counts are exact.</summary>
+        private const int DeferredNamesListed = 20;
+
         private static async Task<int> Main(string[] args)
         {
             using var cts = new CancellationTokenSource();
@@ -65,6 +68,7 @@ namespace VendorOfferUpdater
             int delayMs = QueryOptions.DefaultDelayBetweenRequestsMs;
             int maxAttempts = QueryOptions.DefaultMaxAttempts;
             bool allowCoverageDrop = false;
+            bool recheckMisses = false;
             bool tagSeasonalFestivals = false;
             int maxSeasonalPages = 500;
             string? diffSummaryBefore = null;
@@ -132,6 +136,10 @@ namespace VendorOfferUpdater
                 else if (args[i] == "--allow-coverage-drop")
                 {
                     allowCoverageDrop = true;
+                }
+                else if (args[i] == "--recheck-misses")
+                {
+                    recheckMisses = true;
                 }
                 else if (args[i] == "--tag-seasonal-festivals")
                 {
@@ -310,7 +318,8 @@ namespace VendorOfferUpdater
                 string cachePath = Path.Combine(
                     Path.GetDirectoryName(outputPath) ?? ".",
                     "item_id_cache.json");
-                var itemIdCache = LoadItemIdCache(cachePath);
+                var itemIdCache = ItemIdCache.Load(cachePath);
+                ReportCachedMisses(itemIdCache, recheckMisses);
 
                 if (!skipItemResolution)
                 {
@@ -319,7 +328,7 @@ namespace VendorOfferUpdater
                         .Select(c => c.Currency)
                         .Where(name => !string.IsNullOrEmpty(name)
                             && !apiHelper.ResolveCurrencyId(name).HasValue
-                            && !itemIdCache.ContainsKey(name))
+                            && !itemIdCache.Contains(name))
                         // IsNullOrEmpty above already proved non-null/non-empty;
                         // the static element type just doesn't narrow across
                         // the Where lambda boundary.
@@ -331,25 +340,41 @@ namespace VendorOfferUpdater
                     {
                         Console.WriteLine(
                             $"Resolving {unknownCurrencyNames.Count} item-based currencies via wiki...");
-                        var freshResolved =
+                        var resolution =
                             await wikiClient.ResolveItemGameIdsAsync(
                                 unknownCurrencyNames, ct, queryOptions);
-                        Console.WriteLine(
-                            $"  Resolved {freshResolved.Count} of {unknownCurrencyNames.Count} item names.");
 
-                        foreach (var name in unknownCurrencyNames)
+                        var update = itemIdCache.Record(
+                            unknownCurrencyNames, resolution, DateTime.UtcNow);
+
+                        Console.WriteLine(
+                            $"  Resolved {update.Hits} of {unknownCurrencyNames.Count} item names, " +
+                            $"cached {update.Misses} miss(es) the wiki answered for, " +
+                            $"left {update.Deferred.Count} to ask again.");
+
+                        if (update.Deferred.Count > 0)
                         {
-                            if (freshResolved.TryGetValue(name, out int id))
+                            // Nothing is cached for these. A cached miss is
+                            // permanent - the filter above never asks about a
+                            // cached name again - so recording one for a batch
+                            // the wiki never answered would retire a real item
+                            // from the dataset for good.
+                            Console.WriteLine(
+                                "  These names were never answered for, so nothing was cached " +
+                                "and the next run asks again:");
+                            foreach (var name in update.Deferred.Take(DeferredNamesListed))
                             {
-                                itemIdCache[name] = id;
+                                Console.WriteLine($"    - {name}");
                             }
-                            else
+
+                            if (update.Deferred.Count > DeferredNamesListed)
                             {
-                                itemIdCache[name] = -1; // miss sentinel
+                                Console.WriteLine(
+                                    $"    ... and {update.Deferred.Count - DeferredNamesListed} more");
                             }
                         }
 
-                        SaveItemIdCache(cachePath, itemIdCache);
+                        itemIdCache.Save(cachePath);
                         Console.WriteLine();
                     }
                     else if (itemIdCache.Count > 0)
@@ -366,15 +391,8 @@ namespace VendorOfferUpdater
                     Console.WriteLine();
                 }
 
-                // Build final map excluding misses
-                var itemIdMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                foreach (var kv in itemIdCache)
-                {
-                    if (kv.Value > 0)
-                    {
-                        itemIdMap[kv.Key] = kv.Value;
-                    }
-                }
+                var itemIdMap = new Dictionary<string, int>(
+                    itemIdCache.Ids, StringComparer.OrdinalIgnoreCase);
 
                 // Step 3.5: Resolve festival-vendor seasonal tags via wiki
                 // (opt-in, --tag-seasonal-festivals - see
@@ -1607,44 +1625,40 @@ namespace VendorOfferUpdater
             Console.WriteLine($"  Saved seasonal wikitext cache ({cache.Count} entries) to {path}");
         }
 
-        private static Dictionary<string, int> LoadItemIdCache(string path)
+        /// <summary>
+        /// Says how old the remembered misses are, and drops them when
+        /// --recheck-misses was passed. A miss is only ever as good as the
+        /// day it was recorded: an item the wiki had not documented yet is
+        /// indistinguishable from one that does not exist.
+        /// </summary>
+        private static void ReportCachedMisses(ItemIdCache cache, bool recheckMisses)
         {
-            var cache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            if (!File.Exists(path))
+            if (cache.Misses.Count == 0)
             {
-                return cache;
+                return;
             }
 
-            try
+            if (recheckMisses)
             {
-                string json = File.ReadAllText(path);
-                using var doc = JsonDocument.Parse(json);
-                foreach (var prop in doc.RootElement.EnumerateObject())
-                {
-                    cache[prop.Name] = prop.Value.GetInt32();
-                }
-
-                Console.WriteLine($"Loaded item ID cache ({cache.Count} entries) from {path}");
-            }
-            catch
-            {
-                // Ignore corrupt cache
+                int dropped = cache.ForgetMisses();
+                Console.WriteLine(
+                    $"  --recheck-misses: dropped {dropped} remembered miss(es); " +
+                    "they will be asked about again this run.");
+                return;
             }
 
-            return cache;
-        }
+            var oldest = cache.OldestMissAge(DateTime.UtcNow);
+            string age = oldest.HasValue
+                ? $"the oldest recorded {oldest.Value.TotalDays:F0} day(s) ago"
+                : "none of them dated";
+            int undated = cache.UndatedMissCount;
+            string undatedNote = undated > 0
+                ? $", {undated} carrying no date at all"
+                : string.Empty;
 
-        private static void SaveItemIdCache(
-            string path, Dictionary<string, int> cache)
-        {
-            var sorted = cache
-                .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(kv => kv.Key, kv => kv.Value);
-
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(sorted, options);
-            File.WriteAllText(path, json);
-            Console.WriteLine($"  Saved item ID cache ({cache.Count} entries) to {path}");
+            Console.WriteLine(
+                $"  {cache.Misses.Count} remembered miss(es), {age}{undatedNote}. " +
+                "Pass --recheck-misses to ask the wiki about them again.");
         }
 
         /// <summary>

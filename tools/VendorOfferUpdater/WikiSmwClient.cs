@@ -851,7 +851,7 @@ namespace VendorOfferUpdater
         /// the built-in delay and attempt count rather than the run's.
         /// </para>
         /// </summary>
-        public async Task<Dictionary<string, int>> ResolveItemGameIdsAsync(
+        public async Task<ItemIdResolution> ResolveItemGameIdsAsync(
             IEnumerable<string> itemNames,
             CancellationToken ct = default,
             QueryOptions? options = null)
@@ -862,7 +862,8 @@ namespace VendorOfferUpdater
                 _effectiveDelay = options.DelayBetweenRequestsMs;
             }
 
-            var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var resolution = new ItemIdResolution();
+            var result = resolution.Resolved;
             var names = itemNames.ToList();
 
             int delay = _effectiveDelay;
@@ -929,6 +930,16 @@ namespace VendorOfferUpdater
                 if (reading.Shape == WikiAskShape.Rows || reading.Shape == WikiAskShape.NoRows)
                 {
                     RecordSectionAnswered();
+
+                    // The wiki answered for this batch, so a name it returned
+                    // no id for is a genuine absence rather than a question
+                    // that was never put. Only the caller can act on that
+                    // difference, and only if it is told which names these
+                    // are - a flat dictionary of hits cannot say.
+                    foreach (var name in batch)
+                    {
+                        resolution.Answered.Add(name);
+                    }
                 }
 
                 if (reading.Shape == WikiAskShape.Rows)
@@ -963,7 +974,7 @@ namespace VendorOfferUpdater
                 }
             }
 
-            return result;
+            return resolution;
         }
 
         /// <summary>
@@ -1006,6 +1017,25 @@ namespace VendorOfferUpdater
 
             return null;
         }
+    }
+
+    /// <summary>
+    /// What a resolution pass learned, and what it never got to ask.
+    /// <para>
+    /// <see cref="Resolved"/> alone cannot tell a name the wiki answered
+    /// nothing for from a name in a batch that was refused, failed, or was
+    /// never sent: both are simply absent from it. A caller that caches an
+    /// absence has to know the difference, so <see cref="Answered"/> names
+    /// every item in a batch the wiki did answer.
+    /// </para>
+    /// </summary>
+    public class ItemIdResolution
+    {
+        public Dictionary<string, int> Resolved { get; } =
+            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        public HashSet<string> Answered { get; } =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 
     public class WikiCostEntry

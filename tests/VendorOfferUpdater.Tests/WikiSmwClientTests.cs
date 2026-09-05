@@ -511,9 +511,9 @@ namespace VendorOfferUpdater.Tests
             var resolved = await client.ResolveItemGameIdsAsync(
                 new[] { "Iron Ore", "Copper Ore" });
 
-            Assert.Equal(2, resolved.Count);
-            Assert.Equal(19699, resolved["Iron Ore"]);
-            Assert.Equal(19697, resolved["Copper Ore"]);
+            Assert.Equal(2, resolved.Resolved.Count);
+            Assert.Equal(19699, resolved.Resolved["Iron Ore"]);
+            Assert.Equal(19697, resolved.Resolved["Copper Ore"]);
         }
 
         [Fact]
@@ -547,7 +547,7 @@ namespace VendorOfferUpdater.Tests
 
             var resolved = await client.ResolveItemGameIdsAsync(items);
 
-            Assert.Equal(15, resolved.Count);
+            Assert.Equal(15, resolved.Resolved.Count);
             // 2 batch requests made
             Assert.Equal(initialUrlCount + 2, handler.RequestedUrls.Count);
         }
@@ -571,9 +571,9 @@ namespace VendorOfferUpdater.Tests
             var resolved = await client.ResolveItemGameIdsAsync(
                 new[] { "Iron Ore", "Fake Item" });
 
-            Assert.Single(resolved);
-            Assert.True(resolved.ContainsKey("Iron Ore"));
-            Assert.False(resolved.ContainsKey("Fake Item"));
+            Assert.Single(resolved.Resolved);
+            Assert.True(resolved.Resolved.ContainsKey("Iron Ore"));
+            Assert.False(resolved.Resolved.ContainsKey("Fake Item"));
         }
 
         // Action=parse does not resolve redirects

@@ -25,6 +25,9 @@
 #                       the coverage check objected. Unset by default: a run
 #                       that lost merchants, or left a section unresolved,
 #                       should be re-targeted rather than published.
+#   RECHECK_MISSES      Set to any value to pass --recheck-misses, which drops
+#                       every remembered item-name miss so this run asks the
+#                       wiki about those names again.
 #
 # Requires: .NET 8 SDK, Git Bash on Windows, internet access.
 # jq is optional - used for offer count in the summary if available.
@@ -76,6 +79,7 @@ for arg in "$@"; do
             echo "  DELAY_PASS2=${DELAY_PASS2:-1500}  Delay between resolution requests (ms)"
             echo "  MAX_SEASONAL_PAGES=${MAX_SEASONAL_PAGES:-2500}  Max new seasonal-tag pages fetched by Pass 1"
             echo "  ALLOW_COVERAGE_DROP=${ALLOW_COVERAGE_DROP:-}  Write even if the coverage check objects"
+            echo "  RECHECK_MISSES=${RECHECK_MISSES:-}  Ask the wiki again about remembered item-name misses"
             exit 0
             ;;
         *)
@@ -185,6 +189,7 @@ dotnet run --project "$PROJ" -c Release --no-build -- \
     "${MERGE_FLAGS[@]+"${MERGE_FLAGS[@]}"}" \
     --delay "${DELAY_PASS2:-1500}" \
     ${ALLOW_COVERAGE_DROP:+--allow-coverage-drop} \
+    ${RECHECK_MISSES:+--recheck-misses} \
     "$OUTPUT"
 echo ""
 

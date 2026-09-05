@@ -65,6 +65,7 @@ The tool auto-detects the repository root by walking up the directory tree looki
 | `--delay <ms>` | 250 | Delay between wiki API requests (minimum enforced: 200 ms) |
 | `--max-attempts <n>` | 5 | Attempts one wiki request gets before its section is recorded unresolved. Counts the first try |
 | `--allow-coverage-drop` | off | Write the dataset even though the coverage check objected. See "Coverage check" below |
+| `--recheck-misses` | off | Drop every remembered item-name miss from `ref/item_id_cache.json` so this run asks the wiki about those names again. See "Remembered misses" below |
 | `--dry-run` | off | Print query plan only, no HTTP calls to wiki |
 | `--tag-seasonal-festivals` | off | Fetch each distinct vendor page's wikitext and tag offers whose page carries a `{{Temporary\|...\|seasonal=}}`/`{{Temporary\|...\|event=}}` value matching one of the six known GW2 festivals. Opt-in: adds one extra HTTP request per distinct, not-yet-cached vendor page (see `--max-seasonal-pages`) |
 | `--diff-summary <old> <new>` | off | Read-only. Reports what changed between two vendor datasets and exits without touching the wiki, the API, or any file. See below |
@@ -82,6 +83,7 @@ The `refresh-vendor-data.sh` script accepts these environment variables:
 | `DELAY_PASS2` | 1500 | Pass 2 `--delay` |
 | `MAX_SEASONAL_PAGES` | 2500 | Pass 1 `--max-seasonal-pages` - sized to cover a from-scratch sweep of the measured ~2,088 distinct vendor pages in one run |
 | `ALLOW_COVERAGE_DROP` | unset | Set to any value to pass `--allow-coverage-drop` to both passes |
+| `RECHECK_MISSES` | unset | Set to any value to pass `--recheck-misses` to Pass 2 |
 
 Example:
 
@@ -149,7 +151,7 @@ datasets, the report is `repriced: 371, retagged: 492, rehashed: 48379`.
 | `ref/vendor_offers.json` | ~14.8 MB | **Baseline vendor offers** - loaded by the Blish HUD module at runtime. Contains deduplicated, ID-resolved vendor offers. Committed to repo and embedded in the `.bhm` package. Marked `-diff -merge linguist-generated` in `.gitattributes`. |
 | `ref/vendor_offers_manifest.json` | ~130 B | **Provenance record** for the file above - schema version, source, offer count, and the run's `generatedAt`. Everything run-scoped lives here so the payload stays byte-stable across a no-op refresh. Committed to repo. |
 | `ref/wiki_vendor_cache.json` | ~19.6 MB | **Wiki query cache** - raw SMW results from Pass 1. Used by Pass 2 for currency resolution. Supports incremental merging across multiple scrape runs. Gitignored (dev-local) since PR #92, and excluded from the packed `.bhm` since M38/WP-29 - see `docs/RELEASING.md`. |
-| `ref/item_id_cache.json` | ~40 KB | **Item ID cache** - maps item currency names to GW2 game IDs. Avoids re-resolving known items on subsequent runs. Gitignored (dev-local), same as the wiki cache above. |
+| `ref/item_id_cache.json` | ~40 KB | **Item ID cache** - maps item currency names to GW2 game IDs, and remembers the names the wiki answered no id for, with the date each was recorded. Avoids re-resolving known names on subsequent runs. See "Remembered misses" below. Gitignored (dev-local), same as the wiki cache above. |
 | `ref/vendor_offers_unresolved.json` | small | **Unresolved sections** from the last run - the queries the wiki never answered, for a follow-up run to re-target. Written only when a run leaves something unresolved, and deleted by the next clean run. Gitignored (dev-local, run state rather than data). |
 | `ref/seasonal_wikitext_cache.json` | small | **Seasonal festival tag cache** - maps vendor page name to its raw wiki `{{Temporary\|...}}` seasonal/event value (or `""` for "checked, not tagged"). Only populated by `--tag-seasonal-festivals`. Gitignored (dev-local, like `wiki_vendor_cache.json`/`item_id_cache.json`). |
 
@@ -236,6 +238,42 @@ One refused section is worth carrying on past. Three in a row is the wiki
 declining to answer this address at all, and the run stops there rather than
 spending a full attempt ladder per section to be told the same thing 36 times.
 Whatever was collected up to that point is kept and the wiki cache is saved.
+
+## Remembered misses
+
+Item-based currency names ("Mystic Coin", "Glob of Ectoplasm") are resolved to
+game ids against the wiki and cached in `ref/item_id_cache.json`. Some names
+never resolve, and legitimately so: they are plural forms of a singular item,
+wallet currencies rather than items, or wiki table text with a typo in it (the
+live cache carries `Ancient  Coin`, with two spaces). Those names are cached as
+misses so that every future run does not ask about them again.
+
+A cached miss is permanent - the resolution pass only asks about names the
+cache has never settled - so it must only ever be recorded for a name the wiki
+actually answered about. `ResolveItemGameIdsAsync` reports which names were in
+a batch the wiki answered, alongside the ids it resolved, and a name in a batch
+that was refused, failed, or was never sent is cached neither way. It is
+reported at the end of the pass and asked about again next run.
+
+Every miss records the date it was written:
+
+```jsonc
+{
+  "cacheVersion": 2,
+  "ids": { "Mystic Coin": 19976 },
+  "misses": { "Ancient  Coin": "2026-09-05T21:02:41.7712030Z" }
+}
+```
+
+A run prints how many misses it is carrying and how old the oldest is.
+`--recheck-misses` drops them all so they are asked about again, which is how
+an operator retries a stale one without hand-editing the file. Resolved ids are
+untouched by it.
+
+A cache written in the older flat format (`{"name": 12345, "other": -1}`) is
+migrated on load rather than discarded: `-1` becomes a miss with no date,
+reported as undated, since that format recorded none. A missing cache file is
+an ordinary cold start, not an error.
 
 ## Coverage check
 
