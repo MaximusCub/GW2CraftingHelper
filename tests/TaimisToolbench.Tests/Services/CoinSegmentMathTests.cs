@@ -82,15 +82,18 @@ namespace TaimisToolbench.Tests.Services
         private const int BodyZeroHeight = 15;
         private const int BodyDigitInkBottom = 16;
 
-        // The three shipped 32x32 coin textures, ink rows MEASURED: gold and
-        // silver 5..26, copper 4..26. Copper alone starts a row higher, and
-        // the seat must not care.
+        // The three shipped 32x32 coin textures, DRAWN rows MEASURED by
+        // compositing each source row over a dark row ground: gold and
+        // silver 5..23, copper 7..23. Rows 24..26 composite darker than the
+        // ground on all three - the art's black bottom rim - so they are
+        // not what a reader aligns the digits against. The last drawn row
+        // is shared; the first is not, and the seat must not care.
         private const int CoinArtSourceSize = 32;
 
         [Theory]
-        [InlineData(CoinSegmentMath.GoldAssetId, 5, 26)]
-        [InlineData(CoinSegmentMath.SilverAssetId, 5, 26)]
-        [InlineData(CoinSegmentMath.CopperAssetId, 4, 26)]
+        [InlineData(CoinSegmentMath.GoldAssetId, 5, 23)]
+        [InlineData(CoinSegmentMath.SilverAssetId, 5, 23)]
+        [InlineData(CoinSegmentMath.CopperAssetId, 7, 23)]
         public void TheCoinSeat_HangsEveryDenominationsInkUnderTheDigitsInkBottom(
             int assetId, int firstInkRow, int lastInkRow)
         {
@@ -99,19 +102,29 @@ namespace TaimisToolbench.Tests.Services
 
             // Where this denomination's own measured ink lands once its
             // source rows are point-sampled into the icon box the run draws.
-            int inkBottom = y + ((lastInkRow * iconSize) / CoinArtSourceSize) + 1;
+            int lastDrawnRow = y + ((lastInkRow * iconSize) / CoinArtSourceSize);
             int inkTop = y + ((firstInkRow * iconSize) / CoinArtSourceSize);
 
-            // NOT flush with the baseline. The game hangs the coin one row
-            // under it, which is what the bar tier capture behind
-            // CurrencyIconTiers.VerticalAlignmentRule measures: box y114..129
-            // against digit ink y115..126 puts the art's last inked row at
-            // y127. Flush was the first reading; the game it must match
-            // is a row lower.
+            // The relationship the in-game bar tier shows, stated in rows
+            // rather than in edges: the coin's lowest drawn row sits one
+            // below the digits' lowest. Flush, or above it, is the defect.
             Assert.Equal(
-                BodyDigitInkBottom + CoinSegmentMath.CoinInkBelowBaseline, inkBottom);
-            Assert.True(inkTop < inkBottom, "coin " + assetId + " has no ink");
+                (BodyDigitInkBottom - 1) + CoinSegmentMath.CoinInkBelowBaseline, lastDrawnRow);
+            Assert.True(inkTop <= lastDrawnRow, "coin " + assetId + " has no ink");
             Assert.True(inkTop >= 0, "coin " + assetId + " overdraws the row above");
+        }
+
+        [Fact]
+        public void TheCoinSeat_IsPinnedAtTheShippedFaceAndTier()
+        {
+            // The whole seat, end to end, at the face and tier every plan
+            // table draws its coin runs in: Menomonia 16's '0' against the
+            // 16px bar-tier box. Pinned as one number because it is what a
+            // reader compares against the game, and because a drift in the
+            // glyph pad, the art's last drawn row or the hang below the
+            // baseline each move it without failing anything else.
+            Assert.Equal(
+                5, CoinSegmentMath.CoinIconY(BodyZeroYOffset, BodyZeroHeight, CoinSegmentMath.CoinIconSize));
         }
 
         [Fact]
@@ -140,9 +153,9 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Theory]
-        [InlineData(CoinSegmentMath.CoinIconSize, 14)]
-        [InlineData(CurrencyIconTiers.WalletListIconSize, 27)]
-        [InlineData(12, 10)]
+        [InlineData(CoinSegmentMath.CoinIconSize, 12)]
+        [InlineData(CurrencyIconTiers.WalletListIconSize, 24)]
+        [InlineData(12, 9)]
         public void TheCoinArtsInkBottom_ScalesWithTheIconBox(int iconSize, int expected)
         {
             // The art's bottom padding is a fraction of the texture, not a
@@ -185,7 +198,7 @@ namespace TaimisToolbench.Tests.Services
                 30 - CoinSegmentMath.CoinArtInkBottom(CurrencyIconTiers.WalletListIconSize)
                     + CoinSegmentMath.CoinInkBelowBaseline,
                 y);
-            Assert.Equal(4, y);
+            Assert.Equal(7, y);
         }
 
         [Fact]

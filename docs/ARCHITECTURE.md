@@ -2981,11 +2981,20 @@ the two numbers a caller holds. A Menomonia glyph box is one pixel taller
 than its ink at each edge, the faces being built with `outline="1"
 spacing="1,1"` - measured on the shipped 14-regular, 16-regular, 20-bold and
 32-regular pages, every `0` inks exactly rows 1..height-2 of its own box. And
-the three 32x32 coin textures ink rows 5..26 (gold 156904, silver 156907) and
-4..26 (copper 156902), so their shared bottom edge is row 26 and copper's
-extra row at the top never enters a bottom seat. Every other inline currency
-icon keeps the centred seat: they measured centred to within half a pixel in
-the same capture that reported the coin defect, and were left alone
+the three 32x32 coin textures draw rows 5..23 (gold 156904, silver 156907)
+and 7..23 (copper 156902), so their shared bottom edge is row 23 and the
+denomination that starts lower never enters a bottom seat. Rows 24, 25 and 26
+carry ink but no coin: composited over a dark row ground they come out darker
+than the ground on all three textures, being the art's black bottom rim. A
+seat that counts them hangs three rows of shadow under the digits and leaves
+the visible coin two rows high. `CoinInkBelowBaseline` is read ink against
+ink for the same reason - the icon box's matched position in a bar tier
+capture is a template fit against art the game rescales itself, and it does
+not resolve to the row. Reading it *within* one capture also keeps it free
+of that capture's UI size: both edges scale together, so the row count
+carries into a logical constant without a conversion. Every other inline
+currency icon keeps the centred seat: they measured centred to within half a
+pixel in the same capture that reported the coin defect, and were left alone
 deliberately.
 
 **The tooltip header tier is the one that had to be converted**, decided
