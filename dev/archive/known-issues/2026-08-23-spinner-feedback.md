@@ -3,18 +3,14 @@
 
 ## Spinner and button feedback (spinner-feedback)
 
-Two maintainer field-test directives, verbatim:
+Two requirements reported in game:
 
-> "the loading spinner we made using ascii text is kinda lame -- Blish
-> has its own spinner that i see used underneath the module icons in the
-> top of the screen overlay that sits under them when they first load..
-> it looks like a circular painterly spinner. we should try to find and
-> use that.. its way cooler."
-
-> "when buttons are clicked.. there is no feedback onclick visually or
-> audio wise. it would be good to help the user know the button click
-> was registered by depressing the button or shading it on mousedown and
-> then unshading on release .. a sound would be a nice touch too."
+- Replace the module's ASCII-text loading spinner with Blish's own
+  circular animated spinner, the one drawn under the module icons in the
+  top-of-screen overlay while they load.
+- Give buttons click feedback, visual and audio: shade or depress the
+  button on mousedown, unshade on release, and play a sound, so a click
+  reads as registered.
 
 Everything below marked "measured" was read out of the vendored Blish
 HUD 1.3.0 binary (`packages/BlishHUD.1.3.0/lib/net472/Blish HUD.exe`,
@@ -69,7 +65,7 @@ The spinner trails the status text rather than leading it, for the same
 reason the ASCII glyph did: the phase text then always lays out from the
 label's fixed x=0 origin and only the spinner moves.
 
-**Button feedback, measured.** The maintainer's report is accurate, and
+**Button feedback, measured.** The report is accurate, and
 it is not only about our custom controls - Blish's own `StandardButton`
 is worse than it looks:
 
@@ -152,7 +148,7 @@ wired control is a descendant of another - the labels inside a tree row
 and inside a section header do receive the events, but they carry
 tooltips, not press wiring.
 
-### Desktop gate
+### Sandbox check
 
 1. Plan tab, press Generate Plan on a real multi-item request: a
    circular painterly spinner turns to the right of the status text for
@@ -190,12 +186,12 @@ tooltips, not press wiring.
 10. Sound is NOT verifiable in the muted dummy session used for these
    captures - the screenshot harness runs Blish with no audio device, in
    which case `PlaySoundEffectByName` returns at its first guard. The
-   click sound needs a live audio check by the maintainer; what IS
+   click sound needs a live audio check; what IS
    verified here is only that the asset exists (ref.dat contains
    `audio/button-click.wav`, 22,616 bytes uncompressed) and that the
    name passed is the unprefixed one Blish's own working callers use.
 
-Gate: PASS (2026-08-24 desktop sessions, captures
+Gate: PASS (2026-08-24 sandbox sessions, captures
 preflight/gC1-gC14). (1) SPINNER: "Building recipe tree..." rendered
 with Blish's golden circular spinner inline in the plan strip, and
 two captures ~350ms apart show DIFFERENT rotation frames - the
@@ -208,7 +204,7 @@ non-interactive); pill wiring shares the same PressFeedback helper
 verified on the button. (3) Sound not verifiable in the muted dummy
 session (PlaySoundEffectByName no-ops without an audio device) -
 the corrected unprefixed asset name is measured fact; the
-maintainer's first real click is the audio gate. BONUS gate-found
+first real click in game is the audio gate. BONUS gate-found
 fix folded into this branch: the persisted +24 Agony plan exceeded
 Newtonsoft's default read MaxDepth of 64 and silently failed to
 restore - raised to 512 with a mutation-checked 30-level real

@@ -58,7 +58,7 @@ namespace TaimisToolbench.Views.Rendering
         /// A third grey, distinct from the two above on purpose: the (60,
         /// 60, 60) unknown-rarity fallback is nearly invisible on the dark
         /// window - which is what "these icons have no border at all" meant
-        /// in the field - and 90 is spoken for by Basic, which sits beside
+        /// in game - and 90 is spoken for by Basic, which sits beside
         /// real rarity frames and must not be confused with one. 100 reads
         /// as a deliberate edge without competing with the tinted frames
         /// around it.
@@ -129,7 +129,7 @@ namespace TaimisToolbench.Views.Rendering
         /// CURRENCY art - <see cref="Currency"/> and
         /// <see cref="ExplicitOutline"/>: currency art is mostly
         /// transparent, so a plate behind it shows through as a background
-        /// the field reported as a defect. Item art is a full-bleed
+        /// reported in game as a defect. Item art is a full-bleed
         /// bag-slot square and hides the plate, so the item frames keep it.
         /// </summary>
         internal bool IsOutline

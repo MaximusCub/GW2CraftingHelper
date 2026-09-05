@@ -14,9 +14,9 @@ This section is **not fresh research** - it restates what M34's own research alr
 established and is currently encoded verbatim in `PlanSolver.cs` doc comments
 (`EvaluateVendorOffers`'s XML doc, `FinalizeVendorBatches`'s XML doc). I re-read the
 code to confirm the comments accurately describe the shipped behavior; I did not
-re-fetch `gw2efficiency/recipe-calculation`'s `dailyCooldowns.ts` in this session.
+re-fetch `gw2efficiency/recipe-calculation`'s `dailyCooldowns.ts` for this report.
 **INFERRED (from M34-era code comments, not independently re-verified against gw2e
-source this session):**
+source):**
 
 - gw2efficiency's `dailyCooldowns.ts` treats a vendor purchase cap as **purely a
   post-solve UI notice**. A cap never excludes an offer from competing in the
@@ -313,7 +313,7 @@ scope creep against the "narrowly scoped" review rule).
    section (a new bullet: "After adding new printouts/fields to WikiSmwClient -
    the wiki cache does not retroactively backfill new fields").
 
-### 4c. Reachability scoping (cheap, already computed this session)
+### 4c. Reachability scoping (cheap, already computed)
 
 Ran directly against the repo's own seed files (no wiki calls, seconds of
 runtime): build the set of every item id that appears as a recipe **output** or
@@ -337,7 +337,7 @@ a follow-up refinement but was not necessary to get an order-of-magnitude-useful
 scope cut. The script is ~15 lines of Python/C# over two already-committed JSON
 files and reproducible in seconds.
 
-### 4d. Cap seeding for the concrete case (this session's finding, ready to apply)
+### 4d. Cap seeding for the concrete case (ready to apply)
 
 Set `WeeklyCap = 1` on the three `"Candy Corn Vendor (Weekly)"` Glob-of-Ectoplasm
 offers currently in `ref/vendor_offers.json` (offerIds `125d48dd...`,
@@ -424,8 +424,8 @@ manual). Recommended minimal automation, scoped to the ~5,487 reachable offers
 
 ## 5. Sources
 
-- Local, read directly this session (all under the repo root,
-  main worktree only - `.claude/worktrees/*` copies ignored as stale/foreign):
+- Local, read directly (all under the repo root,
+  main worktree only - scratch checkout copies ignored as stale):
   `docs/gw2e-parity-spec.md`, `docs/KNOWN-ISSUES.md` (items 17, 28), `Models/VendorOffer.cs`,
   `Models/CraftingPlan.cs`, `Models/TimegatedItem.cs`, `Services/VendorOfferHasher.cs`,
   `Services/VendorOfferStore.cs`, `Services/VendorOfferResolver.cs`,
@@ -435,9 +435,9 @@ manual). Recommended minimal automation, scoped to the ~5,487 reachable offers
   VendorOfferHasher.cs,README.md,Models/*.cs}`, `tests/GW2CraftingHelper.Tests/Services/
   VendorOfferHasherTests.cs`, `tests/VendorOfferUpdater.Tests/{ConvertToOfferTests.cs,
   VendorOfferHasherTests.cs}`, `ref/vendor_offers.json`, `ref/wiki_vendor_cache.json`,
-  `ref/item_id_cache.json`, `ref/recipes_seed.json` (all queried via one-off Python scripts
-  in this session, not modified), `git log`/`git show 7e73172` (Gift of Battle removal).
-- Live wiki, fetched read-only this session via `WebFetch` against
+  `ref/item_id_cache.json`, `ref/recipes_seed.json` (all queried via one-off Python scripts,
+  not modified), `git log`/`git show 7e73172` (Gift of Battle removal).
+- Live wiki, fetched read-only via `WebFetch` against
   `wiki.guildwars2.com/api.php` (`action=ask`, SMW JSON API) and
   `wiki.guildwars2.com/index.php?...action=raw` / `wiki.guildwars2.com/wiki/...`:
   - `[[Has purchase limit::+]]` (proved non-existence of a guessed property name)
@@ -490,7 +490,7 @@ manual). Recommended minimal automation, scoped to the ~5,487 reachable offers
   root-specific reachability count was not computed and would need the actual
   set of "user-facing target items" defined first (that set does not obviously
   exist as a single seed file today - `ref/recipe_search_seed.json` may be the
-  right starting point but I did not inspect its schema this session).
+  right starting point but its schema was not inspected here).
 
 ---
 

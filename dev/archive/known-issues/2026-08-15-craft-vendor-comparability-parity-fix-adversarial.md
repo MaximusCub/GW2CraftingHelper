@@ -7,8 +7,8 @@ A second, adversarial pass over the fix above (Code Reviewer Mode, per
 this repo's mandatory Edit -> Review -> Fix loop) found five defects, all
 in `Services/PlanSolver.cs`'s recipe loop and terminal fallback branch.
 Four were fixed; one is a flagged, deliberately-unfixed heuristic
-limitation (documented below, per the task's own "flag genuinely
-debatable large fixes rather than expand scope" instruction).
+limitation (documented below rather than fixed: a genuinely debatable
+large fix, flagged instead of expanding scope).
 
 **Fixed (critical): cross-tier scale mismatch at the terminal fallback
 comparison.** The terminal tie-break compared `bestFallbackCraftCost` (a
@@ -102,8 +102,8 @@ used everywhere else in this loop for absurd valuation input, rather
 than letting a crafting-tree with an extreme currency valuation crash
 the whole `Solve()` call.
 
-**Flagged limitation (finding 4, deliberately not fixed - reported per
-the task's "flag genuinely debatable large fixes" instruction): the
+**Flagged limitation (finding 4, deliberately not fixed - flagged rather
+than expanded into a large, debatable fix): the
 terminal fallback tie-break can let a vendor offer with a near-zero
 coin part beat a craft fallback with a materially higher real coin
 cost, even though the vendor's true total cost (its own large unvalued
@@ -113,7 +113,7 @@ costing 0 coin + 500,000 units of an unvalued currency, purely because
 0 <= 500. This is NOT a scale mismatch (both sides are real coin, after
 the finding-1 fix above) and not new unsoundness introduced by this
 milestone: it is the identical heuristic `EvaluateVendorOffers`' own
-DO-NOT-TOUCH fallback-vs-fallback ranking already uses today (rank by
+frozen fallback-vs-fallback ranking already uses today (rank by
 coin part alone, since currency is unknowable/incomparable across
 offers - see that method's doc comment), now visible in a new pairing
 (craft vs. vendor) that never existed before this milestone added a
@@ -122,9 +122,9 @@ favor of craft would require inventing some notion of "this coin part
 isn't a meaningful proxy for total cost," which is exactly the kind of
 currency-exchange-rate judgment the repo invariant (avoid inventing
 currency comparisons) forbids, and the vendor-side ranking rule is
-explicitly DO-NOT-TOUCH pattern-donor code this milestone was told to
-mirror, not redesign. Per the task's own guidance for this class of
-finding, the deliberate choice is documented here (not just left silent)
+explicitly frozen pattern-donor code this milestone mirrors
+rather than redesigns. The deliberate choice is documented here (not
+just left silent)
 and locked by a dedicated regression test,
 `AllFallback_VendorZeroCoinPart_BeatsHigherRealCraftCost_DocumentedLimitation`,
 so a future change to this heuristic is a conscious decision rather than

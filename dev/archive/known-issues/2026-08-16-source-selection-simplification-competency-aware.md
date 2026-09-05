@@ -3,7 +3,7 @@
 
 ## Source selection simplification: competency-aware default + subdued losing pills (2026-08-16)
 
-Maintainer-approved redesign (docs/gw2e-considerations.md context, the
+Approved redesign (docs/gw2e-considerations.md context, the
 merged Plan Notes/competency machinery). Two independent rules on branch
 `source-selection-simplification`:
 
@@ -42,13 +42,13 @@ field.
 **Rule 2 - subdued losing pills.** A non-selected, multi-option pill that
 decisively loses to the selected pill renders subdued (reuses
 `PillKind.Locked`'s exact muted-gray color via a new `PillKind.Subdued`
-case - "no new colors", per the maintainer's own wording) with a tooltip
+case - no new colors) with a tooltip
 explaining why, under two independently-checked rules:
 - **StrictDomination** (checked first - a stronger, valuation-free
   claim): the losing option's raw coin and every currency/item cost-line
   kind are each >= the selected option's (missing kind on either side
   reads as 0), with at least one strictly greater. Needs NO valuation at
-  all - covers the maintainer's own canonical Amalgamated Rift Essence
+  all - covers the canonical Amalgamated Rift Essence
   shape (vendor needs the same coin, 10 more raw Globs of Ectoplasm than
   crafting does) with a real end-to-end test through the actual solver.
 - **Weighted**: both options' fully-valued decision-value figures are
@@ -74,7 +74,7 @@ precedent, attached to `PlanSolver.Decision`/`SolverDecision`/
 reuses `VendorBatchSolver`'s own already-evaluated
 `VendorCurrencyCosts`/`VendorItemCosts`/coin-cost output verbatim
 (`VendorBatchSolver.cs` itself - the merged-ceil math - was never
-touched, per the DO-NOT-TOUCH list); Craft's breakdown decomposes the
+touched, per the frozen-file list); Craft's breakdown decomposes the
 candidate recipe's DIRECT (non-recursive) ingredient list, which needs
 no pricing/recursion since domination compares raw ingredient quantities
 by id, the same granularity `VendorItemCostLine.Quantity` already uses.
@@ -92,7 +92,7 @@ which already had `CurrencyMetadata` for this purpose and gained a new
 `PlanViewModel.ItemMetadata` passthrough (mirroring `CurrencyMetadata`'s
 own precedent exactly) for the item-kind case.
 
-*Adversarial-review fix (self-caught, not maintainer-flagged):* a merged
+*Adversarial-review fix (self-caught):* a merged
 multi-occurrence vendor step's per-occurrence `VendorCurrencyCosts`/
 `VendorItemCosts` (and therefore this node's own
 `BuyFromVendorCostBreakdown`, built from those same local numbers) can
@@ -177,15 +177,15 @@ suppression fix's own test). All green at every commit checkpoint.
   craft recipe's DIRECT ingredients, not a full recursive expansion - a
   domination that only becomes visible several craft levels deep (rather
   than at the immediate ingredient list) is not detected. Not believed to
-  affect the maintainer's own Amalgamated-Rift-Essence-shaped cases
+  affect the canonical Amalgamated-Rift-Essence-shaped cases
   (which are direct-ingredient-level by construction), and no case
   requiring deeper recursion was specified.
 
-No live desktop verification was performed - `Views/Rendering/
+No live sandbox verification was performed - `Views/Rendering/
 TreeSectionController.cs` and `Views/Rendering/PillColors.cs` are
 Blish-bound and outside this repo's test-runnable surface, same
 constraint every UI-adjacent entry in this file notes. The Subdued
 pill's actual on-screen color/tooltip rendering has not been visually
 confirmed in a running Blish HUD client.
 
-Gate: not yet run live - queued for the next desktop session (subdued-pill + competency-default visuals). Merged after the deepest pipeline of the wave: implementation, two adversarial rounds, three verification passes (the second MEASURED an overcorrection suppressing a real 70c opportunity; the third revert-tested both direction pins on the final design), under the maintainer's standing merge directive (2026-08-16).
+Gate: not yet run live - queued for the next sandbox session (subdued-pill + competency-default visuals). Merged after the deepest pipeline of the wave: implementation, two adversarial rounds, three verification passes (the second MEASURED an overcorrection suppressing a real 70c opportunity; the third revert-tested both direction pins on the final design), under the standing merge directive (2026-08-16).

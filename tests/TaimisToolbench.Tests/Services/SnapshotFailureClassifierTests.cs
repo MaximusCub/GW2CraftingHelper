@@ -5,7 +5,7 @@ using Xunit;
 
 namespace TaimisToolbench.Tests.Services
 {
-    // Field-tested pain: at CHARACTER SELECT, Blish has not yet
+    // Pain seen in game: at CHARACTER SELECT, Blish has not yet
     // resolved the game's Mumble identity, so every account data source
     // call fails with an invalid/missing API key - the Snapshot tab's
     // Refresh Now used to show only "Refresh Failed - {time}" with no hint

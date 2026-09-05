@@ -3,8 +3,8 @@
 
 ## Recipe-ingestion bug class: missing schema-version parameter (2026-08-15)
 
-Root-caused by two independent investigations plus orchestrator-verified
-live API probes: every recipe API call in this module omitted the GW2
+Root-caused by two independent investigations plus live API probes:
+every recipe API call in this module omitted the GW2
 API's `v=` schema-version query parameter entirely. The GW2 API hides an
 entire era of recipes - every recipe whose ingredient list can include a
 `Currency` (or other non-`Item`) entry - from UNVERSIONED responses:
@@ -168,6 +168,6 @@ GW2CraftingHelper.Tests.csproj` - 1276 total (1273 baseline + 3 net new:
 the replaced contract-mirror test became 2 real tests, plus the 2 new
 `AmalgamatedRiftEssenceIngestionTests`) - PASS.
 
-Gate: PASS 2026-08-16 (orchestrator live sandbox session, combined wave-4 staging build). Verified: Amalgamated Rift Essence is searchable via the regenerated name seed, recipe 14025 resolves from the regenerated recipe seed with its three currency ingredients plus 50 Globs of Ectoplasm across all nine disciplines, currency leaf names resolve correctly via live metadata (Fine/Masterwork/Rare Rift Essence), full plan generates in ~2s. The orchestrator independently verified the committed seed files contain 14025 and the cleared "100930" negative search entry before the gate.
+Gate: PASS 2026-08-16 (live sandbox session, combined staging build). Verified: Amalgamated Rift Essence is searchable via the regenerated name seed, recipe 14025 resolves from the regenerated recipe seed with its three currency ingredients plus 50 Globs of Ectoplasm across all nine disciplines, currency leaf names resolve correctly via live metadata (Fine/Masterwork/Rare Rift Essence), full plan generates in ~2s. The committed seed files were independently verified to contain 14025 and the cleared "100930" negative search entry before the gate.
 
 ---

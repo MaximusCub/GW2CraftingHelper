@@ -39,7 +39,7 @@ at HEAD before acting.
   (names -> placeholders) hash md5-identical, and the helper is that
   same byte sequence parameterized. HONEST DEFERRAL: the one-look
   visual check of the Settings tab has NOT been performed - deferred
-  to the next desktop session.
+  to the next sandbox session.
 - **EvaluateContext ctor hardening:** the single construction site in
   PlanSolver.Solve now names all 14 arguments (three same-typed
   ISet<int> params were a silent-transposition hazard); no signature
@@ -50,9 +50,9 @@ throughout - 1837 baseline -> 1838 after B8's new test -> 1846 after
 B11's Split tests (both increases are new tests, zero regressions).
 Updater 207/207 and seeder 3/3 after the tools change. Note: the
 seeder DOES have a test project (tests/GW2CraftingHelper.RecipeSeeder.
-Tests, 3 tests), contrary to the batch brief.
+Tests, 3 tests).
 
-Gate: PASS (orchestrator live desktop session, 2026-08-17 late,
+Gate: PASS (live sandbox session, 2026-08-17 late,
 sandbox at this branch's own build). B14's deferred visual check ran
 and PASSED: all four settings save rows (Currency Valuations,
 Homestead Refinement, Logging, Snapshot) render identically styled at
@@ -63,4 +63,4 @@ tests incl. the new dispatcher-invariant and Split tests; B15 is
 tool-only). Session note: the settings Clear-checkbox suppress
 tooltip and the curated defaults (Spirit Shard 3600, Pristine Fractal
 Relic 1200) were re-verified live incidentally. Merged under the
-maintainer's standing merge directive (2026-08-16).
+standing merge directive (2026-08-16).

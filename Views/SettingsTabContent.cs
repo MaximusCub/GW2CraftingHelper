@@ -346,7 +346,7 @@ namespace TaimisToolbench.Views
         // pair per grid column, repositioned with the columns themselves.
         // The unit belongs here rather than inside each 70px box - as a
         // placeholder it read as a label naming the box, not as a prompt to
-        // type a number into it (field test, bug 2).
+        // type a number into it (bug 2, reported in game).
         private Panel _currencyHeaderPanel;
         private readonly List<Label> _currencyHeaderNames = new List<Label>();
         private readonly List<Label> _currencyHeaderUnits = new List<Label>();
@@ -1271,8 +1271,8 @@ namespace TaimisToolbench.Views
             AddInfoLine(
                 "Coin value per unit of each currency and barter item a vendor takes, used to compare vendor offers.",
                 panelWidth);
-            // The one sentence that names the interaction. Field test, bug
-            // 2: with the unit inside the box and only a grey "default N"
+            // The one sentence that names the interaction. Bug 2, reported
+            // in game: with the unit inside the box and only a grey "default N"
             // beside it, the row read as three read-only labels - nothing
             // said an amount could be typed over the default at all.
             AddInfoLine("Type a whole number of copper in a row's box and press Save to override its default.", panelWidth);

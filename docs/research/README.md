@@ -45,7 +45,7 @@ directory exists:
 - `gw2e-currency-decision-prices.md` - verbatim extraction of gw2e's
   64-key `CURRENCY_DECISION_PRICES` table from the live bundle and the
   TypeScript source, plus the id-mapping proof. The provenance record
-  behind the maintainer's one-time waiver of the no-invented-data rule
+  behind the one-time waiver of the no-invented-data rule
   (`Models/CurrencyDecisionDefaults.cs`).
 - `minimum-window-width.md` - how wide the window has to be for the
   deepest recipe tree in the game to render untruncated (exact graph

@@ -31,8 +31,8 @@ the wiki or from the taxonomy research; where a fact is inferred it says so.
 
 ## 0. Why the headline numbers are from a live run
 
-The brief asked for offline runs. They were done, and they are reported in
-section 5, but they cannot answer the question. Offline the harness wires
+Offline runs were done and are reported in section 5, but they cannot answer
+the question. Offline the harness wires
 `NullPriceApiClient`, which proves an empty Trading Post; the solver then
 force-crafts every tradeable node down to raw materials, and every raw
 material - Iron Ore, Vial of Blood, Glob of Ectoplasm - terminates as
@@ -197,9 +197,9 @@ mechanism for exactly this (it holds one row today, for Gift of Battle).
 
 ---
 
-## 4. The finding that was not asked for: bucket 3 costs nothing
+## 4. An unanticipated finding: bucket 3 costs nothing
 
-The brief expected bucket 3 (vendor for a valued currency) to be a healthy
+Bucket 3 (vendor for a valued currency) was expected to be a healthy
 state. Measured, it is the largest silent hole in the gold total.
 
 A currency valuation is DECISION-ONLY by design
@@ -335,7 +335,7 @@ Shards, Spirit Shards or Provisioner Tokens are handled - see section 7.
 
 ## 7. Confirmed and refuted
 
-The brief predicted six recurring blockers. Measured:
+Six recurring blockers were predicted in advance. Measured:
 
 | Predicted | Verdict | Evidence |
 |---|---|---|

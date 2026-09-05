@@ -53,15 +53,15 @@ namespace TaimisToolbench.Views
         // value - while this is fixed attribution text.
         private const string BlishHudCreditLine = "Built on Blish HUD (MIT License) - github.com/blish-hud/Blish-HUD";
 
-        // The GW2/ArenaNet fan-content disclaimer. The maintainer
-        // approved this exact wording - ship the literal string as-is, do
-        // not derive or reword it.
+        // The GW2/ArenaNet fan-content disclaimer. This exact wording is
+        // approved - ship the literal string as-is, do not derive or
+        // reword it.
         private const string ArenaNetDisclaimerText =
             "Taimi's Toolbench is a fan-made tool and is not affiliated with, endorsed by, or supported by ArenaNet or NCSOFT. Guild Wars 2 and all associated trademarks are the property of NCSOFT Corporation. All game data comes from the official Guild Wars 2 API.";
 
         // The gw2efficiency design-reference credit. Like
-        // ArenaNetDisclaimerText, the maintainer
-        // approved this exact wording for the "Licenses & Attributions"
+        // ArenaNetDisclaimerText, this exact wording is
+        // approved for the "Licenses & Attributions"
         // section. Ship this literal string as-is - do not derive it from
         // other constants or otherwise reword it, since the approval covers
         // this exact text (including the Patreon/PayPal URLs, which render

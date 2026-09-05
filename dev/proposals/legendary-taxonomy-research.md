@@ -9,7 +9,7 @@ Research date: 2026-08-29. All `wiki.guildwars2.com` pages and all
 rotate; nothing numeric here should be treated as durable.
 
 Claims are tagged **MEASURED** (read directly off a page or an API response
-fetched during this session), **INFERRED** (reasoned from measured facts, not
+fetched on that date), **INFERRED** (reasoned from measured facts, not
 itself observed) or **GAP** (could not establish - stated as a gap rather than
 filled with a guess).
 

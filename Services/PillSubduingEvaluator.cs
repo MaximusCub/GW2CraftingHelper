@@ -102,7 +102,7 @@ namespace TaimisToolbench.Services
         // even for a cheap item) AND a relative floor (non-trivial
         // percentage even for an expensive one) - requiring both is the
         // conservative reading. The constants are a modest, tunable
-        // starting point, not maintainer-derived figures.
+        // starting point, not derived figures.
         private const long MinDecisiveMarginCopper = 100; // 1 silver
         private const double MinDecisiveMarginFraction = 0.01; // 1%
 

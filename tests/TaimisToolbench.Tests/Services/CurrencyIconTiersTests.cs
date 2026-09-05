@@ -40,8 +40,8 @@ namespace TaimisToolbench.Tests.Services
             // one equality is what puts all of them on the bar tier.
             Assert.Equal(CurrencyIconTiers.WalletBarIconSize, CoinSegmentMath.CoinIconSize);
 
-            // The currency half of such a run is frame-less now too (owner
-            // ruling: beside digits it is a symbol, like the coins, not a
+            // The currency half of such a run is frame-less now too (beside
+            // digits it is a symbol, like the coins, not a
             // subject) but draws at the same measured window the framed
             // square used to occupy. That equality is what let the border
             // go on, and come off, without moving a single segment
@@ -77,8 +77,8 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void RankerCurrencyShortfallLines_DrawAtTheListTier()
         {
-            // Owner ruling, 2026-08-27, superseding this line's original
-            // bar-tier seat: the Ranker's breakdown is a currency LIST - a
+            // Superseding this line's original bar-tier seat: the Ranker's
+            // breakdown is a currency LIST - a
             // grid of named entries with their own amounts - and it reads at
             // the size the game's wallet list uses. The line carries its own
             // taller pitch to hold it.
@@ -98,7 +98,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void SettingsCurrencyValuationRows_DrawAtTheListTier()
         {
-            // Owner ruling, 2026-08-28: the config panel's Currency
+            // The config panel's Currency
             // Valuations grid is the same one-row-per-currency table, so its
             // icon reads at the same size as the Summary's, and the row was
             // grown to hold it rather than the icon shrunk to fit the row.

@@ -102,7 +102,7 @@ namespace TaimisToolbench.Tests.Services
         public void FormatCompactSummary_WithWallClockMs_UsesWallClockAsTotalAndAppendsPhaseSum()
         {
             // The phase-sum-only "total" this used to log
-            // silently under-reports the real duration a field tester
+            // silently under-reports the real duration a a player
             // experiences by however long the un-instrumented gaps between
             // steps ran. When the caller supplies the wrapper's own
             // wall-clock elapsed time, it becomes the "total", with the

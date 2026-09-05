@@ -171,7 +171,7 @@ namespace TaimisToolbench.Services
         /// cost column's own right edge, which is the edge the "Cost"
         /// header is right-aligned to.
         /// <para>
-        /// Field test, bug 4: with a shared band reserved for the widest
+        /// Bug 4, reported in game: with a shared band reserved for the widest
         /// currency run in the tree, every coin-only row stopped short of
         /// that edge by the width of a band it never filled, so gold
         /// figures sat visibly left of the header while currency rows lined
@@ -295,8 +295,8 @@ namespace TaimisToolbench.Services
         /// around it: neither the tree's fixed column floor
         /// (TreeSectionController.EffectiveCostColumnWidth) nor
         /// <see cref="TotalWidth"/>, which sums per-denomination maxima
-        /// that no one row draws together. On the owner's 2026-08-28
-        /// capture the two differed by 106px - the whole width of a
+        /// that no one row draws together. In an in-game screenshot the two
+        /// differed by 106px - the whole width of a
         /// currency band every coin-only row collapses.
         /// <para>
         /// <paramref name="room"/> is the gap to the pill column on one

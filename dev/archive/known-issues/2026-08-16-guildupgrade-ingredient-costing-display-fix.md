@@ -3,7 +3,7 @@
 
 ## GuildUpgrade ingredient costing/display fix (2026-08-16)
 
-Orchestrator-checksummed audit finding (confirmed via live API): the versioned
+Checksummed audit finding (confirmed via live API): the versioned
 GW2 API returns ingredient `{type:"GuildUpgrade", id:<upgradeId>, count:N}` on
 Guild Decoration recipes (e.g. recipe 12002 -> item 80471, guild upgrade id
 829; 678 occurrences across 225 distinct ids in the current seed). The
@@ -155,9 +155,9 @@ only - see git log for full per-commit detail):
 7. Gave the unrecognized-type leaf its own `UnrecognizedIngredient`
    decision (it was sharing `Unknown`, which meant it got a live,
    clickable IGNORE pill keyed on a non-item id); 3 tests plus 1 rename.
-8. Orchestrator fix-loop: fixed a recurring Gate-line duplication; closed
+8. Fix-loop: fixed a recurring Gate-line duplication; closed
    the fourth Item-positive guard site (`RecipeService.BuildNodeAsync`);
    closed the structurally identical unrecognized-`CostLine.Type` gap in
    `VendorBatchSolver`; 2 tests.
 
-Gate: PARTIAL PASS 2026-08-16 (orchestrator live desktop session). Solver-side safety fully suite-covered; the GuildUpgrade pill/label visuals were unreachable live (no guild-decoration output is plannable via the search list) - visual slice rides the next natural opportunity.
+Gate: PARTIAL PASS 2026-08-16 (live sandbox session). Solver-side safety fully suite-covered; the GuildUpgrade pill/label visuals were unreachable live (no guild-decoration output is plannable via the search list) - visual slice rides the next natural opportunity.

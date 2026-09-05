@@ -25,7 +25,7 @@ namespace TaimisToolbench.Services
         public const int Inset = 16;
 
         /// <summary>
-        /// TIER 1 of the two-tier icon system (owner ruling - see
+        /// TIER 1 of the two-tier icon system (see
         /// ItemIconTiers): a history row is one whole PLAN headlined by its
         /// target item, the same "one row, one object" shape as the
         /// Ranker's watchlist rows, the Snapshot grid and the plan heading

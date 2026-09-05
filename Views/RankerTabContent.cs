@@ -105,7 +105,7 @@ namespace TaimisToolbench.Views
 
         // Muted grey is reserved for content meant to leave the user's
         // focus: the footer captions and the empty-state onboarding prose
-        // (matching EmptyPlanStateRenderer). Field test: primary row data at
+        // (matching EmptyPlanStateRenderer). Reported in game: primary row data at
         // this grey on the grey window read "as if disabled".
         private static readonly Color DimColor = new Color(150, 150, 150);
 
@@ -118,8 +118,8 @@ namespace TaimisToolbench.Views
 
         // The affordability chip reuses SummarySectionRenderer's
         // full-coverage tag colors (PillKind.Selected's darkened green,
-        // 4.21:1 against CreateSmallTag's white label) - the field test
-        // showed white text on RankerReadinessColors' pale #7EBA7E was
+        // 4.21:1 against CreateSmallTag's white label) - in game, white
+        // text on RankerReadinessColors' pale #7EBA7E was
         // unreadable. The readiness TEXT bands keep their own palette; only
         // the pill chrome borrows the proven badge combination.
         private static readonly Color AffordableChipBorder = new Color(31, 143, 12);
@@ -410,7 +410,7 @@ namespace TaimisToolbench.Views
             // computed displays instantly from its own answer set above;
             // one it has not is computed now, for the rows that need it,
             // rather than parked behind a Refresh press the user has no
-            // reason to expect (owner ruling, 2026-08-27).
+            // reason to expect.
             if (Entries.Count > 0 && !_results.IsComplete(mode, Entries))
             {
                 StartRefresh(mode, recomputeAll: false);
@@ -517,8 +517,8 @@ namespace TaimisToolbench.Views
 
             // The comparison mode is a two-option, mutually exclusive
             // choice and BOTH options should read at all times, which a
-            // dropdown cannot do - it hides the alternative behind a click
-            // (owner ruling, 2026-08-27). Blish ships no radio control, so
+            // dropdown cannot do - it hides the alternative behind a click.
+            // Blish ships no radio control, so
             // this is the smallest honest one: the game's own indicator dot
             // plus a label, both clickable, both always visible. The dot is
             // art rather than a U+25CF/U+25CB pair, neither of which exists
@@ -592,8 +592,8 @@ namespace TaimisToolbench.Views
 
         /// <summary>
         /// Selection is carried by BOTH the dot and the label: the dot alone
-        /// is a 16px difference in a row of text, which the field test for
-        /// the tab's other indicators showed reads as no difference at all.
+        /// is a 16px difference in a row of text, which read in game as no
+        /// difference at all on the tab's other indicators.
         /// </summary>
         private void UpdateModeRadios()
         {
@@ -777,7 +777,7 @@ namespace TaimisToolbench.Views
         /// rather than a badge trailing the item name: trailing the name put
         /// it at a different x on every row, so the one mark the table exists
         /// to be scanned for was the only thing in it that could not be
-        /// scanned (owner report, 2026-08-28).
+        /// scanned.
         /// </summary>
         private static readonly string[] ColumnHeaders =
         {
@@ -1781,8 +1781,8 @@ namespace TaimisToolbench.Views
         /// <para>
         /// TWO TOGGLES, both off by default: the headline row is the
         /// comparison and everything here is the explanation, and a user
-        /// comparing twenty rows wants the comparison on screen at once
-        /// (owner ruling, 2026-08-28). Nothing is lost - each half is one
+        /// comparing twenty rows wants the comparison on screen at once.
+        /// Nothing is lost - each half is one
         /// toggle away, and the headline itself still hovers with the
         /// breakdown. The NOTES travel with the category strip because that
         /// is what they explain: a discipline gap, a contested claim, a

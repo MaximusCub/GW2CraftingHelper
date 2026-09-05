@@ -91,7 +91,7 @@ own nice-to-haves, the currency-name-index guard test, the
 `DailyCooldownItemService.Load` `ItemId <= 0` guard), (c) an accepted
 design tradeoff explicitly not a bug (the currency-valuation snapshot
 staleness note, the sticky seasonal-tag limitation), or (d) touches a
-DO-NOT-TOUCH file (`PlanContentHeightMath`'s tree-arm caption-row
+frozen file (`PlanContentHeightMath`'s tree-arm caption-row
 widening). None qualified as both pure comment/doc/test AND genuinely
 cheap beyond the four items already taken above - nothing further was
 taken.
@@ -127,4 +127,4 @@ taken.
 **Risks / follow-ups:** none new; the sweep's own "not taken" list above
 restates why each remaining candidate stays open.
 
-Gate: not applicable - comment/test/wording cleanup with no visual surface beyond a conditional notice clause (suite-pinned). Merged under the maintainer's standing merge directive (2026-08-16).
+Gate: not applicable - comment/test/wording cleanup with no visual surface beyond a conditional notice clause (suite-pinned). Merged under the standing merge directive (2026-08-16).

@@ -171,9 +171,8 @@ than assumed: `BuildBlishHUDModule`'s `ref\**` glob puts all three files in the
 
 ## Amendment - 2026-08-28 (branch `ranker-columns`): the reading-size caret trio
 
-The maintainer asked whether the atlas could retire the remaining ASCII
-affordances: *"now that we have some glyph things to work with are we able to
-use those instead of v ^ and > in other places?"*
+The question this amendment settles: now that the atlas exists, can it retire
+the remaining ASCII affordances - `v`, `^` and `>` - at their other seats?
 
 **Verdict: yes, measured.** Three rows added to `tools/build-glyph-font.py`'s
 `GLYPHS` table, regenerated with `--fetch --preview`:

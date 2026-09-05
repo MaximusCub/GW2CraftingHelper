@@ -3,7 +3,7 @@
 
 ## Audit batch E: tree interaction honesty (audit-de-cost-tree)
 
-Four maintainer-approved UX-audit findings, all one story: a pill's
+Four UX-audit findings, all one story: a pill's
 appearance should tell you whether you can click it, and the tree's
 actions should be reachable when you need them.
 
@@ -72,8 +72,8 @@ actions should be reachable when you need them.
   is not wired to a popup offering the hidden options: the hidden pills are
   almost always the trailing annotation and the IGNORE toggle, and a real
   affordance means a new popup surface with its own dismiss/focus/scroll
-  behaviour hanging off a case tightening already resolves - the desktop
-  gate decides whether the fact needs an affordance.
+  behaviour hanging off a case tightening already resolves - the sandbox
+  check decides whether the fact needs an affordance.
 
 Review round (audit-de-cost-tree), two defects found against the batch as
 written and fixed on the same branch:
@@ -110,7 +110,7 @@ literals in both toolbar states.
 Validation: build 0 errors, full suite 1968 passed / 0 failed (1906
 baseline, 1939 after batch D). No new test references Blish.
 
-What the desktop gate should look at:
+What the sandbox check should look at:
 
 1. **Toolbar placement:** generate a plan long enough to scroll, expand
    several branches, scroll to the bottom. All five buttons must still be
@@ -148,9 +148,9 @@ What the desktop gate should look at:
    unclickable, then both must come back at full strength when the new
    plan lands - including on a cancelled or failed run.
 
-Gate: PASS (2026-08-22 evening desktop batch, branch build at the
+Gate: PASS (2026-08-22 evening sandbox batch, branch build at the
 review-fix HEAD, captures preflight/gDE1-gDE4) - this is the live
-desktop verification the maintainer required before this batch may
+sandbox verification required before this batch may
 merge. Verified on the restored Mystic Clover x77 plan: (1) plan
 header as one left-aligned Font32 "Mystic Clover x 42 needed" line,
 no in-scroll timestamp; (2) promoted Actual Cost to Craft tile with

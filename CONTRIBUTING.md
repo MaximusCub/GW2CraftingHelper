@@ -312,9 +312,8 @@ left diffable, because those you do edit by hand and a reviewer must read.
   trailer. Do **not** add a session-URL trailer (the harness default
   `Claude-Session:` line). 1,054 existing commits carry one (measured
   2026-08-25), and they
-  resolve to a handful of private session IDs that 404 for every reader but
-  the maintainer - a constant paste with no provenance value. Attribution
-  stays; dead links do not.
+  resolve to private session IDs that 404 for every reader - a constant
+  paste with no provenance value. Attribution stays; dead links do not.
 
 - If your change touches pricing, currency comparisons, or item/vendor IDs
   shown anywhere in the UI, note that this repo has a couple of

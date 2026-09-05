@@ -3,7 +3,7 @@
 
 ## Annotation-detection: post-solve advisory-list characterization tests + B8 shape fixes (2026-08-17)
 
-**Milestone goal:** quorum verdict D-3 (TARGETED_FIX_ONLY). A mutation
+**Milestone goal:** review verdict D-3 (TARGETED_FIX_ONLY). A mutation
 deleting all four post-solve annotation-pass calls
 (`CompetencyOpportunityCalculator.Apply`/`ExcessCraftOutputCalculator.
 Apply`/`RecipeSheetSavingsCalculator.Apply`/`SeasonalVendorTipCalculator.
@@ -112,7 +112,7 @@ fixes, and document the whole annotation-pass group in
    readability), not a data dependency - every pass reads only the
    already-built display tree, never another pass's output. Explicitly
    notes there is no `ApplyAll` seam collapsing the three producer calls
-   - rejected on review as premature (quorum verdict D-3): the four
+   - rejected on review as premature (review verdict D-3): the four
    calculators do not share a signature.
 
 **Validation performed:**
@@ -153,7 +153,7 @@ Gate: not run live this pass - annotation-calculator wiring and B8
 shape fixes carry no new rendered surface; the previously-unpinned
 call shapes are now suite-pinned by the characterization tests this
 branch adds (the mutation that silently deleted all four annotation
-passes now fails the suite). Merged under the maintainer's standing
+passes now fails the suite). Merged under the standing
 merge directive (2026-08-16).
 
 ---

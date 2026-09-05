@@ -278,7 +278,7 @@ The corpus has three node types by occurrence: `Recipe` 424,610, `Item`
 function, in the deployed bundle. The whole mechanism migrated into the
 recipe corpus.
 
-The Mystic Forge answer to the brief's question 3 is therefore: **yes, fully,
+The Mystic Forge question is therefore answered: **yes, fully,
 as ordinary recipes with `disciplines: ["Mystic Forge"]`**, and forge steps do
 appear in the tree and in Crafting Steps like any other craft.
 
@@ -499,7 +499,7 @@ counted as owned, recipe sheets marked Missing - lives *inside* the
 calculator, which is the right place for it. If we build a legendary view, it
 should be the plan, not a second table beside the plan.
 
-### Answering the brief's question 4 directly
+### Do legendary prerequisites live in a different tool?
 
 **Legendary prerequisites do not live in a different tool.** There is no
 legendary-progress product at gw2efficiency. `/crafting/legendaries` is a

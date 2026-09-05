@@ -3,12 +3,12 @@
 
 ## Font bump and decision-round polish (font-and-polish)
 
-Four maintainer decisions from the same field-test round, taken as four
+Four decisions from the same round of in-game testing, taken as four
 commits. The first is the module-wide type change the
 minimum-window-width research had been holding open; the other three are
-small, independent fixes to things the field test tripped over.
+small, independent fixes to things in-game use tripped over.
 
-### 1. The +2pt bump ("do it")
+### 1. The +2pt bump
 
 Body text moves **Menomonia 14 -> 16** and small/caption/pill text
 **12 -> 14**. Title (18) and the plan's display title (32) are unchanged.
@@ -189,7 +189,7 @@ An earlier draft of this section recorded two other caveats - a Font16
 quantity prefix of 76-77 and a "3px cost-column convention gap". Both
 were artifacts of summing `xAdvance` instead of measuring the inked rect,
 which is not what either call site does. They are withdrawn rather than
-left to send a future maintainer chasing a gap that is not there.
+left to send a future reader chasing a gap that is not there.
 
 `docs/research/minimum-window-width.md` derived the original Font14 cost
 column as `76+6+40+6+40 = 165`, whose components in fact sum to 168 (and
@@ -197,7 +197,7 @@ to 171 measured on the inked rect the renderer uses). The report's
 arithmetic is corrected in place; the shipped 1436 minimum was derived
 from the slipped 165 and is superseded by this section either way.
 
-### 2. The one-letter empty-state hint ("add a hint")
+### 2. The one-letter empty-state hint
 
 `SnapshotSearchResultBuilder` holds character-name matching back below
 `MinCharacterSearchLength` (2) for a good reason - one letter surfaces
@@ -219,7 +219,7 @@ on the items branch only - the Wallet filter has no character matching at
 all. Seven Blish-free cases, one of which drives the real `BuildItemRows`
 path at one and then two letters to show the hint's premise is true.
 
-### 3. The background-refresh spinner ("use spinner")
+### 3. The background-refresh spinner
 
 Only a clicked Refresh Now turned the inline spinner; the timer-driven
 auto-refresh (`Update()`'s staleness gate, `OnSubtokenUpdated`, module
@@ -249,7 +249,7 @@ so replacing the timestamp they are reading with "Refreshing..." is a
 surprise rather than feedback - and the background path's cancellation
 arm writes no status that would restore the label afterwards.
 
-### 4. Sort reset on a new plan ("reset to defaults when you gen a new plan")
+### 4. Sort reset on a new plan
 
 `ResetPerPlanSortState` clears both sortable tables to `None` at
 `TriggerGenerate`'s commit point, beside the existing
@@ -302,15 +302,15 @@ Things a reviewer should look at hardest, stated rather than buried:
    example total - which is the 6px that separates 1478 from 1472.
 5. **The spinner wiring has no automated coverage.** `Module` and
    `MainView` are Blish-bound; the two-flag OR and the `Update()` drain
-   are argued from source and pinned only by desktop gate item 4.
+   are argued from source and pinned only by sandbox check item 4.
 6. **`Checkbox` staying at Font14** is a visible inconsistency in the
    Settings tab and the Snapshot source filters - Blish gives no seam.
-   Worth a maintainer look at the gate.
+   Worth a look at the gate.
 7. **The `CURRENCY` + `HAVE n/m TOTAL` pill run now needs the tightened
    padding pass** where it did not before. Not a regression (the pass
    exists for this), but it is a visible density change on those rows.
 
-### Desktop gate
+### Sandbox check
 
 1. At the **1478** minimum, read a plan and a snapshot end to end on
    every tab. Row text is legibly larger than before and nothing is
@@ -336,7 +336,7 @@ Things a reviewer should look at hardest, stated rather than buried:
    then click a tree decision pill (re-solve) and confirm the sort and
    its indicator SURVIVE that.
 
-Gate: PASS (2026-08-23 desktop session, branch build at the fix HEAD,
+Gate: PASS (2026-08-23 sandbox session, branch build at the fix HEAD,
 captures preflight/gFP5-gFP36), with two sub-cases left to the live
 install. (1) READING PASS at the effective minimum: every tab read end
 to end - snapshot rows and source tags, tree pills including the "+2"

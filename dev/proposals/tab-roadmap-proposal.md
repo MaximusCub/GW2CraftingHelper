@@ -1,16 +1,15 @@
 # Tab Roadmap - Synthesis of D1-D5 (Design Proposal)
 
-Status: SYNTHESIS PROPOSAL (design only, no code changes). Written by the
-synthesis architect over the five per-tab design proposals
-(`d1-snapshot-about-settings.md`, `d2-log-system.md`, `d3-plan-history.md`,
-`d4-crafting-ranker.md`, `d5-next-step-feasibility.md`) and the M38 cleanup
-plan (`m38-cleanup-plan.md`). Read-only against the repo.
+Status: SYNTHESIS PROPOSAL (design only, no code changes). Written over the five
+per-tab design proposals (`d1-snapshot-about-settings.md`,
+`d2-log-system.md`, `d3-plan-history.md`, `d4-crafting-ranker.md`,
+`d5-next-step-feasibility.md`) and the M38 cleanup plan
+(`m38-cleanup-plan.md`). Read-only against the repo.
 
-Everything below is a PROPOSAL for the maintainer's reaction, not a
-commitment. Effort is classed S/M/L/XL with a one-line reason; no time
-estimates anywhere. Evidence tags: **MEASURED** = read from code/the source
-proposals this session; **INFERRED** = reasoned from measured facts; **GUESS**
-= judgement call.
+Everything below is a PROPOSAL, not a commitment. Effort is classed S/M/L/XL
+with a one-line reason; no time estimates anywhere. Evidence tags:
+**MEASURED** = read from code/the source proposals; **INFERRED** = reasoned
+from measured facts; **GUESS** = judgement call.
 
 The module has 7 tabs. **Crafting Plan is out of scope** (the M38
 `CraftingPlanView` decomposition, WP-04/21/23/24/25/26, owns it). The other
@@ -24,7 +23,7 @@ Ranker.
 | Tab | What it becomes | Effort | Standout open question |
 |---|---|---|---|
 | **Snapshot** (D1) | Redesigned into a search-as-you-type account-inventory browser: plain `TextBox` filter + source-filter checkboxes over the already-built-but-unused `AccountItemIndex`/`GetPrioritizedSources`, one grouped row per item with a per-source breakdown (retires the Aggregate checkbox). **Subsumes a confirmed traced bug**: disk-restored snapshots never reach the view until a network refresh (`Module.LoadAsync` never sets `_snapshotDirty`). | **M** (S once the bug fix is split out) | Session-sticky search/filter state, or clean reset each visit? |
-| **About** (D1) | New static tab: name/version/source/author read live from `ModuleParameters.Manifest` (with a `manifest.json` fallback), Blish-HUD MIT credit, an ArenaNet fan-content disclaimer, and the module data-directory path for bug reports. | **S** | The exact ArenaNet-required disclaimer wording is unverified - draft only, needs sign-off. Branding (MaximusCub vs Lachlan Mulcahy) is WP-28's call. |
+| **About** (D1) | New static tab: name/version/source/author read live from `ModuleParameters.Manifest` (with a `manifest.json` fallback), Blish-HUD MIT credit, an ArenaNet fan-content disclaimer, and the module data-directory path for bug reports. | **S** | The exact ArenaNet-required disclaimer wording is unverified - draft only, needs verification. Branding (MaximusCub vs Lachlan Mulcahy) is WP-28's call. |
 | **Settings** (D1 + all) | Audited; **exactly the additions the other tabs need**, deduped into one plan (see Section 2.1): a shared snapshot-refresh interval, a unified logging/diagnostics section, a plan-history cap. Six candidate settings explicitly rejected (default price basis, reset-to-defaults, Settings Clear Cache, etc.). | **S** | Is `1`-`120` min the right refresh-interval clamp? Section grouping/titles. |
 | **Log** (D2) | New module-level structured log system (`ModuleLog` ring buffer + gated `ModuleLogStore` JSONL file sink) layered ON TOP OF Blish's own untouched `Logger`. Log tab becomes a live search / level-filter / follow-tail / copy pane. Disk policy keeps Error/Warn/Info always-on-but-rare, gates the noisy Debug tier (incl. `[scrolldiag]`) behind one toggle. | **M** | Clipboard API usable for a real Copy button, or fall back to Select-All? Default level filter (`Info+` vs `All`)? |
 | **Plan History** (D3) | New tab. A history entry is the small stable REQUEST (item ids/qty, price basis, settings snapshot, item-id-keyed ignore set) + a tiny generation-time summary - never the large/stale full result. "View" = frozen historical numbers (free); "Reuse" = re-solve at current prices via the same delegate `CraftingPlanView` already uses, zero edits to that file. Auto-capture + dedup/cap/pin. | **L** (M if V2 cross-tab handoff + sparkline cut) | Is V1 inline read-only reuse acceptable, or is reopening the interactive Crafting Plan tab a hard requirement (forces waiting on all view-decomposition waves)? |
@@ -100,10 +99,9 @@ Four new file-backed stores are proposed: `ModuleLogStore` (D2),
 share ONE convention:
 
 1. **Atomic write via `.tmp` + `File.Replace`/`File.Copy`**, matching
-   `StatusStore`/`VendorOfferStore`. **Three proposals (D2, D3, D4)
-   independently corrected the scout note that claimed `SnapshotStore` is
-   atomic** - it is not, it uses a plain non-atomic `File.WriteAllText`
-   (MEASURED in all three). The new stores must copy the RIGHT sibling
+   `StatusStore`/`VendorOfferStore`. **`SnapshotStore` is NOT atomic** - it
+   uses a plain non-atomic `File.WriteAllText` (MEASURED independently in D2,
+   D3 and D4). The new stores must copy the RIGHT sibling
    (`StatusStore`), not `SnapshotStore`. Fold this correction into the eventual
    docs/architecture write-up (WP-27) so the wrong claim does not propagate.
 2. **`onError` callback from day one** (`Action<string, Exception> onError =
@@ -204,8 +202,8 @@ plumbing.
 ## 3. Recommended build order (interleaved with M38)
 
 Guiding principles: quick correctness wins first; infrastructure (logging,
-store convention) before the tabs that lean on it; user-conviction-weighted
-value; and respect the two hard M38 gates - **WP-21/22 (coin renderer)** for
+store convention) before the tabs that lean on it; highest-value work first;
+and respect the two hard M38 gates - **WP-21/22 (coin renderer)** for
 anything showing coin, and **WP-04/21/23/24/25/26 (all view-decomposition
 waves)** for anything that must edit `CraftingPlanView`.
 
@@ -246,20 +244,20 @@ non-coin surface in parallel with M38 Waves A-E and gate only the coin cell.
    of D4's watchlist, sharing the one `RankerStore`. D5 recommends waiting for
    the WP-11/12/13/15 pipeline dedupe to settle before this ships (building the
    classifier against a moving pipeline invites churn); it consumes only the
-   stable `CraftingPlanResult` surface. This delivers the user's flagship "tell
-   me what to do next" ask - see the feasibility verdict, Section 4.
+   stable `CraftingPlanResult` surface. This delivers the flagship "tell me
+   what to do next" capability - see the feasibility verdict, Section 4.
 
-**Phase 3 - Plan History (lower user conviction; more self-contained):**
+**Phase 3 - Plan History (least settled; more self-contained):**
 
-7. **Plan History V1** (D3). The user framed this as "needs thinking thru a bit
-   more maybe" (lowest conviction of the five), and its highest-value form (V2
-   cross-tab reopen) is blocked on all view waves anyway - so it sits after the
-   Ranker. V1 is self-contained: store + list + View/Reuse-inline + tests, zero
-   edits to `CraftingPlanView`. Coin cell gates on **WP-21/22**. Note: if the
-   maintainer prefers a lower-risk warm-up before the Ranker's 2N-solve
-   orchestration, Plan History V1 is the safer first tab and would establish the
-   shared generate-delegate plumbing (2.4) that the Ranker also uses - a
-   defensible reordering, flagged rather than hidden.
+7. **Plan History V1** (D3). This was the least settled of the five proposals,
+   and its highest-value form (V2 cross-tab reopen) is blocked on all view
+   waves anyway - so it sits after the Ranker. V1 is self-contained: store +
+   list + View/Reuse-inline + tests, zero edits to `CraftingPlanView`. Coin
+   cell gates on **WP-21/22**. Note: if a lower-risk warm-up before the
+   Ranker's 2N-solve orchestration is preferred, Plan History V1 is the safer
+   first tab and would establish the shared generate-delegate plumbing (2.4)
+   that the Ranker also uses - a defensible reordering, flagged rather than
+   hidden.
 
 **Deferred / gated (revisit, do not build now):**
 
@@ -267,7 +265,7 @@ non-coin surface in parallel with M38 Waves A-E and gate only the coin cell.
   `CraftingPlanView`; must wait until **WP-04/21/23/24/25/26 all land** (six
   packages actively carving that file). Revisit after M38 view decomposition.
 - **Ranker Tier-2 time-gate projector** (D5) - gated on THREE preconditions
-  (REVISED, maintainer ecto directive, 2026-07-22): the `progression`-scope
+  (REVISED 2026-07-22): the `progression`-scope
   decision, a cap-coverage measurement, AND a working binding-gate filter /
   route-splitter (shared with the Tier-1 classifier). See Section 4.
 - **The `[scrolldiag]` reroute + plan-lifecycle logging** (D2 tail) - complete
@@ -275,11 +273,11 @@ non-coin surface in parallel with M38 Waves A-E and gate only the coin cell.
 
 **Why this order, in one line each:** bug fix first (real breakage, trivial);
 log core second (substrate + one diagnostics toggle + store convention for
-everyone); Snapshot + Settings third (high-conviction "search my bags" ask,
+everyone); Snapshot + Settings third (the "search my bags" capability,
 independent); About fourth (small, waits on branding); Ranker fifth/sixth (the
-detailed high-conviction two-fold ask + its flagship next-step layer); Plan
-History last of the active set (lowest conviction, and its best form is
-view-wave-blocked regardless).
+detailed two-fold requirement + its flagship next-step layer); Plan History
+last of the active set (least settled, and its best form is view-wave-blocked
+regardless).
 
 **Does the Ranker depend on Plan-History-style persistence? No.** They share
 the `PlanRequestItem` model primitive and the store *convention*, but use
@@ -292,8 +290,8 @@ dependency is D4-before-D5 (same `RankerStore`).
 
 ### 4.1 D5's verdict, quoted faithfully
 
-From `d5-next-step-feasibility.md` Section 5.1 (**REVISED - maintainer ecto
-directive, 2026-07-22**; the quote below reflects D5's revised verdict, which
+From `d5-next-step-feasibility.md` Section 5.1 (**REVISED 2026-07-22**; the
+quote below reflects D5's revised verdict, which
 now carries the binding-gate rule):
 
 > | Tier | Feasibility | One-line justification |
@@ -314,7 +312,7 @@ now carries the binding-gate rule):
 > attempt it; any quantified answer risks inventing data (invariant violation).
 > Ship existing `AcquisitionHint` text at most. |
 
-**What the ecto directive changed (D5 Section 1.6, new):** a timegate is
+**What the binding-gate principle changed (D5 Section 1.6, new):** a timegate is
 advice-worthy only when BINDING on the chosen path. The live build renders
 "Glob of Ectoplasm is timegated - Weekly limit: 1 (plan needs 86)" (KNOWN-ISSUES
 M37 observation (d)) - technically true, economically irrelevant, since 85+ of
@@ -337,7 +335,7 @@ legendary at week 3 beats two half-legendaries at week 3).
 to the repo's no-invented-data invariant. Specifically:
 
 - **Tier 1 (HIGH / build it): agreed, with one now-explicit condition
-  (REVISED - maintainer ecto directive, 2026-07-22).** The classifier is
+  (REVISED 2026-07-22).** The classifier is
   bookkeeping over data the solver already emits (`PlanStep.Source`,
   `VendorCurrencyCosts`, `OwnedCurrencyAmounts`, `AccountItemIndex`,
   `TimegatedItems`) and needs no new API scope. But the original "cannot be
@@ -358,8 +356,8 @@ to the repo's no-invented-data invariant. Specifically:
   gap someone just hasn't filled. Any quantified "farm map Z for ~40/hour"
   answer would require inventing numbers and would violate the invariant.
 
-**Where I sharpen D5 - Tier 2 has TWO opposite failure modes, and the ecto
-directive added the second (REVISED - maintainer ecto directive, 2026-07-22).**
+**Where I sharpen D5 - Tier 2 has TWO opposite failure modes, and the
+binding-gate principle added the second (REVISED 2026-07-22).**
 The original text here flagged only ONE failure mode - under-warning by
 *omission*: with ~1.3% cap coverage ("we cannot prove completeness"), if a
 legendary path routes through an item capped in-game but uncapped in the seed,
@@ -370,7 +368,7 @@ legendary trees users actually craft (run the harness against the top few
 legendaries, confirm the seed covers the real gating poles), not on the
 progression-scope decision alone.
 
-The ecto directive adds the OPPOSITE failure mode, which D5 now internalizes:
+The binding-gate principle adds the OPPOSITE failure mode, which D5 now internalizes:
 over-warning by *non-bindingness*. A projector that faithfully computes
 "ceil(86/1) = 86 weeks" for the ecto specimen is confidently, loudly wrong -
 worse than the omission case, because omission silently under-reports a real
@@ -379,7 +377,7 @@ runs the Section 1.6 binding filter (drop non-binding gates; project only the
 bound units) BEFORE the ceil arithmetic. A projector that skips that pass is
 wrong *by construction*, independent of coverage.
 
-**Net gating change (stated explicitly, per the revision brief).** The Tier-2
+**Net gating change, stated explicitly.** The Tier-2
 deferral in Section 3 previously listed TWO preconditions (progression-scope
 decision AND cap-coverage measurement). It now has THREE: those two PLUS a
 working binding-filter/route-splitter (shared with the Tier-1 classifier, so no
@@ -401,7 +399,7 @@ build D4 first, layer D5's Tier-1 classifier on the same `RankerStore` (both
 proposals already reconcile this in D4 Section 0). The feasibility verdict is
 sound; the sequencing is D4-then-D5-Tier-1.
 
-**Net (REVISED - maintainer ecto directive, 2026-07-22):** Tier 1 - build it
+**Net (REVISED 2026-07-22):** Tier 1 - build it
 (Phase 2, step 6), with the binding-gate rule and cap-aware route splitting as
 first-cut scope, not polish. Tier 2 - buildable as a *binding-gate*
 coverage-gated lower-bound projector, deferred behind three preconditions now
@@ -430,7 +428,7 @@ Pieces that fail the value test outright (do not build, on principle):
 - **Persisting the full `CraftingPlanResult`/`PlanSolveContext` in Plan
   History, incl. a "replay pill-clicks on a frozen snapshot" mode** (D3) - large
   per entry, stale within minutes for a Trading-Post-driven module, and for a
-  use case the user only floated as a maybe. The small REQUEST + summary is the
+  use case only ever floated as a maybe. The small REQUEST + summary is the
   right entry.
 - **Reset-to-defaults Settings button** (D1) - Blish's platform settings screen
   already exposes reset; `ResetToDefaults()` is dead code today; duplicating it
@@ -438,7 +436,7 @@ Pieces that fail the value test outright (do not build, on principle):
 - **A Settings-tab Clear Cache button** (D1) - duplicates the Snapshot header
   button one-for-one; textbook settings-soup.
 - **`LogMinFileLevel` as a UI control** (D2) - a fifth logging setting for a
-  knob that matters only to the maintainer debugging a report; hardcode the Info
+  knob that matters only when debugging a report; hardcode the Info
   floor.
 - **Drag-and-drop watchlist reordering for v1** (D4) - no reorder primitive is
   confirmed anywhere in Blish's documented surface or this codebase; up/down

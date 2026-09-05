@@ -3,10 +3,10 @@
 
 ## Per-character source checkboxes + character-name search (char-source-search)
 
-Maintainer directive, verbatim: *"i want per character source checkboxes
-and search matching character labels"* - which resolves d1-snapshot-about-
-settings.md Feature 1's Open Questions 1 and 2 (both recorded as RESOLVED
-in that proposal, against their original opposite choices).
+Per-character source checkboxes, plus search matching character labels -
+which resolves d1-snapshot-about-settings.md Feature 1's Open Questions 1
+and 2 (both recorded as RESOLVED in that proposal, against their original
+opposite choices).
 
 - **Per-character checkboxes (commit 1):** the Snapshot tab's single
   "Characters" checkbox is replaced by one checkbox per character in the
@@ -115,7 +115,7 @@ scroll, roster-change guard on the rebuild, defensive copy of the sticky
 set); all three land in MainView, which is Blish-coupled and therefore
 outside the test suite's reach - build 0 errors, suite still 1884.
 
-Desktop gate should look at: (1) the per-character checkbox row rendering
+Sandbox check should look at: (1) the per-character checkbox row rendering
 with a multi-character snapshot - labels not clipped, no overflow past
 the window's right edge, wrapping onto a second row when needed, and the
 coin row and result list shifting down by exactly that much (then drag
@@ -130,7 +130,7 @@ the box; (4) the bounded row - shrink the window until the filter row hits
 its cap and confirm the result list keeps its minimum height, the row
 gains a working scrollbar, and the checkboxes do not sit under it.
 Gate: PASS on items (1)-(3), (4) not exercisable live (2026-08-19,
-Paint-dummy desktop session, branch build b59df59, captures
+Paint-dummy sandbox session, branch build b59df59, captures
 preflight/cs1-cs5). The canned preflight snapshot was enriched with
 three character-sourced items (Mystic Coin 25 + Mystic Clover 5 on
 "Maximus Test", Orichalcum Ore 50 on "Alt Number Two"; original

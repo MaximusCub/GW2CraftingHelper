@@ -28,7 +28,7 @@ namespace TaimisToolbench.Services
         /// character half is held back, because a single letter surfaces
         /// everything a character whose name contains it holds - so the
         /// opening keystrokes of an item search would widen the list
-        /// instead of narrowing it (maintainer decision, char-search-min2).
+        /// instead of narrowing it (char-search-min2).
         /// </summary>
         private const int MinCharacterSearchLength = 2;
 

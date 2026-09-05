@@ -509,7 +509,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void RequiredDisciplines_RealMysticForgeDiscipline_ExcludedAsFacility()
         {
-            // Field-tested (user-approved, supersedes the
+            // Confirmed in game (user-approved, supersedes the
             // test this replaces): real production Mystic Forge recipes
             // always carry Disciplines = ["MysticForge"]
             // (MysticForgeRecipeData.Load sets this unconditionally),

@@ -4,8 +4,8 @@
 ## App-wide UI consistency wave (app-typography)
 
 Branched from v0.2.3, which redesigned the Crafting Plan tab alone. This
-wave carries that work to the REST of the module, on five maintainer
-directives. It deliberately reuses the 0.2.3 seams rather than growing
+wave carries that work to the REST of the module, on five directives.
+It deliberately reuses the 0.2.3 seams rather than growing
 new ones: `Services/TypeRampMetrics` for the tier seats,
 `Views/Rendering/UiFonts` for the fonts, `PlanContentHeightMath` for the
 band heights those tiers need, `PlanRelayoutMath`'s pinned-right-edge
@@ -50,10 +50,10 @@ a legend rather than a header.
 
 ### B - one item-icon component
 
-Reported: *"item icon displays are not using a standardized code path
-everywhere.. some places give the tooltips, others do not, some places
-give colored borders, other places just use the icon image with no
-border"*. The inventory, taken at v0.2.3:
+Reported in game: item icon displays did not run through one
+standardized code path - some sites answered a hover and others did not,
+some drew a rarity border and others drew the bare icon art. The
+inventory, taken at v0.2.3:
 
 | Site | Frame | Hover |
 |---|---|---|
@@ -95,8 +95,8 @@ not the colour - is what this directive buys there.
 
 ### C - the Snapshot tab's layout
 
-Reported: *"the snapshot tab for sure needs the layout overhaul because
-it has no tooltips and the same icon issue"*.
+Reported in game: the Snapshot tab needed the layout overhaul too -
+it had no tooltips and the same icon inconsistency.
 
 The results were a grid of unlabelled two-line cards. They are two
 sortable tables now, each with a SectionTitle band and rule ("Items",
@@ -143,11 +143,10 @@ panel), `SnapshotTableSorter` holds the comparators, and
 
 ### D - sortable headers are cells, not text
 
-Reported: *"the header rows of columns that you can click to sort should
-highlight lightly when you mouse over them to show that an action can be
-triggered from them. also the tooltip should probably and click action
-should probably trigger for mouseover of the entire column header cell,
-not just the text"*.
+Reported in game: a column header that can be clicked to sort should
+wash lightly on hover to show that an action can be triggered from it, and
+both the hover note and the click should answer over the whole column
+header cell rather than over its text alone.
 
 `Views/Rendering/SortableHeaderCells` owns both halves for every sortable
 table in the module. The mechanism is measured against decompiled Blish
@@ -190,7 +189,7 @@ integer division leaves.
 
 ### E - tooltip translucency
 
-From the maintainer's own in-game inventory capture. A real GW2 tooltip's
+From an in-game inventory capture. A real GW2 tooltip's
 interior is NOT flat: background medians shift about 20 levels per
 channel across one box - (34,38,40) at one end to (43,55,55) at the
 other - because the scene behind shows through, which puts the game's
@@ -308,7 +307,7 @@ tooltip.
 icon as a raw `Panel` with a `BackgroundTexture`, entirely outside
 `IconControls` - so in a Total Cost row the spirit-shard icon named
 itself and the gold coin beside it said nothing. That is the module's
-most numerous icon draw and the site directive B's report literally
+most numerous icon draw and exactly the site directive B's finding
 describes. `IconControls.CreateAssetIcon` is the asset-id twin of the
 unframed path (no missing-art branch: an asset id is a constant, so
 there is no data gap to degrade), and `CoinSegmentMath.DenominationName`
@@ -347,8 +346,8 @@ not a compounding sort. `SortItems`/`SortWallet` are gone with the
 rebuild that used them; the comparators they wrapped are what the order
 is built from, and what the tests drive.
 
-**The wave's comment ratio was over the bar.** The brief set "well under
-25%" for new code and the wave measured 32% (896 comment lines of 2719
+**The wave's comment ratio was over the bar.** The bar for new code is
+well under 25%, and the wave measured 32% (896 comment lines of 2719
 added `.cs` lines against v0.2.3). The heaviest offenders were prose
 re-narrating a decision this file already records at length - the sorter's
 24-line preamble on returning an order rather than a copy, restated a
@@ -371,7 +370,7 @@ triggering. None is touched here. `Services/PlanViewModelBuilder.cs` and
 `Views/CraftingPlanView.cs` are untouched apart from one mechanical
 rename of the icon component in the latter.
 
-### Desktop gate
+### Sandbox check
 
 1. **The ramp, on each of the four tabs.** Snapshot: "Account Snapshot"
    at 24 bold over a full-width rule, the status line at 18 bold,
@@ -428,13 +427,13 @@ rename of the icon component in the latter.
    Click twice more - descending, then back to the search's own order.
    Do the same on the Items header with the list scrolled deep, and
    confirm the Currencies run's order is untouched by it.
-7. **Tooltip translucency against the capture.** Open the maintainer's
-   own inventory screenshot beside a module tooltip over the same kind of
+7. **Tooltip translucency against the capture.** Open the reference
+   inventory screenshot beside a module tooltip over the same kind of
    bright scene: the interior must no longer read as an opaque card, the
    dark border must have a light line immediately inside it, and NO text
    behind the tooltip may be legible through it (audit H6).
 
-Gate: PASS (2026-08-25 desktop session, branch build, captures
+Gate: PASS (2026-08-25 sandbox session, branch build, captures
 preflight/gTY1-gTY15; display-sleep inhibitor held the session).
 
 A. RAMP: Settings, Log and About now carry 24-bold section titles with
@@ -467,10 +466,9 @@ E. TOOLTIP TRANSLUCENCY: 0.82 alpha plus the 1px inner bevel ships; the
 Recorded, NOT a defect in this wave: these tabs now have the plan tab's
 TYPE hierarchy but not its LAYOUT - Settings, Log and About are still
 left-packed, with the panel's right half empty, because this wave scoped
-the ramp plus Snapshot's grid rather than a per-tab redesign. The
-maintainer saw the same thing on the Settings capture and asked for the
-full treatment on every tab; that is its own milestone, not a fix to
-this one.
+the ramp plus Snapshot's grid rather than a per-tab redesign. The same
+gap is visible on the Settings capture; the full treatment on every tab
+is its own milestone, not a fix to this one.
 
 
 
@@ -480,17 +478,14 @@ this one.
 
 The placement table above seats every promoted tier on CHROME - section
 titles, column headers, status lines - and nothing on the content of a
-row. That reading was applied literally once since: a request to promote
-the Plan History tab's row name was declined, citing this record.
+row. That reading was applied literally once since: a promotion of the
+Plan History tab's row name was declined, citing this record.
 
-The maintainer has now ruled the other way for the Crafting Ranker
-(2026-08-28, branch `ranker-columns`):
-
-> "i feel like the font size on crafting ranker for 'materials,
-> currencies, etc' could be a touch larger for better legibility - maybe
-> the item name goes up a size class and these labels go to the same size
-> as item name - given the icon size the item name font size has room for
-> it vertically to be larger"
+The ruling now goes the other way for the Crafting Ranker (2026-08-28,
+branch `ranker-columns`): the item name goes up a size class and the gate
+strip labels ("Materials", "Currencies" and the rest) go to the same size
+as the item name, for legibility - on the ground that the icon size
+already leaves the item name vertical room to be larger.
 
 The rationale in that last clause is the rule, not the exception. A
 Ranker row is 60px tall because it carries a tier-1 bag-slot item icon

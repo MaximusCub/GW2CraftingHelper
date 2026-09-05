@@ -3,9 +3,9 @@
 
 ## First-paint viewport truncation (KNOWN-ISSUES #65)
 
-The report, in the maintainer's words: "there was a bug where the bottom of
-the viewport was cut off until the window got a slight resize jiggle to
-trigger full redraw flow". Three gate captures taken on 2026-08-27
+Reported in game: the bottom of the viewport was cut off until the
+window got a slight resize jiggle to trigger the full redraw flow. Three
+verification screenshots taken on 2026-08-27
 (`gate-master/verify-costband.png`, `fs-open2.png`, `shot-plan-raw.png`)
 show the same Exordium plan on a fresh window open: the plan header, the
 Total Cost band and the four currency rows are drawn, and then nothing -

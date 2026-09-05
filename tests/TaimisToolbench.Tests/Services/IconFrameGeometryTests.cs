@@ -10,7 +10,7 @@ namespace TaimisToolbench.Tests.Services
     /// it through as a grey BACKGROUND nobody asked for. The border must be a
     /// ring, so the assertions below are about what is NOT painted.
     /// <para>
-    /// Since the owner's context ruling the ring is also CONTEXT-bound:
+    /// The ring is also CONTEXT-bound:
     /// only the list tier draws one - the bar tier's inline symbol takes no
     /// frame at all, exactly like the coin icons beside it - so the ring
     /// assertion pins the list tier's 32px window alone, and

@@ -2,20 +2,20 @@
 > Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
 >
 > **Superseded in part - 2026-08-26, branch `tooltip-fidelity`.** Lossless
-> live captures (2026-08-25, `/mnt/c/Dev/Blish/tooltips/live/`, audited in
-> `/mnt/c/Dev/Blish/tooltips/fidelity-audit.md`) overturned several claims
+> live captures (2026-08-25, the `live` set, audited in the tooltip
+> fidelity audit) overturned several claims
 > below: the rarity WORD is drawn in the rarity colour, not white (the
 > 2012-2016 captures behind G5's white reading predate a game change); the
 > upgrade blue is measured at (85,153,255), not the spec's recommended
 > value; `MaxContentWidth` moved 350 -> 392; the inner bevel ring is not in
 > the game (it darkens inward); and the canvas carries a blue-green cast,
-> not pure black. Desktop-gate step 3's "so are the rarity word" clause and
+> not pure black. Sandbox-check step 3's "so are the rarity word" clause and
 > the line-order map's `<Rarity> white` row are the superseded statements.
 > The white ATTRIBUTE lines, line order, and blank rules were all
 > re-confirmed by the same captures.
 >
 > **Superseded further - 2026-08-26, branch `tooltip-round2`.** Thirteen
-> owner captures (`/mnt/c/Dev/Blish/tooltips/live3/`, audited in the
+> further live captures (the live3 set, audited in the
 > fidelity audit's live3 addendum) overturned more of the below: the
 > whole consumable effect block is grey #AAA, not white-first-line (the
 > round-2 correction #1 and F7 rested on JPEG-era captures); the game
@@ -31,12 +31,12 @@
 > vials measures a material's coin row one pitch under the line above);
 > coin segments are bare digits ("2g 0s 0c", never "00"); the sigil
 > cooldown DOES exist in the API (inside buff.description markup); and
-> the owner's field ruling retired the Menomonia-16 divergence - the
+> a field ruling retired the Menomonia-16 divergence - the
 > tooltip renders at 14 with `MaxContentWidth` 350. The line-order map
-> and desktop-gate steps 3/6/15 below describe the superseded shapes.
+> and sandbox-check steps 3/6/15 below describe the superseded shapes.
 >
 > **Superseded further - 2026-08-28, branch `wave1-tooltips`.** The
-> owner's field ruling that retired the Menomonia-16 divergence is itself
+> field ruling that retired the Menomonia-16 divergence is itself
 > retired: a side-by-side against the game's own tooltip reads the 14pt
 > box a size too small, and the surface now draws at `UiFonts.Body`
 > (Menomonia 16). `ItemTooltipMaxContentWidth` is not a transferable
@@ -53,12 +53,11 @@
 
 ## Tooltip authenticity (tooltip-authenticity)
 
-The maintainer's mandate, verbatim: *"tool tips should try as hard as
-possible to duplicate the in-game visual style pixel perfectly.
-divergences where necessary because of the item representations being
-slightly different are ok.. but lets try to make it match."*
+The mandate: tooltips must duplicate the in-game visual style as close
+to pixel-perfectly as possible. Divergences are acceptable only where the
+module's item representations genuinely differ from the game's.
 
-Everything below is built from `/mnt/c/Dev/Blish/tooltip-research/spec.md`,
+Everything below is built from the tooltip-research `spec.md`,
 the read-only research artefact that measured the game's own tooltip off
 five wiki captures, two third-party replicas, and the live `/v2/items`
 responses. Its gap map numbers the deltas G1-G25; this section says what
@@ -177,7 +176,7 @@ TOOLTIP-LOCAL by design - `CoinSegmentMath.CoinIconSize` and
 `TooltipLayoutMath.PreferredMaxContentWidth` keep their values for every
 plan table and every plain tooltip; the tooltip passes its own numbers in.
 
-### Beyond the gap map: the maintainer's own scope
+### Beyond the gap map: the requested scope
 
 **Q1, all surfaces.** The rich item tooltip is now on Used Materials rows,
 Shopping List rows and the Snapshot result list as well as the recipe tree
@@ -238,16 +237,15 @@ re-ellipsis closures stop re-stamping tooltips entirely.
   body shape - Gathering's description/level/flags body matches Gizmo's
   and Trophy's, Tool's matches Container's and Consumable's, MiniPet's
   matches Trophy's, and all three of those neighbours are contiguous.
-  Desktop gate step 6 settles it in one hover.
-  **Judgment call - flagged for the maintainer.**
+  Sandbox check step 6 settles it in one hover.
+  **Judgment call - flagged.**
 - **Armour's slot line is the API's own noun plus "Armor"** - "Gloves
   Armor" where the game says "Hand Armor". The game's slot vocabulary
   (Head/Hand/Chest/Leg/Foot/Shoulder) is a different word set from
   `details.type` (Helm/Gloves/Coat/Leggings/Boots/Shoulders), and a
   mapping table is exactly the kind of invented data this module refuses.
   The ORDER is the game's (weight class first, measured on
-  `warhelm.jpg`); only the noun differs. **Judgment call - flagged for the
-  maintainer.**
+  `warhelm.jpg`); only the noun differs. **Judgment call - flagged.**
 - **"Damage Type: <x>" has no counterpart in the game's weapon block.**
   Kept because it is a real API fact the tooltip already showed, placed
   after the hand line. **Judgment call - flagged.**
@@ -441,8 +439,8 @@ y=130-139 at x4-23, coin icon x23-41). Row 128 carries no glyph and rows
 122-127 only the `q` descender of "Required": 111 -> 129 is ONE 18px
 pitch, contiguous. FWDekker agrees for nine of the eleven builders that
 emit a value. The blank now splits on the item's shape - see the
-line-order block above - and desktop gate step 6 was corrected, since it
-had told the tester to confirm the divergence.
+line-order block above - and sandbox check step 6 was corrected, since it
+asked for the divergence to be confirmed.
 
 **3. A tooltip CLEAR could be undone by the next re-stamp - FIXED.**
 `TooltipFacility.Register` inferred a source's fallback text from
@@ -459,7 +457,7 @@ already showing in full. `ApplyPlain` now records the caller's intent -
 clears included - on any source the control already carries. It costs
 one `ConditionalWeakTable` lookup per plain tooltip assignment, on the
 render path. Not unit-testable: `TooltipFacility` takes a Blish
-`Control` and tests stay Blish-free, so desktop gate step 12 carries the
+`Control` and tests stay Blish-free, so sandbox check step 12 carries the
 check and now names the no-stat-block precondition it needs.
 
 ### Post-review corrections, round 3
@@ -481,11 +479,11 @@ unknown shape falls to Generic. They are now their own labelled arm,
 still contiguous but on a stated nearest-body-shape inference rather
 than a borrowed measurement, recorded under "Accepted divergences" as
 the one guess in the table, pinned by a Theory test that says so, and
-handed to desktop gate step 6. The counts are corrected here, in
+handed to sandbox check step 6. The counts are corrected here, in
 `ItemStatTooltipComposer.ValueSitsAfterABlank`'s doc comment and in
 `ItemStatTooltipComposerTests`.
 
-### Desktop gate (live, required)
+### Sandbox check (live, required)
 
 1. Hover a crafting material row in the recipe tree. The box opens with a
    ~34x34 FRAMED ICON and the item name beside it, vertically centred on
@@ -564,7 +562,7 @@ handed to desktop gate step 6. The counts are corrected here, in
     available for this entry." - never an empty box. After the top-up
     lands the same hover shows the full stat block.
 
-Gate: PASS (2026-08-23 night desktop session, branch build at a291fb1,
+Gate: PASS (2026-08-23 night sandbox session, branch build at a291fb1,
 captures preflight/gTT1-gTT28). Verified live: the full ascended block
 (Wupwup Claymore - icon header with framed 32px icon and pink name,
 thousands-separated strength, nine white attribute lines, one line per

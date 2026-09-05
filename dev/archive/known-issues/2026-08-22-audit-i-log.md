@@ -134,7 +134,7 @@ never-collapse floor) -> 1900 after commit 2 (view-only) -> 1904 after
 the review-fix commit (4 more, pinning the CR/LF/TAB flattening and the
 unchanged-reference fast path).
 
-**Desktop gate items** (rendered surface, outside the test-runnable
+**Sandbox check items** (rendered surface, outside the test-runnable
 Blish-free layer):
 
 1. A long WARN line (long path + exception) shows a dim
@@ -156,7 +156,7 @@ Blish-free layer):
 5. Copy still writes the full untruncated lines to the clipboard, not
    the ellipsized display text.
 
-Gate: PASS (2026-08-22 evening desktop batch, branch build 8026242,
+Gate: PASS (2026-08-22 evening sandbox batch, branch build 8026242,
 captures preflight/gI1-gI3). At Debug+ with the seeded session log:
 every entry rendered as a dim level-tinted prefix column ([WARN]
 orange, [INFO] white, [DEBUG] grey) plus an aligned message column;

@@ -294,8 +294,7 @@ namespace TaimisToolbench.Tests.Services
             // The finish summary's "total" used to be the
             // SUM of the raw per-step timing lines, which necessarily
             // excludes every un-instrumented gap between them and so
-            // silently under-reports the wall-clock duration a field
-            // tester actually experiences. It must now show the wrapper's
+            // silently under-reports the wall-clock duration a a player actually experiences. It must now show the wrapper's
             // own Stopwatch elapsed time as "total", with the phase sum
             // appended alongside as "(phases Nms)" - see
             // PlanPhaseTimingSummary.FormatCompactSummary's own doc

@@ -13,7 +13,7 @@ namespace TaimisToolbench.Tests.Services
     /// <summary>
     /// The plan's own target is what the user asked to craft, not an
     /// acquisition decision to opt out of, so no IGNORE pill is offered on
-    /// a root row (maintainer field feedback). Covers the pill layer
+    /// a root row (field feedback). Covers the pill layer
     /// (DecisionPillPlanner), the flag's single production write site
     /// (CraftingTreeBuilder.BuildTree) and the end-to-end pipeline path,
     /// including the all-children-ignored plan the suppression leaves

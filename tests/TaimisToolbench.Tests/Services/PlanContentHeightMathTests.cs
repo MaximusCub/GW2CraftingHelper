@@ -205,8 +205,8 @@ namespace TaimisToolbench.Tests.Services
 
         // --- SectionBodyHeight: simple per-row-count sections ---
 
-        // Used Materials gained an Item/Amount header in audit batch J's
-        // chrome unification, and the Shopping List's own 22px unbanded
+        // Used Materials gained an Item/Amount header in the chrome
+        // unification, and the Shopping List's own 22px unbanded
         // header became the shared 26px band. Both are counted the way the
         // two column-header tables already were - unconditionally,
         // because all four renderers emit the header before looking at
@@ -592,8 +592,8 @@ namespace TaimisToolbench.Tests.Services
         // StillOneCostTileRowHeight) asserted
         // PlanContentHeightMath.SummaryBodyHeight's shape via
         // PlanRowType.CoinTotal. Deleted as dead code (KNOWN-ISSUES #46,
-        // closed under the high-evidence-zone policy - see
-        // docs/KNOWN-ISSUES.md#policy-high-evidence-zones): CoinTotal was
+        // closed under the policy in docs/KNOWN-ISSUES.md for code
+        // pinned by expensive evidence): CoinTotal was
         // never emitted by PlanViewModelBuilder, and SummaryBodyHeight
         // was unreachable
         // for a real Summary section once the redesign routed

@@ -21,7 +21,7 @@ namespace TaimisToolbench.Services.Diagnostics
     /// real ~19s generation the two can differ by seconds, not milliseconds.
     /// The optional wallClockMs parameter on
     /// <see cref="FormatCompactSummary"/> lets the caller supply the figure a
-    /// field tester actually experiences; when absent the "total" stays the
+    /// a player actually experiences; when absent the "total" stays the
     /// phase sum. Derivation: docs/ARCHITECTURE.md section S1.9.
     /// </para>
     /// </summary>
@@ -177,7 +177,7 @@ namespace TaimisToolbench.Services.Diagnostics
             if (wallClockMs.HasValue)
             {
                 // the wrapper's real wall-clock duration is
-                // the number a field tester actually experiences - it is
+                // the number a a player actually experiences - it is
                 // always >= the phase sum (un-instrumented gaps only ever
                 // ADD time) - shown alongside the phase sum, not in place
                 // of it, so neither figure is lost.

@@ -31,15 +31,10 @@ are in tells you whether a page is safe to edit.
   checks resolves to a real heading.
 - [`RELEASING.md`](RELEASING.md) - what packaging and release actually do
   today, measured, including what still does not exist.
-- [`RENAMING.md`](RENAMING.md) - the runbook for the finale of the
-  Taimi's Toolbench rename: GitHub repo rename, local folder and
-  junction gymnastics, and the owner's Blish install migration. Current
-  state until those steps are executed and verified; a frozen record
-  after.
 - [`gw2e-parity-spec.md`](gw2e-parity-spec.md) - the normative
   gw2efficiency behavior the solver targets, per rule.
-- [`gw2e-considerations.md`](gw2e-considerations.md) - the maintainer's
-  rulings on each convergence row: adopt, preserve, or already equivalent.
+- [`gw2e-considerations.md`](gw2e-considerations.md) - the decision on
+  each convergence row: adopt, preserve, or already equivalent.
 
 ## Durable why
 
@@ -74,8 +69,9 @@ In short:
   pass, before per-branch files existed.
 - the pre-M38 fix-pass diary, under the same item numbers - internal
   history, not published in this repository.
-- [`../dev/proposals/`](../dev/proposals/) - designs for features that were
-  never built.
+- [`../dev/proposals/`](../dev/proposals/) - design write-ups. Four describe
+  tabs that shipped and are cited from source as the reasoning behind them;
+  the rest were never built. That directory's README says which is which.
 
 ## Where the code lives
 
@@ -85,12 +81,12 @@ and not compilation units. File counts measured with `ls <dir>/*.cs | wc -l`.
 
 | Folder | What lives there | Open these first |
 | --- | --- | --- |
-| `Models/` (53) | The data shapes passed between layers: the plan result, the display tree, the view model the renderers read. | `PlanViewModel.cs`, `CraftingTreeNode.cs`, `CraftingPlanResult.cs`, `CurrencyValuation.cs` |
-| `Services/` (165, flat) | Every piece of logic in the module: the solver, pricing, the offline-seed loaders, the pure layout arithmetic, and the text/decision composers the views render. | `PlanSolver.cs`, `CraftingPlanPipeline.cs`, `PlanViewModelBuilder.cs`, `VendorBatchSolver.cs`, `PlanContentHeightMath.cs` |
-| `Services/Recipes/` (8) | Recipe cache stores, the committed seed readers behind them, and the corpus probe that verifies them against the live build. | `RecipeCacheSerializer.cs`, `OverlayRecipeCacheStore.cs`, `RecipeCorpusVerifier.cs` |
+| `Models/` (57) | The data shapes passed between layers: the plan result, the display tree, the view model the renderers read. | `PlanViewModel.cs`, `CraftingTreeNode.cs`, `CraftingPlanResult.cs`, `CurrencyValuation.cs` |
+| `Services/` (209, flat) | Every piece of logic in the module: the solver, pricing, the offline-seed loaders, the pure layout arithmetic, and the text/decision composers the views render. | `PlanSolver.cs`, `CraftingPlanPipeline.cs`, `PlanViewModelBuilder.cs`, `VendorBatchSolver.cs`, `PlanContentHeightMath.cs` |
+| `Services/Recipes/` (10) | Recipe cache stores, the committed seed readers behind them, and the corpus probe that verifies them against the live build. | `RecipeCacheSerializer.cs`, `OverlayRecipeCacheStore.cs`, `RecipeCorpusVerifier.cs` |
 | `Services/Diagnostics/` (2) | Plan-generation phase timing, summarised into the plan's debug log by `CraftingPlanPipeline`. | `PlanTimingAnalyzer.cs`, `PlanPhaseTimingSummary.cs` |
-| `Views/` (17) | The Blish-bound layer: one file per tab, the window, and the two main-thread primitives. | `CraftingPlanView.cs` (4,987 lines - the plan tab), `MainView.cs` (Snapshot), `SettingsTabContent.cs`, `MainThreadMarshal.cs` |
-| `Views/Rendering/` (37) | Per-section renderers, the two seams they reach the view through, plus the shared drawing primitives (fonts, coin rows, rarity colors, tooltips). | `TreeSectionController.cs`, `ITreePlanHost.cs`, `SummarySectionRenderer.cs`, `UiFonts.cs`, `CoinCurrencyRenderer.cs` |
+| `Views/` (65) | The Blish-bound layer: one file per tab, the window, and the two main-thread primitives. | `CraftingPlanView.cs` (5,185 lines - the plan tab), `MainView.cs` (Snapshot), `SettingsTabContent.cs`, `MainThreadMarshal.cs` |
+| `Views/Rendering/` (46) | Per-section renderers, the two seams they reach the view through, plus the shared drawing primitives (fonts, coin rows, rarity colors, tooltips). | `TreeSectionController.cs`, `ITreePlanHost.cs`, `SummarySectionRenderer.cs`, `UiFonts.cs`, `CoinCurrencyRenderer.cs` |
 | `Contracts/` (1) | The item-search seam (`IItemSearchProvider` plus its result type) and nothing else - a directory for one file. | `IItemSearchProvider.cs` |
 | `tools/` | Offline console apps that produce `ref/`. Never run by the module. | `VendorOfferUpdater/`, `TaimisToolbench.RecipeSeeder/`, `MysticForgeSeeder/` |
 | `ref/` | Committed seed data the module reads at runtime, produced by `tools/`. | `vendor_offers.json` (14.8MB, one line), `recipes_seed.json` |
@@ -118,20 +114,21 @@ test files only inside comments; nothing under `tests/` references them.
 
 - **M-NN** - a milestone (M14 through M39 are cited in live docs; earlier
   ones only in the archive). A milestone is one themed wave of work, ending
-  in a live desktop verification.
+  in a live sandbox verification.
 - **WP-NN** - a work package inside the M38 cleanup wave specifically,
   WP-01 through WP-29, defined in the M38 cleanup plan (internal working
   document). No other milestone uses WP numbering.
 - **KNOWN-ISSUES #N** - an entry in the numbered catalog in
   [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md). Cited from `.cs` files as an anchor
   to the investigation behind a piece of code.
-- **Gate** - the live desktop session that verifies a milestone against the
+- **Gate** - the live sandbox session that verifies a milestone against the
   running game. Each milestone record ends in one `Gate: PASS/FAIL/...`
   line; a claim with no gate behind it says so.
-- **High-evidence zone** - code whose behavior is pinned by expensive
-  evidence (a live trace, a decompilation). Changeable, but only with
-  characterization tests written against the current behavior first. See
-  the policy note in [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md).
+- **Pinned by expensive evidence** - code whose behavior rests on
+  measurements that cost a lot to take (a live trace, a decompilation).
+  Changeable, but only with characterization tests written against the
+  current behavior first. See the policy note in
+  [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md).
 - **ADOPT / PRESERVE / EQUIVALENT** - the per-row verdicts in
   [`research/gw2e-convergence-matrix.md`](research/gw2e-convergence-matrix.md):
   change to match gw2efficiency, keep this module's deliberate divergence,

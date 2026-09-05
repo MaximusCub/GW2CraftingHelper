@@ -146,7 +146,7 @@ namespace TaimisToolbench.Tests.Services
         public void ADeepPlanReachesFarEnoughToDrawWholeRowsIntoTheStrip()
         {
             // Sanity on the scale of the reported defect rather than a
-            // threshold to tune: the owner's capture showed whole tree rows
+            // threshold to tune: an in-game screenshot showed whole tree rows
             // over the header, and a depth-14 chain sits about eighteen
             // containers down.
             Assert.True(MaxSlip(18, SmallScale) >= 16);

@@ -382,7 +382,7 @@ namespace TaimisToolbench.Tests.Services.Recipes
                 Assert.Single(handler.Requests);
 
                 // Relaunch inside the same patch: the stamp means 0
-                // requests, which is the owner's firm requirement.
+                // requests, which is a firm requirement.
                 var store2 = Composite(tmp.Path, SeedFrom(seedRows), out _);
                 var again = await NewRefresher(http, store2).RefreshAsync(
                     OldBuild, store2.GetKnownPositiveRecipeIds(), null, CancellationToken.None);

@@ -31,9 +31,9 @@
 > the right-hand columns stay on-screen. Deep rows ellipsize there as they
 > did before.
 >
-> The **+2pt variant landed** on `font-and-polish`: the maintainer took the
-> bump after a field test, so row/body text is now Menomonia 16 and
-> small/caption/pill text Menomonia 14 (`Views/Rendering/UiFonts`), and
+> The **+2pt variant landed** on `font-and-polish` after an in-game test, so
+> row/body text is now Menomonia 16 and small/caption/pill text
+> Menomonia 14 (`Views/Rendering/UiFonts`), and
 > `WindowSizing.MinWindowWidth` moved 1436 -> **1478**: section 7's
 > prediction (1448 + one `TreeIndentPer` = 1472) plus 6px, because the
 > cost column below is derived from one example gold total and Menomonia's
@@ -311,11 +311,10 @@ widest two-currency bulk offer (250 shards for `6250` magic + `262500`
 karma) adds **+154px**.
 
 1232 accepts that a row combining a forced-craft dust chain with a vendor
-currency run ellipsizes. The maintainer declined that trade - *"we are
-designing for a minimum resolution of 1920x1080, so cramming down to a
-smaller min-size that will result in cramped renders seems bad"* - so the
-shipped floor carries the +154 rider, and the cost column budget becomes
-181 + 154 = 335:
+currency run ellipsizes. That trade was declined: the module is designed
+for a 1920x1080 minimum resolution, so shrinking the floor further only
+buys cramped renders. The shipped floor therefore carries the +154 rider,
+and the cost column budget becomes 181 + 154 = 335:
 
 ```
 629 + 24 + 256 + 335 + 8 = 1252  -> window 1378   (shipped MinWindowWidth)

@@ -7,8 +7,8 @@ namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
     /// The guard that stops a recipe-tree row answering a click its own
-    /// IGNORE toggle is about to answer, and the behaviour the field report
-    /// asked for: N clicks on the toggle with a cursor that never moves
+    /// IGNORE toggle is about to answer, and the behaviour asked for in
+    /// game: N clicks on the toggle with a cursor that never moves
     /// produce N toggles and no expand/collapse.
     /// <para>
     /// The row was rebuilt on every one of those clicks and the guard used

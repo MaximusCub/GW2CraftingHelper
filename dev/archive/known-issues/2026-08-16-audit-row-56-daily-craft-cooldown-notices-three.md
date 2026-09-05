@@ -19,9 +19,9 @@ Fix, purely additive/informational, no solver or pricing change,
   entries, each with an item id, a per-day cap, and a
   `wiki.guildwars2.com` citation. Curated by fetching each candidate
   item's RAW wikitext (`index.php?title=...&action=raw`) via
-  `api.php`/`index.php`, not by trusting the task's own suggested item
-  list at face value - that research turned up a real correction: the
-  task's suggested set (Deldrimor Steel Ingot, Spiritwood Plank, Elonian
+  `api.php`/`index.php`, not by trusting a suggested item list at face
+  value - that research turned up a real correction: the suggested set
+  (Deldrimor Steel Ingot, Spiritwood Plank, Elonian
   Leather Square, Bolt of Damask, Xunlai Electrum Ingot) are the
   ascended-refinement STEP-2 outputs, and the wiki confirms those five
   are explicitly NOT recipe-capped ("The step 2 materials are not
@@ -33,14 +33,14 @@ Fix, purely additive/informational, no solver or pricing change,
   Elder Spirit Residue, Spool of Silk Weaving Thread, Spool of Thick
   Elonian Cord - each confirmed via its own item page's raw wikitext
   ("This item can only be acquired once per day per account...",
-  `timegate = y`, `[[Category:Time gated recipes]]`). The task's
+  `timegate = y`, `[[Category:Time gated recipes]]`). The suggested
   "obsidian refinement" example did NOT verify - the wiki's own Obsidian
   Refinement subsection explicitly has no time-gating note ("unlike the
   Ectoplasm Refinement section above it") and Vision Crystal's own
   recipe carries no `timegate` flag - so no obsidian-refinement entry
-  was added, per the task's own "do NOT include entries you could not
-  verify" instruction. The remaining eleven entries (Heat Stone, Clay
-  Pot, Vial of Maize Balm, Gossamer Stuffing, Grow Lamp, Plate of Meaty
+  was added: an entry that cannot be verified is not included. The
+  remaining eleven entries (Heat Stone, Clay Pot, Vial of Maize Balm,
+  Gossamer Stuffing, Grow Lamp, Plate of Meaty
   Plant Food, Plate of Piquant Plant Food, plus the four Dragon Hatchling
   Doll parts below) came from the wiki's own
   `Category:Time gated recipes` listing.
@@ -86,7 +86,7 @@ Fix, purely additive/informational, no solver or pricing change,
     cooldown notice regardless of whether it is in this seed. Extending
     the pass to also cover `ShoppingUnknown`/non-craft rows is a real
     follow-up, out of scope for this fix.
-  - **`itemName`/`note` fields are maintainer-only documentation.**
+  - **`itemName`/`note` fields are internal-only documentation.**
     `DailyCooldownItemService.Load` never reads either field (see its
     own `DailyCooldownEntry` shape) and no test pins them - they exist
     purely to make the JSON file human-readable during curation/review
@@ -179,7 +179,7 @@ craft-cooldown notice coexisting in one section).
    the corrections inline in PART A above: added the four Dragon
    Hatchling Doll parts (finding 1), removed the dead Charged Quartz
    Crystal entry (finding 2), documented the Craft-step-only limitation
-   this exposes, and noted `itemName`/`note` are maintainer-only
+   this exposes, and noted `itemName`/`note` are internal-only
    documentation fields. Seed count: 15 (was 12: +4 Dragon Hatchling
    Doll parts, -1 Charged Quartz Crystal). `DailyCooldownItemServiceTests`
    extended (same `[Fact]` methods, more assertions - no test count
@@ -248,7 +248,7 @@ contract mirrors, no fake file I/O (the shipped-seed-file test reads
 the real `ref/daily_cooldown_items.json` from disk via the existing
 `RepoFileLocator` helper). IDs remain internal-only - the new craft-
 cooldown notice text never surfaces an item id, only its resolved name.
-No live desktop verification was performed - `Views/MainView.cs`,
+No live sandbox verification was performed - `Views/MainView.cs`,
 `Views/SuggestionPanel.cs`, and `Views/Rendering/TreeSectionController.cs`
 are all Blish-bound and outside this repo's test-runnable surface; the
 icon-placeholder fix in particular (a Snapshot-tab render change) has
@@ -256,11 +256,11 @@ not been visually confirmed in a live client.
 
 ### PART D: post-PART-C follow-up review fixes
 
-1. **Coverage gap against a named brief target: Charged Quartz Crystal
+1. **Coverage gap against a named target: Charged Quartz Crystal
    (43772).** PART C finding 2 correctly removed 43772 from
    `ref/daily_cooldown_items.json` (dead data - the notice pass only ever
    inspects `AcquisitionSource.Craft` steps, and 43772 is never a recipe
-   output). But 43772 is one of the brief's own named motivating examples,
+   output). But 43772 is one of this work's named motivating examples,
    is `AccountBound`/no-TP/no-vendor-offer, and had no
    `ref/acquisition_hints_seed.json` entry either - so it resolved to a
    `ShoppingUnknown` leaf with zero timegate signal at all. Concrete
@@ -344,7 +344,7 @@ assertion exercises a real production entry point
 `CraftingPlanPipeline.GenerateStructuredAsync`/`ResolveWithOverrides`,
 `Gw2ConstantsCurrencyNamesTests`), no contract mirrors, no fake file
 I/O. IDs remain internal-only - the new/changed hint text never
-surfaces an item id. No live desktop verification was performed (same
+surfaces an item id. No live sandbox verification was performed (same
 Blish-bound surface as PART A/B/C).
 
-Gate: PASS 2026-08-16 (orchestrator live desktop session). Deldrimor Steel Ingot x5 rendered the timegate notice verbatim ('Lump of Mithrillium is timegated - 1 per day per account - crafting 5 will take about 5 days'); the empty-IconUrl magenta fix verified on the Snapshot tab (Spirit Shards row degrades to no icon); currency-name corrections suite-covered.
+Gate: PASS 2026-08-16 (live sandbox session). Deldrimor Steel Ingot x5 rendered the timegate notice verbatim ('Lump of Mithrillium is timegated - 1 per day per account - crafting 5 will take about 5 days'); the empty-IconUrl magenta fix verified on the Snapshot tab (Spirit Shards row degrades to no icon); currency-name corrections suite-covered.

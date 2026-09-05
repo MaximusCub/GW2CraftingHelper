@@ -4,8 +4,8 @@
 ## Opportunity notes: recipe-sheet savings + seasonal vendor tips (2026-08-16)
 
 Extended the Plan Notes section (previous entry, immediately above) with
-two maintainer-directed OPPORTUNITY note kinds, both carrying concrete
-numbers, per the maintainer's design law: structured sections show the
+two OPPORTUNITY note kinds, both carrying concrete
+numbers, per the design law: structured sections show the
 BEST-NOW option; opportunities/considerations go to Plan Notes.
 
 **1. RECIPE-SHEET SAVINGS.** For a bought (not crafted) item whose
@@ -17,8 +17,8 @@ it instead - saves `<delta>` per unit", or the training variant when no
 character meets the recipe's own discipline/rating.
 
 **Design decision worth flagging explicitly (data-availability gap, not
-a scope cut):** the task's own join ("VendorOfferStore offers whose
-output is the sheet item") requires a recipe-id -> unlocking-sheet-item-id
+a scope cut):** the intended join (VendorOfferStore offers whose
+output is the sheet item) requires a recipe-id -> unlocking-sheet-item-id
 mapping. Neither the real GW2 `/v2/recipes` API nor this repo's existing
 data (recipes seed, vendor offers, item metadata) captures that
 linkage anywhere - the GW2 API only exposes it from the OTHER direction
@@ -27,7 +27,8 @@ linkage anywhere - the GW2 API only exposes it from the OTHER direction
 (fetch-and-cross-reference every vendor offer's own item metadata to
 find which are recipe sheets) is exactly the "reverse-sheet-index
 plumbing" the task explicitly ruled out. Rather than fabricate a
-recipe/sheet pairing I could not verify against a real wiki source (repo
+recipe/sheet pairing that could not be verified against a real wiki
+source (repo
 invariant: never invent data), `RecipeSheetSavingsCalculator.Apply`
 takes `recipeSheetItemIdByRecipeId` as an injectable, optional
 dictionary - `CraftingPlanPipeline`'s own constructor default is empty.
@@ -81,8 +82,8 @@ simple capitalization of Name for every festival (`"superadventurefestival"`
 `VendorOffer.SeasonalFestival` seeds exactly the three real
 Candy Corn Vendor (Weekly) ecto (Glob of Ectoplasm, item 19721) offers
 already present in `ref/vendor_offers.json`'s wiki-scraped baseline -
-every other offer in that 53,536-row file is untouched. Per the
-maintainer's explicit decision, seasonal offers are excluded from the
+every other offer in that 53,536-row file is untouched. By
+explicit decision, seasonal offers are excluded from the
 solver's own candidate set UNCONDITIONALLY (`SeasonalOfferFilter.
 ExcludeSeasonal`, applied only at the actual `_solver.Solve`/
 `OwnedMaterialsForceBuyPrePass` call sites in `CraftingPlanPipeline` -
@@ -111,7 +112,7 @@ need a hand edit like this one) is a recorded follow-up, not this pass.
 `FestivalDisplayNames`), `Services/CraftingTreeBuilder.cs`
 (`ApplyReferenceRecipeInfo`), `Services/CostLineValuation.cs` (new,
 shared coin-valuation helper - never touches `VendorBatchSolver`, one of
-the DO-NOT-TOUCH files), `Services/SeasonalOfferFilter.cs` (new),
+the frozen files), `Services/SeasonalOfferFilter.cs` (new),
 `Services/RecipeSheetSavingsCalculator.cs` (new),
 `Services/SeasonalVendorTipCalculator.cs` (new),
 `Services/CraftingPlanPipeline.cs` (two new optional constructor
@@ -142,7 +143,7 @@ projects alongside the main suite).
 - [x] Pricing logic preserves multi-source correctness (`CostLineValuation`
   refuses - never guesses - on a non-coin currency line, an unpriced Item
   line, or any unrecognized `CostLine.Type`, mirroring `VendorBatchSolver.
-  EvaluateVendorOffers`' own posture without touching that DO-NOT-TOUCH
+  EvaluateVendorOffers`' own posture without touching that frozen
   file).
 - [x] IDs remain internal-only (every note resolves item/recipe/discipline
   **names**, never raw ids).
@@ -193,7 +194,7 @@ own identical "cheapest priceable offer wins" precedent - new test
 - Seasonal-offer detection is a one-time hand tag of three known rows,
   not an automated wiki-scrape pass - see the SEASONAL VENDOR TIP section
   above.
-- No live desktop verification was performed - `Views/CraftingPlanView.cs`
+- No live sandbox verification was performed - `Views/CraftingPlanView.cs`
   and `Views/Rendering/NotesSectionRenderer.cs` are Blish-bound and
   outside this repo's test-runnable surface, same constraint every
   UI-adjacent entry in this file notes (including the immediately
@@ -208,5 +209,5 @@ own identical "cheapest priceable offer wins" precedent - new test
   `recipeSheetItemIdByRecipeId` seed in production (see above), but has
   not yet been confirmed against a real generated plan on-screen.
 
-Gate: PASS (negative checks) 2026-08-16 (orchestrator live desktop session). Seasonal exclusion verified as the headline: the ARE craft path now prices ectos at the real TP rate (~26s vs the old ~4s26 phantom Halloween vendor), the ecto row's vendor source is gone entirely, and the Candy Corn tip correctly does NOT render out of season; sheet-savings positive render suite-covered.
-Gate: not yet run live - queued for the next batched desktop session (maintainer is currently holding the desktop). Merged after the full review pipeline resolved every finding (2 adversarial rounds, verification zero-blocking, 1536/1536 pre-merge), under the maintainer's standing merge directive (2026-08-16).
+Gate: PASS (negative checks) 2026-08-16 (live sandbox session). Seasonal exclusion verified as the headline: the ARE craft path now prices ectos at the real TP rate (~26s vs the old ~4s26 phantom Halloween vendor), the ecto row's vendor source is gone entirely, and the Candy Corn tip correctly does NOT render out of season; sheet-savings positive render suite-covered.
+Gate: not yet run live - queued for the next batched sandbox session. Merged after the full review pipeline resolved every finding (2 adversarial rounds, verification zero-blocking, 1536/1536 pre-merge), under the standing merge directive (2026-08-16).

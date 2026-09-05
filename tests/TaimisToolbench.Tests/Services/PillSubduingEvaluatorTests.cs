@@ -245,7 +245,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void StrictDomination_AmalgamatedRiftEssenceShape_SameCoinTenMoreEcto()
         {
-            // The maintainer's own canonical example: same currencies
+            // The canonical example: same currencies
             // (here, no coin either side - the "same" part), vendor needs
             // 10 more raw Globs of Ectoplasm (item id 100) than crafting
             // does. Needs no valuation at all - both breakdowns pass

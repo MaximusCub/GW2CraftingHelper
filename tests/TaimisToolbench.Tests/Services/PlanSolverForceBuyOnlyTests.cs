@@ -120,7 +120,7 @@ namespace TaimisToolbench.Tests.Services
         {
             // Same setup as above, but the user ALSO manually forces Craft
             // on the root - matching gw2e's own "manual pill always beats
-            // the automatic pre-pass" rule (Section 3.2 of the R2 report).
+            // the automatic pre-pass" rule.
             var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
             var prices = new Dictionary<int, ItemPrice>
             {

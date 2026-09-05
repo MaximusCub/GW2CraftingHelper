@@ -7,10 +7,10 @@ The closing note of the app-wide UI consistency wave named exactly this
 milestone: those tabs took the wave's TYPE ramp but not its LAYOUT -
 Settings, Log and About stayed left-packed, with the panel's right half
 empty at every window width, because that wave scoped the ramp plus the
-Snapshot grid rather than a per-tab redesign. The maintainer, on the
-Settings capture: "the font hierarchy in the settings dialog ... does not
-follow consistently with the crafting plan pane which looks gorgeous. all
-the tabs need the same treatment."
+Snapshot grid rather than a per-tab redesign. Reported in game, on
+the Settings capture: the type hierarchy there does not follow the
+Crafting Plan pane's consistently, and every tab needs the same
+treatment.
 
 Measured before the change, at the 1378 window minimum (a 1232px panel):
 the widest Settings control row ended at x=604, leaving 628px empty on
@@ -63,7 +63,7 @@ milestone neither handler measured a single string.
 The module already had the answer twice over and this milestone now uses
 it once: positions and widths track the drag live, and the half that
 MEASURES text runs at drag settle. Correction to the first pass of this
-work, which swept for the wrong shape and reported "no third instance":
+work, which swept for the wrong shape and found no third instance:
 it looked for width-GUARDED relayouts and so found only the two tabs it
 had just written, when the predicate that matters is TEXT MEASUREMENT ON
 A RESIZE PATH. By that predicate the module's heaviest instance was
@@ -165,9 +165,9 @@ checked against the tooltips already on the controls it describes:
 "some currencies show a default estimate" is carried by the default tag's
 own hover, "leave a currency unset" by the amount box's, and the
 price-basis pointer moved to the section title's hover. The two that
-remain are the one that says what the number means and the field-test
-line that says an amount can be typed over a default at all. This is
-copy, not layout - cheap for the maintainer to veto.
+remain are the one that says what the number means and the line that
+says an amount can be typed over a default at all. This is
+copy, not layout - cheap to revert.
 
 CORRECTION, since the first draft of this section got it wrong and said
 so in a code comment as well: those hovers do not repeat the dropped
@@ -176,7 +176,7 @@ default tag exists only on rows that HAVE a default, so on the four
 curated currencies that have none (Astral Acclaim and the three Rift
 Essence tiers) nothing said that leaving the box blank is a supported
 state rather than an unfinished one - which is the exact confusion the
-field-test note says this section already had once. The amount box's own
+in-game note says this section already had once. The amount box's own
 hover now states it on both of its branches. A comment asserting a false
 invariant is worse than no comment, so both it and this paragraph now
 say what is actually true.
@@ -305,10 +305,10 @@ TypeRampMetrics - which is the pair SmallHeading exists for.
 Copy: the six fact labels lose their trailing colons (inside a table with
 a rule, a colon on every label is punctuation doing a column's job),
 "Disclaimer:" becomes "Disclaimer", "Credits: gw2efficiency" becomes
-"gw2efficiency". The two maintainer-approved literal strings (the
+"gw2efficiency". The two approved literal strings (the
 ArenaNet disclaimer, the gw2efficiency credit) ship verbatim.
 
-ACCEPTED DIVERGENCE, for the maintainer to rule on: past roughly 1100px
+ACCEPTED DIVERGENCE, still open: past roughly 1100px
 of panel, About stops using its width. Text is capped at a 560px measure
 - 66 characters at the module's own measured 8.4px Body-16 average -
 because a 280-character line at a 2560 window is a worse artefact than
@@ -360,7 +360,7 @@ width rather than the grid's, so a wrapped run can still reach ~20px
 right of the chrome edge. Re-deriving it would move a wrap threshold in a
 component this milestone has no complaint about.
 
-### Desktop gate checklist
+### Sandbox check checklist
 
 Take each tab at 1378 (the enforced minimum), 1638, 1836 and 2406, and
 one very wide (2560+). At EVERY width, on every tab: no band of empty
@@ -497,8 +497,8 @@ SNAPSHOT
 - The header title sits at the 16px inset with its rule 1px clear beneath
   the buttons.
 
-Gate: PASS (2026-08-25 desktop session, branch build at the
-orchestrator's fix HEAD, captures preflight/gTB0-gTB5).
+Gate: PASS (2026-08-25 sandbox session, branch build at the fix HEAD,
+captures preflight/gTB0-gTB5).
 
 SETTINGS - the tab that prompted the milestone. The left-packed run of
 rows is gone: a genuine two-column board (Sound | Homestead Refinement,
@@ -524,7 +524,7 @@ and no overlap; content runs under the screen edge exactly as the
 plan-view gate already recorded for a sub-minimum client, which is the
 window's effective-minimum behavior and not this milestone's doing.
 
-Two round-capped Must Fixes were applied by the orchestrator before this
+Two round-capped Must Fixes were applied before this
 gate rather than shipped: About cleared its built flag only inside the
 off-thread Build, leaving a settle callback free to dereference the
 blocks Build was about to replace (now cleared on the main thread at the

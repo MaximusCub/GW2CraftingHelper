@@ -1,45 +1,38 @@
 # D2 - Module Logging System & Log Tab Redesign
 
-Status: PROPOSAL (design only, no code changes). Author: design-proposal subagent, 2026-07-22.
+Status: PROPOSAL (design only, no code changes). 2026-07-22.
 Scope: `Views/LogTabContent.cs` (74 lines today), a NEW `Services/ModuleLog.cs` (+ `ModuleLogStore.cs`),
 `ModuleSettings.cs` additions, `SettingsTabContent.cs` additions, and migration notes for existing
 `Logger.*` call sites. No changes proposed to `CraftingPlanView.cs`'s scroll/relayout machinery itself
 (WP-21/23/24/25/26 territory) beyond how its `[scrolldiag]` channel is *routed*.
 
-Evidence labels: **MEASURED** = read directly from this session's file reads (paths/line numbers cited
-inline). **INFERRED** = a reasonable conclusion not directly proven by a read. **OPEN** = a question
-for the maintainer, not resolved here.
+Evidence labels: **MEASURED** = read directly from the files cited inline (paths/line numbers).
+**INFERRED** = a reasonable conclusion not directly proven by a read. **OPEN** = an unresolved
+question.
 
 ---
 
-## 1. User directive (verbatim, for traceability)
+## 1. Scope
 
-> "the log tab would contain useful logging/debug info - right now its just some small amount of
-> messages... consider the overall module and whether it has a meaningful log system with different
-> log levels and turn that log tab into a log search/view pane. We should make sure we log stuff that
-> would be useful only - we dont want to fill users disks with endless crap... probably the system
-> needs log rotation and some settings should exist for something like maximum log size on disk or
-> number of days retention or something."
-
-Four asks, all addressed below: (1) a real module-wide log system with levels, (2) the Log tab becomes
-a search/view pane, (3) a disk-usage policy (don't log "endless crap"), (4) rotation/retention settings.
+Four requirements, all addressed below: (1) a real module-wide log system with levels, (2) the Log tab
+becomes a search/view pane, (3) a disk-usage policy (do not fill a user's disk with noise), (4) log
+rotation plus retention settings (maximum log size on disk, days of retention).
 
 ---
 
 ## 2. Problem / intent
 
-**MEASURED** - today there are two disjoint, incomplete logging paths, neither of which is what the
-directive asks for:
+**MEASURED** - today there are two disjoint, incomplete logging paths, neither of which meets those
+requirements:
 
 1. **Blish's own `Logger`** (`Blish_HUD.Logger.GetLogger<T>()`) is called 48 times across 6 files
    (`Module.cs` 11x, `Services/Gw2AccountSnapshotService.cs` 8x, `Views/MainThreadMarshal.cs` 2x,
    `Views/MainView.cs` 1x, `Views/SettingsTabContent.cs` 1x, `Views/CraftingPlanView.cs` ~25x including
    the 12 `[scrolldiag]`-tagged lines). All of it writes to Blish HUD's *own* log file
-   (`...\Documents\Guild Wars 2\addons\blishhud\logs`, per prior-session measurement in memory
-   `blish-automation-environment.md`; Blish retains ~6 files, rotation not controllable from inside a
-   module) - invisible from any in-module UI, and not something this module should try to duplicate or
+   (`...\Documents\Guild Wars 2\addons\blishhud\logs`, MEASURED; Blish retains ~6 files, rotation
+   not controllable from inside a module) - invisible from any in-module UI, and not something this module should try to duplicate or
    supersede. The module has zero control over Blish's rotation/retention; building a second copy of
-   that mechanism would be redundant scope, not the ask.
+   that mechanism would be redundant scope, not the requirement.
 2. **The Log tab** (`Views/LogTabContent.cs`, 74 lines, MEASURED) shows *only*
    `CraftingPlanView.LastDebugLog` (wired in `Module.cs:388` as
    `() => _craftingContent.LastDebugLog`) - a `List<string>` of timing lines
@@ -49,7 +42,7 @@ directive asks for:
    at lines 1923/1984/2015/3696. One plan's worth of lines, no levels, no timestamps, no persistence,
    no search, no filter.
 
-Neither path gives the user (or the maintainer debugging a user's bug report) a way to answer "what did
+Neither path gives the user (or anyone debugging a bug report) a way to answer "what did
 the module actually do in the last session" - snapshot refresh failures, cache-refresh/seed-load
 anomalies, API degradations (`Gw2AccountSnapshotService`'s 8 `Logger.Warn` sites, all currently
 Blish-log-only and invisible in-module) never reach any UI at all today.
@@ -83,10 +76,10 @@ see Section 8).
 ## 3. Proposed UX - the Log tab as a search/view pane
 
 Replaces `Views/LogTabContent.cs` (74 lines) with a genuine search/view pane, following the existing
-**lightweight FlowPanel(CanScroll)** pattern (pattern A in the scout notes) - this tab's content is
+**lightweight FlowPanel(CanScroll)** pattern (pattern A) - this tab's content is
 label-per-row with a toolbar, not multi-column ellipsized rows that must reflow live during a resize
 drag, so it does not need to opt into the M33 PlanContentHeightMath/relayout-registry contract (pattern
-B, `CraftingPlanView`-only, DO-NOT-TOUCH per M38).
+B, `CraftingPlanView`-only, frozen per M38).
 
 **Layout** (top to bottom, inside the `ViewAdapter`-provided bordered panel - same chrome every other
 tab gets):
@@ -112,7 +105,7 @@ tab gets):
      "remove unused `<Reference>`" candidate, meaning a clipboard-capable type is already linked into
      this project today) - confirm the exact API surface at implementation time; if unavailable, ship a
      "Select All" affordance instead (Blish `TextBox`/`Label` selection semantics need checking) - OPEN
-     QUESTION for the maintainer/implementer, not a blocker on the rest of the design.
+     QUESTION for the implementer, not a blocker on the rest of the design.
    - **Clear view** button: clears what's currently displayed in the tab (does NOT delete the on-disk
      log file or the in-memory ring - see Section 9 for exact lifecycle). Useful for "I want to watch
      just what happens from now on" without losing history for a bug report.
@@ -182,9 +175,8 @@ a file picker (clipboard covers the "attach to a bug report" use case more simpl
     unit), rewrite via the SAME atomic `.tmp` + `File.Replace`/`File.Copy` pattern `StatusStore.Save`
     (MEASURED, `Services/StatusStore.cs:36-39`) and `VendorOfferStore.SaveOverlay` (MEASURED,
     `Services/VendorOfferStore.cs:85-95`) already use - **not** `SnapshotStore`'s own `File.WriteAllText`
-    (MEASURED, `Services/SnapshotStore.cs:39` - plain, non-atomic; the scout notes' claim that all three
-    stores share one atomic pattern is not accurate for `SnapshotStore` itself - flagging this
-    correction so the new store does not copy the wrong sibling).
+    (MEASURED, `Services/SnapshotStore.cs:39` - plain, non-atomic; the three stores do NOT all share one
+    atomic pattern, so the new store must not copy the wrong sibling).
   - On module `LoadAsync` (once per session, not per-append - age-based pruning does not need per-write
     cost), drop any line whose `t` is older than `RetentionDays` before the in-session ring/file diverge
     further. Same rewrite mechanics as the size trim.
@@ -195,8 +187,8 @@ a file picker (clipboard covers the "attach to a bug report" use case more simpl
   `m38-cleanup-plan.md` lines 263-272): `ModuleLogStore` takes an `Action<string, Exception> onError =
   null` constructor parameter from day one, called instead of a bare `Debug.WriteLine` on any IO
   failure inside the store. This is exactly the shape WP-16 is retrofitting onto the four existing
-  stores - building it in now means this is not a fifth store WP-16 has to revisit later (explicit
-  scout callout). A log store's own IO failure obviously must never itself try to log through the same
+  stores - building it in now means this is not a fifth store WP-16 has to revisit later. A log
+  store's own IO failure obviously must never itself try to log through the same
   sink (unbounded recursion) - `Module.cs` wires this callback to `Logger.Warn` (Blish's own logger),
   the same target WP-16 wires the other four stores' callbacks to.
 
@@ -255,8 +247,8 @@ No changes to `AccountSnapshot`, `AccountItemIndex`, `CraftingPlanPipeline`'s pu
 `PlanContentHeightMath`/relayout registry. `PlanTimingAnalyzer` is untouched - its regex-based
 summarization of timing lines is a separate, narrower concern (parsing `CraftingPlanResult.DebugLog`
 for the Crafting Plan tab's own use) and this proposal does not fold it into `ModuleLog`; the Crafting
-Plan tab keeps generating its own `DebugLog` exactly as today (out of scope per the brief - "Crafting
-Plan... do not propose changes here"). The only NEW cross-reference: whichever `Generate*Async` call
+Plan tab keeps generating its own `DebugLog` exactly as today (out of scope: this document proposes no
+changes to the Crafting Plan tab). The only NEW cross-reference: whichever `Generate*Async` call
 site already appends to `DebugLog` may ALSO call `ModuleLog.Write(Info, "plan", ...)` for the
 lifecycle-level facts (start/finish/failure/elapsed) - see Section 8's migration table - but the two
 lists remain independent; nothing is deleted from `CraftingPlanResult.DebugLog`.
@@ -268,41 +260,41 @@ template - MEASURED, `Services/ModuleSettings.cs:66-105` - no new settings idiom
 
 | Setting | Type | Default | Rationale |
 |---|---|---|---|
-| `LogMaxSizeBytes` | `int` | `2 \* 1024 \* 1024` (2 MB) | Directive: "maximum log size on disk". 2 MB of JSONL at the Section 6 write rate is INFERRED to hold weeks of normal-Info-level history comfortably (a few hundred bytes/line, low write rate - see Section 6) while remaining a trivial disk footprint even for a user who never opens Settings. |
-| `LogRetentionDays` | `int` | `14` | Directive: "number of days retention". Two weeks covers "the bug happened a few days ago, can you send me the log" without becoming a silent multi-month accumulation. |
-| `LogDiagnosticsEnabled` | `bool` | `false` | Directive: "log stuff that would be useful only". Gates whether Debug-level lines (including the migrated `[scrolldiag]` channel - see Section 8) reach the FILE sink at all; they always still land in the in-memory ring (so a live "turn it on, reproduce, turn it off, read the tab" flow works without a file at all) - see Section 6's exact policy table. This SUBSUMES the existing `ScrollDiagnosticsEnabled` setting (Section 8: migrate, do not duplicate). |
-| `LogMinFileLevel` | `int` (stored as the `ModuleLogLevel` ordinal; 0-3) | `1` (Info) | The floor level that reaches the file sink even when `LogDiagnosticsEnabled` is false. Kept a separate setting from the diagnostics toggle so a maintainer/power-user can, in principle, silence even Info-level file writes (set to `2`/Warn) without touching the diagnostics toggle's meaning - OPEN QUESTION 3 below asks whether this is worth exposing in the UI at all vs. hardcoding. |
+| `LogMaxSizeBytes` | `int` | `2 \* 1024 \* 1024` (2 MB) | Requirement: a maximum log size on disk. 2 MB of JSONL at the Section 6 write rate is INFERRED to hold weeks of normal-Info-level history comfortably (a few hundred bytes/line, low write rate - see Section 6) while remaining a trivial disk footprint even for a user who never opens Settings. |
+| `LogRetentionDays` | `int` | `14` | Requirement: a days-of-retention setting. Two weeks covers "the bug happened a few days ago, can you send me the log" without becoming a silent multi-month accumulation. |
+| `LogDiagnosticsEnabled` | `bool` | `false` | Requirement: log only what is useful. Gates whether Debug-level lines (including the migrated `[scrolldiag]` channel - see Section 8) reach the FILE sink at all; they always still land in the in-memory ring (so a live "turn it on, reproduce, turn it off, read the tab" flow works without a file at all) - see Section 6's exact policy table. This SUBSUMES the existing `ScrollDiagnosticsEnabled` setting (Section 8: migrate, do not duplicate). |
+| `LogMinFileLevel` | `int` (stored as the `ModuleLogLevel` ordinal; 0-3) | `1` (Info) | The floor level that reaches the file sink even when `LogDiagnosticsEnabled` is false. Kept a separate setting from the diagnostics toggle so a power user can, in principle, silence even Info-level file writes (set to `2`/Warn) without touching the diagnostics toggle's meaning - OPEN QUESTION 3 below asks whether this is worth exposing in the UI at all vs. hardcoding. |
 
 **UI**: reuses **idiom (b)** from `SettingsTabContent` (TextBox + per-row error Label + shared Save
 button, `SettingsInputParser.TryParse*` validation, "invalid rows left unchanged not cleared" contract
-- MEASURED, `Views/SettingsTabContent.cs` idiom described in scout notes) for `LogMaxSizeBytes`
+- MEASURED, `Views/SettingsTabContent.cs`) for `LogMaxSizeBytes`
 (accept a human-friendly value like `"2"` labeled "MB", convert to bytes at parse time - do not make
 the user type raw byte counts) and `LogRetentionDays` (plain integer, 1-365 clamp mirroring the
 existing Homestead-tier 0-2 clamp pattern at `ModuleSettings.cs:128-133`). Reuses **idiom (a)**
 (immediate-apply `Checkbox`, no Save button - MEASURED, `ValueOwnMaterials`'s pattern) for
 `LogDiagnosticsEnabled`, replacing (not duplicating) the existing JSON-only `ScrollDiagnosticsEnabled`
 flip - see Section 8. `LogMinFileLevel` is proposed as NOT exposed in the UI initially (hardcoded at
-Info) unless the maintainer wants the extra control surface - see Open Question 3.
+Info) unless the extra control surface is wanted - see Open Question 3.
 
 A new "Logging" section header in `SettingsTabContent.Build`, following the existing
-`AddSectionHeader`/`AddInfoLine`/row-builder idiom (MEASURED pattern names from scout notes) - no new
+`AddSectionHeader`/`AddInfoLine`/row-builder idiom (MEASURED pattern names) - no new
 control idiom invented, per this repo's explicit rule ("No Dropdown/stepper control is used anywhere in
 Views for settings today... reuse idiom (a) or (b), not invent a third").
 
 ---
 
-## 6. Level policy - "log stuff that would be useful only"
+## 6. Level policy - log only what is useful
 
-Exact ring-buffer-vs-file-sink policy, addressing the directive's disk-usage concern directly:
+Exact ring-buffer-vs-file-sink policy, addressing the disk-usage requirement directly:
 
 | Level | Ring (always) | File sink | When to use |
 |---|---|---|---|
 | **Error** | Yes | Always (regardless of `LogDiagnosticsEnabled`) | Something the user should know failed and didn't silently degrade - e.g. a snapshot fetch that timed out and left stale data, a plan generation that threw. Rare by construction (repo invariant: prefer graceful degradation - most current `catch` blocks already recover, so genuine Errors should be uncommon). |
 | **Warn** | Yes | Always | A degradation that was handled but the user might want to know about - migrates the 8 `Gw2AccountSnapshotService.Warn` sites, `Module.cs`'s refresh-failed sites, `MainView`'s "Refresh Now failed", `SettingsTabContent`'s "Failed to save currency valuations". |
-| **Info** | Yes | Always (respects `LogMaxSizeBytes`/`LogRetentionDays` trims, but not gated by the diagnostics toggle) | One line per discrete lifecycle event, NOT progress spam - "Plan generation started (3 items)" / "Plan generation finished in 842ms" / "Snapshot refreshed: 1,204 items, 6 wallet entries" / "Item search fallback to static provider: <reason>". This is the tier the directive's "useful only" concern is really about: one Info line per user-visible action, not one per internal step. |
+| **Info** | Yes | Always (respects `LogMaxSizeBytes`/`LogRetentionDays` trims, but not gated by the diagnostics toggle) | One line per discrete lifecycle event, NOT progress spam - "Plan generation started (3 items)" / "Plan generation finished in 842ms" / "Snapshot refreshed: 1,204 items, 6 wallet entries" / "Item search fallback to static provider: <reason>". This is the tier the "useful only" requirement is really about: one Info line per user-visible action, not one per internal step. |
 | **Debug** | Yes | Only when `LogDiagnosticsEnabled` is true | Everything currently behind `ScrollDiagnosticsEnabled`'s 12 `[scrolldiag]` sites, plus any future fine-grained troubleshooting output. This is exactly Blish's own `Logger.Debug` usage today, migrated. |
 
-**Why this shape answers "don't fill users' disks with endless crap"**: Error/Warn/Info together are, by
+**Why this shape bounds disk growth**: Error/Warn/Info together are, by
 construction, at most a few dozen lines per typical session (one snapshot refresh cycle every 10 minutes
 per `Module.cs`'s `StaleThreshold`, MEASURED at line 42; one plan generation per user Generate click,
 a human-paced action) - the disk-growth risk is entirely concentrated in the Debug tier, which is the
@@ -328,16 +320,16 @@ if the ring wraps mid-session that's fine, the file still has the full history w
   a bug report spanning a prior session). Trimmed only by the rotation policy (Section 4.2) - never
   wholesale-deleted except by an explicit user action. Proposed addition: a "Clear log file" button
   (separate from "Clear view") that calls `ModuleLogStore.DeleteAll()` - OPEN QUESTION 4 below asks
-  whether the maintainer wants this exposed at all vs. leaving rotation as the only cleanup path.
+  whether this should be exposed at all vs. leaving rotation as the only cleanup path.
 - **On tab open** (`Build`): the view loads the CURRENT ring contents (not the on-disk file - the ring
   already holds everything written this session, and reading the file back on every tab-open would be
   wasted IO for the common case) into the FlowPanel, respecting the current filter state (defaults:
-  `"Info+"`, empty search, Follow ON). If the maintainer wants "on tab open, also show pre-session
-  history from the file" that's a deliberate, separate feature (read `ModuleLogStore.ReadAll()` once at
+  `"Info+"`, empty search, Follow ON). Showing pre-session history from the file on tab open is a
+  deliberate, separate feature (read `ModuleLogStore.ReadAll()` once at
   `LoadAsync` and seed the ring with it before the module logs its own first line this session) - this
   proposal recommends doing exactly that (seed the ring from the file's tail at startup, capped at ring
   capacity) since it costs nothing extra architecturally and directly serves the "meaningful log system"
-  ask (a log that only ever shows "since I last opened the tab" is not much better than today's
+  requirement (a log that only ever shows "since I last opened the tab" is not much better than today's
   per-generation reset).
 
 ---
@@ -374,10 +366,10 @@ everything it gets today for anyone debugging via Blish's own log viewer)**:
 - Any `Logger.Debug`/`Info` inside `CraftingPlanView.cs` NOT already tagged `[scrolldiag]` (if any exist
   beyond the 12 counted sites - re-verify exact count at implementation time; the 25x total for that
   file includes the 12 `[scrolldiag]` sites plus whatever remainder are `LastDebugLog`-adjacent, which
-  are explicitly out of scope per the brief's "Crafting Plan... do not propose changes here").
+  are explicitly out of scope: this document proposes no changes to the Crafting Plan tab).
 
 **Rationale for the additive (not replacing) approach**: Blish's own `Logger` calls remain because (a)
-they cost nothing extra to keep, (b) a maintainer with direct file-system/Blish-log-viewer access loses
+they cost nothing extra to keep, (b) anyone with direct file-system/Blish-log-viewer access loses
 nothing, and (c) it avoids a risky "delete and re-route 48 call sites in one PR" - each migrated site is
 a one-line addition (`ModuleLog.Write(...)` alongside the existing `Logger.X(...)` call), which is
 low-risk, easily reviewed diff-by-diff, and trivially revertible per-site if one turns out noisy.
@@ -403,12 +395,12 @@ low-risk, easily reviewed diff-by-diff, and trivially revertible per-site if one
 - **No runtime wiki/gw2efficiency calls**: N/A - this feature adds no network calls at all (pure local
   logging/persistence).
 - **M33 layout contract (`PlanContentHeightMath`/relayout registry)**: NOT touched, NOT opted into - the
-  Log tab uses pattern A (lightweight FlowPanel), explicitly out of the M33 blast radius per the scout
-  notes' own guidance ("a new tab only needs to opt into any of it if it grows genuinely complex...
-  otherwise pattern (A) is the correct, far-cheaper default").
+  Log tab uses pattern A (lightweight FlowPanel), explicitly out of the M33 blast radius: a new tab
+  only needs to opt into any of that contract if it grows genuinely complex, and otherwise pattern (A)
+  is the correct, far-cheaper default.
 - **Atomic persistence pattern**: `ModuleLogStore` follows the `StatusStore`/`VendorOfferStore` atomic
-  `.tmp`+`Replace` shape (Section 4.2) - not `SnapshotStore`'s non-atomic `WriteAllText` (a discrepancy
-  in the scout notes this proposal corrects, per Section 4.2's explicit callout).
+  `.tmp`+`Replace` shape (Section 4.2) - not `SnapshotStore`'s non-atomic `WriteAllText` (see Section
+  4.2).
 
 ---
 
@@ -429,8 +421,7 @@ reserves for CraftingPlanView-scale structural work.
 
 ## 11. Dependencies & sequencing (incl. M38 packages)
 
-- **No WP package currently targets this area** (confirmed by scout notes and by this session's own
-  read of `m38-cleanup-plan.md`) - this is genuinely greenfield relative to M38, so it can be sequenced
+- **No WP package currently targets this area** (confirmed by a full read of `m38-cleanup-plan.md`) - this is genuinely greenfield relative to M38, so it can be sequenced
   independently of the WP waves with one exception below.
 - **WP-16** (`m38-cleanup-plan.md` lines 263-272, MEASURED): adds the `onError` callback shape to
   `SnapshotStore`/`StatusStore`/`VendorOfferStore`/`OverlayRecipeCacheStore`. This proposal's
@@ -458,7 +449,7 @@ reserves for CraftingPlanView-scale structural work.
 
 ---
 
-## 12. Open questions for the maintainer
+## 12. Open questions
 
 1. **Clipboard API availability** (Section 3): the exact Blish HUD clipboard surface needs a one-shot
    verification (an `AsyncClipboardService`-shaped reference already appears linked into this project
@@ -467,23 +458,22 @@ reserves for CraftingPlanView-scale structural work.
    fallback.
 2. **Seed-the-ring-from-file-at-startup** (Section 7): this proposal recommends it (better matches "a
    meaningful log system," not "log tab resets every launch"), but it is an explicit design choice, not
-   free - confirm the maintainer wants pre-session history visible on first tab-open each session, vs.
+   free - confirm whether pre-session history should be visible on first tab-open each session, vs.
    a simpler "ring starts empty every launch, file is history-only, read only via Copy/a future export"
    design that is marginally cheaper to reason about.
 3. **`LogMinFileLevel` UI exposure** (Section 5): proposed as hardcoded (Info floor, not user-editable)
-   to avoid adding a fifth setting for a knob that mostly matters to the maintainer debugging a report,
-   not to end users. Confirm whether it should be a real Settings-tab control or stay code-only.
+   to avoid adding a fifth setting for a knob that mostly matters when debugging a report, not to end
+   users. Confirm whether it should be a real Settings-tab control or stay code-only.
 4. **"Clear log file" button** (Section 7): should the Log tab expose a destructive "delete the on-disk
    history now" action distinct from rotation, or should rotation (age/size caps) be the only cleanup
    path a user has? Leaning toward yes (cheap, matches "Clear Cache" precedent already in the Snapshot
-   tab), but explicitly deferring to the maintainer.
+   tab), but explicitly left open.
 5. **Plan-generation lifecycle logging ownership** (Section 4.4/Section 8's last row): this proposal adds
    NEW `Write(Info/Warn, "plan", ...)` calls around `CraftingPlanPipeline`'s `Generate*Async` methods -
    technically a (very small, additive-only) touch to a file WP-13 (`m38-cleanup-plan.md` lines 231-238)
    is also going to restructure (extracting shared helpers across the three `Generate*Async` overloads).
    Confirm whether this feature's plan-lifecycle logging lands before or after WP-13 - either order is
    low-risk (additive one-liners at method entry/exit, not touching the extracted-helper bodies WP-13
-   is reshaping), but the maintainer may prefer one over the other for diff-cleanliness.
-6. **Level-filter default** (`"Info+"`, Section 3): confirm this matches the maintainer's own mental
-   model of "the useful default view" vs., say, defaulting to `"All"` and letting users dial down noise
-   themselves.
+   is reshaping), but one order may be preferable for diff-cleanliness.
+6. **Level-filter default** (`"Info+"`, Section 3): confirm this matches the intended "useful default
+   view" vs., say, defaulting to `"All"` and letting users dial down noise themselves.

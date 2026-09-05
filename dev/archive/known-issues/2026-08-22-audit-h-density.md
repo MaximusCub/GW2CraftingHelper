@@ -3,7 +3,7 @@
 
 ## Audit batch H: table density (audit-h-density)
 
-Two maintainer-approved UX-audit findings, one premise: every data table
+Two UX-audit findings, one premise: every data table
 in the module splits the name (pinned far left) from the numbers (pinned
 far right), so widening the window widens an empty band down the middle
 of every row 1:1 rather than making the table more readable. The audit
@@ -137,7 +137,7 @@ but it is view-local (`CoinRowY`/`ContentY`) and now routed through
 Validation: build 0 errors, full suite 2113 passed / 0 failed (2072
 baseline). No new test references Blish.
 
-What the desktop gate should look at:
+What the sandbox check should look at:
 
 1. **Tree gutter closed:** generate a plan and look at the Recipe Tree at
    the default window width. The pill column must sit just right of the
@@ -187,7 +187,7 @@ What the desktop gate should look at:
    followed by the gold/silver/copper figures, with each coin icon still
    to the RIGHT of its number.
 
-Gate: PASS (2026-08-23 desktop session, branch build at the
+Gate: PASS (2026-08-23 sandbox session, branch build at the
 review-fix HEAD, captures preflight/gH1-gH3). (1) The dead gutter is
 visibly closed across the plan's scroll column on the restored x77
 plan: Used Materials quantities sit directly beside the names

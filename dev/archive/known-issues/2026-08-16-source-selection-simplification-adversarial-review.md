@@ -98,7 +98,7 @@ would genuinely have been cheaper. Writes
 `CraftingPlanResult.CompetencyOpportunities`, rendered by
 `PlanViewModelBuilder.BuildNotesSection` as a new Plan Notes bucket
 ("{item}: could be crafted for less - no character has {discipline}
-{rating}"), per the maintainer's own design law (opportunities go to
+{rating}"), per the design law (opportunities go to
 Plan Notes with concrete numbers). Tests:
 `CompetencyOpportunityCalculatorTests` (8 cases: basic delta, manual-
 override suppression, not-excluded, cost-neutral, reference-branch
@@ -128,9 +128,9 @@ production code path this repo's test suite is permitted to exercise.
 `Models/CraftingPlanResult.cs`, `Models/CompetencyOpportunity.cs` (new).
 
 **Deliberately NOT applied** (each explicitly flagged by the review as
-needing maintainer sign-off, not a unilateral call): Weighted subduing's
-"any strictly-positive margin" threshold (the brief said "decisive",
-none was specified - **superseded, see the round-2 entry below**: a
+needing an explicit decision, not a unilateral call): Weighted subduing's
+"any strictly-positive margin" threshold (the requirement was a decisive
+margin, and no number was specified - **superseded, see the round-2 entry below**: a
 round-2 finding directed gating this rather than continuing to defer it,
 so it is no longer un-signed-off/live-by-default as of that entry);
 extracting the now-three-times-duplicated

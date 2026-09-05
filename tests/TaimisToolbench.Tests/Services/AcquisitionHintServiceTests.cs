@@ -186,7 +186,7 @@ namespace TaimisToolbench.Tests.Services
                 Assert.Equal("DAILY", hints[43772].Badge);
                 Assert.Contains("1 per day per account", hints[43772].Hint);
 
-                // The three Endless Summer gifts from the field report.
+                // The three Endless Summer gifts reported in game.
                 // Each has an EMPTY search row in the recipe seed - the
                 // API knows no recipe - and each is bought with
                 // account-bound tokens that have no TP price, so

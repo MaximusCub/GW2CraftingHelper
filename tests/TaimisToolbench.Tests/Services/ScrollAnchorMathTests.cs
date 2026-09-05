@@ -6,8 +6,8 @@ namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
     /// The arithmetic behind "the row under my cursor must not move when a
-    /// re-solve reflows the sections above it" - the maintainer's report
-    /// that toggling IGNORE jars the view because the Total Cost section
+    /// re-solve reflows the sections above it" - reported in game as
+    /// toggling IGNORE jarring the view because the Total Cost section
     /// gains or loses currency rows. Each test runs the real
     /// capture-then-restore sequence the view runs, over a candidate list
     /// standing in for the content panel's laid-out children.

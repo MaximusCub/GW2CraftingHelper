@@ -12,7 +12,7 @@ which carries no coin valuation on either side of `CurrencyValuation`, so
 each row ranked as free and undercut every real route.
 
 **The premise of the report was half wrong, and the half that was wrong
-matters.** The brief assumed this was the Gift of Battle case again - a
+matters.** It assumed this was the Gift of Battle case again - a
 wiki page that is not marked historical, which the scrape therefore cannot
 distinguish from a live one. The Battle Historian page IS marked
 historical, and has been since long before this dataset was built:
@@ -115,8 +115,8 @@ in their possession exchanged for an equal amount of Magnetite Shards" and
 "Merchants who previously traded items for Gaeting Crystals now accept
 Magnetite Shards in their place."
 
-**Measured, and the brief's figure was low.** The report that reached this
-branch said 110 offers over 10 output items. The merchant holds **121**
+**Measured, and the figure that reached this branch was low.** It gave 110
+offers over 10 output items. The merchant holds **121**
 rows over **112** distinct output items: 110 charge the retired crystal
 plus coin, 10 more are the buy-back rows that PAY 40 crystals for a raid
 miniature, and 1 sells Legendary Divination for a Legendary Insight. A
@@ -167,7 +167,7 @@ was worth checking rather than assuming, since a live vendor still
 charging a currency retired in 2022 would have been a bigger finding than
 the dead vendor itself.
 
-**One thing this turned up that is NOT mine to fix.**
+**One thing this turned up that is NOT this branch's to fix.**
 `Models/BarterItemDecisionDefaults.cs` values item 86094 at 3600 copper,
 with a comment that item 86094 and wallet currencies 39 and 77 "are all
 named 'Gaeting Crystal' on /v2/items and /v2/currencies - the same
@@ -288,5 +288,5 @@ Module 3,971, RecipeSeeder 3, VendorOfferUpdater 238 (4,212 total, from a
 4,208 baseline plus the four new tests), all green. Two exclusions, 170
 offers removed, seven acquisition hints added. The byte-identical round
 trip of the untouched dataset through the tool's own serializer, run again
-before the second exclusion, is the verification a desktop gate could not
+before the second exclusion, is the verification a sandbox check could not
 add.

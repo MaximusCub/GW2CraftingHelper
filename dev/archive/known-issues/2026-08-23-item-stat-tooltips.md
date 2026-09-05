@@ -140,7 +140,7 @@ currency half of a barter offer - the item half carries its gold value).
 
 ### What is stubbed, and behind which judgment call
 
-The design pass left 14 numbered judgment calls for the maintainer.
+The design pass left 14 numbered judgment calls open.
 This branch built only what is unambiguous and applied the recommended
 default wherever it was cheap and reversible. Everything below is a
 deliberate stub, not an oversight:
@@ -209,7 +209,7 @@ previously had no tooltip at all now have one.
   description that summarises several attributes is distinct wording and
   still renders.
 
-### Desktop gate (live, required)
+### Sandbox check (live, required)
 
 1. Generate a plan whose tree contains ordinary crafting materials
    (Mithril Ore, Orichalcum Ingot). Hover a material row: a tooltip
@@ -259,7 +259,7 @@ previously had no tooltip at all now have one.
 11. Infusion de-duplication: put a +1 Agony Infusion in a plan and hover
     it. "+1 Agony Resistance" must appear exactly ONCE.
 
-Gate: PASS (2026-08-24 desktop session, branch build at the
+Gate: PASS (2026-08-24 sandbox session, branch build at the
 review-fix HEAD, captures preflight/gIS3-gIS4). Generated +22 Agony
 Infusion live (typed adoption); hovering the root tree row rendered
 the full stat block on the opaque facility surface: the item name
@@ -272,6 +272,6 @@ line. Materials-with-null-details tooltips (Q2a default) and the
 plan-header surface share the same composer path; the cross-domain
 id gate (the review's Critical - currency/guild-upgrade ids must
 never be looked up as item ids) is pinned by its Blish-free tests.
-Judgment calls Q1-Q14 ride to the maintainer unresolved beyond the
+Judgment calls Q1-Q14 remain unresolved beyond the
 implemented cheap-reversible defaults.
 ---

@@ -163,8 +163,7 @@ namespace TaimisToolbench.Views.Rendering
         /// not bubble and the gaps otherwise answered nothing - which meant
         /// a wide row popped the item's tooltip over its counts, its
         /// prices, its timestamps and its empty middle. Those gaps SHOULD
-        /// answer nothing. Owner ruling: "i want just the icon for the item
-        /// tooltip."
+        /// answer nothing: the item tooltip belongs to the icon only.
         /// </para>
         /// </summary>
         internal void StampOnIconTree(Control iconTree)

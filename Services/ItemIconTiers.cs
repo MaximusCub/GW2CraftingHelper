@@ -8,8 +8,8 @@ namespace TaimisToolbench.Services
     /// the vocabulary; those two are the ruler.
     ///
     /// <para>
-    /// Four of the six are governed by an owner ruling (two item tiers, two
-    /// currency tiers). The last two are the surfaces no ruling covers, named
+    /// Four of the six are fixed by an explicit rule (two item tiers, two
+    /// currency tiers). The last two are the surfaces no rule covers, named
     /// here rather than left as literals so every icon in the module traces
     /// to a name and a new surface has to pick from this list instead of
     /// inventing a number.

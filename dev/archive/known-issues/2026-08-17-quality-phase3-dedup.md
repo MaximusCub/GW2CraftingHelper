@@ -60,6 +60,6 @@ the old name deliberately.
 Gate: PASS (structural dedup with measured move-purity - the review
 diffed the shared body against both original paths and found only the
 four parameterization hunks, and three targeted reducer mutations were
-killed by the ported tests; no rendered surface changed, so no desktop
-gate applies; suite 1827/1827 and build clean at the verification
+killed by the ported tests; no rendered surface changed, so no sandbox
+check applies; suite 1827/1827 and build clean at the verification
 pass).

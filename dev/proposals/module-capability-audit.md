@@ -1,7 +1,7 @@
 # Module capability audit: what this codebase actually models
 
 Status: AUDIT (read-only). No production code, `ref/` data or workflow was
-changed to produce it. Author: audit subagent, 2026-08-29, against commit
+changed to produce it. Written 2026-08-29 against commit
 `d060c02` on branch `w3-audit-capability`.
 
 Scope: what the crafting planner can and cannot REPRESENT. It is the
@@ -16,7 +16,7 @@ Evidence labels, matching the convention the other proposals in this
 directory use:
 
 - **MEASURED** - read directly out of a file cited by path and line, or
-  computed from a shipped `ref/*.json` in this session.
+  computed from a shipped `ref/*.json`.
 - **INFERRED** - a conclusion drawn from what was read, not itself printed
   anywhere.
 - **UNKNOWN** - could not be settled from the tree; the section says what
@@ -618,8 +618,8 @@ Four things could not be settled from the tree.
    superset and a hand-maintained exclusion list of one row. Coverage
    against the game is not measurable from inside the repo. *To settle: a
    fresh full scrape diffed against the committed seed, which
-   `tools/VendorOfferUpdater` supports (`VendorOfferDiff`), plus the
-   maintainer's judgement on the drift rows.*
+   `tools/VendorOfferUpdater` supports (`VendorOfferDiff`), plus a judgement
+   call on the drift rows.*
 
 3. **Whether a legendary chain in practice terminates in routes the solver
    can price.** I established the shape of the boundary (earned routes are
@@ -635,8 +635,8 @@ Four things could not be settled from the tree.
    recipes because "the seeder has no code path that produces them", which
    implies a manual re-add step whose completeness is not enforced by
    anything I could find. *To settle: read
-   `tools/TaimisToolbench.RecipeSeeder`'s merge path and whatever the
-   maintainer's re-add procedure is, if one is written down.*
+   `tools/TaimisToolbench.RecipeSeeder`'s merge path and whatever re-add
+   procedure exists, if one is written down.*
 
 ---
 

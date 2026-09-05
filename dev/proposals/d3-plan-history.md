@@ -5,18 +5,17 @@ commit `d62b7ed` (MEASURED, `git log -1` at proposal time - master is
 advancing concurrently under the M38 wave; this is a read-only reference
 point, not a claim that master is frozen).
 
-Epistemic tags used throughout: **MEASURED** = read directly from code in
-this session; **INFERRED** = a reasoned conclusion the scout/this proposal
-draws from MEASURED facts, not itself directly observed; **GUESS** = a
+Epistemic tags used throughout: **MEASURED** = read directly from code;
+**INFERRED** = a reasoned conclusion this proposal draws from MEASURED
+facts, not itself directly observed; **GUESS** = a
 judgment call with no code evidence either way.
 
 ---
 
 ## 1. Problem / intent
 
-User directive (verbatim): *"plan history could show like previously
-generated crafting plans that could be selected and opened or reused or
-something - it needs thinking thru a bit more maybe."*
+Intent: the Plan History tab should show previously generated crafting plans
+that can be selected and opened, or reused. The exact shape was left open.
 
 Today (MEASURED): the "Plan History" tab is a single grey "Coming Soon"
 label (`Module.BuildPlaceholder`). Nothing about a generated plan survives
@@ -24,9 +23,8 @@ past the session - `CraftingPlanResult`/`PlanSolveContext` live only in
 `CraftingPlanView`'s private fields (`_lastResult`, `_nodeOverrides`,
 `_ignoredItemIds`) and vanish on tab close or module reload. There is no
 service, store, or view code anywhere in the repo that persists a plan
-request or result. This proposal is the "thinking through" the user asked
-for: it resolves what a history *entry* is, what "reopen" means, how
-dedup/retention/auto-capture work, and where the real fragility (per-node
+request or result. This proposal resolves what a history *entry* is, what
+"reopen" means, how dedup/retention/auto-capture work, and where the real fragility (per-node
 override replay) actually lives in the code - rather than leaving those as
 open questions.
 
@@ -50,8 +48,7 @@ Architecture Impacts):
   read-only summary directly under the row: shopping-list line items,
   required disciplines, total cost - all pulled from a `PlanViewModel`
   built fresh (see 4.3), not the stale generation-time numbers. This is
-  the "view" action from the brief, folded into the row itself rather than
-  a separate screen.
+  the "view" action, folded into the row itself rather than a separate screen.
 - **Reuse** button: re-runs the stored request through the real pipeline
   at current prices/settings and replaces the inline expansion with the
   new result (see 4.2 for exactly what is/isn't replayed).
@@ -155,18 +152,17 @@ Two distinct, clearly-labeled actions, not one ambiguous "open":
   bookkeeping purposes.
 
 A stale full-result "replay exactly what I saw before, pill-clicks and
-all" mode (the third option the brief floated) is **not** proposed: it
+all" mode (a third option that was floated) is **not** proposed: it
 would require persisting the full `PlanSolveContext` (rejected in 3.1) to
 get the interactive tree back, for a use case ("I want to click pills on
-a frozen historical snapshot") the brief itself only raises as a maybe.
+a frozen historical snapshot") that was only ever raised as a maybe.
 "View" already answers the cheaper, more common question ("what did this
 cost me when I last checked").
 
 ### 3.3 Cross-tab handoff ("open in the interactive Crafting Plan tab")
 
-This is the one place the brief's phrasing ("selected and opened") pulls
-against the "Crafting Plan tab is out of scope, do not propose changes
-there" constraint. Resolved as an explicit **V1 vs. V2 split**:
+This is the one place "selected and opened" pulls against the constraint
+that the Crafting Plan tab is out of scope and takes no changes. Resolved as an explicit **V1 vs. V2 split**:
 
 - **V1 (this proposal's core scope):** Reuse renders its result inline in
   Plan History's own lightweight panel (3.2), built entirely from
@@ -193,8 +189,8 @@ precedent (`SnapshotStore` captures automatically on the refresh cadence;
 the user's only manual controls are Clear/Refresh-Now) rather than
 inventing a third idiom (opt-in "Save to History" buttons exist nowhere
 else in this codebase). An explicit "Save" step is easy to forget and
-directly undercuts the user's stated want ("previously generated ...
-plans" implies "just show me what I already did").
+directly undercuts the intent ("previously generated ... plans" implies
+"just show me what I already did").
 
 Manual controls that DO exist: per-row **Pin** (exempts from cap/eviction)
 and **Delete**, plus a footer **Clear History** (unpinned only).
@@ -211,9 +207,9 @@ and **Delete**, plus a footer **Clear History** (unpinned only).
   (capped list, e.g. last 20 - discipline needed so a request the user
   regenerates daily for months doesn't grow unbounded; see 3.7).
 - Changing `PriceBasis`/`ValueOwnMaterials`/`HomesteadTiers` counts as a
-  **different** entry under this key (open question 8.7 - the maintainer
-  may prefer looser dedup that ignores basis/settings and only compares
-  `RequestedItems`+`IgnoredItemIds`).
+  **different** entry under this key (open question 8.7 - looser dedup that
+  ignores basis/settings and only compares `RequestedItems`+`IgnoredItemIds`
+  is a defensible alternative).
 - **Retention cap**: a `PlanHistoryMaxEntries` int setting (default GUESS
   50 - no existing precedent to anchor a number to; open question). Oldest
   **unpinned** entry is evicted first when the cap is exceeded. Pinned
@@ -221,8 +217,8 @@ and **Delete**, plus a footer **Clear History** (unpinned only).
 
 ### 3.6 Per-node overrides and NodeId stability - the fragile part
 
-This is the piece the scout flagged as unresolved from code alone, and it
-deserves the most precise answer this proposal can give, because getting
+This piece cannot be resolved from code alone, and it deserves the most
+precise answer this proposal can give, because getting
 it wrong doesn't crash - it silently misapplies an override to the wrong
 ingredient.
 
@@ -257,15 +253,13 @@ them are guarded against anywhere in the current code:
    recipe options exist as nodes at all* in the raw pre-reduction tree.
    If the latter, a Reuse at different current settings than the stored
    snapshot could shift shape even with byte-identical recipe data. Left
-   as open question 8.2 - it needs a maintainer/codebase check, not a
-   guess.
+   as open question 8.2 - it needs a codebase check, not a guess.
 3. **No structural fingerprint exists today.** Nothing in `RecipeNodeIds`,
    `PlanSolveContext`, or `CraftingPlanPipeline` computes or checks a
    tree-shape hash before trusting a `NodeId`-keyed dictionary against a
    *different* solve's tree. Building one would be new engineering (a
-   node-count/shape hash comparison gate), not a UI decision - exactly
-   the scout's original conclusion, now with the specific missing
-   mechanism identified.
+   node-count/shape hash comparison gate), not a UI decision, and the
+   specific missing mechanism is identified here.
 
 **Recommendation**: v1 does **not** attempt to replay per-node overrides.
 `IgnoredItemIds` (item-id keyed, MEASURED stable regardless of tree
@@ -275,13 +269,13 @@ applied when this was generated - not restored on Reuse") but the
 dictionary itself is either not persisted at all, or persisted
 best-effort/display-only (never fed back into a solve). Building safe
 override replay (the structural-fingerprint guard in point 3 above) is
-flagged as a real, separate follow-up if the maintainer wants it - not
-something this UI proposal should paper over by just wiring the
-dictionary through and hoping the shape matches.
+flagged as a real, separate follow-up - not something this UI proposal
+should paper over by just wiring the dictionary through and hoping the
+shape matches.
 
 ### 3.7 Cost-over-time sparkline - assessed honestly
 
-The brief calls this optional gravy and asks for an honest assessment:
+This is optional gravy. Assessed honestly:
 
 - **Data capture is nearly free**: once dedup/bump logic exists (3.5), the
   `{timestamp, cost}` sample this needs is a one-line append inside the
@@ -300,9 +294,9 @@ The brief calls this optional gravy and asks for an honest assessment:
 **Recommendation**: capture the sample data in v1 (cheap, and useful even
 without a chart - "last generated 3 days ago at 1g 20s cheaper" is a
 one-line text derivation from two samples, no drawing required). Defer
-the actual sparkline *rendering* to a v2/gravy increment gated on
-maintainer interest - it is the one piece of this proposal that would
-introduce a wholly new UI primitive rather than reusing an existing one.
+the actual sparkline *rendering* to a v2/gravy increment - it is the one
+piece of this proposal that would introduce a wholly new UI primitive
+rather than reusing an existing one.
 
 ## 4. Data & architecture
 
@@ -347,10 +341,8 @@ introduce a wholly new UI primitive rather than reusing an existing one.
   (matches WP-16's planned shape for the other four stores - see
   Dependencies 7) instead of a bare `Debug.WriteLine`, so it is not a
   fifth store WP-16 has to retrofit.
-  - **Correction to the scout notes**: the scout summary states the
-    atomic tmp+Replace pattern is used by "`SnapshotStore.cs`,
-    `StatusStore.cs`, `VendorOfferStore.cs`." MEASURED (this session, full
-    read of each file): `SnapshotStore.Save` actually uses a plain
+  - **The three stores do NOT share one atomic pattern.** MEASURED (full
+    read of each file): `SnapshotStore.Save` uses a plain
     `File.WriteAllText(_filePath, json)` with **no** tmp file or atomic
     replace at all. `StatusStore.Save` and `VendorOfferStore.SaveOverlay`
     *do* use the tmp+Replace/Copy pattern. `PlanHistoryStore` should
@@ -370,7 +362,7 @@ introduce a wholly new UI primitive rather than reusing an existing one.
 - `tests/GW2CraftingHelper.Tests/Services/PlanHistoryStoreTests.cs` - real
   temp-dir file IO, Blish-free, following `VendorOfferStoreTests.cs`'s
   exact `IDisposable` + `Path.GetTempPath()`/`Guid.NewGuid()` template
-  (MEASURED, read in full this session). Covers: save/load round-trip,
+  (MEASURED, read in full). Covers: save/load round-trip,
   dedup-bump-not-duplicate, cap eviction (oldest unpinned first, pinned
   survives), delete, and the `onError` callback firing on a forced-failure
   path (mirrors what WP-16 will add to the other four stores).
@@ -400,9 +392,9 @@ centralizes (see Dependencies 7) - not a new ad-hoc one.
 |---|---|---|---|
 | `PlanHistoryMaxEntries` | `SettingEntry<int>` | 50 (GUESS) | (b) TextBox + shared Save + `SettingsInputParser` validation, same section-add pattern as Homestead tiers |
 
-No new control idiom is introduced (open question 8.6 raises whether a cap
-belongs to the maintainer's taste for "unlimited until user clears"
-instead of a numeric setting at all).
+No new control idiom is introduced (open question 8.6 raises whether
+"unlimited until the user clears" is preferable to a numeric setting at
+all).
 
 ## 6. Invariant / contract impacts
 
@@ -440,8 +432,8 @@ collapse, pin/delete) rather than plain label rows (M-shaped), a
 (small but touches wiring both views depend on), a dedup/retention/
 cap engine with its own edge cases (bump vs. new entry, pinned-exempt
 eviction), and a genuinely researched but still-open fragility question
-(3.6) that constrains what "Reuse" is allowed to promise. If the
-maintainer wants to *cut* scope, dropping the sparkline sample capture
+(3.6) that constrains what "Reuse" is allowed to promise. If scope must be
+*cut*, dropping the sparkline sample capture
 (3.7) and the V2 cross-tab handoff (3.3) brings the remaining core (store
 + list + view/reuse-inline-summary + settings + tests) down to a solid
 **M**.
@@ -450,7 +442,7 @@ Sequencing:
 
 - **No M38 work package currently targets Log/Plan History/Crafting
   Ranker/About/Settings** (confirmed by full read of
-  `m38-plan/m38-cleanup-plan.md` this session) - this feature is
+  `m38-plan/m38-cleanup-plan.md`) - this feature is
   genuinely greenfield relative to the cleanup wave, and can start
   independently of it.
 - **Sequence coin rendering after WP-21/22** (`CoinCurrencyRenderer`
@@ -463,8 +455,8 @@ Sequencing:
 - **Adopt WP-16's onError-callback shape from inception** (not a hard
   dependency - `PlanHistoryStore` can be built before or after WP-16
   lands, but must match the `Action<string, Exception> onError = null`
-  shape WP-16 is standardizing across the other four stores, per the
-  scout notes' own flag, so it isn't a fifth store retrofitted later).
+  shape WP-16 is standardizing across the other four stores, so it isn't a
+  fifth store retrofitted later).
 - **V2's cross-tab handoff (3.3) must wait until after WP-04, WP-21,
   WP-23, WP-24, WP-25, WP-26 all land** - adding a new public entry point
   to `CraftingPlanView.cs` while six separate packages are actively
@@ -479,7 +471,7 @@ Sequencing:
   internals, or the stores those branches modify (`VendorOfferStore` is
   read-only prior art here, not edited).
 
-## 8. Open questions for the maintainer
+## 8. Open questions
 
 1. Is the V1 "reuse renders an inline read-only summary in Plan History
    itself" acceptable, or is jumping straight to "reopen the interactive
@@ -494,9 +486,8 @@ Sequencing:
    matters in practice.
 3. Given the NodeId-stability findings (3.6): is "IgnoredItemIds replay
    only, per-node overrides shown as a count but never replayed" an
-   acceptable v1 answer, or does the maintainer want the larger
-   structural-fingerprint-guard engineering built now to attempt safe
-   override replay?
+   acceptable v1 answer, or should the larger structural-fingerprint-guard
+   engineering be built now to attempt safe override replay?
 4. What should `PlanHistoryMaxEntries` default to, and should it be a cap
    at all vs. "unlimited until the user manually clears" (mirrors an open
    question the Log-tab retention design will independently need to
@@ -513,7 +504,6 @@ Sequencing:
    now despite being new UI infrastructure with zero precedent in this
    codebase?
 8. Tab ordering: `Tab.OrderPriority`'s default/tie-break behavior is
-   unproven from code (scout gap #1) - once Plan History stops being a
-   placeholder, does the maintainer want it pinned to an explicit
-   `OrderPriority` rather than relying on whatever the untested default
-   tie-break produces?
+   unproven from code - once Plan History stops being a placeholder, should
+   it be pinned to an explicit `OrderPriority` rather than relying on
+   whatever the untested default tie-break produces?

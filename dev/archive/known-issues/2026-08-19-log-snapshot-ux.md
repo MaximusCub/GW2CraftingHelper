@@ -40,13 +40,13 @@
 Validation per commit: module build 0 errors; suite green throughout -
 1847 baseline -> 1851 (IsStale tests) -> 1854 (DeleteFileAndReset
 tests) -> 1854 (commit 3 is view-only). Two rendered surfaces await
-the orchestrator's desktop check: the Log tab's new Delete Log File
+the sandbox check: the Log tab's new Delete Log File
 button (placement left of Copy/Clear view; confirm dialog shows a
 "Delete" button; post-confirm the view shows only the trace entry) and
 the Snapshot staleness label recoloring against a changed
 SnapshotRefreshIntervalMinutes setting. The sticky dropdown is also a
 one-look check (pick Wallet, switch tabs, return).
-Gate: PASS (2026-08-19, live desktop session over the Paint dummy,
+Gate: PASS (2026-08-19, live sandbox session over the Paint dummy,
 branch build 21aa2ac). All three surfaces verified from captures
 (preflight/ux1-ux6): (1) Delete Log File button renders leftmost of
 the three right-aligned Log toolbar buttons with the cannot-be-undone

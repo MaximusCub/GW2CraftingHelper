@@ -13,8 +13,8 @@ using Xunit;
 namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
-    /// The maintainer's field report: "Gift of Rays ... shows UNKNOWN in
-    /// the recipe tree", with the module logging "Recipe seed built for
+    /// Reported in game: Gift of Rays shows UNKNOWN in the recipe tree,
+    /// with the module logging "Recipe seed built for
     /// build 205505; current build 205780; seed negative entries will fall
     /// back to API" on every generation.
     ///
@@ -23,7 +23,7 @@ namespace TaimisToolbench.Tests.Services
     /// ref/recipes_seed.json and ref/mystic_forge_recipes.json both carry
     /// -1587 (Gift of Rays, wiki-sourced). Every route through the cache is
     /// run against a game build that does NOT match the seed's, since that
-    /// is the state the report was filed from.
+    /// is the state it was seen in.
     /// <para>
     /// Measured outcome (see KNOWN-ISSUES #60, item 4):
     /// no route reproduces the reported UNKNOWN for Gift of Rays - it
@@ -146,8 +146,8 @@ namespace TaimisToolbench.Tests.Services
         }
 
         /// <summary>
-        /// The whole plan the field report came from - Endless Summer
-        /// (107022), the parent the maintainer's own module_log and
+        /// The whole plan reported in game - Endless Summer
+        /// (107022), the parent the reported module_log and
         /// persisted plan.json name - run through the REAL shipped seed
         /// against a build the seed does not match.
         /// <para>

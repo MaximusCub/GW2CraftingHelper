@@ -3,7 +3,7 @@
 
 ## W3B: Generation progress + rich logging (2026-08-08)
 
-User-directed, field-test feedback: Generate Plan gave zero feedback while
+Reported in game: Generate Plan gave zero feedback while
 running (a static "Generating..." for the whole ~19s a real plan can take)
 and the log said nothing more useful than "Generation started (1 item)" /
 "Generation finished in 19036ms". Implemented in the isolated `wt-w3b`
@@ -128,7 +128,7 @@ review, all fixed.**
   "total" the compact summary line logged silently excluded every
   un-instrumented gap between raw timing steps, so a real ~19s
   generation could log "total 18158ms" with `sw.ElapsedMilliseconds`
-  (the number a field tester actually experiences) discarded entirely.
+  (the number a a player actually experiences) discarded entirely.
   `PlanPhaseTimingSummary.FormatCompactSummary` gained an optional
   `long? wallClockMs = null` parameter (default preserves the exact
   pre-existing wording for every current caller/test); the pipeline's
@@ -160,7 +160,7 @@ with `progress: null`; the `BuildingTree` phase event carries the
 first-run hint as `Detail`, no other phase does). The tab-switch
 re-arm/ordinal-guard call-site wiring inside `CraftingPlanView` itself
 has no new tests, same Blish-free-tests-invariant rationale as item 4
-above - covered by the live desktop gate below.
+above - covered by the live sandbox check below.
 
 Validation: `dotnet build -p:Platform=x64` clean (0 errors); module test
 suite green - 1191 passed (was 1182 after the original milestone; +9
@@ -171,7 +171,7 @@ every new test exercises real production code (`CraftingPlanPipeline`,
 `PlanPhaseTimingSummary`, `PhaseOrdinalGuard`, a real
 `ModuleLog`/`ModuleLogStore`) with no contract-mirror/fake-logic tests.
 
-Live desktop gate round 1 (2026-08-08, orchestrator session) - core
+Live sandbox check round 1 (2026-08-08, live session) - core
 behaviors PASSED:
 
 - Live phase text with trailing spinner observed in the plan strip
@@ -277,7 +277,7 @@ prior finished generation's leftover state, and a parallel-writers
 smoke test proving no exception/torn state under concurrent
 `UpdatePhase`/`Snapshot` calls). The `CraftingPlanView`/`Module.cs` wiring
 itself has no new tests, same Blish-free-tests-invariant rationale as
-every other pass in this file - covered by the live desktop gate below.
+every other pass in this file - covered by the live sandbox check below.
 
 Validation: `dotnet build -p:Platform=x64` clean (0 errors, no new
 warnings). Module test suite - 1210 passed (was 1199; +11 new
@@ -346,13 +346,13 @@ virgin board rejected, a second `Finish` for the same generation rejected -
 the two cases the guard fix above closes). `CraftingPlanView`'s
 `SpinnerTick`/`Build()`/`TriggerGenerate` wiring itself has no new tests,
 same Blish-free-tests-invariant rationale as every other pass in this file
-- covered by the live desktop gate below.
+- covered by the live sandbox check below.
 
 Validation: `dotnet build -p:Platform=x64` clean (0 errors, 0 warnings from
 any touched file). Module test suite - 1218 passed (was 1210; +8 new: 6
 `PlanStripTickDecisionTests`, 2 added to `PlanStripStatusBoardTests`).
 
-Live desktop gate round 2: PASS (2026-08-08, orchestrator session,
+Live sandbox check round 2: PASS (2026-08-08, live session,
 fresh sandbox on the fixed build). All three scenarios verified:
 
 - Normal untouched completion: strip ended at "Plan generated - Aug 8,

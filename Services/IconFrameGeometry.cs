@@ -36,7 +36,7 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Whether a currency icon at this tier paints its border ring. The
-        /// two currency tiers split along the owner's ruling: a
+        /// two currency tiers split by role: a
         /// CurrencyListRow icon is a row's subject (the Settings valuation
         /// grid, the wallet rows, the plan Summary's currency table, the
         /// Ranker's shortfall list) and keeps the ring; a CurrencyBarRun

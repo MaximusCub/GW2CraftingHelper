@@ -3,13 +3,13 @@
 
 ## Root ignore suppression and the zero-cost band (root-ignore-summary-zero)
 
-Two maintainer findings from the same field-test round, both about what
+Two findings from the same round of in-game testing, both about what
 the plan shows once nothing is left to buy.
 
 ### 1. The root row must not offer IGNORE
 
-"You should probably not be able to IGNORE the top level item in the
-recipe tree." The Ignore pill means "treat this item as already in hand
+The top-level item in the recipe tree should not be IGNORE-able. The
+Ignore pill means "treat this item as already in hand
 tree-wide"; on the plan's own target that is a request to plan nothing,
 and gw2e offers it only because gw2e's tree has no separate target row.
 
@@ -114,7 +114,7 @@ Two pre-existing `DecisionPillPlannerTests` end-to-end cases asserted an
 IGNORE pill on a `BuildTree` root and were updated to the new
 expectation.
 
-### Desktop gate
+### Sandbox check
 
 1. Generate any plan. The **root row shows no IGNORE pill** - source
    pills and any HAVE annotation are unchanged, and every child row still
@@ -160,7 +160,7 @@ expectation.
    ignores, so ignoring an ingredient and then planning that item alone
    yields an ordinary un-ignored root.
 
-Gate: PASS with recorded partials (2026-08-23 night desktop session,
+Gate: PASS with recorded partials (2026-08-23 night sandbox session,
 branch build, captures preflight/gRZ1-gRZ6). LIVE-VERIFIED: the plan
 root offers no IGNORE pill - and on the strongest possible variant:
 a schema-3 plan RESTORED from disk into this build (PlanStoreHelpers
@@ -169,13 +169,12 @@ plans; children keep their IGNORE pills). The regenerate-confirm
 backdrop also demonstrably ate mispositioned clicks (batch-J modality
 working). PARTIALS: the all-ignored zero band, un-ignore restoration,
 the pre-ignored root's IGNORED escape hatch, and the unpriced-zero
-profit-band suppression were not reachable live this session - the
+profit-band suppression were not reachable live in that gate - the
 sandbox's known synthetic-input decay (M33/M38 class) killed keyboard
 then clicks before the multi-step flows completed. All four stand on
 real-production-path tests (PlanRootIgnoreTests end-to-end through
 CraftingPlanPipeline + the three zero-band viewmodel cases + the
-profit-band assertion) and are one-hover checks on the maintainer's
-live install.
+profit-band assertion) and are one-hover checks on a live install.
 Morning re-run (2026-08-24, screens awake, captures preflight/gM1-gM8):
 those partials are now LIVE-VERIFIED - a fresh-generated root also
 offers no IGNORE pill; ignoring the sole child rendered the FULL

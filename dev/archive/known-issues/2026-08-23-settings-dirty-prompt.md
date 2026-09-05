@@ -3,9 +3,9 @@
 
 ## Settings dirty prompt (settings-dirty-prompt)
 
-Maintainer field-test directive, verbatim: "if settings have been edited
-before tabbing away.. it should prompt the user to ask if they want to
-save the changes they have made or discard before proceeding." The
+Reported in game: if settings have been edited before tabbing
+away, the module must prompt the user to save or discard those changes
+before proceeding. The
 Settings tab has one Save button covering four sections, and nothing
 told a user who typed a currency override and then clicked another tab
 that the override was about to evaporate - the tab is rebuilt from
@@ -192,7 +192,7 @@ than before and with no frame drawn in between.
   in practice - `ModalBackdrop` blocks the module window while any dialog
   is up, so the tab click that would trigger it cannot land.
 
-Desktop gate:
+Sandbox check:
 
 1. Settings tab, edit one currency amount (type a number into an empty
    box), then click another tab. The prompt appears, headed "Confirm",
@@ -248,7 +248,7 @@ Desktop gate:
     Confirm and on Cancel, and Escape/X still cancels, with the module
     window interactive again afterwards.
 
-Gate: PASS (2026-08-23 desktop session, branch build at the
+Gate: PASS (2026-08-23 sandbox session, branch build at the
 review-round-2 HEAD, captures preflight/gF2a-gF2d). Typed 7 into
 Karma's box and tabbed to Snapshot: the prompt appeared with the
 exact dirty count ("You have 1 unsaved change on the Settings tab.

@@ -3,10 +3,10 @@
 
 ## Click volume slider (click-sound-gain)
 
-Field feedback, verbatim: the module's click sound is "VERY quiet. I can
-barely hear it over my own mouse physical click sound." This section
-records what the playback path actually was, the mapping that replaced
-it, and the two judgment calls taken along the way.
+Reported in game: the module's click sound is too quiet to hear
+over the physical click of a mouse. This section records what the
+playback path actually was, the mapping that replaced it, and the two
+judgment calls taken along the way.
 
 ### The measured playback path
 
@@ -70,7 +70,7 @@ default. The shipped default is **`ClickSoundVolume.DefaultPercent =
 75`** - 1.875x the absolute old ceiling (+5.5 dB) and 3.75x the old
 fixed default (+11.5 dB), with headroom left above it. It sits at
 -11.4 dBFS peak. That constant is the single line to edit when the
-maintainer's field test returns a number; nothing else encodes a
+in-game measurement returns a number; nothing else encodes a
 default.
 
 ### Deliberate divergence 1: the slider is not save-gated
@@ -150,7 +150,7 @@ which renders **every** `SettingEntry` the module defines - and a
 `SettingEntry<int>` renders as `IntSettingView : NumericSettingView<int>`,
 whose `BuildSetting` builds its own 277x16 `TrackBar`. So Blish's Manage
 Modules pane already shows a second, fully draggable 0-100 click-volume
-slider, and it is the one the maintainer may well reach first.
+slider, and it may well be the one reached first.
 
 Everything therefore hangs off the **setting**, not off either control:
 
@@ -241,7 +241,7 @@ call `PlaySoundEffectByName` are `Checkbox`, `ColorBox`, `CornerIcon`,
 
 So at 0 the module is silent except for a checkbox tick and the corner
 icon, and at 100 a checkbox is audibly quieter than a button in the same
-window. That is a real seam and the field test will meet it.
+window. That is a real seam and in-game testing will meet it.
 
 Why it is not fixed here: the sound sits **inside** those overrides,
 ahead of the base call. `Checkbox.OnLeftMouseButtonReleased` is
@@ -290,20 +290,20 @@ session, same as `TooltipFacility`).
    it directly - `Module` does).
 7. Report the number that feels right - it replaces `DefaultPercent`.
 
-Gate: PASS on the render half (2026-08-23 night desktop session,
+Gate: PASS on the render half (2026-08-23 night sandbox session,
 captures preflight/gSND1-gSND2): the Sound section renders first on
 the Settings tab with the Click volume label, the TrackBar at the 75
 default, the live "75%" readout, the Test button beside it, and the
 instant-apply/zero-off/checkbox-exception prose. The audible half -
 how loud 75 actually feels, the Test button's playback at the dragged
-value, silence at 0, persistence across a relaunch - is the
-maintainer's field check by nature (the sandbox cannot hear); the
+value, silence at 0, persistence across a relaunch - is a field check
+by nature (the sandbox cannot hear); the
 percent-to-volume mapping and clamps are pinned by
-ClickSoundVolumeTests. The maintainer's number becomes the new
+ClickSoundVolumeTests. The number measured in game becomes the new
 DefaultPercent in a one-line change.
 Morning re-run (2026-08-24, captures preflight/gM9-gM14): thumb DRAG
 moves the value with the readout live-updating (75 -> 21), the value
 SURVIVED a full Blish relaunch (restored at 21), and the slider was
 returned to ~the default afterwards. Notes: click-on-track does not
 jump and the wheel scrolls the panel, not the slider - both stock
-Blish TrackBar behavior. Only audibility remains with the maintainer.
+Blish TrackBar behavior. Only audibility remains unverified.

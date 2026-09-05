@@ -1095,7 +1095,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(20, overInk - overBand);
         }
 
-        // The owner's 2026-08-28 capture, re-derived. Every one of the
+        // A in-game screenshot, re-derived. Every one of the
         // three number headers out-measured the values under it, and the
         // band clamp answered that by pinning the header's RIGHT edge to
         // the values' right edge - right-alignment, the exact thing the

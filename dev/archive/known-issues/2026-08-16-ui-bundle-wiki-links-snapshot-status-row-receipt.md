@@ -3,12 +3,12 @@
 
 ## UI bundle: wiki links, snapshot status row, receipt/what-if captions (2026-08-16)
 
-Three maintainer-approved UI features, developed together in one
+Three approved UI features, developed together in one
 worktree (`ui-bundle` branch) since they touch disjoint files except
 where noted.
 
-**Feature A (wiki links)**: two placements, both maintainer-authorized
-context actions rather than visible icons.
+**Feature A (wiki links)**: two placements, both context actions rather
+than visible icons.
 
 1. Recipe Tree rows (`TreeSectionController.RenderTreeNode`): every row
    (item leaf, internal node, cost-component leaf, reference-branch
@@ -121,8 +121,8 @@ be strictly more discoverable, but requires either widening
 row" concept or synthesizing captions as real (Blish-free-serializable)
 `CraftingTreeNode` children the existing math would count for free;
 both are real design changes to a frozen file's contract or the
-solver-adjacent tree-node model, out of scope for this milestone's
-"tooltip fallback, report the substitution" instruction.
+solver-adjacent tree-node model, out of scope for this milestone, whose
+scope was a tooltip fallback with the substitution reported.
 
 Build: `dotnet build GW2CraftingHelper.csproj -p:Platform=x64` - clean,
 0 errors (StyleCop warning count unchanged from before this milestone;
@@ -142,8 +142,8 @@ mirrors, no fake file I/O. `WikiLinkLauncher`/the `RightMouseButtonPressed`
 handlers and Feature B's layout are Blish-bound UI surface outside this
 repo's test-runnable boundary, same constraint every UI-adjacent entry
 in this file notes - not live-verified in a running Blish HUD/GW2
-client this session (browser automation requires asking the user
-first, per this repo's own rule, and was not requested this session).
+client (browser automation requires explicit permission per this
+repo's own rule, and was not used here).
 No `PersistedPlan` schema bump: `RequiredRecipe.IsLearnedFromItem` and
 `PlanRowViewModel.WikiUrl` are both additive with safe defaults
 (`false`/`null`) - the same precedent `IsCostComponent`'s own doc
@@ -153,4 +153,4 @@ persisted at all (only `CraftingPlanResult`, which
 IDs remain internal-only throughout; coin icons unaffected (no
 coin-rendering code touched by any of the three features).
 
-Gate: MIXED 2026-08-16 (orchestrator live desktop session). Status own-row PASS (full-width, dated failure status, no button collision); wiki-link affordance PASS-visual ('Right-click: Open wiki page' tooltip renders on rows; the actual browser launch deliberately untested with guests present); receipt/what-if captions FAIL - they do not render in the reachable override-re-solve state (ARE vendor flip showed both child groups uncaptioned); root-cause + fix in flight on branch gate-fixes.
+Gate: MIXED 2026-08-16 (live sandbox session). Status own-row PASS (full-width, dated failure status, no button collision); wiki-link affordance PASS-visual ('Right-click: Open wiki page' tooltip renders on rows; the actual browser launch deliberately untested); receipt/what-if captions FAIL - they do not render in the reachable override-re-solve state (ARE vendor flip showed both child groups uncaptioned); root-cause + fix in flight on branch gate-fixes.

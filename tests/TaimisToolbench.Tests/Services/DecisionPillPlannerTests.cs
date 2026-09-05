@@ -419,7 +419,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(AcquisitionSource.BuyFromVendor, vendorPill.Source);
         }
 
-        // --- "HAVE N/M NEEDED" annotation (field-tested:
+        // --- "HAVE N/M NEEDED" annotation (reported in game:
         // widened to show the original total demand, not just the covered
         // count, alongside the tree row's own remaining-need "Nx" prefix;
         // the final wording pass moved OWNED away
@@ -449,7 +449,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void PartialOwnership_TotalDemand_SumsOwnedAndRemainingQuantity()
         {
-            // Regression guard for the field-test A paradox report itself:
+            // Regression guard for finding A's paradox, reported in game:
             // a large remaining need (120) alongside a large owned count
             // (130) must show the true original total (250), not either
             // number alone.
@@ -638,7 +638,7 @@ namespace TaimisToolbench.Tests.Services
         // ---- Cost-component leaves - informational-only pill
         // vocabulary ----
         //
-        // Maintainer's field-test finding: the earlier HAVE/
+        // In-game finding: the earlier HAVE/
         // "HAVE x/y NEEDED" vocabulary was replaced by a subdued "OWN n"
         // badge (PillKind.OwnedInfo, the same muted-gold kind the ordinary
         // partial-ownership annotation uses) showing the raw

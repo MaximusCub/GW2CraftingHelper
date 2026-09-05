@@ -17,8 +17,8 @@ namespace TaimisToolbench.Tests.Services
             // The rule the old 14/16/18-regular ramp failed, stated as the
             // RELATION it actually is. Deliberately not "at least 1.25x
             // over 16pt": that gate reads as an invariant while really
-            // encoding one of the two tier seats the maintainer chose
-            // between, and it fails by construction on the 18/22 retreat
+            // encoding one of the two candidate tier seats, and it fails
+            // by construction on the 18/22 retreat
             // that was kept one commit away.
             Assert.True(
                 TypeRampMetrics.SectionTitlePointSize > TypeRampMetrics.ColumnHeaderPointSize,

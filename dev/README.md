@@ -2,7 +2,7 @@
 
 Nothing in this directory is current documentation. It is the dated,
 mostly-frozen record of how the module got to be the way it is: what was
-measured, what was tried and rejected, what a live desktop session actually
+measured, what was tried and rejected, what a live sandbox session actually
 showed. It lives here rather than under `docs/` so that a reader looking for
 documentation finds documentation, and a reader looking for evidence finds
 evidence, without either one having to sift the other.
@@ -18,9 +18,9 @@ page there disagree, `docs/` wins and this directory is stale by design.
 | [`archive/known-issues/`](archive/known-issues/) | 69 older milestone records, rotated out of `docs/KNOWN-ISSUES.md` in one pass on 2026-08-24, before per-branch files existed. Same content, older filing scheme. |
 | [`archive/`](archive/) | Closed point-in-time audits (`m37-*`, `m38-a4/a5/a6`) and the original per-phase project plans under `archive/plans/`. |
 | `dev-notes/HISTORY.md` | The pre-M38 fix-pass diary: hypotheses, instrumentation, root-cause traces and dated gate records, filed under the same item numbers `docs/KNOWN-ISSUES.md` uses. Local-only since 2026-08-31 - private working state, not published. |
-| `dev-notes/SESSION-STATE.md`, `dev-notes/FEEDBACK-BACKLOG.md`, `dev-notes/SESSION-HANDOFF.md` | The agent's live working state and the owner's field-test ledger. Local-only since 2026-08-31 - private working state, not published. |
+| `dev-notes/SESSION-STATE.md`, `dev-notes/FEEDBACK-BACKLOG.md`, `dev-notes/SESSION-HANDOFF.md` | Live working state and the in-game feedback ledger. Local-only since 2026-08-31 - private working state, not published. |
 | `dev-notes/m38-plan/` | The M38 cleanup wave's analysis and work-package plan. Executed; kept for the reasoning. Local-only since 2026-08-31 - private working state, not published. |
-| [`proposals/`](proposals/) | Written-up designs for features that were never built. Not a roadmap. |
+| [`proposals/`](proposals/) | Design write-ups. Some shipped and are cited from source as the reasoning behind that code; some were never built. The README there says which. |
 
 ## Why records are kept and not summarised
 

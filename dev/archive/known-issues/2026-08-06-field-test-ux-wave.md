@@ -1,16 +1,16 @@
 > **Frozen record - 2026-08-06, branch `field-test-ux-wave`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
 > Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
 
-## Field-test UX wave (six S-sized display fixes, 2026-08-06)
+## In-game UX wave (six S-sized display fixes, 2026-08-06)
 
-Six pre-investigated display-layer fixes from a live field-test pass over
+Six pre-investigated display-layer fixes from a live in-game pass over
 the recipe tree; every finding was root-caused against master (e2e0936)
 before implementation. All six commits: display-layer only, no
 InventoryReducer/PlanSolver/VendorBatchSolver changes.
 
 **A. Owned/needed pill clarity.** The tree row's "Nx" prefix shows the
 post-reduction REMAINING need, so the "USING N OWNED" pill alongside it
-read as a paradox in the field (a large owned count next to a smaller
+read as a paradox in game (a large owned count next to a smaller
 remaining-need number looked contradictory). `DecisionPillPlanner.
 AppendOwnershipPills` now shows "USING {used} OF {total} OWNED"
 (total = OwnedQuantityUsed + Quantity, per CraftingTreeNode's own
@@ -27,7 +27,7 @@ this is not the shopping list's true per-batch rate). Separately, swept
 the currency-icon-only cost cells (tree cost column + shopping list
 Each/Total, both routed through `CoinCurrencyRenderer.
 LayoutCurrencySegments`) to add a hover tooltip naming the currency,
-per the field-test principle "anywhere a currency icon shows, the name
+per the principle "anywhere a currency icon shows, the name
 must be available."
 
 **C. Pill border contrast.** Three pill border colors measured below the
@@ -46,7 +46,7 @@ pill kinds: Selected, Have, OwnedInfo (finding A's text), and
 AchievementBitDeduped (explains the COUNTED ELSEWHERE semantics per
 #26).
 
-**E. Mystic Forge is a facility, not a discipline (user-approved).** The
+**E. Mystic Forge is a facility, not a discipline (approved).** The
 forge has no rating requirement and nothing to unlock, so it no longer
 appears in the Required Disciplines section (joins the existing
 Achievement/Merchant filter in `PlanResultBuilder.
@@ -66,17 +66,17 @@ CurrencyDisplayResolver, PlanResultBuilder, PlanViewModelBuilder) with no
 contract-mirror/fake-logic tests. Pure-Blish view code (PillColors,
 TreeSectionController's pill rendering, IconControls, CoinCurrencyRenderer)
 has no new tests per the Blish-free-tests invariant - covered by the live
-desktop gate instead.
+sandbox check instead.
 
-Live desktop gate: PASS (orchestrator, 2026-08-06, live branch-build
-sandbox session under the hardened desktop protocol, captures uxg_01-11
+Live sandbox check: PASS (2026-08-06, live branch-build
+sandbox session under the hardened sandbox protocol, captures uxg_01-11
 in preflight/captures; Exordium plan with the synthetic snapshot, Use Own
 Materials on, tree fully expanded):
 - Finding A + final wording: the partial-coverage pill renders
   "HAVE 30/75 NEEDED" live (45x Stabilizing Matrix row: needs 75, owns 30)
   directly above a fully-covered row's plain blue "HAVE" (Mystic
-  Runestone) - the vocabulary alignment reads exactly as the maintainer
-  intended; hover shows the approved tooltip verbatim: "Needs 75 total -
+  Runestone) - the vocabulary alignment is as intended; hover shows the
+  approved tooltip verbatim: "Needs 75 total -
   30 covered by your materials, 45 left to acquire".
 - Finding B1: hovering a non-coin vendor row's price area shows
   "Unit price: 92 for 912 Spirit Shard" (Philosopher's Stone; the

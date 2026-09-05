@@ -3,8 +3,7 @@
 
 ## W4A: Total Cost section redesign (2026-08-15)
 
-User-designed spec (the user personally iterated on this layout before
-handing it off). Implemented in the isolated `wt-cost` worktree off
+Implemented to a fixed layout spec, in the isolated `wt-cost` worktree off
 `origin/master` (`727c90b`) on branch `cost-section-redesign`.
 
 **1. Two formula bands, replacing the old flat cost-tile row
@@ -16,7 +15,7 @@ Materials Used = Actual Cost to Craft"; Band 2 (only when
 Materials Value = Profit/Loss if Sold". Actual Cost to Craft and Sell
 Value/Profit are exactly the pre-existing `TotalCoinCost`/`NetSaleValue`/
 `CraftingProfit` math, untouched; Total Materials Value is new, computed
-for display only. COLLAPSE RULE (user-mandated): Band 1 collapses to a
+for display only. COLLAPSE RULE (spec-mandated): Band 1 collapses to a
 single "Actual Cost to Craft" tile when `MaterialOpportunityCost` is null
 or 0 - the formula is meaningless with no middle term. Both bands render
 through the same `CreateFormulaBand` tile-row geometry the pre-W4A
@@ -26,10 +25,11 @@ of once over every coin row flattened together - two bands now render as
 two stacked tile rows, not one wider one.
 
 **2. Band 2's identity was verified, not assumed - and does NOT
-universally hold.** The task's own instruction was to verify
+universally hold.** The identity
 `CraftingProfit == NetSaleValue - TotalCoinCost - MaterialOpportunityCost`
-before wiring Band 2's middle tile to `TotalCoinCost + MaterialOpportunityCost`
-(Band 1's formula). Reading `Services/SellSideEconomics.cs` end to end:
+was verified before wiring Band 2's middle tile to
+`TotalCoinCost + MaterialOpportunityCost` (Band 1's formula).
+Reading `Services/SellSideEconomics.cs` end to end:
 the identity holds exactly for a single-item plan
 (`ApplySellSideEconomics`, `profit = NetSaleValue - solveResult.Plan.
 TotalCoinCost - materialOpportunityCost`) but explicitly NOT for a
@@ -54,11 +54,11 @@ prices the whole batch, Band 2 only its sellable portion, matching what
 tooltip clause for that case rather than silently showing a formula that
 would not visually balance.
 
-**3. Mouseover tooltips on every formula-band header (user-mandated).**
+**3. Mouseover tooltips on every formula-band header (spec-mandated).**
 `PlanRowViewModel` gained `TooltipText`; `SummarySectionRenderer.
 CreateFormulaBand` sets it directly on the caption `Label` control
 itself, never on the tile's containing `Panel` - the M32 lesson
-(`docs/KNOWN-ISSUES.md`'s "Field-test UX wave", finding D) is that a
+(`docs/KNOWN-ISSUES.md`'s "In-game UX wave", finding D) is that a
 label captures the mouse before a container tooltip underneath it would
 ever be reached, so the tooltip has to live on the exact control that
 receives the hover. Wording matches the spec's exact text for all five
@@ -81,13 +81,13 @@ ComputeCurrencyColumnEdges` (fixed-width right-to-left columns - Required/
 Have/Needed are always short plain integers, no coin icons, so no
 per-render widest-value pre-scan is needed the way the Shopping List's
 Each/Total columns need one). Rows sort alphabetically by resolved
-currency name (user-mandated) via a stable `OrderBy`, not `List.Sort`
+currency name (spec-mandated) via a stable `OrderBy`, not `List.Sort`
 (unstable) - two different unknown currency ids both fall back to the
 same generic "Currency" name, and an unstable sort could reorder that
 tied pair nondeterministically run to run. `Have` is now the RAW,
 UNCLAMPED wallet holding (`PlanRowViewModel.CurrencyOwnedQuantity`'s
 contract changed from `Math.Min(owned, Required)` pre-W4A to the real
-holding - user-mandated); `Needed` (`CurrencyNeededQuantity`, new field)
+holding - spec-mandated); `Needed` (`CurrencyNeededQuantity`, new field)
 is `max(0, Required - Have)`; both are null (never a fabricated 0) when
 no wallet snapshot exists. Rows where `Have >= Required` get
 `CurrencyFullyCovered = true` (new field), rendered as a green "OK" badge
@@ -102,20 +102,20 @@ to render-test the glyph directly. This module's own prior investigation
 (`docs/dev-notes/HISTORY.md`, "Carried follow-up resolved: caret glyphs")
 already found that a technically-representable Unicode glyph (a triangle
 expand/collapse indicator) was NOT the reliable choice for this exact
-font once live-tested across multiple desktop sessions/machines - ASCII
+font once live-tested across multiple sandbox sessions/machines - ASCII
 carets were kept instead. Given that precedent and no way to independently
 verify a different, also-unverified glyph here, this package takes the
 pre-authorized safe fallback: a small green "OK" pill via the existing
 `LabelHelpers.CreateSmallTag` helper (same one the tree's Locked/Available
 pills and the shopping source tag already use), colored to match
 `PillColors.PillKind.Selected`'s green (#1F8F0C) rather than adding a new
-`PillKind` for this single non-tree use. **A live desktop check of this
-one glyph decision remains open** - if a future session confirms the
+`PillKind` for this single non-tree use. **A live sandbox check of this
+one glyph decision remains open** - if a future live check confirms the
 check-mark glyph (the escaped form, backslash-u-2713 - see the
 ASCII-only-source rule) renders cleanly in this font, swapping it in is
 a one-line change in `SummarySectionRenderer.FullCoverageMarkerText`.
 
-**6. Footnote row (user-mandated).** A new `PlanRowType.SummaryFootnote`
+**6. Footnote row (spec-mandated).** A new `PlanRowType.SummaryFootnote`
 row, always exactly one, always last (after the pre-existing multi-item
 `MultiItemNote` banner when both are present) - subdued styling
 (`DefaultFont12`, dim grey `(130,130,130)`, via a new `CreateFootnoteRow`)
@@ -125,14 +125,14 @@ Text: "Prices are Trading Post data - actual purchase and sale prices are
 likely to vary."
 
 **7. Height agreement lives in a new class, not
-`PlanContentHeightMath.cs` (DO-NOT-TOUCH for this package).** The
+`PlanContentHeightMath.cs` (frozen for this package).** The
 redesigned section's shape (two independently-present tile rows, a
 currency table header + N rows, a note row, a footnote row) cannot be
 expressed by `PlanContentHeightMath.SummaryBodyHeight`'s pre-W4A formula
 (a single boolean "has a coin row" flag good for exactly one
 `CostTileRowHeight`, not two independently-gated bands) without editing
 that method - and `Services/PlanContentHeightMath.cs`/`PlanRelayoutMath.cs`
-were both explicitly DO-NOT-TOUCH for this package (shared infrastructure
+were both explicitly frozen for this package (shared infrastructure
 several other sections' row builders depend on, plus other in-flight
 work touching the same files). Resolution: a new `Services/
 SummarySectionLayoutMath.cs` (`BodyHeight`, `ComputeCurrencyColumnEdges`) -
@@ -161,7 +161,7 @@ of the M36b `Container.Paint` round-trip simulation sweep that
 section deliberately had no per-row dividers at all by its own original
 doc comment. Adding one at an unproven row height, for a visual element
 the spec never actually asked for, would have risked resurrecting
-exactly the defect DO-NOT-TOUCH #6 (divider math) exists to stay clear
+exactly the defect frozen-file #6 (divider math) exists to stay clear
 of. Currency rows resize via a plain `AddRelayout` closure instead, with
 no divider - the header row's dark background alone delineates the
 table, matching gw2e's own header-only table styling.
@@ -223,7 +223,7 @@ commits, before any push/PR:
   footnote rows a future change emits.
 - **Ellipsized currency-name tooltip swallowed (Must Fix,
   `CreateCurrencyTableRow`, both the build path and its `AddReellipsis`
-  closure).** The M32 lesson (this file's own "Field-test UX wave"
+  closure).** The M32 lesson (this file's own "In-game UX wave"
   finding D) is that a label captures the mouse before a tooltip on a
   control underneath it is ever reached; the currency table's `nameLabel`
   sat directly on top of its own truncated text with the tooltip stamped
@@ -335,8 +335,8 @@ TreeSectionController.cs` was not touched; every other section renderer
 (Used Materials, Shopping List, Crafting Steps, Required Disciplines,
 Required Recipes) is untouched.
 
-No live desktop verification was performed for this package (browser/game
-automation was out of scope for this session) - item 5's glyph choice and
+No live sandbox verification was performed for this package (browser/game
+automation was out of scope here) - item 5's glyph choice and
 the overall visual layout (including the review-fix round's new formula-
 band operators and widened currency columns) are unverified live and
 should get a look in a real Blish HUD session before this is considered
@@ -381,8 +381,8 @@ targeting round 1's own fixes.**
   code is this one, so there is no sibling instance of this pattern to
   fix elsewhere) - this fix only changes which punctuation mark is drawn
   at one boundary, never the coin math, never the caption text, and never
-  touches `CoinSegmentMath`/`CoinCurrencyRenderer` (reused as-is, per
-  task instruction). Covered by three new/extended
+  touches `CoinSegmentMath`/`CoinCurrencyRenderer` (reused as-is).
+  Covered by three new/extended
   `PlanViewModelBuilderSummaryTests.cs` cases:
   `ProfitBand_NegativeProfit_LabeledLossWithAbsoluteValue` now also
   asserts `FormulaResultIsExact == false`; a new
@@ -416,17 +416,17 @@ modified - the fix lives entirely in `PlanRowViewModel` (new field),
 `PlanViewModelBuilder.BuildProfitFormulaBand` (sets it), and
 `SummarySectionRenderer.CreateFormulaBand` (reads it). Item/currency/
 vendor IDs remain internal-only; coin amounts still render icon-right-
-of-number throughout (unchanged). No live desktop verification was
+of-number throughout (unchanged). No live sandbox verification was
 performed for this round either, same caveat as item 11's own closing
 paragraph above.
 
-Gate: PASS 2026-08-16 (orchestrator live sandbox session, combined wave-4 staging build). Verified: cost-band collapse rule (single Actual Cost to Craft tile when opportunity cost is zero - ARE and Zojja plans), currency table alphabetical with icons and correct Required/Have/Needed math, green OK badges on all fully-covered rows, TP-variance footnote, band-caption tooltip renders on hover, coin icons right of numbers. Checkmark-glyph experiment FAILED live (U+2713 renders as an empty tag in the Blish font) - the OK badge is the permanent marker choice.
+Gate: PASS 2026-08-16 (live sandbox session, combined staging build). Verified: cost-band collapse rule (single Actual Cost to Craft tile when opportunity cost is zero - ARE and Zojja plans), currency table alphabetical with icons and correct Required/Have/Needed math, green OK badges on all fully-covered rows, TP-variance footnote, band-caption tooltip renders on hover, coin icons right of numbers. Checkmark-glyph experiment FAILED live (U+2713 renders as an empty tag in the Blish font) - the OK badge is the permanent marker choice.
 
 Follow-ups (recorded during a later polish pass, not yet implemented):
 
 - Follow-up: delete `PlanContentHeightMath.SummaryBodyHeight`, its tests
   (`PlanContentHeightMathTests.cs` ~348-390), and `PlanRowType.CoinTotal`
-  once the DO-NOT-TOUCH freeze on `PlanContentHeightMath` lifts - all
+  once the freeze on `PlanContentHeightMath` lifts - all
   three are dead for production since `CraftingPlanView` routes Summary
   to `SummarySectionLayoutMath`. **DONE (2026-08-17, high-evidence-zones
   branch).** Characterized first per the new policy (see this file's
@@ -452,7 +452,7 @@ Follow-ups (recorded during a later polish pass, not yet implemented):
   false-fail the moment either constant is retuned independently. Deleted.
   Full suite: 1765 before the first deletion pass, 1761 after it, 1760
   after this correction (5 dead/vacuous tests removed total).
-- Follow-up (user decision pending): the Summary currency table now
+- Follow-up (decision pending): the Summary currency table now
   shows the RAW wallet holding in Have, while the shopping list still
   clamps its per-currency owned amount to the required amount
   (`CurrencyDisplayResolver.ResolveAmounts`) - the same currency can

@@ -1,13 +1,13 @@
 > **Frozen record - 2026-08-23, branch `field-fixes-1`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
 > Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
 
-## Field-test fixes wave 1 (field-fixes-1)
+## In-game fixes wave 1 (field-fixes-1)
 
-The first feedback from outside the build loop: the maintainer ran v0.2.0
-as a user, in game, and reported five defects in their own words. Every
-one was reproduced from the code before it was touched, and three of them
-are visible in the existing gate captures - which is the useful lesson of
-this wave. The captures had them all along; nobody was looking for them,
+The first feedback from outside the build loop: v0.2.0 was run in game
+as a player would, and five defects came back. Every one was reproduced
+from the code before it was touched, and three of them are visible in the
+existing verification screenshots - which is the useful lesson of this
+wave. The captures had them all along; nobody was looking for them,
 because each gate was reading for the item it was staged to prove.
 
 - **Bug 1, the confirm dialog did not fit its own sentence - DONE.**
@@ -17,7 +17,7 @@ because each gate was reading for the item it was staged to prove.
   shows "ched account snapshot? It can only be rebuilt when the GW2 A".
   The 400px window additionally squeezed WindowBase2's left title-bar
   texture into ~200px, which rasterizes as coloured streaks behind the
-  title - the "title seems poorly aligned too" half of the report. Both
+  title - the misaligned-title half of the report. Both
   are fixed by adopting `ApiAccessDialog`'s proven geometry and text
   handling: 560x170 and a wrap against the content width. Blish draws
   the title itself at a fixed 80px indent in DefaultFont32 with no
@@ -126,7 +126,7 @@ the currency column header, four on the caller-supplied wrap line cap; the
 stale "copper" placeholder width test was rewritten against the real defaults
 table), tree clean, nothing pushed.
 
-Desktop gate items, one per bug:
+Sandbox check items, one per bug:
 
 1. Open Snapshot, press Clear Cache: the confirm reads its whole
    sentence with margin on both sides, the title bar draws clean, and
@@ -161,7 +161,7 @@ Desktop gate items, one per bug:
    "12x <name>" likewise, and the shopping list's "Item" header sits on
    the same line as its Amount/Each/Total headers.
 
-Gate: PASS after one gate-found fix (2026-08-23 desktop sessions,
+Gate: PASS after one gate-found fix (2026-08-23 sandbox sessions,
 captures preflight/gA1w-gA7w). (1) Modal: the FIRST gate run showed
 the second wrapped line clipped mid-glyph - AutoSizeHeight with a
 fixed Width takes Blish's stale-layout-pass measure; fixed in
@@ -180,4 +180,4 @@ unchanged. (5) Zoomed crop confirms full descenders on "Log",
 "Augur's" and "Mystic" where the ph01 capture shows clipping.
 Blish's fixed 80px title indent (title cannot be centered without
 reimplementing window chrome) is recorded as the accepted limit;
-the Emblem option noted for a future maintainer call.
+the Emblem option noted for a future decision.

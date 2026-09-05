@@ -71,9 +71,9 @@ namespace TaimisToolbench.Services
 
         // --- Tier seats ---
         //
-        // The two promoted tiers are named ONCE, here, so the maintainer's
-        // "let's try 20/24 and if it's too big we can go 18/22" is a
-        // constant swap rather than a hunt through renderers. The retreat,
+        // The two promoted tiers are named ONCE, here, so a retreat from
+        // 20/24 to 18/22 is a constant swap rather than a hunt through
+        // renderers. The retreat,
         // MEASURED by applying it and running the suite - six constants,
         // no test edits, every band height unchanged:
         //     ColumnHeaderPointSize 20 -> 18, ColumnHeaderInk Bold20 -> Bold18
@@ -88,8 +88,8 @@ namespace TaimisToolbench.Services
         //
         // No absolute point size is asserted anywhere. A test that pinned
         // 20 as a floor would read as an invariant while really encoding
-        // one of the two seats the maintainer is choosing between, and it
-        // would fail by construction on his own documented fallback.
+        // one of the two candidate seats, and it would fail by
+        // construction on the documented fallback above.
 
         /// <summary>Every column header, and the Total Cost tile captions.</summary>
         public const int ColumnHeaderPointSize = 20;

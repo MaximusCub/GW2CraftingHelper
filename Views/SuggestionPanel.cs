@@ -371,8 +371,8 @@ namespace TaimisToolbench.Views
             // Left edge of the text box: a classic dropdown, directly under
             // the box being typed into. It was anchored right of the Qty
             // stepper for a while so it would not cover the controls beneath
-            // it, and the field test rejected that outright - "the typeahead
-            // popup ... floats far off to the right". Transiently covering
+            // it, and that was rejected outright in game: the popup read
+            // as floating far off to the right. Transiently covering
             // the row's own quantity field and the rows below is what a
             // dropdown does; it closes on pick, on the box losing focus and
             // on a click outside.

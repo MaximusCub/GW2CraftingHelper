@@ -17,7 +17,7 @@ namespace TaimisToolbench.Tests.Services
     /// BuyFromVendorCostBreakdown), threaded through CraftingTreeBuilder
     /// into a real CraftingTreeNode and consumed by the real
     /// DecisionPillPlanner.BuildPillSpecs - exercises the full production
-    /// pipeline for both maintainer-specified subduing rules, not just the
+    /// pipeline for both subduing rules, not just the
     /// pure PillSubduingEvaluator/DecisionPillPlanner unit coverage.
     /// </summary>
     public class PlanSolverPillSubduingTests
@@ -36,7 +36,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void AmalgamatedRiftEssenceShape_VendorNeedsMoreRawEcto_StrictlyDominated()
         {
-            // The maintainer's own canonical example: crafting needs 5
+            // The canonical example: crafting needs 5
             // Globs of Ectoplasm (item 100); the vendor trade-in needs 15 -
             // same currencies (both 0 coin), 10 more raw Ecto. Craft wins
             // on real cost (500c vs the vendor's 1500c-folded offer); the

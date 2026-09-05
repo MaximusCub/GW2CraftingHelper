@@ -4,12 +4,12 @@
 # M38 Post-Parity Cleanup Analysis - Lens: C#/.NET Practices
 
 Scope: current `master` (commit `be8ebda`, "Merge pull request #56 from
-MaximusCub/m37-ach-dedup"). Read-only static analysis; no build was run (the
-repo rule for this session was strict read-only, and a build writes to
-`bin/`/`obj/` in a checkout shared with concurrent agents, so anything here
+MaximusCub/m37-ach-dedup"). Read-only static analysis; no build was run (this
+pass was strictly read-only, and a build writes to
+`bin/`/`obj/` in a shared checkout, so anything here
 that would benefit from compiling was left as a proposed cheap check instead
 of being executed). All file/line references are to real source under the
-repo root; `.claude/worktrees/*` (agent scratch checkouts of this same repo)
+repo root; scratch checkouts of this same repo
 and `packages/`, `bin/`, `obj/`, `.vs/` were excluded from every scan below.
 
 **Headline finding first, because it is the one thing every other section
@@ -72,7 +72,7 @@ Every one of these guards a `try/catch (Exception ex)` around real local
 file I/O (`File.ReadAllText`, `File.WriteAllText`, `File.Replace`, JSON
 deserialize) that already degrades gracefully on failure (returns `null`,
 falls back to an empty dataset, etc.) - the *behavior* is fine. The problem
-is purely diagnostic: a maintainer triaging "my snapshot never saves" or
+is purely diagnostic: anyone triaging "my snapshot never saves" or
 "my vendor overlay keeps resetting" from a user bug report gets zero trail
 today, in a Release build, forever.
 
@@ -351,8 +351,8 @@ running against a panel tree that `_mainWindow.Dispose()` just tore down.
 fallback that self-cancels on any failure - but it means correctness here
 depends on a generic catch-and-log fallback rather than a deliberate
 teardown, and a module disable timed unluckily could emit a spurious
-"FrameTicker step failed" warning that looks like a real bug report to a
-maintainer. Recommendation: give `CraftingPlanView` a small
+"FrameTicker step failed" warning that looks like a real bug report.
+Recommendation: give `CraftingPlanView` a small
 `StopLiveTickers()` method (cancel `_scrollVerifyTicker`,
 `_resizeDebounceTicker`, `_wheelWrapVerifyTicker` if non-null - the same
 three lines `Build()` already runs at `CraftingPlanView.cs:1308-1313`) and
@@ -540,8 +540,8 @@ Recommended, low-risk, **additive-only** step:
 3. Set the new analyzer set to emit **warnings, not errors**, at least for
    the first pass - there is no CI gate today (no `.github/workflows`
    found), so nothing will silently break; treat it as a to-do surfaced in
-   the IDE, not a build gate, until the maintainer has triaged the initial
-   warning set once.
+   the IDE, not a build gate, until the initial warning set has been
+   triaged once.
 
 ---
 
@@ -600,7 +600,7 @@ value; guessing and picking something lower would silently disable
 whatever syntax is already relied upon, and picking something higher
 without verifying could newly break on a contributor's older toolchain.
 This was not run in this analysis pass to stay strictly read-only in a
-checkout with concurrent agents active.
+shared checkout.
 
 ---
 

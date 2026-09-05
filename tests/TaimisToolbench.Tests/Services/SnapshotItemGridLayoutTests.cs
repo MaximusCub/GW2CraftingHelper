@@ -11,7 +11,7 @@ namespace TaimisToolbench.Tests.Services
         // itself - i.e. the grid width at the window minimum is exactly the
         // panel width the rest of the module's layout math is derived
         // against. That last step is a fact about the VIEW and so cannot be
-        // asserted from a Blish-free test; step 1 of the desktop gate checks
+        // asserted from a Blish-free test; step 1 of the sandbox check checks
         // it live (the rightmost column's text stopping clear of the
         // scrollbar). What IS asserted here is the arithmetic hanging off
         // it: move MinColumnWidth or WindowToTabPanelChrome and the

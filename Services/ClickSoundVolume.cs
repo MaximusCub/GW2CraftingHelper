@@ -13,7 +13,7 @@ namespace TaimisToolbench.Services
         public const int MinPercent = 0;
         public const int MaxPercent = 100;
 
-        // The maintainer's field-tested number: 0.875x the 0.4 ceiling
+        // A number measured in game: 0.875x the 0.4 ceiling
         // Blish's game-derived click volume can ever reach (-1.2 dB) and
         // 1.75x its 0.2 fixed-volume default (+4.9 dB), which puts the
         // asset's own 0.357 peak at -18.1 dBFS. Louder than the 0.2 fixed

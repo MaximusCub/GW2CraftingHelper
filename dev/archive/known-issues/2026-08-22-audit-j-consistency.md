@@ -278,7 +278,7 @@ batch moves a height: the empty-state label lives outside every
 section's math, the button-height change is bounded by rows whose
 heights are fixed constants, and the tree's node count is text.
 
-### What the desktop gate should look at
+### What the sandbox check should look at
 
 1. **Modal really blocks:** open the Snapshot tab's Clear Cache confirm
    and click the Crafting Plan tab's "+" add-row button behind it, the
@@ -407,7 +407,7 @@ L3 bullet above corrected. Doc-only - no control height changed.
 Build 0 errors (2082 pre-existing StyleCop warnings), suite 2186 passed
 / 0 failed, tree clean, nothing pushed.
 
-Gate: PASS (2026-08-23 desktop session, branch build at the
+Gate: PASS (2026-08-23 sandbox session, branch build at the
 review-fix HEAD, captures preflight/gJ1-gJ6). (L1) With plan.json
 moved aside, the Crafting Plan tab rendered the centered dim empty
 state. (M9) Snapshot rows read "75x Green Wood Log", the wallet

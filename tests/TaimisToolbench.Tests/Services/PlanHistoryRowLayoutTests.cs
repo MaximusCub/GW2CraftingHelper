@@ -5,7 +5,7 @@ namespace TaimisToolbench.Tests.Services
 {
     public class PlanHistoryRowLayoutTests
     {
-        // The five desktop-gate widths, as PANEL widths (the window minus
+        // The five sandbox-check widths, as PANEL widths (the window minus
         // its chrome), matching RankerRowLayoutTests' own convention.
         public static TheoryData<int> GateWidths => new TheoryData<int>
         {
@@ -237,7 +237,7 @@ namespace TaimisToolbench.Tests.Services
         }
 
         /// <summary>
-        /// The owner's report: Plan / Cost / Generated packed together and
+        /// Reported in game: Plan / Cost / Generated packed together and
         /// left a stranded band before the action controls. Each data
         /// column now CENTRES its band on its own track, so its header
         /// stands over the values it names. The property that says so is
@@ -382,7 +382,7 @@ namespace TaimisToolbench.Tests.Services
         }
 
         /// <summary>
-        /// The owner's report: expanding a one-item plan redrew the icon
+        /// Reported in game: expanding a one-item plan redrew the icon
         /// and name the collapsed row above it was already showing. A
         /// single-item plan draws no item list at all, and the panel's
         /// height is measured from the same count so it cannot reserve

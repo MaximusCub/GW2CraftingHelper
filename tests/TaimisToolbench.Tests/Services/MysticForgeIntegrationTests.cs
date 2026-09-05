@@ -582,7 +582,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.NotNull(craftStep);
             Assert.Equal(-4, craftStep.RecipeId);
 
-            // RequiredDisciplines excludes MysticForge (field-test finding
+            // RequiredDisciplines excludes MysticForge (in-game finding
             // E: the forge is a facility, not a discipline)
             Assert.DoesNotContain(result.RequiredDisciplines,
                 d => d.Discipline == "MysticForge");

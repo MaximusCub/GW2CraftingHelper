@@ -4,7 +4,7 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// opportunity-notes (SEASONAL VENDOR TIP, maintainer decision): a
+    /// opportunity-notes (SEASONAL VENDOR TIP): a
     /// seasonal vendor offer (VendorOffer.SeasonalFestival non-null) is
     /// UNCONDITIONALLY excluded from the solver's own offer set - the plan
     /// always assumes the regular market, regardless of whether the

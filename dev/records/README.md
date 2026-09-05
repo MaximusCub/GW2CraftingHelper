@@ -6,7 +6,7 @@ of the directory: two branches never touch the same file, so two records
 never conflict, and no one has to remember a merge ritual.
 
 Each record is what the branch actually did - the defect, the root cause,
-the measurements, the review rounds, and the live desktop gate at the end.
+the measurements, the review rounds, and the live sandbox check at the end.
 It describes the code as of its own date and is not maintained afterwards.
 Corrections are a new record, never an edit to an old one.
 

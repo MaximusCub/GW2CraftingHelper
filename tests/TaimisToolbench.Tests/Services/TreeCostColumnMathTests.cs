@@ -246,7 +246,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void ComputeRowEdges_CoinOnlyRow_EndsOnTheColumnRightEdge()
         {
-            // Field test, bug 4: the "Cost" header right-aligns on the
+            // Bug 4, reported in game: the "Cost" header right-aligns on the
             // column's own right edge, so a row that never fills the shared
             // currency band must not stop short of it - a gold figure
             // sitting a whole currency band left of the header is what the
@@ -361,7 +361,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(TreeCostColumnMath.TotalWidth(widths), edges.TotalWidth);
         }
 
-        // --- ScanColumns name extent (audit batch H: dead gutters) ---
+        // --- ScanColumns name extent (dead gutters) ---
         private static CraftingTreeNode NamedNode(
             int nodeId, string name, int quantity = 0, IReadOnlyList<CraftingTreeNode> children = null)
         {
@@ -381,7 +381,7 @@ namespace TaimisToolbench.Tests.Services
             return TreeCostColumnMath.ScanColumns(roots, MeasureByLength, _ => 0);
         }
 
-        // --- ScanColumns node count (audit batch J, L2: the Recipe Tree
+        // --- ScanColumns node count (the Recipe Tree
         // section header's parenthesised count) ---
         [Fact]
         public void ScanColumns_NodeCount_CountsEveryNodeAtEveryDepth()

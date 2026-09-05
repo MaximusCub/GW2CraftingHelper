@@ -180,7 +180,7 @@ namespace TaimisToolbench.Tests.Services
 
         // --- Characterization: ApplyBatchSellSideEconomics/CraftingProfit
         // is a real downstream consumer of AllocateVendorNodeCosts' merged-
-        // ceil remainder shape (quorum verdict C6, merged-ceil-remainder
+        // ceil remainder shape (merged-ceil-remainder
         // stream) - a REAL PlanSolver.Solve() round trip (not a hand-built
         // SolveResult like the sibling tests above), since itemCraftCost
         // here must be the actual corrected memo TotalCost AllocateVendorNodeCosts

@@ -517,8 +517,8 @@ namespace TaimisToolbench.Tests.Services
             // Finding 4 (flagged, documented rather than fixed - see
             // KNOWN-ISSUES #44): the terminal fallback tie-break ranks purely
             // on each side's REAL coin part (the finding-1 fix above), the
-            // SAME heuristic EvaluateVendorOffers' own DO-NOT-TOUCH
-            // fallback-vs-fallback ranking already uses (coin part only -
+            // SAME heuristic EvaluateVendorOffers' own fallback-vs-fallback
+            // ranking already uses (coin part only -
             // currency is unvalued/unknowable on both sides, so there is no
             // sounder common unit). A vendor offer whose coin part is very
             // low - here, 0, entirely currency-paid - therefore beats a

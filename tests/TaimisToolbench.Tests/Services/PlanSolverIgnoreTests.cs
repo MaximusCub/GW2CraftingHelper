@@ -34,7 +34,7 @@ namespace TaimisToolbench.Tests.Services
             // Item 1 crafts from 2x item 2 (would normally cost 2*100=200).
             // Ignoring item 2 must make the WHOLE craft's cost 0, not just
             // hide item 2's own row - matching gw2e's "owned materials are
-            // free" rule (Section 2.1 of the r2 report) applied via Ignore.
+            // free" rule applied via Ignore.
             var tree = Craftable(1, 1, Option(10, 1, 1, Leaf(2, 2)));
             var prices = new Dictionary<int, ItemPrice>
             {

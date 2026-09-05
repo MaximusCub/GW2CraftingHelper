@@ -120,7 +120,7 @@ namespace TaimisToolbench.Services.Recipes
 
             ct.ThrowIfCancellationRequested();
 
-            // A build that moved is exactly the owner's trigger: drop the
+            // A build that moved is exactly the trigger: drop the
             // old cursor and rebuild the corpus for the new build.
             int cursor = sameBuild ? _store.CorpusRefreshCursorId : 0;
 

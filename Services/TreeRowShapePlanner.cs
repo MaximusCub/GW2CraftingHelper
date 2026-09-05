@@ -21,7 +21,7 @@ namespace TaimisToolbench.Services
         public const int IndentPerDepth = 24;
         public const int CaretColumnWidth = 18;
 
-        // Tier 2 of the module's two-tier icon system (owner ruling): tree
+        // Tier 2 of the module's two-tier icon system: tree
         // rows carry in-game bag-sidebar-sized item art, like every other
         // row-level icon in the Crafting Plan tab.
         public const int IconSize = ItemIconTiers.BagSidebarIconSize;

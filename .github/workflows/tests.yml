@@ -513,9 +513,9 @@ jobs:
       - name: Every item icon names its tier and what it shows on hover
         shell: bash
         run: |
-          # The owner's report: "tons of items in account snapshot dont have
-          # the right color borders... there should be a library call to paint
-          # these icons that everything is using that pushes the standards".
+          # Reported in game: item icons on the Snapshot tab drew the wrong
+          # rarity border colours, and there was no single call that every
+          # surface had to go through to get them right.
           # There was one - IconControls.CreateItemIcon - but its size and
           # border were DEFAULTED parameters, so the standard was opt-in and
           # eleven call sites each chose their own numbers. The defaults are
@@ -530,9 +530,9 @@ jobs:
           # of them. It is now a required ItemIconTooltip: a silent icon has
           # to name its reason through ItemIconTooltip.None(ItemIconSilence.X).
           #
-          # SCOPE is the other half, and the owner's second report: "the
-          # entire row - even just the deadspace for an item in the ranker
-          # pops up the item tooltip - it should just be the icon." The
+          # SCOPE is the other half. Also reported in game: the whole Ranker
+          # row answered with the item tooltip, including its empty space,
+          # when only the icon should. The
           # module used to stamp the row panel and every label on it,
           # precisely BECAUSE Blish resolves on the deepest control and
           # never bubbles so the gaps otherwise answered nothing. The gaps
@@ -816,10 +816,8 @@ jobs:
           #   dev/            dated point-in-time records, frozen by policy
           #   docs/research/  same policy (both trees are already excluded
           #                   from the live-docs path check above)
-          #   docs/RENAMING.md  the rename runbook names the old identifiers
-          #                   because it is the record of migrating off them
           a="Crafting"; b="Helper"
-          allow='^(dev/|docs/research/|CHANGELOG\.md$|docs/RENAMING\.md$)'
+          allow='^(dev/|docs/research/|CHANGELOG\.md$)'
           hits=$(git ls-files -z | grep -zvE "$allow" \
             | xargs -0 -r grep -liE "$a$b|$a $b" || true)
           named=$(git ls-files | grep -vE "$allow" | grep -iE "$a.?$b" || true)

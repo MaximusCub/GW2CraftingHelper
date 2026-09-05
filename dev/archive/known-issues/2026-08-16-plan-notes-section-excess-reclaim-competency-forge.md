@@ -165,7 +165,7 @@ IndexRecipeOptions`) but therefore shares their same unbounded recursion
 depth on a pathologically deep crafting tree; not a regression, not
 addressed here.
 
-No live desktop verification was performed - `Views/CraftingPlanView.cs`
+No live sandbox verification was performed - `Views/CraftingPlanView.cs`
 and `Views/Rendering/NotesSectionRenderer.cs` are Blish-bound and outside
 this repo's test-runnable surface, same constraint every UI-adjacent
 entry in this file notes. The Notes section's real on-screen layout
@@ -173,4 +173,4 @@ entry in this file notes. The Notes section's real on-screen layout
 collapse/expand) has not been visually confirmed in a running Blish HUD
 client.
 
-Gate: PASS (hidden-when-empty) 2026-08-16 (orchestrator live desktop session). Verified hidden on two plans that generate zero notes - correct per design; positive note rendering is suite-covered (cooldown notice, a sibling feature, rendered live); a notes-generating live fixture rides the next natural field test.
+Gate: PASS (hidden-when-empty) 2026-08-16 (live sandbox session). Verified hidden on two plans that generate zero notes - correct per design; positive note rendering is suite-covered (cooldown notice, a sibling feature, rendered live); a notes-generating live fixture rides the next natural in-game test.

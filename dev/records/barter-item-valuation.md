@@ -22,9 +22,10 @@ genuinely purchasable - just not with gold.
 | item cost-line usages covered by the 654 | 10,551 of 21,489 (49%) |
 | concentration | top 5 = 41.6%, top 20 = 54.3%, top 50 = 65.7%, top 100 = 77.1% |
 
-One brief figure did not survive checking. The claim "every one of the 654
-is flagged `AccountBound`" is 628 of 654. Of the remaining 26, 23 are
-`SoulbindOnAcquire` rather than `AccountBound`, and 3 (25720, 84356,
+One figure recorded in advance did not survive checking. The claim that
+every one of the 654 is flagged `AccountBound` is 628 of 654. Of the
+remaining 26, 23 are `SoulbindOnAcquire` rather than `AccountBound`, and
+3 (25720, 84356,
 102962) no longer resolve on `/v2/items` at all. None is tradeable, so the
 conclusion holds; the wording did not.
 
@@ -64,7 +65,7 @@ coin figure is the whole cost", which a barter node breaks:
 `RecipeSheetSavingsCalculator` (direct and recursive), then
 `SeasonalVendorTipCalculator`, then `TreeRowTooltipComposer`, which would
 have printed "Unit price: 0c" for an item that really costs tokens - the
-same field-test finding B a pure-currency offer already had to suppress.
+same in-game finding a pure-currency offer already had to suppress.
 All three now check `VendorHasBarterItemCost`, and each guard has a test
 that was confirmed red with the guard stubbed out before being restored.
 
@@ -78,7 +79,7 @@ over-valued token makes its offer look dearer, never cheaper. The Black
 Lion family (2,365 + 1,359 + five smaller rows, ~35% of affected usages) is
 left unvalued on purpose: gem-store RNG-chest currency whose gold worth is
 personal, the posture Astral Acclaim already gets. So are the Grandmaster
-Marks, which the brief expected to be valuable: their chain bottoms out in
+Marks, which were expected to be valuable: their chain bottoms out in
 `Glob of Dark Matter` plus daily time-gated crafts, so no route satisfies
 the rule, and inventing one would have been exactly the thing the invariant
 forbids.

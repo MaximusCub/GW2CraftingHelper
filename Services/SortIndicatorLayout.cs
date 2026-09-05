@@ -24,7 +24,7 @@ namespace TaimisToolbench.Services
     {
         /// <summary>Gap between a header's word and its indicator. Wider
         /// than a space's advance at the ColumnHeader tier: at that width
-        /// the mark measured ~5px from the label at the owner's UI scale
+        /// the mark measured ~5px from the label in an in-game screenshot
         /// and read as attached to the word. Kept as a number because the
         /// two are separate controls and no string joins them.</summary>
         public const int Gap = 8;

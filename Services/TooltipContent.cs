@@ -145,7 +145,7 @@ namespace TaimisToolbench.Services
     /// up, apart from an item nobody looked up: both arrive as null. The
     /// two want different frames - currency art is mostly transparent and
     /// a filled frame behind it shows through as a grey background, the
-    /// defect the field reported on the Snapshot tab - so the call site
+    /// defect on the Snapshot tab - so the call site
     /// has to say which it means, and a factory name is what a diff shows.
     /// </para>
     /// </summary>

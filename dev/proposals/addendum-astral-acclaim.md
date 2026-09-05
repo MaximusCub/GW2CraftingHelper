@@ -1,4 +1,4 @@
-# Addendum: Astral Acclaim / Wizard's Vault awareness (maintainer question, 2026-07-22)
+# Addendum: Astral Acclaim / Wizard's Vault awareness (2026-07-22)
 
 ## What the module knows today (MEASURED against master)
 
@@ -54,11 +54,11 @@ no-invented-data invariant: the rate derives from real TP quotes, and the user
 opts in. Interacts with binding test (b): AA spent on clovers competes with AA
 spent on coins/gold - the implied rate IS that competition, priced.
 
-## REVISED (maintainer critique, 2026-07-22): no single-anchor valuation
+## REVISED (2026-07-22): no single-anchor valuation
 
-The auto-valuation idea above is WITHDRAWN as originally framed. Maintainer
-critique: a single implied copper/AA rate from one item assumes AA is equally
-valuable across the store, which is false - deal quality varies per item, and
+The auto-valuation idea above is WITHDRAWN as originally framed. A single implied
+copper/AA rate from one item assumes AA is equally valuable across the
+store, which is false - deal quality varies per item, and
 tiered pricing (limited quantity at a discount, higher price tier after)
 makes the implied rate a supply curve, not a point. Deal-weighing is
 partly subjective.
@@ -105,7 +105,7 @@ Coins is genuinely tiered (8 AA x100 then 35 AA uncapped, a >4x cliff);
 the legendary mats are hard seasonal caps with no continuation tier.
 Contested items (Obsidian Shards - arithmetic settles it against, 1 uncapped
 Laurel beats 30 AA; the 1,000-AA starter key - thin evidence) belong in the
-table with their numbers, unranked by default. Correction absorbed:
+table with their numbers, unranked by default.
 Amalgamated Gemstones were never Vault stock.
 
 ## Open questions

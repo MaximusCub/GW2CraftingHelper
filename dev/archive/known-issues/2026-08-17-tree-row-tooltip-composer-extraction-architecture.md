@@ -3,13 +3,13 @@
 
 ## Tree row tooltip composer extraction + architecture doc corrections (2026-08-17)
 
-**Milestone goal:** apply quorum verdict D-2 (TARGETED_FIX_ONLY): correct
+**Milestone goal:** apply review verdict D-2 (TARGETED_FIX_ONLY): correct
 and extend `docs/ARCHITECTURE.md`'s TreeSectionController state/render
 split entry (record the split as rejected by decision, not deferred;
 correct the coupling figure), add a STANDING RULE line for future
 tree-row/pill features, extract the Recipe Tree row's extra-tooltip-line
 construction into a pure, Blish-free `Services/` composer with real-path
-tests, and fold in quorum verdict D-1's targeted `FrameTicker`/line-count
+tests, and fold in review verdict D-1's targeted `FrameTicker`/line-count
 doc corrections plus the `CraftingPlanView.FormatPhaseText` -> `Services/`
 move. No `TreeSectionController` state/render split and no
 `PlanStripController` were implemented - both are explicitly rejected by
@@ -50,7 +50,7 @@ this verdict, not merely out of scope.
    Extracted the `extraTooltipLines` build (`Views/Rendering/
    TreeSectionController.cs`, formerly ~726-940) verbatim into a static,
    Blish-free `BuildExtraTooltipLines(node, captionText, currentPlan)`
-   method: the qty>1 unit-price line(s) (including the Field-test finding
+   method: the qty>1 unit-price line(s) (including the in-game finding
    B zero-coin-with-currency-cost suppression), the AUDIT ROW 20/38
    TP-price-side-fallback caveat (including the b18fb03 null-plan/
    PriceBasis hazard class - a null `currentPlan` gets a basis-agnostic
@@ -93,7 +93,7 @@ this verdict, not merely out of scope.
    class, not the instance) - `docs/KNOWN-ISSUES.md`'s own historical W3B
    narrative entry was deliberately left as-is (an accurate record of
    that milestone's state at the time, not a live cross-reference).
-5. **Quorum verdict D-1 fold-in, `docs/ARCHITECTURE.md` section 1
+5. **Review verdict D-1 fold-in, `docs/ARCHITECTURE.md` section 1
    (`FrameTicker`).** Corrected "three live instances" to "FOUR live
    instances (measured)": `_spinnerTicker` (the W3B status-strip spinner
    ticker, added between the section's original writing and now) is a
@@ -106,7 +106,7 @@ this verdict, not merely out of scope.
    the time of this pass, and that `_spinnerTicker` sits in the identical
    hazard class as the other three (not independently verified live -
    same OUT OF SCOPE deferral as the rest of that row).
-6. **Quorum verdict D-1 fold-in, `docs/ARCHITECTURE.md` section 5
+6. **Review verdict D-1 fold-in, `docs/ARCHITECTURE.md` section 5
    (stale line-count figure).** The "~2,802 lines" post-WP-26 figure is
    now explicitly scoped as "at the time WP-26 was cut" rather than
    read as still-current, with a new "Measured current" sentence stating
@@ -186,6 +186,6 @@ independently re-verified against the new coupling figure beyond the
 Gate: not run live this pass - pure extraction of tooltip composition
 with the emitted line content pinned by the suite (1802 green at the
 stream's verification, re-run post-merge below); the visual surface is
-unchanged by construction, and the next desktop gate batch covers
+unchanged by construction, and the next sandbox check batch covers
 tooltips incidentally through its deferred value-detail hover check.
-Merged under the maintainer's standing merge directive (2026-08-16).
+Merged under the standing merge directive (2026-08-16).

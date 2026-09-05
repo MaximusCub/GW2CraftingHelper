@@ -240,8 +240,8 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Cause text for a failed Refresh Now (Views/MainView.cs), keyed
-        /// by SnapshotFailureClassifier's classification - the field-tested
-        /// fix for the "Refresh Failed" dead end (at CHARACTER
+        /// by SnapshotFailureClassifier's classification - the fix,
+        /// measured in game, for the "Refresh Failed" dead end (at CHARACTER
         /// SELECT every account data source throws an invalid-token
         /// exception, and the bare status line gave no hint why). Callers
         /// pass the result to <see cref="Stamp"/> as the verb, so the

@@ -202,7 +202,7 @@ flagged is untouched here. Two upstream Blish candidates remain noted
 and unattempted: clamping `UpdateTooltipPosition` on all four edges, and
 making `BasicTooltipView`'s max width relative to the screen.
 
-### Desktop gate (live, required)
+### Sandbox check (live, required)
 
 1. **Opaque value tooltip with coin icons:** generate a currency-bearing
    plan (a Mystic Clover / spirit-shard chain - anything whose committed
@@ -252,7 +252,7 @@ making `BasicTooltipView`'s max width relative to the screen.
    visible at once.
 
 Gate: PASS after one gate-found Critical was fixed and re-gated
-(2026-08-23 desktop sessions, captures preflight/gT1-gT6). The
+(2026-08-23 sandbox sessions, captures preflight/gT1-gT6). The
 FIRST gate run crashed Blish fatally on the second hover:
 RichTooltipSurface.DisposeContent built a List directly from
 Children, and ControlCollection.CopyTo throws by design - the empty

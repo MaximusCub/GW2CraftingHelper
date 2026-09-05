@@ -106,8 +106,8 @@ namespace TaimisToolbench.Tests.Services
             // under it, which is what the bar tier capture behind
             // CurrencyIconTiers.VerticalAlignmentRule measures: box y114..129
             // against digit ink y115..126 puts the art's last inked row at
-            // y127. Flush was the first reading of the owner's words; the
-            // game he asked to match is a row lower.
+            // y127. Flush was the first reading; the game it must match
+            // is a row lower.
             Assert.Equal(
                 BodyDigitInkBottom + CoinSegmentMath.CoinInkBelowBaseline, inkBottom);
             Assert.True(inkTop < inkBottom, "coin " + assetId + " has no ink");
@@ -117,7 +117,7 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void TheCoinSeat_SitsLowerThanTheCurrencySeatItUsedToShare()
         {
-            // The owner's ruling: gold, silver and copper move DOWN onto the
+            // The rule: gold, silver and copper move DOWN onto the
             // digits' ink bottom; every other inline currency icon keeps the
             // centred box. A change that folds the two seats back together
             // fails here.

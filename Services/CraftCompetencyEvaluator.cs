@@ -5,7 +5,7 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// source-selection-simplification (maintainer-approved redesign,
+    /// source-selection-simplification (redesign,
     /// docs/gw2e-considerations.md): pure, Blish-free competency check - can
     /// the account actually craft a given recipe, i.e. does some character
     /// have one of the recipe's Disciplines at or above its MinRating? Used

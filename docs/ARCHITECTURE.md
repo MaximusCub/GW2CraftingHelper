@@ -347,8 +347,8 @@ stale: `Panel.UpdateContentRegionBounds` only re-writes the scrollbar's
 `SetProperty` short-circuits and no layout pass runs. Both restore paths
 (`ApplySavedScrollSynchronously` and `PreserveScrollAcrossResize`)
 therefore call `scrollbar.RecalculateLayout()` first, letting the expected
-reset happen while nothing is riding on it. This is the field-reported
-"toggle a decision and the view jumps to the top": the currency table
+reset happen while nothing is riding on it. This is the "toggle a
+decision and the view jumps to the top" defect reported in game: the currency table
 gaining or losing rows is precisely a content-height change.
 
 **Why the correction is computed in pixel space:**
@@ -470,13 +470,12 @@ already has.
 **`CostTileLabelToValueGap` used to be a residual.** Both Total Cost bands
 bottom-anchored their amount inside a fixed row height, so the space under
 the caption was whatever the height arithmetic happened to leave over - 1px
-on the profit band, which the field report called cramped ("'Sell Value'
-and the gold line are a little cramped"). Anchoring the amount *under* the
-caption instead makes that gap one named constant at every band, and the
-two bands can no longer drift apart. Its value, 8, is derived from the
-caption tier's own metrics rather than chosen by eye; the derivation is in
-the constant's own doc comment, because the number is the thing a caller
-has to get right.
+on the profit band, which read as cramped in game. Anchoring the
+amount *under* the caption instead makes that gap one named constant at
+every band, and the two bands can no longer drift apart. Its value, 8, is
+derived from the caption tier's own metrics rather than chosen by eye; the
+derivation is in the constant's own doc comment, because the number is the
+thing a caller has to get right.
 
 **`MultiRootTreeFlowHeight` and the multi-root render.** gw2efficiency
 renders N independent top-level recipe trees, its synthetic wrapper node
@@ -614,10 +613,12 @@ fully region-mapped with KNOWN-ISSUES anchor comments at each region head.
 
 The file then grew back past its own pre-decomposition baseline - 5,281
 lines on 2026-08-25, +2,156 in the 33 days after the decomposition
-landed - with nothing in CI to notice. It stands at **4,987 lines,
-measured 2026-08-26** (`wc -l Views/CraftingPlanView.cs`), against the
-~4,802 above. `Views/Rendering/` holds 9,109 lines across 37 files on the
-same date, so the split of plan-tab code is roughly 65% outside the view -
+landed - with nothing in CI to notice. Its current size is the entry in
+`docs/file-budgets.txt`, which CI enforces, rather than a number restated
+here that goes stale the moment the file moves; it was 5,185 against the
+~4,802 above when this paragraph was last checked. `Views/Rendering/` holds
+about 12,100 lines across 46 files, so the split of plan-tab code is roughly
+70% outside the view -
 a ratio that can move in either direction, unlike the one-off before/after
 figure. Both numbers, and the date, so a later reader can re-run the two
 commands rather than take a characterization on trust.
@@ -781,23 +782,23 @@ occurrence. This lives in `Services/VendorBatchSolver.cs`
 **Why:** Rounding per-occurrence instead of per-total overstates cost.
 The canonical regression case: needing 179 of a vendor item sold in
 batches of some size that should round up to a total of 180, not 186 -
-the bug that motivated pinning this arithmetic as a high-evidence zone
-(formerly do-not-touch; see `docs/KNOWN-ISSUES.md`'s policy note). The
+the bug that motivated pinning this arithmetic against change without
+proof (see `docs/KNOWN-ISSUES.md`'s policy note). The
 class also carries the Astral Acclaim / Wizard's Vault seasonal purchase
 cap (`SeasonalCap`, independent of the pre-existing daily/weekly cap
 fields) and the Homestead Refinement efficiency-tier discount, both
 threaded through the exact same merged-batch machinery rather than as
 separate paths.
 
-**Where:** `Services/VendorBatchSolver.cs`. This arithmetic is a
-documented-essential high-evidence zone (formerly do-not-touch): WP-11
+**Where:** `Services/VendorBatchSolver.cs`. This arithmetic is
+documented-essential and pinned by expensive evidence: WP-11
 and WP-15 restructured the *shape* around it (an out-param bundle became
 a result struct; the whole engine moved out of `PlanSolver` into its own
 class) but never touched the arithmetic itself - both moves are diffable
 as pure code motion. A change to the arithmetic itself is permitted when
 it carries characterization tests of current behavior, the standard
 adversarial review pipeline, and an explicit improved/regressed-nothing
-statement, per the high-evidence-zone policy.
+statement, per `docs/KNOWN-ISSUES.md`'s policy note.
 
 ### 7.1 Offer tiering, in full
 
@@ -1554,7 +1555,7 @@ is the only place that resolves an actual `BitmapFont`.
 
 **Why:** the numbers are measured, not chosen, and two of them are
 measured *defects* that a later contributor would otherwise rediscover the
-expensive way, in a live desktop session:
+expensive way, in a live sandbox session:
 
 - **18-regular is unusable for prose.** Its space glyph advances 4px,
   against 7 at 16-regular and 9 at 18-bold, so any multi-word string at
@@ -1981,7 +1982,7 @@ one. The bounded window is armed once, at drag settle.
 `SuspendLayout`/`ResumeLayout` around the replay is about comparison cost.
 For a long shopping list or a deep tree, replaying dozens of per-row closures
 in a single tick without it would trigger that many redundant full sibling
-reflows in the same frame (the `O(rows^2)` risk raised as m2 risk 2). The
+reflows in the same frame - an `O(rows^2)` risk. The
 coalesced reflow is a no-op for vertical position anyway, because these
 writes only ever touch `Width`/`X` - row heights stay fixed, and
 `SingleTopToBottom` flow positions children from cumulative `Height`.
@@ -2261,7 +2262,7 @@ which simulation confirms is immune (0/5000 vanishes) for every
 (`rowHeight`, scale) pair tested - proven, not merely observed clean at one
 scale.
 
-The tier-2 re-run, after the owner icon ruling grew the plan tab's icon-led
+The tier-2 re-run, after the tier-2 icon change grew the plan tab's icon-led
 rows to 45px (Used Materials / Shopping / Required Recipes: flush tier-2 frame
 plus divider) and 52px (Crafting Steps): the simulation, re-derived from the
 decompiled `ScaleBy` floor/ceil semantics and validated by reproducing the
@@ -2288,7 +2289,7 @@ no rasterized scanline survives the scissor.
 The model earns its authority over the shipped geometry by first reproducing
 the measured past: the vulnerable 44px and 32px rows at the 0.897 "Normal"
 scale and the then-30px section header at the 0.81 "Small" scale (the scale of
-that session's live pixel scans), at the same ~10.2% vanish rates published
+the live pixel scans), at the same ~10.2% vanish rates published
 above, and the immune 36px rows. A model that cannot reproduce the
 live-verified past has no authority over the present.
 
@@ -2547,7 +2548,7 @@ INSTANCE was primed by its own press, so a frame long enough to contain both
 halves of the next click loses the press. A decision pill's click used to
 re-solve and rebuild every control in the plan, which is what turned into the
 reported "rapid IGNORE toggling drops clicks". Ignoring a LEAF material - the
-common case, and the one the field report is about - passes the gate.
+common case, and the one reported in game - passes the gate.
 
 The pill column's budget is exceeded because `DecisionPillPlanner.AppendOwnershipPills`
 unconditionally adds an ignore toggle, plus "USING N OWNED" when applicable, to
@@ -2568,7 +2569,7 @@ available between the column's two neighbours' minimums - the whole panel
 surplus past the module's minimum width leftward, plus the cost column's
 reserve above what its rows actually draw rightward
 (`TreePillColumnMath.Affordable`). An earlier cap of half the surplus was
-what the field report's second pass caught: the "1x Obsidian Shard" row
+what a second look in game caught: the "1x Obsidian Shard" row
 still chipped on windows with room to spare on both sides of the column.
 Each direction stops at that side's own minimum. Leftward the name column
 keeps the budget it holds at the minimum window - the budgets
@@ -2611,7 +2612,7 @@ options. The hidden pills are almost always the trailing annotation and the
 IGNORE toggle, and a real affordance means a new popup or menu surface, with
 its own dismiss, focus and scroll behaviour, hanging off a case that tightened
 padding already resolves most of the time. The tooltip states the fact; the
-desktop gate decides whether the fact needs an affordance.
+sandbox check decides whether the fact needs an affordance.
 
 ### V.34 `TreeToolbarCommands`: why the buttons left the section header
 
@@ -2888,7 +2889,7 @@ exceeds it - a fixed floor (`ShoppingColumnMath.TotalMinWidth`), a
 header-width floor (every band in the module is floored at its own label so
 the label fits), or a reserve shared by several columns and sized by the
 widest of them (`SummarySectionLayoutMath`'s one `NumberColumnWidth` across
-Required/Have/Needed). Measured on the owner's 2026-08-28 capture: the
+Required/Have/Needed). Measured on a 2026-08-28 capture: the
 Recipe Tree's "Source" header centred at x~797 over a badge run occupying
 700..765, and the currency table's "Have" header sat over neither its own
 numbers' right edge nor their centre.
@@ -2906,8 +2907,8 @@ is the column's right edge whenever the band ends there, so the clamp fires
 for every header wider than its column's ink - which is most of them, since
 every band is floored at its own header label - and pins the header's right
 edge to the values' right edge. That is right-alignment: precisely what the
-centring was added to remove, and what the owner measured on the 2026-08-29
-capture, where Required/Have/Needed sat 17, 12 and 15px left of their ink -
+centring was added to remove, and what the 2026-08-29 capture measured,
+where Required/Have/Needed sat 17, 12 and 15px left of their ink -
 exactly half of each header's excess over the numbers under it.
 
 A band is not a boundary. What a header must not reach is the *neighbouring
@@ -2940,7 +2941,7 @@ band still tracks the content.
 
 `Services/ItemIconTiers.cs` and `Services/CurrencyIconTiers.cs` hold two
 sizes each, matched to the game's own two inventory and two wallet tiers
-(owner rulings, 2026-08-26 and 2026-08-27). Both are Blish-free so the
+(decided 2026-08-26 and 2026-08-27). Both are Blish-free so the
 layout math that reserves room for an icon and the view that draws it read
 the same number.
 
@@ -2972,7 +2973,7 @@ half the size. That is the rule the renderers spell as
 `iconYOffset = (textHeight - iconSize) / 2`, recorded here so it need not be
 re-derived from a screenshot.
 
-**The coins are the exception**, ruled by the owner on 2026-09-04: gold,
+**The coins are the exception**, decided 2026-09-04: gold,
 silver and copper seat their *art* on the number's ink bottom
 (`CoinIconY`, in `Services/CoinSegmentMath.cs`), because a centred *box* leaves the
 padded coin art reading high against the digits. Two paddings sit between
@@ -3004,7 +3005,7 @@ SoulBindOnUse), which is what rules out a most-specific ladder. Within a
 dimension the stronger flag wins - live3 almonds 12337 and fury-scorched
 86967 both carry AccountBound *and* AccountBindOnUse and render one account
 line. Five captures carry a bind-on-acquire flag and read bare: Gift of
-Twilight 19648 (the 2026-08-27 owner A/B, the same item hovered in the
+Twilight 19648 (the 2026-08-27 A/B, the same item hovered in the
 module and in the game), heart-of-destroyer 67017 and holographic-wings
 79157 - all AccountBound + AccountBindOnUse, all bare "Account Bound" -
 relic-livingcity 104938, and red-festival-lantern 68638 (SoulbindOnAcquire +
@@ -3141,7 +3142,7 @@ true rate is not a whole number, and rather than round - inventing data the
 spec does not ask for - the amount carries a literal "N for M" bundle label.
 
 `ResolveTreeNodeUnitAmounts` answers the same question for a single tree row
-(`TreeSectionController`'s "Unit price:" tooltip line, field-test finding B),
+(`TreeSectionController`'s "Unit price:" tooltip line, an in-game finding),
 where the true batch rate is simply not present: `OutputCount` and
 `CurrencyCostLinesPerBatch` exist only on `PlanStep`, threaded there by
 `VendorBatchSolver.FinalizeVendorBatches` for the merged shopping list - a
@@ -3203,7 +3204,7 @@ The `wallClockMs` parameter exists because the sum of the raw per-step lines
 necessarily omits every un-instrumented gap between them - task scheduling,
 awaits resuming, GC - so it is always less than or equal to the wrapper's
 own wall-clock `Stopwatch`, and for a real ~19s generation the two can
-differ by seconds rather than milliseconds. The single number a field tester
+differ by seconds rather than milliseconds. The single number a a player
 actually experiences ("it took 19 seconds") is the wall-clock figure, so
 when it is supplied it becomes the "total" with the phase sum appended
 alongside as "(phases Nms)" for comparison; when absent - every existing
@@ -3227,7 +3228,7 @@ two points: a 400px window (about 184px of draw) rasterized as coloured
 streaks behind the title, and 560 (about 344px) renders clean. 500 - the
 480px `MinContentWidth` plus the shell's 2x10 side insets - sits at about
 284px of draw. That is inferred from the bracket, not measured; if the art
-degrades in the field the floor moves up, and nothing else has to change.
+degrades in game the floor moves up, and nothing else has to change.
 
 **Why the title can push past the ceiling.** `PaintTitleText` draws the
 title in `DefaultFont32` at a fixed 80px indent with no alignment control,
@@ -3388,7 +3389,7 @@ calls about substitutability, which is a property the game itself decides:
 different questions about the same rows, and a row's answer under one says
 nothing about its answer under the other. Keeping only the last mode's set
 made every toggle a full recompute, including a toggle straight back to
-numbers the session had already paid for (owner ruling, 2026-08-27).
+numbers the session had already paid for (decided 2026-08-27).
 
 ### S2.3 Column and section geometry (Q-Z)
 
@@ -3418,8 +3419,9 @@ and why the fallback is exactly the full-width row the flow had before.
 same kind of thing `Services/PlanContentHeightMath.cs` and
 `Services/PlanRelayoutMath.cs` already do for every other section, and it
 is deliberately kept out of both: they are shared infrastructure several
-other sections' row builders depend on, and they are high-evidence zones
-(see [`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md#policy-high-evidence-zones)) -
+other sections' row builders depend on, and both are pinned by expensive
+evidence (see
+[`docs/KNOWN-ISSUES.md`](KNOWN-ISSUES.md#policy-code-pinned-by-expensive-evidence)) -
 off-limits for the broader fold-back this class's existence sidesteps.
 KNOWN-ISSUES #46 carries the original rationale.
 
@@ -3672,9 +3674,9 @@ section 9 reproduces the method and every anchor figure of that report's own
 
 1378, not the 1232 the like-for-like depth-14 arithmetic gives on its own:
 1232 accepts that a row combining a forced-craft dust chain with a vendor
-currency run ellipsizes, and the maintainer declined that trade - "we are
-designing for a minimum resolution of 1920x1080, so cramming down to a
-smaller min-size that will result in cramped renders seems bad". The +154
+currency run ellipsizes, and that trade was declined: the module is
+designed against a minimum resolution of 1920x1080, and a smaller minimum
+window size produces cramped renders. The +154
 rider is what buys "a two-currency vendor run always fits at the floor".
 
 Down from 1478, which fitted the depth-23 "+24 Agony Infusion" chain
@@ -3691,7 +3693,7 @@ trailing padding - under 700px all told, half of what the tree needs.
 ### S2.10 Wiki link launch
 
 **`WikiLinkLauncher` - the first external-URL launch.** This is the module's
-first launch of an external URL, a deliberate maintainer decision. The
+first launch of an external URL, a deliberate decision. The
 try/catch exists because ShellExecute can throw for reasons outside the
 module's control - `Win32Exception` for no registered URL handler, a
 locked-down environment, and so on. The `Task.Run` offload was a later

@@ -6,8 +6,8 @@ namespace TaimisToolbench.Tests.Models
 {
     // CurrencyDecisionDefaults is a static
     // curated table, not a service - these tests pin its structural
-    // invariants (no coin-keyed entry, no entry for the currencies the
-    // maintainer explicitly decided must stay blank, and the values a
+    // invariants (no coin-keyed entry, no entry for the currencies
+    // deliberately left blank, and the values a
     // second table would otherwise contradict) rather than mirroring every
     // one of its entries.
     public class CurrencyDecisionDefaultsTests

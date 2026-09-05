@@ -73,8 +73,8 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void CostBand_NoMaterialsUsed_StillRendersTheWholeFormula()
         {
-            // The maintainer's ruling, made twice against a live plan: a
-            // term worth zero shows a zero. Owning none of what a plan
+            // The rule, settled twice against a live plan: a term worth
+            // zero shows a zero. Owning none of what a plan
             // needs is the ordinary case, and it used to hide two thirds
             // of the section.
             var result = MakeResult(totalCoinCost: 123456);

@@ -3,9 +3,9 @@
 
 ## Two "Gaeting Crystal" currency ids: one is retired (gaeting-crystal-duplicate-ids)
 
-Answers FEEDBACK-BACKLOG item R1: two wallet currency ids, 39 and 77, both
-carry the name "Gaeting Crystal", and the Settings valuation grid drew them
-as two identically-labelled rows.
+Two wallet currency ids, 39 and 77, both carry the name "Gaeting Crystal",
+and the Settings valuation grid drew them as two identically-labelled
+rows.
 
 **Answer: currency 39 is retired. It was withdrawn from the game on
 2022-07-19 and no account can hold it. Currency 77 is the live one. They
@@ -69,7 +69,7 @@ entirely past tense ("were a currency earned from killing bosses ... in the
 Hall of Chains, Mythwright Gambit, and The Key of Ahdashim raid wings").
 
 The conversion was automatic, account-wide and 1:1, so **no live account
-holds currency 39 in any amount**. The brief's caution about not removing a
+holds currency 39 in any amount**. The caution about not removing a
 valuation while held balances might still exist does not apply here; there
 are none by construction.
 
@@ -209,9 +209,9 @@ with the renames in this branch applied.
 ### What changed on this branch
 
 **The relabelling described in the first version of this section was
-superseded by an owner ruling on the same day: a currency retired from the
+superseded the same day by a stricter rule: a currency retired from the
 game is removed from the module outright rather than relabelled.** The
-evidence above is what carries that ruling - section 6 measured zero cost
+evidence above is what carries that rule - section 6 measured zero cost
 lines paying currency 39 in `ref/vendor_offers.json`, and no account has
 been able to hold one since 2022-07-19, so the row could not tip a solve and
 a Settings row for it could only offer to clear a default that never

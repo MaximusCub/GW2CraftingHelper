@@ -213,7 +213,7 @@ process, all of it checkable from this repository:
 - **UI changes are checked in the running game**, not asserted from a diff, and
   what was actually observed is recorded: each milestone record under
   [`dev/records/`](dev/records/) ends in an explicit `Gate:` line - PASS,
-  FAIL, or "not required" with the reason - naming the live desktop session
+  FAIL, or "not required" with the reason - naming the live sandbox session
   that verified it, and a claim with no gate behind it says so.
 - **Every change is adversarially reviewed** against a written checklist in
   [`CLAUDE.md`](CLAUDE.md) - null inputs, empty collections, cancellation, API

@@ -3,7 +3,7 @@
 
 ## Character-name search minimum query length (char-search-min2)
 
-Maintainer decision, closing the "Character-search minimum query length"
+Decision closing the "Character-search minimum query length"
 item the nth-cleanup batch left open by choice. The reason is the result
 list, not the per-keystroke cost: with one-letter matching, typing "ar"
 on the way to an item name first passes through "a", which surfaces
@@ -33,13 +33,13 @@ it.
 
 Validation: module build 0 errors; suite 1889/1889.
 
-Desktop gate should look at: type a single letter that begins a character
+Sandbox check should look at: type a single letter that begins a character
 name into the Snapshot search and confirm only item/currency name matches
 appear (no character holdings), then add the second letter and confirm
 that character's items appear. The per-character checkboxes and the
 AND-composition from char-source-search are unaffected and need no
 re-gating.
-Gate: PASS (2026-08-22, Paint-dummy desktop session, branch build
+Gate: PASS (2026-08-22, Paint-dummy sandbox session, branch build
 651375c, captures preflight/m2a-one-char.png / m2b-two-char.png).
 The preflight roster's holder names all contain "t" (Maximus Test,
 Alt Number Two, Third Wheel, Ranger Of The North...), giving a clean
@@ -49,5 +49,5 @@ character); adding "h" ("th", matched by no item name) returned
 exactly Green Wood Log via Third Wheel / Ranger Of The North (the
 floor lifting at two). The reviewer's noted empty-state wording gap
 (a one-letter query's message does not mention the character-label
-floor) was observed as accurate-but-unexplained live; left as the
-recorded maintainer call.
+floor) was observed as accurate-but-unexplained live; left as
+recorded.

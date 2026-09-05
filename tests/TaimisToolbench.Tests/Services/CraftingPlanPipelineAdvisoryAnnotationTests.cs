@@ -10,8 +10,8 @@ namespace TaimisToolbench.Tests.Services
 {
     public class CraftingPlanPipelineAdvisoryAnnotationTests
     {
-        // --- Quorum verdict D-3 (TARGETED_FIX_ONLY): annotation-detection
-        // characterization tests. A mutation deleting all four post-solve
+        // --- Annotation-detection characterization tests. A mutation
+        // deleting all four post-solve
         // annotation-pass calls (CompetencyOpportunityCalculator.Apply,
         // ExcessCraftOutputCalculator.Apply, RecipeSheetSavingsCalculator.
         // Apply, SeasonalVendorTipCalculator.Apply) at the multi-item

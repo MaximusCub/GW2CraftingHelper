@@ -43,11 +43,11 @@ parameters. [Wizard's Vault - GW2 Wiki](https://wiki.guildwars2.com/wiki/Wizard%
 | Mystic Clover | 60 AA each | 20/season (1,200 AA to cap) | Flat single-tier price; no purchase beyond the cap. Account-bound, **not tradable on the Trading Post** (confirmed live: `GET /v2/commerce/prices/19675` -> `"text": "no such id"`). |
 | Obsidian Shard | 30 AA each | 20/season (600 AA to cap) | Flat single-tier price. Also account-bound/no-sell (confirmed via `/v2/items/19925` flags `AccountBound, NoSalvage, NoSell`). |
 | Vision Crystal | 150 AA each | 4/season (600 AA to cap) | Ascended-tier trophy; tangential to weapon legendaries, more relevant to legendary armor/ascended progression. |
-| Bag of Coins (1 Gold) | 8 AA each (limited tier), **then 35 AA each (unlimited tier)** | 100/season at 8 AA, unlimited after that at 35 AA | **This is the confirmed two-tier item** the maintainer flagged - see section 2. |
+| Bag of Coins (1 Gold) | 8 AA each (limited tier), **then 35 AA each (unlimited tier)** | 100/season at 8 AA, unlimited after that at 35 AA | **This is the confirmed two-tier item** - see section 2. |
 | Legendary Weapon Starter Key - Set 1 | 1,000 AA | Limit 1 per account, ever (not per-season) | Requires *Guild Wars 2: Visions of Eternity*. One-time unlock of a starter kit (precursor + legendary-specific gift + choice of Gift of Magic/Might) for one of several Gen-1 legendaries (Bifrost, Quip, Bolt, Meteorlogicus in Set 1). Later "Set 2..10" variants exist as new content ships, each independently capped at 1/account. [Legendary Weapon Starter Key-Set 1](https://wiki.guildwars2.com/wiki/Legendary_Weapon_Starter_Key%E2%80%94Set_1) |
 | Legendary Essence of Luck | 20 AA | Cap not captured in the raw-wikitext extraction (unspecified) | Minor luck-consumable; not central to crafting. Flagged UNVERIFIED for cap. |
 
-**Not currently in the store** (correcting an assumption in the research brief):
+**Not currently in the store** (correcting an earlier assumption):
 Amalgamated Gemstone does not appear in the Wizard's Vault at all, now or
 historically as far as searches could establish - it is purely a Mystic Forge
 product (T6 material + doubloon/crest + ectoplasm), unrelated to Astral
@@ -76,8 +76,8 @@ Acclaim - GW2 Wiki](https://wiki.guildwars2.com/wiki/Astral_Acclaim),
 
 ## 2. Tiered pricing: confirmed pattern, and where it does/doesn't apply
 
-The maintainer's premise ("many items have tiered pricing: N at a discount,
-then a higher price") is **confirmed for Bag of Coins (1 Gold)** and
+The premise that many items have tiered pricing (N at a discount, then a
+higher price) is **confirmed for Bag of Coins (1 Gold)** and
 **NOT confirmed for any of Mystic Coin / Mystic Clover / Obsidian Shard /
 Vision Crystal**, per the raw wikitext of the main Astral Rewards table (no
 second row, no "unlimited"/"additional" language for any of those four - the
@@ -93,8 +93,8 @@ wiki page:
 
 Arithmetic (section 5) shows Tier 1 is ~4.4x more copper-efficient than Tier
 2 (1,250 vs 286 copper/AA), which is a clean, well-defined case of "buy the
-discounted batch, stop before the second tier" - the exact pattern the
-maintainer described. No 3+-source community discussion of this *specific*
+discounted batch, stop before the second tier" - the exact tiered pattern in
+question. No 3+-source community discussion of this *specific*
 item's tiering was found (it's a minor gold-conversion sink, not a
 legendary-crafting headline), so the "stop at tier 1" advice here is
 **UNVERIFIED as explicit community guidance** but is a direct, unambiguous
@@ -180,7 +180,7 @@ reasons guides give for prioritizing clovers, not a copper-efficiency claim:
    Crows](https://snowcrows.com/guides/open-world/how-to-get-mystic-clovers),
    [eathealthy365 2026 guide](https://eathealthy365.com/your-ultimate-guide-to-farming-mystic-clovers-in-2026/)
 
-This is the key nuance for the maintainer's eventual ranking feature: a pure
+This is the key nuance for any eventual ranking feature: a pure
 "copper saved per AA" metric would under-rank clovers relative to how
 legendary crafters actually value them, because the real driver is
 *guaranteed supply against a hard per-legendary requirement*, not marginal
@@ -319,11 +319,11 @@ directly confirmed by wiki arithmetic):
 | Mystic Coin | 9 AA each, cap 60/season | CONSENSUS top-tier buy (GuildJen, Medium 2023, SEO cluster) | **2,332 c/AA** (TP instant-buy 20,991c/coin) - best clean, fully-priced rate in this survey; confirms the consensus. |
 | Mystic Clover | 60 AA each, cap 20/season | CONSENSUS top-priority buy for legendary crafters (GuildJen, Medium 2023, eathealthy365, Snow Crows) | **~1,234 c/AA implied** (EV cost avoided via TP-priceable Forge-gamble mats only, ~31-33% success) - *lower* raw rate than Mystic Coin; consensus is driven by guaranteed-supply-against-a-77-per-weapon-cap, not copper efficiency (see section 3). |
 | Obsidian Shard | 30 AA each, cap 20/season | CONTESTED (worth it per Medium 2023; skip it per GuildJen 2026) | **Arithmetic sides with "skip it"**: Laurel Merchant sells the same item for 1 uncapped Laurel vs. 30 capped AA. |
-| Bag of Coins, Tier 1 | 8 AA each, cap 100/season | CONSENSUS-by-arithmetic "buy the discount tier" (no source named this item specifically, but the tiering itself is the maintainer's flagged pattern) | **1,250 c/AA** (flat 1 gold = 10,000c). |
+| Bag of Coins, Tier 1 | 8 AA each, cap 100/season | CONSENSUS-by-arithmetic "buy the discount tier" (no source named this item specifically, but the tiering itself is the pattern in question) | **1,250 c/AA** (flat 1 gold = 10,000c). |
 | Bag of Coins, Tier 2 | 35 AA each, uncapped, after Tier 1 | CONSENSUS-by-arithmetic "stop before this tier" | **286 c/AA** - a >4x drop from Tier 1, the clearest tiered-pricing cliff found. |
 | Legendary Weapon Starter Key (Set 1) | 1,000 AA, 1/account ever | CONTESTED/thin (2 favorable voices, no direct opposing case, but no rigorous cost-benefit found either) | Not computed - one-time unlock of account-bound crafting components feeding into a tradable legendary; no clean per-AA comparison exists since it's not a repeatable/marginal purchase. |
 | Vision Crystal | 150 AA each, cap 4/season | UNVERIFIED (no source discussed it in a legendary-crafting context) | Not computed - tangential to weapon legendaries. |
-| Amalgamated Gemstone | N/A - not in the store | N/A | Confirms the research brief's speculative inclusion of this item was incorrect; it is Mystic-Forge-only. |
+| Amalgamated Gemstone | N/A - not in the store | N/A | Confirms the speculative inclusion of this item was incorrect; it is Mystic-Forge-only. |
 
 ## Sources
 

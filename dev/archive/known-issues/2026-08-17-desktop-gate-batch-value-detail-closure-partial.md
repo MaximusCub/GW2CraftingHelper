@@ -1,7 +1,7 @@
 > **Frozen record - 2026-08-17, branch `desktop-gate-batch-value-detail-closure-partial`.** Moved verbatim out of `docs/KNOWN-ISSUES.md`; the heading below is the section's own.
 > Point-in-time evidence - it describes the code as it stood that day and may not describe current code. Current documentation is [`docs/`](../../../docs/README.md).
 
-## Desktop gate batch: value-detail closure + partial currency coverage (2026-08-17, orchestrator live session)
+## Sandbox check batch: value-detail closure + partial currency coverage (2026-08-17, live session)
 
 Sandbox at master 51bdf88 (m38-final copy, preflight settings, Paint
 dummy, PID-scoped teardown).

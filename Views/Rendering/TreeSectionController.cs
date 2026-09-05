@@ -94,7 +94,7 @@ namespace TaimisToolbench.Views.Rendering
         // semantics (see PlanSolver.Solve's ignoredItemIds parameter).
         // Independent of _nodeOverrides: neither "Best Path" nor "Craft
         // All"/"Buy All" clears this (gw2e's bulk actions are documented as
-        // unrelated to ownership - r2 report Section 3.3); it is only ever
+        // unrelated to ownership); it is only ever
         // toggled per item id (the pill click) or on a fresh Generate.
         private readonly HashSet<int> _ignoredItemIds = new HashSet<int>();
         private readonly Dictionary<int, bool> _nodeExpansion =
@@ -594,8 +594,8 @@ namespace TaimisToolbench.Views.Rendering
         /// "Plan updated" event rather than claiming "Best path restored",
         /// which is a preset's label and not a description of clearing.
         /// See KNOWN-ISSUES #59: the two buttons being one action is a
-        /// finding for the maintainer, not something this seam invents a
-        /// difference to hide.
+        /// recorded finding, not something this seam invents a difference
+        /// to hide.
         /// </summary>
         private void ClearOverrides()
         {

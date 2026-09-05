@@ -605,7 +605,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal("blade.png", section.Rows[0].IconUrl);
         }
 
-        // --- Wave-3 quick win #2: Mystic Forge rows excluded from the
+        // --- Quick win #2: Mystic Forge rows excluded from the
         // Required Recipes SECTION (nothing to learn) ---
         [Fact]
         public void RequiredRecipes_MysticForgeOnly_SectionOmittedEntirely()
