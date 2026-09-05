@@ -447,20 +447,21 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// A group heading is one line of caption text in its own row, at
-        /// the single-line row height the section's footnote already draws
-        /// at - aliased rather than restated, for the reason this class's
-        /// own doc comment gives.
+        /// A group heading is one line drawn in the same face as the column
+        /// headers above it, so it takes the same row height and the same
+        /// label y they do - aliased rather than restated, for the reason
+        /// this class's own doc comment gives. That pair is the one already
+        /// derived to clear this face's descenders inside the row, so a
+        /// tier-seat swap moves the heading with the band it matches.
         /// </summary>
-        public const int NonCoinGroupHeadingHeight = PlanContentHeightMath.FallbackTextRowHeight;
+        public const int NonCoinGroupHeadingHeight = PlanContentHeightMath.ColumnHeaderRowHeight;
 
         /// <summary>
-        /// Baseline-box y of a group heading's label: its Caption line box
-        /// centred in the heading row, the same rule
-        /// <see cref="CurrencyRowTextY"/> centres a data row by.
+        /// Line-box y of a group heading's label. See
+        /// <see cref="NonCoinGroupHeadingHeight"/> for why it is the column
+        /// header's own, not a centring of the line box in the row.
         /// </summary>
-        public static int NonCoinGroupHeadingTextY =>
-            (NonCoinGroupHeadingHeight - TypeRampMetrics.CaptionInk.LineHeight) / 2;
+        public const int NonCoinGroupHeadingTextY = PlanContentHeightMath.ColumnHeaderLabelY;
 
         /// <summary>
         /// Height of everything the non-coin table draws BELOW its

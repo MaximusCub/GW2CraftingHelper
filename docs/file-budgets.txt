@@ -247,7 +247,7 @@ Services/StatusStore.cs                                                         
 Services/StatusText.cs                                                                  286
 Services/StatusUpdateGuard.cs                                                           38
 Services/StickyHeaderLayout.cs                                                          117
-Services/SummarySectionLayoutMath.cs                                                    852
+Services/SummarySectionLayoutMath.cs                                                    853
 Services/TableSortState.cs                                                              114
 Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
@@ -453,7 +453,7 @@ tests/TaimisToolbench.Tests/Services/PillSubduingEvaluatorTests.cs              
 tests/TaimisToolbench.Tests/Services/PillSubduingTooltipBuilderTests.cs                 130
 tests/TaimisToolbench.Tests/Services/PillTooltipTextComposerTests.cs                    306
 tests/TaimisToolbench.Tests/Services/PlanCompatibilityFixtureTests.cs                   371
-tests/TaimisToolbench.Tests/Services/PlanContentHeightMathTests.cs                      604
+tests/TaimisToolbench.Tests/Services/PlanContentHeightMathTests.cs                      625
 tests/TaimisToolbench.Tests/Services/PlanHistoryBlobStoreTests.cs                       324
 tests/TaimisToolbench.Tests/Services/PlanHistoryDedupKeyTests.cs                        94
 tests/TaimisToolbench.Tests/Services/PlanHistoryLabelsTests.cs                          138

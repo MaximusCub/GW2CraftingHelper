@@ -40,6 +40,27 @@ namespace TaimisToolbench.Tests.Services
                     + $"{PlanContentHeightMath.ColumnHeaderRowHeight}px band");
         }
 
+        /// <summary>
+        /// The Total Cost table's group headings ("From your wallet" /
+        /// "From your inventory") draw in the SAME face as the banded
+        /// column headers above them, so their row has to hold that face's
+        /// descenders too. A row sized for the shorter caption line the
+        /// headings used to draw in would clip them.
+        /// </summary>
+        [Fact]
+        public void NonCoinGroupHeadingRow_HoldsTheHeaderFacesDescenders()
+        {
+            int inkBottom = TypeRampMetrics.InkBottom(
+                TypeRampMetrics.ColumnHeaderInk,
+                SummarySectionLayoutMath.NonCoinGroupHeadingTextY);
+
+            Assert.True(
+                inkBottom + ScissorSafeClearance
+                    <= SummarySectionLayoutMath.NonCoinGroupHeadingHeight,
+                $"group heading ink bottom {inkBottom} crowds the "
+                    + $"{SummarySectionLayoutMath.NonCoinGroupHeadingHeight}px row");
+        }
+
         [Fact]
         public void ColumnHeaderBand_KeepsTheOpticalPlacementTheBodyHeaderHad()
         {
