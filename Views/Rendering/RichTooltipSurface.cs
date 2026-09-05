@@ -107,19 +107,24 @@ namespace TaimisToolbench.Views.Rendering
         private static readonly Color ShadowColor = Color.Black * 0.8f;
 
         /// <summary>
-        /// The header icon: ~34x34 including its 1px frame, ~32px of art,
-        /// with the name ~5px to its right - all measured off the xyaren
-        /// capture (KNOWN-ISSUES #42, gap G11).
+        /// The header icon's box, read off the tier table rather than
+        /// restated here: the row height and the name indent below have to
+        /// be the number IconControls actually draws the icon at.
         /// </summary>
-        private const int HeaderIconSize = 32;
+        private static readonly int HeaderIconFrameSize =
+            ItemIconTiers.FrameSize(ItemIconTier.TooltipHeader);
 
-        private const int HeaderIconBorder = 1;
-
-        private const int HeaderIconFrameSize = HeaderIconSize + (2 * HeaderIconBorder);
-
+        /// <summary>The gap between that box and the name, measured off the
+        /// xyaren capture (KNOWN-ISSUES #42, gap G11).</summary>
         private const int HeaderIconGap = 5;
 
-        private static readonly Color HeaderIconFrameColor = new Color(166, 175, 174);
+        /// <summary>
+        /// The game's frame around a tooltip header icon: an exact
+        /// (229,229,229) on all four edges of a lossless currency-tooltip
+        /// capture. Supersedes (166,175,174), one edge sample off the
+        /// xyaren item capture that landed flagged as a judgment call.
+        /// </summary>
+        private static readonly Color HeaderIconFrameColor = new Color(229, 229, 229);
 
         /// <summary>
         /// The inline effect icon beside a consumable's effect block:
@@ -429,13 +434,13 @@ namespace TaimisToolbench.Views.Rendering
             }
             else if (row.IconUrl != null)
             {
-                // The game frames the icon in a 1px light grey (measured
-                // (166,175,174) on the xyaren capture's left edge) rather
-                // than in the rarity colour the module frames its ROWS
-                // with - the name beside it already carries the rarity.
-                // One colour, two shapes: a plate behind a currency's
-                // transparent art shows through as a background, so a
-                // currency takes the ring (ItemIconFrame.IsOutline).
+                // The game frames the icon in the light grey named on
+                // HeaderIconFrameColor rather than in the rarity colour the
+                // module frames its ROWS with - the name beside it already
+                // carries the rarity. One colour, two shapes: a plate
+                // behind a currency's transparent art shows through as a
+                // background, so a currency takes the ring
+                // (ItemIconFrame.IsOutline).
                 ItemIconFrame frame = row.HeaderSubject.IsCurrency
                     ? ItemIconFrame.ExplicitOutline(HeaderIconFrameColor)
                     : ItemIconFrame.Explicit(HeaderIconFrameColor);
@@ -507,6 +512,11 @@ namespace TaimisToolbench.Views.Rendering
                 // name reads identically on the row and in its tooltip.
                 case TooltipSpanRole.Rarity:
                     return RarityColors.GetRarityNameColor(span.RarityKey);
+
+                // Blish's own constant for the game's warm tan, and it is
+                // the measured currency-name colour to the unit.
+                case TooltipSpanRole.CurrencyName:
+                    return ContentService.Colors.Chardonnay;
 
                 // MEASURED on live/eq-weapon-full.png (2026-08-25,
                 // lossless) across six independent lines - two sigil

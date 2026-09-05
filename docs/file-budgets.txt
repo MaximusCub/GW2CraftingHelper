@@ -252,7 +252,7 @@ Services/TableSortState.cs                                                      
 Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
 Services/TextWrapMath.cs                                                                324
-Services/TooltipContent.cs                                                              572
+Services/TooltipContent.cs                                                              589
 Services/TooltipLayoutMath.cs                                                           487
 Services/TooltipTextFormat.cs                                                           136
 Services/TopRegionLayoutMath.cs                                                         116
@@ -315,7 +315,7 @@ Views/Rendering/PressFeedback.cs                                                
 Views/Rendering/RankerReadinessColors.cs                                                99
 Views/Rendering/RarityColors.cs                                                         199
 Views/Rendering/RecipesSectionRenderer.cs                                               365
-Views/Rendering/RichTooltipSurface.cs                                                   607
+Views/Rendering/RichTooltipSurface.cs                                                   609
 Views/Rendering/RowRelayoutHelpers.cs                                                   72
 Views/Rendering/ShoppingBadgeColors.cs                                                  72
 Views/Rendering/ShoppingListSectionRenderer.cs                                          550
@@ -418,7 +418,7 @@ tests/TaimisToolbench.Tests/Services/IconFrameGeometryTests.cs                  
 tests/TaimisToolbench.Tests/Services/InlineSpinnerLayoutTests.cs                        87
 tests/TaimisToolbench.Tests/Services/InventoryReducerTests.cs                           1617
 tests/TaimisToolbench.Tests/Services/ItemDescriptionSanitizerTests.cs                   155
-tests/TaimisToolbench.Tests/Services/ItemIconTiersTests.cs                              150
+tests/TaimisToolbench.Tests/Services/ItemIconTiersTests.cs                              164
 tests/TaimisToolbench.Tests/Services/ItemInputGridLayoutTests.cs                        356
 tests/TaimisToolbench.Tests/Services/ItemMetadataServiceConcurrencyTests.cs             197
 tests/TaimisToolbench.Tests/Services/ItemMetadataServiceStatCacheTests.cs               214

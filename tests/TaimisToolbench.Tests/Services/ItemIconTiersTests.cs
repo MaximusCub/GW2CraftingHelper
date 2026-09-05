@@ -104,6 +104,20 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void TheTooltipHeaderTierReservesTheGamesOwnHeaderBox()
+        {
+            // The game's tooltip header icon measures 34x34 physical on a
+            // capture taken at the "Normal" GW2 UI size, and Blish paints
+            // this tier's logical box through that size's 0.897 scale. A
+            // tier set to the physical 34 painted 31 and read 3px small on
+            // each axis beside the game's own tooltip.
+            Assert.Equal(38, ItemIconTiers.FrameSize(ItemIconTier.TooltipHeader));
+            Assert.Equal(
+                34,
+                (int)Math.Round(ItemIconTiers.FrameSize(ItemIconTier.TooltipHeader) * 0.897));
+        }
+
+        [Fact]
         public void TheCurrencyTiersFramedBoxIsTheMeasuredWalletWindow()
         {
             // The one place the item tiers and the currency tiers differ:
