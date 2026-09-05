@@ -252,6 +252,11 @@ namespace TaimisToolbench.Views.Rendering
         private int _pillColumnWidth = PlanRelayoutMath.TreePillColumnWidth;
         private int _planPillRequiredFloor;
 
+        // Widest pill run each row has drawn while THIS plan has been on
+        // screen. The IGNORE key answers to this rather than to the run
+        // the row currently draws - see Services/TreePillRunInkFloor.
+        private readonly TreePillRunInkFloor _planPillRunInk = new TreePillRunInkFloor();
+
         // How much of THIS render's pill column was claimed from the cost
         // column's reserve above what its rows draw
         // (TreePillColumnMath.RightClaim). EffectiveCostColumnWidth hands
@@ -335,6 +340,7 @@ namespace TaimisToolbench.Views.Rendering
             // fact and is cleared with it.
             _planCostColumnFloor = TreeCostColumnMath.CostColumnWidths.Empty;
             _planPillRequiredFloor = 0;
+            _planPillRunInk.Clear();
             _pillColumnCostClaim = 0;
             _sourceHeaderInkWidth = 0;
             _lastResult = result;
@@ -1961,10 +1967,11 @@ namespace TaimisToolbench.Views.Rendering
 
             int maxRightEdge = pillColX + handle.PillColumnWidth - TreePillColumnMath.TrailingClearance;
 
-            // The Ignore toggle leaves the flowed run for a slot pinned to
-            // the column's right edge - only when it is last, which is
-            // where DecisionPillPlanner emits it; anywhere else it stays in
-            // the run rather than letting the pills after it be dropped.
+            // The Ignore key leaves the flowed run for a slot of its own
+            // (Services/TreeIgnoreKeyPlacement) - only when it is last,
+            // which is where DecisionPillPlanner emits it; anywhere else it
+            // stays in the run rather than letting the pills after it be
+            // dropped.
             int anchoredIndex = specs.Count > 0 && specs[specs.Count - 1].Kind == PillKind.Ignore
                 ? specs.Count - 1
                 : -1;
@@ -1986,8 +1993,9 @@ namespace TaimisToolbench.Views.Rendering
             int chosenPadding = PillPadding - fit.WidthReduction;
 
             // Where every pill goes, decided before any is built: the
-            // flowed leading run, then the anchored toggle. The overflow
-            // pill is rendered after the loop, from the x the run left.
+            // flowed leading run, then the key seated beyond it. The
+            // overflow pill is rendered after the loop, from the x the run
+            // left.
             var placements = new List<PillPlacement>(fit.VisibleCount + 1);
             for (int specIndex = 0; specIndex < fit.VisibleCount; specIndex++)
             {
@@ -1996,32 +2004,37 @@ namespace TaimisToolbench.Views.Rendering
                 x += width + PillGap;
             }
 
+            // Right edge of this row's flowed run, including the "+N" chip
+            // the loop below draws from the same x. Read off the run
+            // rather than off the placements, because the key that
+            // follows is not part of it and is seated against it.
+            int runRightEdge = pillColX;
+            if (fit.VisibleCount > 0)
+            {
+                runRightEdge = x - PillGap;
+            }
+
+            if (fit.HiddenCount > 0)
+            {
+                runRightEdge = x + fit.OverflowPillWidth;
+            }
+
             if (anchoredIndex >= 0)
             {
                 placements.Add(new PillPlacement(
                     anchoredIndex,
-                    TreePillRunLayout.AnchoredSlotX(maxRightEdge, anchoredWidth),
+                    TreeIgnoreKeyPlacement.SlotX(
+                        maxRightEdge, CostInkX(handle, pillColX), anchoredWidth, PillGap,
+                        pillColX + _planPillRunInk.Widen(node.NodeId, runRightEdge - pillColX)),
                     anchoredWidth,
                     0));
             }
-
-            // Right edge of this row's INK, which the "Source" header
-            // centres over. Taken off the resolved placements rather than
-            // off the column's reserve: the anchored IGNORE slot is
-            // already among them at the column's own right edge, so a row
-            // that has one reports the full column and a root row that
-            // does not reports just its badges.
-            int inkRightEdge = pillColX;
 
             foreach (var placement in placements)
             {
                 var spec = specs[placement.SpecIndex];
                 int pillWidth = placement.Width;
                 int textWidth = placement.TextWidth;
-                if (placement.X + pillWidth > inkRightEdge)
-                {
-                    inkRightEdge = placement.X + pillWidth;
-                }
 
                 PillColors.GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
 
@@ -2264,13 +2277,9 @@ namespace TaimisToolbench.Views.Rendering
                 pillPanels.Add(
                     RenderOverflowPill(rowPanel, specs, fit, font, x, pillY, dimmed));
                 pillOffsets.Add(x - pillColX);
-                if (x + fit.OverflowPillWidth > inkRightEdge)
-                {
-                    inkRightEdge = x + fit.OverflowPillWidth;
-                }
             }
 
-            NoteSourceHeaderInk(inkRightEdge - pillColX);
+            NoteSourceHeaderInk(TreePillRunLayout.HeaderInkWidth(pillColX, runRightEdge));
         }
 
         /// <summary>
@@ -2309,6 +2318,24 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
+        /// Leftmost pixel the cost column's values reach on any row of
+        /// this tree, which is the line the IGNORE key may not cross
+        /// (Services/TreeIgnoreKeyPlacement). The scan behind
+        /// LeftmostInkReach measures coin and currency runs only, so a
+        /// tree with nothing priced reports 0 and this yields the column's
+        /// own left edge - conceding the whole reserve to the unmeasured
+        /// dash those rows draw, exactly as EffectiveCostColumnWidth does.
+        /// </summary>
+        private static int CostInkX(TreeRowHandle handle, int pillColX)
+        {
+            int costRightEdge = pillColX + handle.PillColumnWidth + handle.CostColumnWidth;
+            int reach = handle.ColumnWidths.LeftmostInkReach;
+            return reach > 0 && reach < handle.CostColumnWidth
+                ? costRightEdge - reach
+                : costRightEdge - handle.CostColumnWidth;
+        }
+
+        /// <summary>
         /// One pill's resolved geometry: which spec it draws, where it
         /// sits, and how wide its slot and its text are. Text width is
         /// carried separately because a pill's slot includes padding the
@@ -2332,11 +2359,11 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         /// <summary>
-        /// One pill's slot width. The IGNORE toggle answers from its own
+        /// One pill's slot width. The IGNORE key answers from its own
         /// reserved slot whatever position it lands in, so a run that ever
         /// flowed it (it does not - DecisionPillPlanner emits it last, and
-        /// RenderDecisionPills anchors it there) could not size it from a
-        /// word it no longer draws.
+        /// RenderDecisionPills takes it out of the run there) could not
+        /// size it from a word it no longer draws.
         /// <para>
         /// Takes the measurement as a delegate rather than a font because
         /// its two callers need different ones: a row builds one closure
@@ -2358,12 +2385,12 @@ namespace TaimisToolbench.Views.Rendering
         /// report benchmarked it against. Nothing is padded on top of that
         /// edge, because padding outside a filled control is a dead strip
         /// the row's expand/collapse click would answer - the exact mis-hit
-        /// the anchored slot exists to prevent.
+        /// the reserved slot exists to prevent.
         /// <para>
-        /// The slot is state-independent by construction: the key draws the
-        /// same mark plain or amber (CloseKeyButton.Tint), so ignoring an
-        /// item re-renders the toggle at the same rectangle it was clicked
-        /// in (Services/TreePillRunLayout).
+        /// The width is state-independent by construction: the key draws
+        /// the same mark plain or amber (CloseKeyButton.Tint), so ignoring
+        /// an item re-renders it at the same size it was clicked at. Its x
+        /// is held still by Services/TreePillRunInkFloor.
         /// </para>
         /// </summary>
         private static int ReservedIgnorePillWidth()
@@ -2404,9 +2431,9 @@ namespace TaimisToolbench.Views.Rendering
                 textColor *= PillColors.DimmedPillFactor;
             }
 
-            // Bounded by the fit, not by specs.Count: the anchored IGNORE
-            // toggle is the last spec and was never part of the run this
-            // fit was computed over, so it is not one of the hidden ones.
+            // Bounded by the fit, not by specs.Count: the IGNORE key is
+            // the last spec and was never part of the run this fit was
+            // computed over, so it is not one of the hidden ones.
             var hiddenTexts = new List<string>(fit.HiddenCount);
             for (int i = fit.VisibleCount; i < fit.VisibleCount + fit.HiddenCount; i++)
             {

@@ -110,15 +110,16 @@ namespace TaimisToolbench.Tests.Services
         }
 
         /// <summary>
-        /// The bug in one test: the pills BESIDE the toggle change
+        /// Half of the reported bug: the pills BESIDE the toggle change
         /// wholesale across the click - CRAFT/TP/IGNORE become
         /// HAVE/IGNORED - which moves a flowed toggle out from under the
-        /// cursor. The anchored slot is the same rectangle either side,
-        /// because its x is derived from the column's right edge rather
-        /// than from the run to its left.
+        /// cursor. The slot is not flowed, and it is one size for both
+        /// faces, so the toggle does not resize under the cursor either.
+        /// Holding its x still across the click is
+        /// TreePillRunInkFloorTests.
         /// </summary>
         [Fact]
-        public void ToggleKeepsItsRectangle_AcrossTheClickThatRebuildsTheRow()
+        public void ToggleKeepsItsSize_AcrossTheClickThatRebuildsTheRow()
         {
             var live = DecisionPillPlanner.BuildPillSpecs(TwoSourceNode());
             var ignored = DecisionPillPlanner.BuildPillSpecs(IgnoredNode());
@@ -243,7 +244,8 @@ namespace TaimisToolbench.Tests.Services
             var specs = DecisionPillPlanner.BuildPillSpecs(TwoSourceRoot());
             Assert.DoesNotContain(specs, spec => spec.Kind == PillKind.Ignore);
 
-            int ink = FlowedRunRightEdge(specs) - ColumnStart;
+            int ink = TreePillRunLayout.HeaderInkWidth(
+                ColumnStart, FlowedRunRightEdge(specs));
             Assert.True(ink < ColumnWidth / 2);
 
             int headerX = TreePillRunLayout.HeaderX(
@@ -256,24 +258,26 @@ namespace TaimisToolbench.Tests.Services
         }
 
         /// <summary>
-        /// A row that reserves the anchored toggle draws ink all the way
-        /// to the column's right edge, so there the band IS the content
-        /// and the two rules agree - the header does not lurch left the
-        /// moment such a row is built.
+        /// A row that draws the IGNORE key reports the run and not the
+        /// key: the header names the sources the pills carry, and the key
+        /// is a row action seated in the gap beyond them
+        /// (Services/TreeIgnoreKeyPlacement). Counting it put the header
+        /// over the whole reserve, well right of every pill under it.
         /// </summary>
         [Fact]
-        public void SourceHeader_MatchesTheBand_OnceARowReachesTheColumnsRightEdge()
+        public void SourceHeader_LeavesTheIgnoreKeyOutOfTheInkItCentresOver()
         {
             var specs = DecisionPillPlanner.BuildPillSpecs(TwoSourceNode());
             Assert.Equal(PillKind.Ignore, specs[specs.Count - 1].Kind);
 
-            // The anchored slot ends on the column's right edge whatever
-            // the run to its left does, so the row's ink is the column.
-            int ink = TreePillRunLayout.AnchoredSlotX(ColumnWidth, ReservedWidth()) + ReservedWidth();
+            int runRightEdge = FlowedRunRightEdge(specs.GetRange(0, specs.Count - 1));
+            int ink = TreePillRunLayout.HeaderInkWidth(ColumnStart, runRightEdge);
 
-            Assert.Equal(
-                JustifiedColumnTracks.CenteredInBand(ColumnStart, ColumnWidth, SourceHeaderWidth),
-                TreePillRunLayout.HeaderX(ColumnStart, ink, SourceHeaderWidth, SourceRoom(ink)));
+            Assert.True(ink < ColumnWidth / 2);
+            Assert.True(
+                TreePillRunLayout.HeaderX(ColumnStart, ink, SourceHeaderWidth, SourceRoom(ink))
+                    < JustifiedColumnTracks.CenteredInBand(
+                        ColumnStart, ColumnWidth, SourceHeaderWidth));
         }
 
         /// <summary>

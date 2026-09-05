@@ -3,20 +3,19 @@ namespace TaimisToolbench.Services
     /// <summary>
     /// Horizontal placement inside one tree row's fixed-width decision-pill
     /// column (Blish-free, unit-testable): a left-packed leading run, and
-    /// the IGNORE toggle in a slot reserved on the column's right edge.
+    /// a slot the run is fitted around for the IGNORE key.
     /// <para>
-    /// The toggle is anchored rather than flowed because clicking it
-    /// changes which pills the row HAS: an ignored node re-solves to an
-    /// owned one, so its source pills are gone on the next render. Flowed,
-    /// the toggle moved out from under the cursor that had just clicked it
-    /// and the next click landed on the row instead, which expands or
-    /// collapses the node. Anchored, its slot is the same rectangle in both
-    /// states: <see cref="ReservedSlotWidth"/> sizes ONE slot for both of
-    /// the faces it can draw, so the pill neither moves nor resizes across
-    /// a click. The two faces are now the same mark - the renderer draws
-    /// one close key, plain or amber, rather than the words
-    /// "IGNORE"/"IGNORED" - which makes that rectangle identical by
-    /// construction rather than by measurement.
+    /// The key does not flow after the pills, because clicking it changes
+    /// which pills the row HAS: an ignored node re-solves to an owned one,
+    /// so its source pills are gone on the next render. Flowed, the key
+    /// moved out from under the cursor that had just clicked it and the
+    /// next click landed on the row instead, which expands or collapses
+    /// the node. It does not resize across that click either:
+    /// <see cref="ReservedSlotWidth"/> sizes ONE slot for both faces, and
+    /// the renderer draws one close key, plain or amber, rather than the
+    /// words "IGNORE"/"IGNORED". Where the slot lands is
+    /// Services/TreeIgnoreKeyPlacement; what holds it still across the
+    /// click is Services/TreePillRunInkFloor.
     /// </para>
     /// </summary>
     internal static class TreePillRunLayout
@@ -39,9 +38,11 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// x of the reserved slot, right-aligned on the pill column's own
-        /// right edge. Independent of everything to its left, which is the
-        /// whole point.
+        /// x of the slot right-aligned on the pill column's own right
+        /// edge: the budget every leading run is fitted against
+        /// (<see cref="LeadingLimitX"/>), and the x the key keeps on a row
+        /// that leaves no band to seat it in
+        /// (Services/TreeIgnoreKeyPlacement).
         /// </summary>
         public static int AnchoredSlotX(int maxRightEdge, int reservedWidth)
         {
@@ -66,6 +67,24 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// Width the "Source" header centres over on one row, measured
+        /// from the pill column's left rule: the row's flowed pill run,
+        /// and only that.
+        /// <para>
+        /// The IGNORE key beside the run is not part of it. The header
+        /// names the sources the pills carry, and the key is a row action
+        /// rather than a source; it is also seated per row now
+        /// (Services/TreeIgnoreKeyPlacement), so counting it would put the
+        /// header over whichever row happened to seat its key furthest
+        /// right rather than over the pills.
+        /// </para>
+        /// </summary>
+        public static int HeaderInkWidth(int pillColX, int runRightEdge)
+        {
+            return runRightEdge > pillColX ? runRightEdge - pillColX : 0;
+        }
+
+        /// <summary>
         /// Left edge of the "Source" header, centred over the INK the
         /// pill runs cover rather than over the column's fixed reserve
         /// (PlanRelayoutMath.TreePillColumnWidth). The pills stay
@@ -73,14 +92,11 @@ namespace TaimisToolbench.Services
         /// there and <paramref name="inkRunWidth"/> is how far right the
         /// widest row on screen reaches.
         /// <para>
-        /// The two rules agree once any row reserves the anchored IGNORE
-        /// slot, which pins to the column's right edge - but a freshly
-        /// generated tree shows only plan roots, which never get that
-        /// toggle (DecisionPillPlanner.AppendOwnershipPills), and there
-        /// the reserve overstates the ink by most of its width: measured
-        /// 2026-08-28, a header centred at x=797 over a badge run
-        /// occupying 700-765. Derivation: docs/ARCHITECTURE.md section
-        /// S1.2.
+        /// The reserve overstates the ink by most of its width on a
+        /// freshly generated tree, which shows only plan roots and their
+        /// two or three badges: measured 2026-08-28, a header centred at
+        /// x=797 over a badge run occupying 700-765. Derivation:
+        /// docs/ARCHITECTURE.md section S1.2.
         /// </para>
         /// </summary>
         public static int HeaderX(
