@@ -591,16 +591,21 @@ namespace TaimisToolbench.Views
         private DateTime _lastResizeEventUtc;
         private bool _resizeSettlePending;
 
+        // Ceiling on how long a held pointer may hold the strip's reflow
+        // back, and not a second debounce - DeferredReflowGate.TryTake owns
+        // the rule and why the number is this far above ResizeDebounceMs.
+        private const int StripReflowStallMs = 2000;
+
         // The item input strip's column count is a step function of the
         // panel width, so re-seating it on every drag tick stretches each
         // cell between two boundaries and repacks the whole strip at each
-        // one. This gate holds the newest width and releases it once, at
-        // settle or on pointer release. Everything whose position derives
-        // from the strip's width reads AppliedWidth, never the live width:
-        // the reserved height and the strip it reserves for have to move on
-        // the same frame or the content jumps ahead of the strip.
+        // one. This gate holds the newest width and releases it once the
+        // drag ends. Everything whose position derives from the strip's
+        // width reads AppliedWidth, never the live width: the reserved
+        // height and the strip it reserves for have to move on the same
+        // frame or the content jumps ahead of the strip.
         private readonly DeferredReflowGate _stripReflow =
-            new DeferredReflowGate(ResizeDebounceMs);
+            new DeferredReflowGate(ResizeDebounceMs, StripReflowStallMs);
 
         #endregion // Resize relayout: the closure registries - KNOWN-ISSUES #13/#19
 
@@ -2947,14 +2952,14 @@ namespace TaimisToolbench.Views
             // Update widths of layout panels. Top-strip controls keep their
             // pre-existing direct updates - these were never part of the
             // dispose+rebuild problem the relayout registry below replaces.
-            // The input strip is the exception: its cells are re-seated at
-            // drag settle instead (ApplyPendingStripReflow), and the Y
-            // offsets below the strip are computed from the width the strip
-            // is actually laid out at rather than from this one, so the
-            // content below can never move ahead of the strip above it. The
-            // panel itself still takes the live width - it is the clipping
-            // frame for cells that a narrowing drag has not re-seated yet.
-            _stripReflow.Observe(w, nowUtc);
+            // The input strip is the exception: its cells are re-seated once
+            // the drag ends (ApplyPendingStripReflow), and the Y offsets
+            // below the strip are computed from the width the strip is
+            // actually laid out at rather than from this one, so the content
+            // below can never move ahead of the strip above it. The panel
+            // itself still takes the live width - it is the clipping frame
+            // for cells that a narrowing drag has not re-seated yet.
+            _stripReflow.Observe(w, nowUtc, PointerHeld());
             var layout = ComputeTopRegionLayout(_stripReflow.AppliedWidth);
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
 
@@ -3022,7 +3027,11 @@ namespace TaimisToolbench.Views
             {
                 _lastResizeEventUtc = nowUtc;
 
-                if (!_resizeSettlePending)
+                // The flag alone is not enough to mean "a ticker is running":
+                // a step that throws stops its own ticker without clearing
+                // it (FrameTicker), and the pass would then be dead for the
+                // session rather than for that one drag.
+                if (!_resizeSettlePending || _resizeDebounceTicker?.IsActive != true)
                 {
                     _resizeSettlePending = true;
                     _resizeDebounceTicker?.Cancel();
@@ -3254,13 +3263,19 @@ namespace TaimisToolbench.Views
                 return false;
             }
 
-            // Ahead of the interval check below, because a released pointer
-            // settles the strip with no quiet period at all. The gate's own
-            // interval is this pass's, measured from the same tick, so the
-            // strip has always been re-seated by the time the check passes.
+            // Ahead of the interval check below, so a released pointer
+            // settles the strip on the frame of the release rather than a
+            // debounce later.
             ApplyPendingStripReflow();
 
-            if ((DateTime.UtcNow - _lastResizeEventUtc).TotalMilliseconds < ResizeDebounceMs)
+            // This ticker is the only caller of ApplyPendingStripReflow, so
+            // it has to outlive the DRAG rather than the last width the drag
+            // produced: a hand held still past the debounce would otherwise
+            // release the button with nothing left running to notice.
+            // Bounded, because the gate clears IsPending within its own
+            // stall ceiling whether or not a release ever arrives.
+            if (_stripReflow.IsPending
+                || (DateTime.UtcNow - _lastResizeEventUtc).TotalMilliseconds < ResizeDebounceMs)
             {
                 return true;
             }
