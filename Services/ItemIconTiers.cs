@@ -134,9 +134,15 @@ namespace TaimisToolbench.Services
                 // The two the rulings do not cover. Their numbers ARE the
                 // measurement, because the surface each belongs to is the
                 // only thing that sizes them: the suggestion dropdown's 24px
-                // row box, and the game tooltip's own 32px header icon.
+                // row box, and the game tooltip's own header icon.
+                //
+                // That header icon measures 34x34 physical - 1px of frame
+                // around 32px of art - on a capture taken at the "Normal"
+                // GW2 UI size, whose 0.897 scale Blish applies to logical
+                // coordinates as a GPU matrix. So the logical box to reserve
+                // is 34 / 0.897 = 37.9, which 36 of art carries.
                 case ItemIconTier.SearchSuggestion: return 22;
-                case ItemIconTier.TooltipHeader: return 32;
+                case ItemIconTier.TooltipHeader: return 36;
 
                 // Not a fallback that guesses a size: an unnamed tier is a
                 // programming error, and a silent default is how the module

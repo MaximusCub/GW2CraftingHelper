@@ -2988,6 +2988,17 @@ icon keeps the centred seat: they measured centred to within half a pixel in
 the same capture that reported the coin defect, and were left alone
 deliberately.
 
+**The tooltip header tier is the one that had to be converted**, decided
+2026-09-05. A capture is native 1:1 only relative to the GW2 UI size it was
+taken at, and Blish paints module coordinates through that size's own scale
+(0.897 at "Normal", 1.0 at "Large"), so a number lifted off a capture is in
+game UI units only when the capture was taken at "Large". The item and
+currency tiers above were; the tooltip header icon's 34x34 was not. The same
+frame proves it: a currency tooltip capture shows the game's header icon at
+34 physical pixels beside the module's own 34-unit frame painted at 31, which
+puts that capture at 0.897. So the tier holds 34 / 0.897 = 38, which paints
+the game's 34 at "Normal" and its 38 at "Large", and the art inside it is 36.
+
 ### S1.4 Item tooltips: what the API says and what the game shows
 
 `Services/ItemStatBlockFactory.cs` is where every "what does an absent field
