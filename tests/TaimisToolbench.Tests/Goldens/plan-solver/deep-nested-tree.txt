@@ -284,6 +284,7 @@ result.MaterialOpportunityCost = null
 result.MultiItemRoots = null
 result.NetSaleValue = 15300
 result.OwnedCurrencyAmounts = null
+result.OwnedVendorItemAmounts = null
 result.Plan.BarterItemCosts.count = 0
 result.Plan.CurrencyCosts.count = 0
 result.Plan.Steps.count = 4

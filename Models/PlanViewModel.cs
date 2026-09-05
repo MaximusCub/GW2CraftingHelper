@@ -261,9 +261,9 @@ namespace TaimisToolbench.Models
 
         // Owned/needed split for a shopping-row currency Total amount
         // (gw2e parity - mirrors PlanRowViewModel.
-        // CurrencyOwnedQuantity's doc comment): min(Amount, wallet amount)
-        // of this currency the account already holds. Null (not 0) when no
-        // wallet snapshot was available, or this amount is a per-unit
+        // CurrencyOwnedQuantity's doc comment): min(Amount, holding) of
+        // what this row costs that the account already holds. Null (not 0)
+        // when no account snapshot was available, or this is a per-unit
         // "Each" figure (ownership is a total-quantity concept - see
         // CurrencyDisplayResolver.ResolveAmounts/ResolveUnitAmounts). This
         // value is DELIBERATELY clamped so the HAVE/Amount pair the row
@@ -272,12 +272,12 @@ namespace TaimisToolbench.Models
         // RawOwnedQuantity below for the real, unclamped holding.
         public int? OwnedQuantity { get; set; }
 
-        // Raw, UNCLAMPED wallet holding backing OwnedQuantity above
+        // Raw, UNCLAMPED holding backing OwnedQuantity above
         // (shoplist-have-format): unlike OwnedQuantity, this is never
         // capped at Amount, so it can exceed the row's Total when the
-        // account holds more of this currency than this row needs. Null
-        // under the exact same conditions as OwnedQuantity (no wallet
-        // snapshot / per-unit "Each" figure). Tooltip-only - lets the
+        // account holds more than this row needs. Null under the exact
+        // same conditions as OwnedQuantity (no account snapshot /
+        // per-unit "Each" figure). Tooltip-only - lets the
         // shopping row's tooltip spell out the real holding even when the
         // clamped OwnedQuantity/Amount pair alone would hide it.
         public int? RawOwnedQuantity { get; set; }
@@ -363,16 +363,17 @@ namespace TaimisToolbench.Models
         // Null/empty under the same condition as CurrencyCosts.
         public List<CurrencyAmountViewModel> UnitCurrencyCosts { get; set; }
 
-        // Owned split for a CurrencyCost row (gw2e parity - see
-        // AccountCurrencyIndex): the account's wallet holding of this
-        // currency. Null (not 0) when no wallet snapshot was available at
-        // all, distinct from "0 owned" - only ever set on CurrencyCost
-        // rows. User-mandated: this is
-        // the RAW, UNCLAMPED wallet amount (not min(Quantity, wallet
-        // amount)) - the redesigned currency table's "Have" column
-        // shows the real holding even when it exceeds what the plan needs,
-        // rather than silently capping it at Quantity. CurrencyNeededQuantity
-        // below is the (still-clamped-to-zero) gap derived from this value.
+        // Owned split for a CurrencyCost row (gw2e parity): the account's
+        // holding of what the row costs - a wallet balance for a currency
+        // (AccountCurrencyIndex), an account-wide item count for a barter
+        // item (AccountItemIndex). Null (not 0) when no account snapshot
+        // was available at all, distinct from "0 owned" - only ever set on
+        // CurrencyCost rows. User-mandated: this is the RAW, UNCLAMPED
+        // holding (not min(Quantity, holding)) - the currency table's
+        // "Have" column shows the real holding even when it exceeds what
+        // the plan needs, rather than silently capping it at Quantity.
+        // CurrencyNeededQuantity below is the (still-clamped-to-zero) gap
+        // derived from this value.
         public int? CurrencyOwnedQuantity { get; set; }
 
         // The currency's own /v2/currencies prose, for a CurrencyCost
@@ -384,9 +385,9 @@ namespace TaimisToolbench.Models
         public string CurrencyDescription { get; set; }
 
         // Still-to-acquire gap for a CurrencyCost row in the
-        // redesigned currency table's "Needed" column - max(0, Quantity -
+        // currency table's "Needed" column - max(0, Quantity -
         // CurrencyOwnedQuantity). Null (not 0) whenever CurrencyOwnedQuantity
-        // is null (no wallet snapshot) - mirrors that field's own null
+        // is null (no account snapshot) - mirrors that field's own null
         // contract, never a fabricated gap. Only ever set on CurrencyCost
         // rows.
         public int? CurrencyNeededQuantity { get; set; }
@@ -394,20 +395,20 @@ namespace TaimisToolbench.Models
         // True when CurrencyOwnedQuantity is present AND covers the
         // full Required amount (CurrencyOwnedQuantity >= Quantity) - drives
         // the currency table's green full-coverage marker. Always false
-        // when no wallet snapshot exists (CurrencyOwnedQuantity null) -
-        // "unknown" must never render as "covered". Only ever set on
-        // CurrencyCost rows.
+        // when no account snapshot exists (CurrencyOwnedQuantity null) -
+        // "unknown" must never render as "covered". Set on both kinds of
+        // CurrencyCost row: a barter item the account already holds in
+        // full is as covered as a wallet currency it holds in full.
         public bool CurrencyFullyCovered { get; set; }
 
         // True on the CurrencyCost rows that are a BARTER ITEM rather than
         // a wallet currency - an untradeable vendor token whose units are
         // the price (CraftingPlan.BarterItemCosts). ItemId is then a real
         // item id and Rarity is populated, so the renderer frames and
-        // hovers the row as an ITEM; CurrencyOwnedQuantity,
-        // CurrencyNeededQuantity and CurrencyDescription are all null on
-        // one, because the module reads a wallet and /v2/currencies,
-        // neither of which knows anything about an item. False on every
-        // other row.
+        // hovers the row as an ITEM. Only CurrencyDescription is null on
+        // one: /v2/currencies knows nothing about an item, while the
+        // account snapshot's item index does, so the owned split above is
+        // populated for both kinds. False on every other row.
         public bool IsBarterItemCost { get; set; }
 
         // User-mandated mouseover

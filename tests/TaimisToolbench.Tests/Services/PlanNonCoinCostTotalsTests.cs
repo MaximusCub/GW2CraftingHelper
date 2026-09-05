@@ -37,7 +37,8 @@ namespace TaimisToolbench.Tests.Services
         private static async Task<CraftingPlanResult> GenerateAsync(
             IEnumerable<CostLine> costLines,
             int outputCount = 1,
-            int requestQuantity = 1)
+            int requestQuantity = 1,
+            AccountSnapshot snapshot = null)
         {
             var builder = PipelineBuilder.Create()
                 .WithItem(Target, "Vendor Only Widget", "widget.png")
@@ -64,7 +65,7 @@ namespace TaimisToolbench.Tests.Services
 
                 return await builder.WithVendorOfferStore(store).Build()
                     .GenerateStructuredAsync(
-                        Target, requestQuantity, null, CancellationToken.None,
+                        Target, requestQuantity, snapshot, CancellationToken.None,
                         priceBasis: PriceBasis.InstantBuy);
             }
         }
@@ -132,7 +133,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal("Blue Prophet Shard", row.Label);
             Assert.Equal(6, row.Quantity);
 
-            // A wallet knows nothing about an item, so "Have" is unknown -
+            // No account snapshot at all, so the holding is unknown -
             // never a fabricated zero, and never a coverage claim.
             Assert.Null(row.CurrencyOwnedQuantity);
             Assert.Null(row.CurrencyNeededQuantity);
@@ -142,6 +143,106 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal("Blue Prophet Shard", total.Name);
             Assert.Equal(6, total.Amount);
             Assert.Null(total.OwnedQuantity);
+        }
+
+        /// <summary>
+        /// An account snapshot holding <paramref name="ownedTokens"/> of
+        /// the barter token and nothing else.
+        /// </summary>
+        private static AccountSnapshot SnapshotHolding(int ownedTokens)
+        {
+            return new AccountSnapshot
+            {
+                Items = new List<SnapshotItemEntry>
+                {
+                    new SnapshotItemEntry
+                    {
+                        ItemId = BarterToken,
+                        Count = ownedTokens,
+                        Source = AccountItemIndex.SourceMaterialStorage,
+                    },
+                },
+            };
+        }
+
+        private static PlanRowViewModel BarterRow(CraftingPlanResult result)
+        {
+            var vm = new PlanViewModelBuilder().Build(result);
+            return Assert.Single(NonCoinRows(vm).Where(r => r.IsBarterItemCost));
+        }
+
+        /// <summary>
+        /// An inventory row's Have and Needed are real numbers, from the
+        /// account's own count of the token. The plan needs 6 and the
+        /// account holds 4, so 2 are still to find.
+        /// </summary>
+        [Fact]
+        public async Task BarterRow_PartialHolding_FillsHaveAndNeeded()
+        {
+            var result = await GenerateAsync(
+                BarterOnly(3), requestQuantity: 2, snapshot: SnapshotHolding(4));
+
+            var row = BarterRow(result);
+            Assert.Equal(6, row.Quantity);
+            Assert.Equal(4, row.CurrencyOwnedQuantity);
+            Assert.Equal(2, row.CurrencyNeededQuantity);
+            Assert.False(row.CurrencyFullyCovered);
+        }
+
+        /// <summary>
+        /// Holding the lot closes the gap and lights the coverage marker,
+        /// on the same terms a wallet currency gets it: the holding is
+        /// known and it meets the requirement. The holding is reported RAW,
+        /// so an account with more than the plan needs says so.
+        /// </summary>
+        [Fact]
+        public async Task BarterRow_FullHolding_ClosesTheGapAndMarksItCovered()
+        {
+            var result = await GenerateAsync(
+                BarterOnly(3), requestQuantity: 2, snapshot: SnapshotHolding(10));
+
+            var row = BarterRow(result);
+            Assert.Equal(10, row.CurrencyOwnedQuantity);
+            Assert.Equal(0, row.CurrencyNeededQuantity);
+            Assert.True(row.CurrencyFullyCovered);
+
+            // Owning the token is cosmetic: the plan still costs 6 of it.
+            Assert.Equal(6, Assert.Single(result.Plan.BarterItemCosts).Amount);
+            Assert.Equal(6, row.Quantity);
+        }
+
+        /// <summary>
+        /// The distinction the whole null contract exists for: a snapshot
+        /// that shows none of the token is a known ZERO, not the unknown a
+        /// missing snapshot gives.
+        /// </summary>
+        [Fact]
+        public async Task BarterRow_SnapshotHoldingNoneOfIt_ReadsZeroRatherThanUnknown()
+        {
+            var result = await GenerateAsync(
+                BarterOnly(3), requestQuantity: 2, snapshot: new AccountSnapshot());
+
+            var row = BarterRow(result);
+            Assert.Equal(0, row.CurrencyOwnedQuantity);
+            Assert.Equal(6, row.CurrencyNeededQuantity);
+            Assert.False(row.CurrencyFullyCovered);
+        }
+
+        /// <summary>
+        /// One source, two consumers: the Recipe Tree's cost-component leaf
+        /// and the Total Cost table both state the account's holding of the
+        /// same token, so they have to state the same number. A second
+        /// count derived anywhere else is what this pins against.
+        /// </summary>
+        [Fact]
+        public async Task BarterRow_AndItsTreeLeaf_StateTheSameHolding()
+        {
+            var result = await GenerateAsync(
+                BarterOnly(3), requestQuantity: 2, snapshot: SnapshotHolding(4));
+
+            var leaf = Assert.Single(
+                result.CraftingTree.Children.Where(c => c.IsCostComponent && c.ItemId == BarterToken));
+            Assert.Equal(leaf.ComponentOwnedQuantity, BarterRow(result).CurrencyOwnedQuantity);
         }
 
         /// <summary>

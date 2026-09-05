@@ -37,6 +37,7 @@ CraftingPlanResult.MaterialOpportunityCost:Nullable`1<Int64>
 CraftingPlanResult.MultiItemRoots:List`1<CraftingTreeNode>
 CraftingPlanResult.NetSaleValue:Nullable`1<Int64>
 CraftingPlanResult.OwnedCurrencyAmounts:IReadOnlyDictionary`2<Int32,Int32>
+CraftingPlanResult.OwnedVendorItemAmounts:IReadOnlyDictionary`2<Int32,Int32>
 CraftingPlanResult.Plan:CraftingPlan
 CraftingPlanResult.PriceBasis:PriceBasis
 CraftingPlanResult.ProbabilisticForgeOutputItemIds:List`1<Int32>

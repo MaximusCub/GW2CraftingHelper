@@ -278,6 +278,7 @@ result.MultiItemRoots[1].VendorCurrencyCosts = null
 result.MultiItemRoots[1].VendorHasBarterItemCost = False
 result.NetSaleValue = 238
 result.OwnedCurrencyAmounts = null
+result.OwnedVendorItemAmounts = null
 result.Plan.BarterItemCosts.count = 0
 result.Plan.CurrencyCosts.count = 0
 result.Plan.Steps.count = 4

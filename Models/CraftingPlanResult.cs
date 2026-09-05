@@ -121,6 +121,17 @@ namespace TaimisToolbench.Models
         public IReadOnlyDictionary<int, int> OwnedCurrencyAmounts { get; set; }
 
         /// <summary>
+        /// Owned amount per item id appearing as a vendor Item cost line -
+        /// the account-wide total across bank, shared inventory, material
+        /// storage and every character's bags (see AccountItemIndex).
+        /// Cosmetic display data only, on the same never-fed-back contract
+        /// as OwnedCurrencyAmounts above. Null when no account snapshot was
+        /// available or no offer carries an item cost line, so a caller can
+        /// tell "no data" from "0 owned".
+        /// </summary>
+        public IReadOnlyDictionary<int, int> OwnedVendorItemAmounts { get; set; }
+
+        /// <summary>
         /// The original per-item request (item id + quantity) this
         /// result was generated
         /// for, in request order. Populated ONLY for a genuine multi-item
