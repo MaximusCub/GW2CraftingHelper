@@ -615,7 +615,7 @@ tests/VendorOfferUpdater.Tests/VendorOfferManifestTests.cs                      
 tests/VendorOfferUpdater.Tests/WikiSmwClientTests.cs                                    610
 tools/TaimisToolbench.Harness/Program.cs                                                861
 tools/TaimisToolbench.RecipeSeeder/Program.cs                                           724
-tools/MysticForgeSeeder/Program.cs                                                      814
+tools/MysticForgeSeeder/Program.cs                                                      818
 tools/MysticForgeSeeder/WikiRecipeClient.cs                                             627
 tools/Shared/FileMysticForgeRecipeSource.cs                                             39
 tools/VendorOfferUpdater/Gw2ApiHelper.cs                                                99
