@@ -43,6 +43,7 @@ namespace VendorOfferUpdater
         private QueryStats _stats = null!;
         private Stopwatch _stopwatch = null!;
         private int _effectiveDelay = QueryOptions.DefaultDelayBetweenRequestsMs;
+        private int _consecutiveUnresolved;
 
         public WikiSmwClient(HttpClient httpClient)
         {
@@ -227,6 +228,7 @@ namespace VendorOfferUpdater
 
                 if (reading.Shape == WikiAskShape.NoRows)
                 {
+                    RecordSectionAnswered();
                     break;
                 }
 
@@ -243,6 +245,8 @@ namespace VendorOfferUpdater
                     sectionUnresolved = true;
                     break;
                 }
+
+                RecordSectionAnswered();
 
                 var root = doc.RootElement;
                 var results = reading.Results;
@@ -372,6 +376,7 @@ namespace VendorOfferUpdater
 
                 if (probeShape == WikiAskShape.NoRows)
                 {
+                    RecordSectionAnswered();
                     skippedEmpty++;
                     emptyPrefixes.Add(subPrefix);
                     continue;
@@ -390,6 +395,8 @@ namespace VendorOfferUpdater
                     continue;
                 }
 
+                RecordSectionAnswered();
+
                 // Non-empty: paginate fully (re-fetches from offset=0; dedup handles overlap)
                 await PaginateConditionAsync(
                     baseCondition, subPrefix, depth + 1, allResults, seenKeys, ct);
@@ -407,6 +414,15 @@ namespace VendorOfferUpdater
             CancellationToken ct, string label, int depth, int distinctCount)
         {
             ct.ThrowIfCancellationRequested();
+
+            if (HasStoppedAnswering())
+            {
+                throw new SafetyLimitException(
+                    $"{_consecutiveUnresolved} sections in a row went unanswered, " +
+                    $"the last at [{label}] depth={depth}. Stopping rather than " +
+                    "asking the wiki the same question section by section. " +
+                    $"Rows: {_stats.TotalRowsFetched} ({distinctCount} distinct).");
+            }
 
             if (_stats.TotalHttpRequests >= _options.MaxTotalRequests)
             {
@@ -678,7 +694,18 @@ namespace VendorOfferUpdater
                 Attempts = attempts,
             });
 
+            _consecutiveUnresolved++;
             Console.WriteLine($"    UNRESOLVED {kind} [{label}]: {code} - {reason}");
+        }
+
+        private void RecordSectionAnswered()
+        {
+            _consecutiveUnresolved = 0;
+        }
+
+        private bool HasStoppedAnswering()
+        {
+            return _consecutiveUnresolved >= _options.MaxConsecutiveUnresolvedSections;
         }
 
         private static WikiVendorResult? ParseResult(string pageName, JsonElement element)
@@ -848,6 +875,14 @@ namespace VendorOfferUpdater
             {
                 ct.ThrowIfCancellationRequested();
 
+                if (HasStoppedAnswering())
+                {
+                    Console.WriteLine(
+                        $"  WARNING: {_consecutiveUnresolved} batches in a row went " +
+                        $"unanswered. Stopping with {result.Count} resolved.");
+                    break;
+                }
+
                 var batch = names.Skip(i).Take(batchSize).ToList();
                 var condition = "[[" + string.Join("||", batch) + "]]";
                 var query = condition + "|?Has game id";
@@ -890,6 +925,11 @@ namespace VendorOfferUpdater
 
                 using var doc = JsonDocument.Parse(response);
                 var reading = WikiAskResponse.Read(doc.RootElement);
+
+                if (reading.Shape == WikiAskShape.Rows || reading.Shape == WikiAskShape.NoRows)
+                {
+                    RecordSectionAnswered();
+                }
 
                 if (reading.Shape == WikiAskShape.Rows)
                 {

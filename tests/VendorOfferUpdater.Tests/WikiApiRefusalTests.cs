@@ -119,8 +119,8 @@ namespace VendorOfferUpdater.Tests
 
             await client.QueryVendorItemsAsync("[[Sells item::+]]", FastOptions());
 
-            Assert.Equal(QueryOptions.DefaultMaxAttempts, handler.RequestedUrls.Count);
-            Assert.Equal(5, QueryOptions.DefaultMaxAttempts);
+            // Five by default: the first try and four retries.
+            Assert.Equal(5, handler.RequestedUrls.Count);
         }
 
         [Fact]
@@ -278,6 +278,36 @@ namespace VendorOfferUpdater.Tests
             Assert.Equal("item-batch", section.Kind);
             Assert.Equal("item batch 1", section.Label);
             Assert.Contains("Item 1", section.Condition, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task AWikiThatStopsAnsweringAltogether_StopsTheRun()
+        {
+            var (client, handler, http) = CreateClient();
+            using var _ = http;
+
+            handler.Enqueue(new WikiJsonBuilder()
+                .AddResult("NPC#root", gameId: 1, vendor: "Alpha")
+                .WithContinueOffset(0)
+                .Build());
+
+            // Three prefixes refused end to end. The fourth is never asked:
+            // the run stops rather than putting every remaining prefix
+            // through its own attempt ladder against a wiki that has shut.
+            for (int i = 0; i < 3 * QueryOptions.DefaultMaxAttempts; i++)
+            {
+                handler.Enqueue(WikiJsonBuilder.BuildMaxLagError());
+            }
+
+            var (results, stats) = await client.QueryVendorItemsAsync(
+                "[[Sells item::+]]", FastOptions(maxPrefixDepth: 1));
+
+            Assert.Equal(1 + (3 * QueryOptions.DefaultMaxAttempts), handler.RequestedUrls.Count);
+            Assert.Equal(3, client.UnresolvedSections.Count);
+            Assert.True(stats.WasInterrupted);
+
+            // The root's own row survives the stop.
+            Assert.Single(results);
         }
 
         // -- Request shape ------------------------------------------

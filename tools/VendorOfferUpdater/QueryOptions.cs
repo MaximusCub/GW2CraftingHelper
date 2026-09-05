@@ -33,6 +33,15 @@ namespace VendorOfferUpdater
         /// </summary>
         public int RetryBackoffBaseMs { get; init; } = 1000;
 
+        /// <summary>
+        /// How many sections in a row may go unanswered before the run stops
+        /// asking. One refused section is worth carrying on past; several in
+        /// a row means the wiki has stopped answering this address, and every
+        /// further section would spend its whole attempt ladder finding that
+        /// out again. Reset by any section that answers.
+        /// </summary>
+        public int MaxConsecutiveUnresolvedSections { get; init; } = 3;
+
         public bool DryRun { get; init; }
     }
 }

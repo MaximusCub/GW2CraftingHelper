@@ -232,6 +232,11 @@ dotnet run --project tools/VendorOfferUpdater/VendorOfferUpdater.csproj -- \
 The sidecar is deleted by the next run that resolves everything, so its
 presence always describes the latest run.
 
+One refused section is worth carrying on past. Three in a row is the wiki
+declining to answer this address at all, and the run stops there rather than
+spending a full attempt ladder per section to be told the same thing 36 times.
+Whatever was collected up to that point is kept and the wiki cache is saved.
+
 ## Coverage check
 
 Before the dataset is written, the run compares it against the file it would
