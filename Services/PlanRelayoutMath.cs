@@ -113,25 +113,41 @@ namespace TaimisToolbench.Services
             ColumnHeaderLabelMath.LabelX(ShoppingColumnMath.NameX, ShoppingColumnMath.IconX);
 
         /// <summary>
-        /// FLOOR width of the recipe tree's decision-pill column - the
-        /// narrowest pillColumnWidth a tree caller ever passes
+        /// FLOOR width of the recipe tree's decision column - the narrowest
+        /// pillColumnWidth a tree caller ever passes
         /// <see cref="ComputeTreeColumnEdges"/>, and the width every tree
-        /// gets at the module's minimum window. Above that minimum the
-        /// column may claim more (Services/TreePillColumnMath), up to what
-        /// its widest row needs. Lives here, next to the function that
-        /// consumes it, so the Blish-free width tests assert against the
-        /// shipped column rather than a copy of it.
+        /// gets at the module's minimum window. Above it the column may
+        /// claim more (Services/TreePillColumnMath). Lives here so the
+        /// Blish-free width tests assert against the shipped column.
         /// <para>
-        /// 240 until the minimum-width research measured the standard
-        /// CRAFT/TP/VENDOR/IGNORE run at 222px against the 236px budget a
-        /// 240px column leaves: any slightly wider label ran the row through
-        /// the tightened-padding pass. 256 gives that run its comfort margin
-        /// (budget 252). Cost: 16px off every row's name column, which the
-        /// window minimum was raised to absorb - see
-        /// docs/research/minimum-window-width.md.
+        /// The ignore button is NOT in this column - it has one of its own
+        /// at the far right of the row - so the widest run the floor has to
+        /// hold is CRAFT / TP / VENDOR, 171px at the Menomonia 14 the
+        /// markers draw in; 231 leaves it a budget of 227. 231 is also the
+        /// old 256 less exactly what the action column costs, so the two
+        /// together take what this column alone used to, and no window
+        /// width paid for the new one: docs/ARCHITECTURE.md section V.33.
         /// </para>
         /// </summary>
-        public const int TreePillColumnWidth = 256;
+        public const int TreePillColumnWidth = 231;
+
+        /// <summary>
+        /// Width of the tree's trailing action column, which closes every
+        /// row after Cost and carries the ignore button. That button IS
+        /// Blish's own window close control at its measured box
+        /// (Services/GlyphButtonMetrics), so the column is exactly as wide
+        /// as the control in it.
+        /// </summary>
+        public const int TreeActionColumnWidth = GlyphButtonMetrics.RowActionWidth;
+
+        /// <summary>
+        /// Clearance between the cost values and the ignore button beside
+        /// them. Its own number, chosen to read the same as the clearance
+        /// the decision column keeps before the cost column, and
+        /// deliberately not derived from it: tuning one column's internal
+        /// padding must not move a column two places away.
+        /// </summary>
+        public const int TreeActionColumnGap = 4;
 
         public readonly struct TreeColumnEdges
         {
@@ -145,34 +161,44 @@ namespace TaimisToolbench.Services
                 CostRightEdge = costRightEdge;
                 NameMaxWidth = nameMaxWidth;
             }
+
+            /// <summary>
+            /// x of the row's ignore button, one gap right of where the
+            /// cost values stop. Derived rather than stored: the action
+            /// column is what pushed <see cref="CostRightEdge"/> left in the
+            /// first place, so the two can never be given different
+            /// answers.
+            /// </summary>
+            public int ActionButtonX => CostRightEdge + TreeActionColumnGap;
         }
 
         /// <summary>
-        /// Recipe tree's fixed right-anchored column grid (pills, cost) plus
-        /// the resulting name-column budget, entirely as a function of
-        /// panelWidth plus the row's own indent-derived nameX and the
-        /// qty-prefix text width (font-only, invariant to panelWidth).
-        /// Mirrors CraftingPlanView.RenderTreeNode's own pillColX/
-        /// costRightEdge/nameMaxWidth arithmetic exactly - both the initial
-        /// build and the relayout/re-ellipsis closures call this
-        /// same function, so a tree row's columns and its build-time
-        /// counterpart can never drift apart.
+        /// Recipe tree's fixed right-anchored column grid (pills, cost,
+        /// action) plus the resulting name-column budget, entirely as a
+        /// function of panelWidth plus the row's own indent-derived nameX
+        /// and the qty-prefix text width (font-only, invariant to
+        /// panelWidth). Both the initial build and the relayout/
+        /// re-ellipsis closures call this same function, so a tree row's
+        /// columns and its build-time counterpart cannot drift apart.
         /// <para>
-        /// The pill+cost block is pinned to the panel edge (see
-        /// <see cref="PinnedRightEdge"/>), so for a given pillColumnWidth
-        /// the pill column's own budget - maxRightEdge minus pillColX,
-        /// which <see cref="ComputePillFit"/> resolves against - is
-        /// width-invariant: a pill that fits at one window width fits at
-        /// every other. The caller settles that width once per render, so
-        /// a resize drag never refits.
+        /// The ignore button takes the row's right edge and the data
+        /// columns end short of it, the shape RankerRowLayout.Compute
+        /// already uses. The whole block is pinned to the panel edge (see
+        /// <see cref="PinnedRightEdge"/>), so every offset between the four
+        /// columns is width-invariant: a source marker that fits at one
+        /// window width fits at every other, the caller settles the
+        /// decision column's width once per render so a resize drag never
+        /// refits, and a relayout can replay any of the four from PillColX
+        /// alone.
         /// </para>
         /// </summary>
         public static TreeColumnEdges ComputeTreeColumnEdges(
             int panelWidth, int nameX, int qtyPrefixWidth,
             int pillColumnWidth, int costColumnWidth, int rightMargin)
         {
-            int pillColX = panelWidth - (rightMargin + costColumnWidth) - pillColumnWidth;
-            int costRightEdge = pillColX + pillColumnWidth + costColumnWidth;
+            int rightEdge = panelWidth - rightMargin;
+            int costRightEdge = rightEdge - TreeActionColumnWidth - TreeActionColumnGap;
+            int pillColX = costRightEdge - costColumnWidth - pillColumnWidth;
 
             int nameMaxWidth = pillColX - nameX - TreeNameGap;
             if (nameMaxWidth < 20)

@@ -37,32 +37,26 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Column width one row needs to draw its whole pill run at full
-        /// padding: the left-packed leading run and its gaps, then the gap
-        /// and the anchored IGNORE slot (Services/TreePillRunLayout), then
-        /// <see cref="TrailingClearance"/>.
-        /// <paramref name="anchoredWidth"/> 0 is a row with no toggle at
-        /// all, which pays for neither the slot nor the gap before it.
+        /// padding: the left-packed run and its gaps, then
+        /// <see cref="TrailingClearance"/>. The ignore button is not in
+        /// this column at all - it has its own at the far right of the row
+        /// (PlanRelayoutMath.TreeActionColumnWidth) - so no row reserves
+        /// anything for it here.
         /// </summary>
-        public static int RequiredWidth(
-            IReadOnlyList<int> leadingPillWidths, int gap, int anchoredWidth)
+        public static int RequiredWidth(IReadOnlyList<int> pillWidths, int gap)
         {
             int run = 0;
-            if (leadingPillWidths != null)
+            if (pillWidths != null)
             {
-                for (int i = 0; i < leadingPillWidths.Count; i++)
+                for (int i = 0; i < pillWidths.Count; i++)
                 {
                     if (i > 0)
                     {
                         run += gap;
                     }
 
-                    run += leadingPillWidths[i];
+                    run += pillWidths[i];
                 }
-            }
-
-            if (anchoredWidth > 0)
-            {
-                run += (run > 0 ? gap : 0) + anchoredWidth;
             }
 
             return run > 0 ? run + TrailingClearance : 0;

@@ -2550,14 +2550,42 @@ re-solve and rebuild every control in the plan, which is what turned into the
 reported "rapid IGNORE toggling drops clicks". Ignoring a LEAF material - the
 common case, and the one reported in game - passes the gate.
 
-The pill column's budget is exceeded because `DecisionPillPlanner.AppendOwnershipPills`
-unconditionally adds an ignore toggle, plus "USING N OWNED" when applicable, to
-every ordinary node, on top of its 1-3 source pills. The row cannot grow to
-absorb them: `TreeRowHeight` is a fixed per-row height shared by every
+The pill column's budget is exceeded because
+`DecisionPillPlanner.AppendOwnershipPills` adds "USING N OWNED" when
+applicable on top of a node's 1-3 source pills. The row cannot grow to absorb
+them: `TreeRowHeight` is a fixed per-row height shared by every
 layout/scroll-height calculation in that file, so there is no wrap and no
 second line. Before `ComputePillFit`, trailing pills were simply dropped with
 nothing on the row to say they had existed - which is what the "+N" pill now
 says.
+
+The ignore button is not one of those pills. It has a column of its own,
+which closes every tree row after Cost: the button takes the row's right edge
+and the data columns end short of it, the shape `Services/RankerRowLayout`
+already uses for the Ranker's row actions.
+`PlanRelayoutMath.ComputeTreeColumnEdges` derives `ActionButtonX` from the
+panel edge alone, so the button is at the same x on every row and moves only
+when the window does. That matters because clicking it re-solves the node: an
+ignored node comes back owned, with none of the source markers it was drawn
+beside. Placed anywhere among those markers, the button moved out from under
+the cursor that had just clicked it, and the next click reached the row and
+expanded the node instead. A column derived from the panel edge cannot move
+for that reason, or for a re-solve that changes either data column's width.
+
+The new column costs `TreeActionColumnWidth` 21 + `TreeActionColumnGap` 4 of
+every row, and it is paid for by `PlanRelayoutMath.TreePillColumnWidth`
+dropping 256 to 231, so no window width lost a pixel to it and
+`WindowSizing.MinWindowWidth` is unchanged. That 25px was reserve this column
+was not using. 256 was derived to hold `CRAFT / TP / VENDOR / IGNORE` at a
+10px margin when IGNORE was a 53px word; the button that replaced it draws
+21px, so the floor had been 44px wider than its own derivation asked for and
+never followed the change. Measured at Menomonia 14, the widest run the
+column can be asked to hold from a plan's structure alone is
+`CRAFT / TP / VENDOR` at 171px, which 231 seats at full padding with 56px to
+spare. An ownership annotation is wider than that, but it depends on the
+player's inventory rather than on the plan, and rows carrying one still
+degrade through `ComputePillFit` exactly as they did: the run's budget at the
+floor went from 225px to 227px, so no row can chip that did not chip before.
 
 The column itself is no longer flat, because a "+N" chip on a window with
 hundreds of unused pixels in the name column beside it is a lie the reader
@@ -2608,8 +2636,8 @@ refresh that kept a stale claim placed its rows where a full render at the
 same window size would not have.
 
 That "+N" pill is deliberately not wired to a popup offering the hidden
-options. The hidden pills are almost always the trailing annotation and the
-IGNORE toggle, and a real affordance means a new popup or menu surface, with
+options. The hidden pills are almost always the trailing annotation, and a
+real affordance means a new popup or menu surface, with
 its own dismiss, focus and scroll behaviour, hanging off a case that tightened
 padding already resolves most of the time. The tooltip states the fact; the
 sandbox check decides whether the fact needs an affordance.
@@ -3682,15 +3710,20 @@ section 9 reproduces the method and every anchor figure of that report's own
 
 ```
  629  widestNameEnd  = nameX(14) 394 + "429750x " 69 + name 166
- +24  the designed name-to-pill gutter at the deepest row
-+256  TreePillColumnWidth
+ +24  the designed clearance before the decision column at the deepest row
++231  TreePillColumnWidth
 +335  cost column: 181 worst-digit six-digit-gold coin run
                    + 154 widest two-currency vendor run
+ +25  action column: TreeActionColumnGap 4 + TreeActionColumnWidth 21
   +8  TableRightMargin
 ---- 1252  tab panel
 +126  WindowToTabPanelChrome
 ==== 1378
 ```
+
+The decision column and the action column together are the 256 the decision
+column alone used to hold, so this total is unchanged by the action column's
+arrival. Why 231 is the right figure for the decision column now: V.33.
 
 1378, not the 1232 the like-for-like depth-14 arithmetic gives on its own:
 1232 accepts that a row combining a forced-craft dust chain with a vendor

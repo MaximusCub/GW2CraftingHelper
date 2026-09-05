@@ -37,13 +37,6 @@ namespace TaimisToolbench.Tests.Services
             return (int)System.Math.Ceiling(text.Length * 8.21);
         }
 
-        /// <summary>The anchored slot the toggle's remove mark sits in -
-        /// xadvance 17 in ref/glyphs.fnt, plus the pill's padding.</summary>
-        private static int ToggleSlot()
-        {
-            return TreePillRunLayout.ReservedSlotWidth(17, 17, Padding);
-        }
-
         private static List<int> Run(params string[] texts)
         {
             var widths = new List<int>(texts.Length);
@@ -60,41 +53,59 @@ namespace TaimisToolbench.Tests.Services
             return WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth);
         }
 
+        // Inked widths of the source markers at the face they are drawn in,
+        // Menomonia 14, parsed from the installed XNBs by the method
+        // docs/research/minimum-window-width.md section 9.1 sets out and
+        // validated against every anchor figure it publishes. Literals for
+        // the reason PlanRelayoutMathTests holds its cost-column figures as
+        // literals: a Blish-free test cannot open a font, and these are the
+        // numbers the shipped floor is derived from.
+        private const int CraftTextWidth = 47;
+        private const int TpTextWidth = 19;
+        private const int VendorTextWidth = 57;
+
+        // The word the ignore button replaced, at the same face.
+        private const int IgnoreTextWidth = 53;
+
+        // Historical literal, deliberately not a production constant: the
+        // decision column's floor while the ignore button was drawn inside
+        // it.
+        private const int OldFloorWithTheButtonInside = 256;
+
         // --- RequiredWidth ---
         [Fact]
-        public void RequiredWidth_IsTheRunPlusItsGapsPlusTheSlotAndTheClearance()
-        {
-            var run = Run("CRAFT", "TP");
-            int slot = ToggleSlot();
-
-            Assert.Equal(
-                run[0] + Gap + run[1] + Gap + slot + TreePillColumnMath.TrailingClearance,
-                TreePillColumnMath.RequiredWidth(run, Gap, slot));
-        }
-
-        [Fact]
-        public void RequiredWidth_ARowWithNoToggle_PaysForNeitherTheSlotNorTheGapBeforeIt()
+        public void RequiredWidth_IsTheRunPlusItsGapsPlusTheClearance()
         {
             var run = Run("CRAFT", "TP");
 
             Assert.Equal(
                 run[0] + Gap + run[1] + TreePillColumnMath.TrailingClearance,
-                TreePillColumnMath.RequiredWidth(run, Gap, 0));
+                TreePillColumnMath.RequiredWidth(run, Gap));
         }
 
+        /// <summary>
+        /// The ignore button has a column of its own at the far right of
+        /// the row, so a row that draws one asks this column for exactly
+        /// what a row that does not asks: its source markers.
+        /// </summary>
         [Fact]
-        public void RequiredWidth_AToggleWithNoRunBesideIt_PaysNoLeadingGap()
+        public void RequiredWidth_ReservesNothingForTheIgnoreButton()
         {
+            var run = Run("CRAFT", "TP");
+
             Assert.Equal(
-                29 + TreePillColumnMath.TrailingClearance,
-                TreePillColumnMath.RequiredWidth(new List<int>(), Gap, 29));
+                run[0] + Gap + run[1] + TreePillColumnMath.TrailingClearance,
+                TreePillColumnMath.RequiredWidth(run, Gap));
+            Assert.Equal(
+                Run("CRAFT")[0] + TreePillColumnMath.TrailingClearance,
+                TreePillColumnMath.RequiredWidth(Run("CRAFT"), Gap));
         }
 
         [Fact]
         public void RequiredWidth_NothingToDraw_NeedsNoColumn()
         {
-            Assert.Equal(0, TreePillColumnMath.RequiredWidth(null, Gap, 0));
-            Assert.Equal(0, TreePillColumnMath.RequiredWidth(new List<int>(), Gap, 0));
+            Assert.Equal(0, TreePillColumnMath.RequiredWidth(null, Gap));
+            Assert.Equal(0, TreePillColumnMath.RequiredWidth(new List<int>(), Gap));
         }
 
         // --- Affordable: the space between the two neighbours' minimums ---
@@ -296,59 +307,84 @@ namespace TaimisToolbench.Tests.Services
         // --- The reported row, end to end ---
 
         /// <summary>
-        /// An Obsidian Heavy Breastplate ingredient row: two sources, an
-        /// owned-materials annotation, and the toggle. Against the flat
-        /// 256px column it lost a pill to a "+N" chip even on a window with
-        /// hundreds of spare pixels; against the derived column it draws
-        /// all three at full padding.
+        /// The floor's own derivation, at the face the source markers draw
+        /// in. CRAFT / TP / VENDOR is the widest run the decision column
+        /// can be asked to hold from the tree's structure alone - an
+        /// ownership note is wider, but it depends on the player's
+        /// inventory rather than on the plan - and the floor holds it at
+        /// full padding with room to spare.
         /// </summary>
         [Fact]
-        public void TheReportedRow_FitsWholeOnceTheColumnIsAllowedTheWidthTheWindowHas()
+        public void TheFloor_HoldsTheWidestSourceRunAtFullPadding()
         {
-            var run = Run("CRAFT", "TP", "HAVE 12/50 NEEDED");
-            int slot = ToggleSlot();
+            var standard = new List<int>
+            {
+                CraftTextWidth + Padding, TpTextWidth + Padding, VendorTextWidth + Padding,
+            };
 
-            var chipped = Fit(run, slot, PlanRelayoutMath.TreePillColumnWidth);
-            Assert.Equal(2, chipped.VisibleCount);
-            Assert.Equal(1, chipped.HiddenCount);
+            Assert.Equal(175, TreePillColumnMath.RequiredWidth(standard, Gap));
 
-            // A 1920px window: 1794px of panel, 542 of them past the
-            // module's minimum, all of them the pills' to claim - the run
-            // needs 286, well inside the space between the neighbours.
-            int panel = WindowSizing.TabPanelWidthFor(1920);
-            int column = TreePillColumnMath.ColumnWidth(
-                TreePillColumnMath.RequiredWidth(run, Gap, slot),
-                PlanRelayoutMath.TreePillColumnWidth,
-                TreePillColumnMath.Affordable(
-                    panel, PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 0));
-
-            var whole = Fit(run, slot, column);
-            Assert.Equal(3, whole.VisibleCount);
-            Assert.Equal(0, whole.HiddenCount);
-            Assert.Equal(0, whole.WidthReduction);
+            var fit = Fit(standard, PlanRelayoutMath.TreePillColumnWidth);
+            Assert.Equal(3, fit.VisibleCount);
+            Assert.Equal(0, fit.HiddenCount);
+            Assert.Equal(0, fit.WidthReduction);
         }
 
         /// <summary>
-        /// And at the minimum window the same row degrades exactly as it
-        /// always did - with no surplus and a cost column already at or
-        /// above its floor there is genuinely no room on either side, so
-        /// the column cannot grow and nothing the minimum was derived
-        /// from moves.
+        /// The action column is paid for out of this column, and out of
+        /// reserve it was not using: the floor came down by exactly the new
+        /// column's width, and the run is still no worse off than it was
+        /// when the ignore button sat inside the column at the old floor.
+        /// <para>
+        /// That is what makes the new column free at the module's minimum
+        /// window. PlanRelayoutMathTests pins the other half, the deepest
+        /// row's own clearance, which does not move either.
+        /// </para>
         /// </summary>
         [Fact]
-        public void AtTheMinimumWindow_TheColumnIsStillTheFlatFloor()
+        public void TheFloorCameDownByTheActionColumn_AndTheRunIsNoWorseOff()
         {
-            var run = Run("CRAFT", "TP", "HAVE 12/50 NEEDED");
-            int slot = ToggleSlot();
+            Assert.Equal(
+                OldFloorWithTheButtonInside
+                    - PlanRelayoutMath.TreeActionColumnWidth
+                    - PlanRelayoutMath.TreeActionColumnGap,
+                PlanRelayoutMath.TreePillColumnWidth);
 
-            int column = TreePillColumnMath.ColumnWidth(
-                TreePillColumnMath.RequiredWidth(run, Gap, slot),
-                PlanRelayoutMath.TreePillColumnWidth,
-                TreePillColumnMath.Affordable(
-                    MinPanel(), PlanRelayoutMath.TreePillColumnWidth, MinPanel(), 0));
+            int budgetNow =
+                PlanRelayoutMath.TreePillColumnWidth - TreePillColumnMath.TrailingClearance;
+            int budgetWithTheButtonInside =
+                OldFloorWithTheButtonInside - TreePillColumnMath.TrailingClearance
+                    - PlanRelayoutMath.TreeActionColumnWidth - Gap;
 
-            Assert.Equal(PlanRelayoutMath.TreePillColumnWidth, column);
-            Assert.Equal(1, Fit(run, slot, column).HiddenCount);
+            Assert.True(
+                budgetNow >= budgetWithTheButtonInside,
+                $"run budget {budgetNow} is narrower than the {budgetWithTheButtonInside} " +
+                "it had while the button was in this column");
+        }
+
+        /// <summary>
+        /// What the old floor was actually holding. 256 was derived to fit
+        /// CRAFT / TP / VENDOR / IGNORE at a 10px margin, when IGNORE was a
+        /// word rather than a button. The button that replaced it is
+        /// narrower than that word, and the floor never followed - which is
+        /// the reserve the action column is now spending.
+        /// </summary>
+        [Fact]
+        public void TheOldFloorWasReservingRoomForAWordThatIsNoLongerDrawn()
+        {
+            var withTheWord = new List<int>
+            {
+                CraftTextWidth + Padding, TpTextWidth + Padding,
+                VendorTextWidth + Padding, IgnoreTextWidth + Padding,
+            };
+
+            int wordRun = TreePillColumnMath.RequiredWidth(withTheWord, Gap);
+            Assert.Equal(246, wordRun);
+            Assert.Equal(10, OldFloorWithTheButtonInside - wordRun);
+
+            Assert.True(
+                PlanRelayoutMath.TreeActionColumnWidth < IgnoreTextWidth + Padding,
+                "the button is not narrower than the word it replaced");
         }
 
         // --- The second report: the 1x Obsidian Shard row, again ---
@@ -381,8 +417,8 @@ namespace TaimisToolbench.Tests.Services
         private static int ScannedRequired(IReadOnlyList<CraftingTreeNode> roots)
         {
             int chest = TreePillColumnMath.RequiredWidth(
-                Run("CURRENCY", "GUILD UPGRADE", "HAVE 125/500 TOTAL"), Gap, ToggleSlot());
-            int shard = TreePillColumnMath.RequiredWidth(ShardRun(), Gap, ToggleSlot());
+                Run("CURRENCY", "GUILD UPGRADE", "HAVE 125/500 TOTAL"), Gap);
+            int shard = TreePillColumnMath.RequiredWidth(ShardRun(), Gap);
 
             return TreePillColumnMath.Scan(roots, node =>
                 node.NodeId == ChestNodeId ? chest : shard);
@@ -421,7 +457,7 @@ namespace TaimisToolbench.Tests.Services
                 column, PlanRelayoutMath.TreePillColumnWidth, panel - MinPanel(), 0);
             Assert.Equal(0, claim);
 
-            var fit = Fit(ShardRun(), ToggleSlot(), column);
+            var fit = Fit(ShardRun(), column);
             Assert.Equal(3, fit.VisibleCount);
             Assert.Equal(0, fit.HiddenCount);
             Assert.Equal(0, fit.WidthReduction);
@@ -458,7 +494,7 @@ namespace TaimisToolbench.Tests.Services
                 column, PlanRelayoutMath.TreePillColumnWidth, panel - MinPanel(), costSlack);
             Assert.Equal(costSlack, claim);
 
-            var fit = Fit(ShardRun(), ToggleSlot(), column);
+            var fit = Fit(ShardRun(), column);
             Assert.Equal(3, fit.VisibleCount);
             Assert.Equal(0, fit.HiddenCount);
             Assert.Equal(0, fit.WidthReduction);
@@ -513,7 +549,7 @@ namespace TaimisToolbench.Tests.Services
 
             Assert.Equal(PlanRelayoutMath.TreePillColumnWidth, column);
 
-            var fit = Fit(ShardRun(), ToggleSlot(), column);
+            var fit = Fit(ShardRun(), column);
             Assert.Equal(2, fit.VisibleCount);
             Assert.Equal(1, fit.HiddenCount);
             Assert.Equal(Cap("+1") + TightPadding, fit.OverflowPillWidth);
@@ -540,7 +576,7 @@ namespace TaimisToolbench.Tests.Services
                 column, PlanRelayoutMath.TreePillColumnWidth, 0, 45);
             Assert.Equal(45, claim);
 
-            var fit = Fit(ShardRun(), ToggleSlot(), column);
+            var fit = Fit(ShardRun(), column);
             Assert.Equal(3, fit.VisibleCount);
             Assert.Equal(0, fit.HiddenCount);
             Assert.Equal(Padding - TightPadding, fit.WidthReduction);
@@ -741,7 +777,7 @@ namespace TaimisToolbench.Tests.Services
             var resolved = TreePillColumnMath.Resolve(
                 ScannedRequired(ReportedPlanNodes()), 0, Floor, MinPanel(), MinPanel(), slack);
 
-            var fit = Fit(ShardRun(), ToggleSlot(), resolved.Width);
+            var fit = Fit(ShardRun(), resolved.Width);
             Assert.Equal(3, fit.VisibleCount);
             Assert.Equal(0, fit.HiddenCount);
 
@@ -779,12 +815,11 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(unclaimed.CostRightEdge, claimed.CostRightEdge);
         }
 
-        private static PlanRelayoutMath.PillFitPlan Fit(List<int> run, int slot, int columnWidth)
+        private static PlanRelayoutMath.PillFitPlan Fit(List<int> run, int columnWidth)
         {
-            int maxRightEdge = columnWidth - TreePillColumnMath.TrailingClearance;
             return PlanRelayoutMath.ComputePillFit(
                 run, Padding - TightPadding, Gap, 0,
-                TreePillRunLayout.LeadingLimitX(maxRightEdge, slot, Gap),
+                columnWidth - TreePillColumnMath.TrailingClearance,
                 hidden => Cap("+" + hidden) + TightPadding);
         }
     }
