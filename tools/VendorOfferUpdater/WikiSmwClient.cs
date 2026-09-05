@@ -56,11 +56,34 @@ namespace VendorOfferUpdater
         /// </summary>
         public IReadOnlyList<UnresolvedSection> UnresolvedSections => _unresolved;
 
-        // Characters used as prefixes when partitioning queries that exceed
-        // the wiki's ~5500 result offset limit.
-        private static readonly string[] PartitionPrefixes =
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        // Characters appended to a vendor-name prefix when splitting a query
+        // past the wiki's ~5500 result offset limit. Both the case and the
+        // punctuation are load-bearing, and neither is a free choice:
+        // the glob is a byte-wise LIKE over a sortkey, so it is
+        // case-sensitive, a space is a real character to split on and an
+        // underscore is not, and the leading double quote is the only way to
+        // reach five live merchants. Every character here appears in a
+        // merchant name in ref/vendor_offers.json. Widening the set costs one
+        // request per overflowing partition; the derivation, from Semantic
+        // MediaWiki's own source, is docs/ARCHITECTURE.md section T.9.
+        private static readonly string[] PartitionCharacters =
+            ("ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+             "abcdefghijklmnopqrstuvwxyz" +
+             "0123456789" +
+             " -'.,/():&\"")
                 .Select(c => c.ToString()).ToArray();
+
+        /// <summary>
+        /// What a partition's own query returned. A partition that was never
+        /// answered is not an empty one, and a parent that overflowed cannot
+        /// have children that are all empty.
+        /// </summary>
+        private enum PartitionOutcome
+        {
+            Rows,
+            NoRows,
+            Unresolved,
+        }
 
         // Note: the wiki also exposes "Has character purchase cap" and
         // "Has total purchase cap" on the same per-offer subobjects, but the
@@ -118,9 +141,8 @@ namespace VendorOfferUpdater
         ///   Has seasonal purchase cap - Wizard's Vault seasonal purchase limit
         ///                               (absent = uncapped or not a Vault offer)
         ///
-        /// Past the SMW API's ~5500-result pagination limit per query condition, the
-        /// query is automatically partitioned by vendor name prefix (e.g. [[Has
-        /// vendor::~A*]]), empty prefixes probed and skipped, under safety limits.
+        /// Past the SMW API's ~5500-result limit per condition, the query is
+        /// split by vendor name prefix: see PartitionCharacters.
         /// </summary>
         public async Task<(List<WikiVendorResult> Results, QueryStats Stats)> QueryVendorItemsAsync(
             string? queryCondition = null, QueryOptions? options = null, CancellationToken ct = default)
@@ -156,12 +178,16 @@ namespace VendorOfferUpdater
             _stats.Elapsed = _stopwatch.Elapsed;
             _stats.DistinctResults = seenKeys.Count;
 
-            // Detect non-alphanumeric vendor names in collected results
+            // Names whose first character no prefix can reach. Measured
+            // against the split's own character set rather than a separate
+            // notion of "alphanumeric": those two disagreeing is what makes a
+            // warning claim a gap that is not there, or miss one that is.
+            var firstCharacters = new HashSet<string>(PartitionCharacters, StringComparer.Ordinal);
             var nonAlpha = new HashSet<string>(StringComparer.Ordinal);
             foreach (var r in allResults)
             {
                 if (!string.IsNullOrEmpty(r.MerchantName) &&
-                    !char.IsLetterOrDigit(r.MerchantName[0]))
+                    !firstCharacters.Contains(r.MerchantName[0].ToString()))
                 {
                     nonAlpha.Add(r.MerchantName);
                 }
@@ -175,7 +201,7 @@ namespace VendorOfferUpdater
             return (allResults, _stats);
         }
 
-        private async Task PaginateConditionAsync(
+        private async Task<PartitionOutcome> PaginateConditionAsync(
             string baseCondition,
             string? vendorPrefix,
             int depth,
@@ -193,6 +219,13 @@ namespace VendorOfferUpdater
 
             int partitionRowsAdded = 0;
             int partitionHttpRequests = 0;
+
+            // Rows the wiki RETURNED, before deduplication. A sub-partition
+            // re-fetches from offset 0, so its rows are usually all duplicates
+            // of the parent's and add nothing; that is still an answer of
+            // "this prefix holds rows", which is what the overflow arithmetic
+            // below is checked against.
+            int partitionRowsReturned = 0;
             bool hitOffsetLimit = false;
             bool sectionUnresolved = false;
             int offset = 0;
@@ -254,6 +287,8 @@ namespace VendorOfferUpdater
                 int batchAdded = 0;
                 foreach (var resultProp in results.EnumerateObject())
                 {
+                    partitionRowsReturned++;
+
                     var parsed = ParseResult(resultProp.Name, resultProp.Value);
                     if (parsed == null)
                     {
@@ -310,104 +345,104 @@ namespace VendorOfferUpdater
                 Console.WriteLine(
                     $"  [{label}] UNRESOLVED: kept {partitionRowsAdded} row(s) already " +
                     "collected, continuing with the rest of the run.");
-                return;
+                return PartitionOutcome.Unresolved;
             }
 
             if (!hitOffsetLimit)
             {
                 Console.WriteLine(
                     $"  [{label}] done: {partitionRowsAdded} rows in {partitionHttpRequests} requests");
-                return;
+                return partitionRowsReturned > 0 ? PartitionOutcome.Rows : PartitionOutcome.NoRows;
             }
 
             // OVERFLOW - check depth limit
             if (depth >= _options.MaxPrefixDepth)
             {
-                Console.WriteLine(
-                    $"  WARNING: Partition [{label}] overflowing at max depth {depth}. " +
-                    $"{partitionRowsAdded} rows collected, remaining truncated.");
                 pStats.WasTruncated = true;
                 _stats.TruncatedPartitions++;
-                return;
+
+                // Truncation is silent data loss, not a warning: this prefix
+                // holds rows past the offset limit that no query in this run
+                // will ask for. Recorded so the coverage gate can refuse to
+                // publish a dataset with a hole in it.
+                RecordUnresolved(
+                    "partition",
+                    label,
+                    vendorPrefix,
+                    condition,
+                    new WikiApiError(
+                        "truncated-at-max-depth",
+                        $"Overflowed the offset limit at max depth {depth} with " +
+                        $"{partitionRowsAdded} rows kept. Rows past that are not fetched. " +
+                        "Raise --max-depth to split this prefix further."));
+                return PartitionOutcome.Rows;
             }
 
             Console.WriteLine(
-                $"  [{label}] overflow at depth {depth}, probing sub-partitions...");
+                $"  [{label}] overflow at depth {depth}, splitting on the next character...");
 
-            // Probe + paginate sub-partitions (KEEP all rows already collected)
-            int skippedEmpty = 0;
+            // Split and paginate each child (KEEP all rows already collected).
+            // There is no separate probe request: an empty child costs one
+            // request to paginate and one to probe, so probing only added a
+            // request per non-empty child, and a second place to read a
+            // response and call it empty.
+            int childrenWithRows = 0;
+            int emptyChildren = 0;
+            int unresolvedChildren = 0;
             var emptyPrefixes = new List<string>();
-            foreach (var prefix in PartitionPrefixes)
+
+            foreach (var character in PartitionCharacters)
             {
-                string subPrefix = (vendorPrefix ?? "") + prefix;
+                string subPrefix = (vendorPrefix ?? string.Empty) + character;
 
-                // Probe with limit=1 and no printouts (minimal payload)
-                CheckSafetyLimits(ct, $"probe {subPrefix}", depth + 1, seenKeys.Count);
+                var outcome = await PaginateConditionAsync(
+                    baseCondition, subPrefix, depth + 1, allResults, seenKeys, ct);
 
-                string probeCondition = baseCondition + $"[[Has vendor::~{subPrefix}*]]";
-                string probeQuery = probeCondition + "|limit=1|offset=0";
-                string probeUrl = BuildAskUrl(probeQuery);
-
-                _stats.TotalHttpRequests++;
-
-                string probeResponse;
-                try
+                switch (outcome)
                 {
-                    probeResponse = await FetchWithRetryAsync(
-                        probeUrl, $"probe {subPrefix}", probeCondition, ct);
-                }
-                catch (HttpRequestException ex)
-                {
-                    RecordUnresolved("probe", subPrefix, subPrefix, probeCondition, ex);
-                    await Task.Delay(_effectiveDelay, ct);
-                    continue;
+                    case PartitionOutcome.Rows:
+                        childrenWithRows++;
+                        break;
+                    case PartitionOutcome.NoRows:
+                        emptyChildren++;
+                        emptyPrefixes.Add($"'{subPrefix}'");
+                        break;
+                    default:
+                        unresolvedChildren++;
+                        break;
                 }
 
                 await Task.Delay(_effectiveDelay, ct);
-
-                WikiAskShape probeShape;
-                WikiApiError? probeError;
-                using (var probeDoc = JsonDocument.Parse(probeResponse))
-                {
-                    var probeReading = WikiAskResponse.Read(probeDoc.RootElement);
-                    probeShape = probeReading.Shape;
-                    probeError = probeReading.Error;
-                }
-
-                if (probeShape == WikiAskShape.NoRows)
-                {
-                    RecordSectionAnswered();
-                    skippedEmpty++;
-                    emptyPrefixes.Add(subPrefix);
-                    continue;
-                }
-
-                if (probeShape != WikiAskShape.Rows)
-                {
-                    // The whole defect this guard exists for: an unreadable
-                    // probe used to skip the prefix as if it held no vendors.
-                    RecordUnresolved(
-                        "probe",
-                        subPrefix,
-                        subPrefix,
-                        probeCondition,
-                        probeError ?? UnreadableResponse());
-                    continue;
-                }
-
-                RecordSectionAnswered();
-
-                // Non-empty: paginate fully (re-fetches from offset=0; dedup handles overlap)
-                await PaginateConditionAsync(
-                    baseCondition, subPrefix, depth + 1, allResults, seenKeys, ct);
             }
 
             // The prefixes are named, not just counted: a count alone cannot
-            // tell "36 prefixes hold no vendors" from "36 probes were refused".
+            // tell "these prefixes hold no vendors" from "these queries never
+            // matched the way their names are actually spelled".
             Console.WriteLine(
-                $"  [{label}] sub-partitions done, " +
-                $"{skippedEmpty}/{PartitionPrefixes.Length} empty prefixes skipped" +
-                (emptyPrefixes.Count > 0 ? $": {string.Join(" ", emptyPrefixes)}" : string.Empty));
+                $"  [{label}] split done: {childrenWithRows} with rows, " +
+                $"{emptyChildren} empty, {unresolvedChildren} unresolved" +
+                (emptyPrefixes.Count > 0 ? $". Empty: {string.Join(" ", emptyPrefixes)}" : string.Empty));
+
+            // The arithmetic that makes an unreachable prefix impossible to
+            // miss. This partition returned more rows than one query can
+            // page through, so at least one child must hold rows. Every child
+            // answering "none" is a contradiction, and it means the split is
+            // not reaching the names - not that the names are not there.
+            if (childrenWithRows == 0 && unresolvedChildren == 0)
+            {
+                RecordUnresolved(
+                    "partition",
+                    label,
+                    vendorPrefix,
+                    condition,
+                    new WikiApiError(
+                        "empty-subpartitions",
+                        $"Overflowed the offset limit, so this prefix holds more rows " +
+                        $"than one query returns, yet all {emptyChildren} sub-prefixes " +
+                        "returned none. The split is not reaching those names."));
+            }
+
+            return PartitionOutcome.Rows;
         }
 
         private void CheckSafetyLimits(
@@ -459,16 +494,17 @@ namespace VendorOfferUpdater
             Console.WriteLine($"  Level 0: 1 root partition");
             for (int d = 1; d <= _options.MaxPrefixDepth; d++)
             {
-                int maxPartitions = (int)Math.Pow(PartitionPrefixes.Length, d);
+                double maxPartitions = Math.Pow(PartitionCharacters.Length, d);
                 Console.WriteLine(
-                    $"  Level {d}: up to {maxPartitions} prefixes " +
-                    $"({PartitionPrefixes.Length} per overflow at level {d - 1})");
+                    $"  Level {d}: up to {maxPartitions:N0} prefixes " +
+                    $"({PartitionCharacters.Length} per overflow at level {d - 1})");
             }
 
             Console.WriteLine();
             Console.WriteLine(
-                "Actual request count is unknown without probing - " +
-                "depends on data distribution.");
+                "A level is only reached where the level above it overflowed, so the "
+                + "actual request count depends on data distribution and is bounded by "
+                + $"--max-requests ({_options.MaxTotalRequests}).");
         }
 
         private static string ComputeCompositeKey(WikiVendorResult r)

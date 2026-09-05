@@ -18,7 +18,16 @@ namespace VendorOfferUpdater
 
         public int MaxPrefixDepth { get; init; } = 2;
 
-        public int MaxTotalRequests { get; init; } = 2000;
+        /// <summary>
+        /// Ceiling on requests for one run. 2,000 was sized for a prefix
+        /// split whose second level matched nothing and so cost 36 requests
+        /// per overflowing letter and returned no rows for any of them. A
+        /// split that reaches real names costs more, and being cut off
+        /// mid-run leaves a partition unscraped rather than merely slow.
+        /// </summary>
+        public const int DefaultMaxTotalRequests = 4000;
+
+        public int MaxTotalRequests { get; init; } = DefaultMaxTotalRequests;
 
         public TimeSpan MaxRuntime { get; init; } = TimeSpan.FromMinutes(30);
 

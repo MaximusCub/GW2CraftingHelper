@@ -63,7 +63,7 @@ namespace VendorOfferUpdater
             bool skipItemResolution = false;
             bool resolveOnly = false;
             int maxDepth = 2;
-            int maxRequests = 2000;
+            int maxRequests = QueryOptions.DefaultMaxTotalRequests;
             int maxRuntimeMinutes = 30;
             int delayMs = QueryOptions.DefaultDelayBetweenRequestsMs;
             int maxAttempts = QueryOptions.DefaultMaxAttempts;
@@ -725,8 +725,9 @@ namespace VendorOfferUpdater
             {
                 Console.WriteLine();
                 Console.WriteLine(
-                    $"  WARNING: Found {stats.NonAlphaVendors.Count} vendor(s) with " +
-                    "non-alphanumeric names (not covered by prefix partitioning):");
+                    $"  WARNING: Found {stats.NonAlphaVendors.Count} vendor(s) whose " +
+                    "first character is outside the partition character set, so a " +
+                    "prefix split cannot reach them:");
                 foreach (var name in stats.NonAlphaVendors)
                 {
                     Console.WriteLine($"    - {name}");

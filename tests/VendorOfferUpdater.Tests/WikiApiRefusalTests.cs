@@ -214,40 +214,41 @@ namespace VendorOfferUpdater.Tests
 
         // -- The run continues --------------------------------------
         [Fact]
-        public async Task RefusedProbe_RecordsThePrefixAndKeepsScrapingTheRest()
+        public async Task RefusedChildPartition_RecordsThePrefixAndKeepsScrapingTheRest()
         {
             var (client, handler, http) = CreateClient();
             using var _ = http;
 
             // Root overflows (a continue-offset that does not advance), which
-            // is what sends the scrape down the per-prefix probe path.
+            // is what sends the scrape down the per-character split.
             handler.Enqueue(new WikiJsonBuilder()
                 .AddResult("NPC#root", gameId: 1, vendor: "Alpha")
                 .WithContinueOffset(0)
                 .Build());
 
-            // A: refused on every attempt. B: one row. Everything else empty.
+            // The first child is refused on every attempt. The second returns
+            // a row. Everything after that is empty.
             for (int i = 0; i < QueryOptions.DefaultMaxAttempts; i++)
             {
                 handler.Enqueue(WikiJsonBuilder.BuildMaxLagError());
             }
 
             handler.Enqueue(OneRow("Astral Ward Quartermaster", 200));
-            handler.Enqueue(OneRow("Astral Ward Quartermaster", 200));
 
-            for (int i = 0; i < 34; i++)
+            for (int i = 0; i < 200; i++)
             {
                 handler.Enqueue(WikiJsonBuilder.BuildEmpty());
             }
 
-            var (results, _) = await client.QueryVendorItemsAsync(
+            var (results, _2) = await client.QueryVendorItemsAsync(
                 "[[Sells item::+]]", FastOptions(maxPrefixDepth: 1));
 
-            // The B rows were fetched after A was refused: the run continued.
+            // The second child was fetched after the first was refused: the
+            // run continued.
             Assert.Contains(results, r => r.GameId == 200);
 
             var section = Assert.Single(client.UnresolvedSections);
-            Assert.Equal("probe", section.Kind);
+            Assert.Equal("partition", section.Kind);
             Assert.Equal("A", section.Prefix);
             Assert.Contains("~A*", section.Condition, StringComparison.Ordinal);
         }

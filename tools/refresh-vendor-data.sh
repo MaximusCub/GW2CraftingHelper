@@ -8,7 +8,11 @@
 #
 # Environment overrides (optional):
 #   MAX_RUNTIME        Max wiki scrape time in minutes  (default: 20)
-#   MAX_REQUESTS       Max HTTP requests for wiki scrape (default: 2000)
+#   MAX_REQUESTS       Max HTTP requests for wiki scrape (default: 4000)
+#   MAX_DEPTH          Max prefix-split depth for the wiki scrape (default: 2).
+#                       Raise it if a run reports a partition truncated at max
+#                       depth, which means one prefix still holds more rows
+#                       than a single query can page through.
 #   DELAY_PASS1        Delay between wiki requests in ms (default: 250)
 #   DELAY_PASS2        Delay between resolution requests (default: 1500)
 #   MAX_SEASONAL_PAGES Max NEW seasonal-tag wiki pages fetched by Pass 1
@@ -74,7 +78,8 @@ for arg in "$@"; do
             echo ""
             echo "Environment overrides:"
             echo "  MAX_RUNTIME=${MAX_RUNTIME:-20}    Max wiki scrape time in minutes"
-            echo "  MAX_REQUESTS=${MAX_REQUESTS:-2000}  Max HTTP requests for wiki scrape"
+            echo "  MAX_REQUESTS=${MAX_REQUESTS:-4000}  Max HTTP requests for wiki scrape"
+            echo "  MAX_DEPTH=${MAX_DEPTH:-2}     Max prefix-split depth for the wiki scrape"
             echo "  DELAY_PASS1=${DELAY_PASS1:-250}   Delay between wiki requests (ms)"
             echo "  DELAY_PASS2=${DELAY_PASS2:-1500}  Delay between resolution requests (ms)"
             echo "  MAX_SEASONAL_PAGES=${MAX_SEASONAL_PAGES:-2500}  Max new seasonal-tag pages fetched by Pass 1"
@@ -157,7 +162,8 @@ if [[ "$PASS2_ONLY" == false ]]; then
         --tag-seasonal-festivals \
         "${MERGE_FLAGS[@]+"${MERGE_FLAGS[@]}"}" \
         --max-runtime "${MAX_RUNTIME:-20}" \
-        --max-requests "${MAX_REQUESTS:-2000}" \
+        --max-requests "${MAX_REQUESTS:-4000}" \
+        --max-depth "${MAX_DEPTH:-2}" \
         --delay "${DELAY_PASS1:-250}" \
         --max-seasonal-pages "${MAX_SEASONAL_PAGES:-2500}" \
         ${ALLOW_COVERAGE_DROP:+--allow-coverage-drop} \

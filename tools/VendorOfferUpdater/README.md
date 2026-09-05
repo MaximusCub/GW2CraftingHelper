@@ -59,7 +59,7 @@ The tool auto-detects the repository root by walking up the directory tree looki
 | `--skip-item-resolution` | off | Skip item-based currency resolution; generate partial output and save wiki cache |
 | `--resolve-item-currencies-only` | off | Load wiki cache instead of scraping; resolve currencies and generate final output |
 | `--query <condition>` | `[[Sells item::+]]` | Override the SMW query condition (e.g. `[[Has vendor::"Miyani"]]`) |
-| `--max-depth <n>` | 2 | Max prefix partition depth for SMW queries |
+| `--max-depth <n>` | 2 | Max prefix partition depth for SMW queries. See "Splitting an oversized query" below |
 | `--max-requests <n>` | 2000 | Safety limit on total HTTP requests |
 | `--max-runtime <minutes>` | 30 | Safety limit on total execution time |
 | `--delay <ms>` | 250 | Delay between wiki API requests (minimum enforced: 200 ms) |
@@ -78,7 +78,8 @@ The `refresh-vendor-data.sh` script accepts these environment variables:
 | Variable | Default | Used in |
 |----------|---------|---------|
 | `MAX_RUNTIME` | 20 | Pass 1 `--max-runtime` |
-| `MAX_REQUESTS` | 2000 | Pass 1 `--max-requests` |
+| `MAX_REQUESTS` | 4000 | Pass 1 `--max-requests` |
+| `MAX_DEPTH` | 2 | Pass 1 `--max-depth` - raise it if a run reports a partition truncated at max depth |
 | `DELAY_PASS1` | 250 | Pass 1 `--delay` |
 | `DELAY_PASS2` | 1500 | Pass 2 `--delay` |
 | `MAX_SEASONAL_PAGES` | 2500 | Pass 1 `--max-seasonal-pages` - sized to cover a from-scratch sweep of the measured ~2,088 distinct vendor pages in one run |
@@ -209,10 +210,10 @@ of the run and written to a sidecar file beside the dataset:
   "generatedAt": "2026-09-05T10:02:41.7712030Z",
   "sections": [
     {
-      "kind": "probe",
-      "label": "AS",
-      "prefix": "AS",
-      "condition": "[[Sells item::+]][[Has vendor::~AS*]]",
+      "kind": "partition",
+      "label": "As",
+      "prefix": "As",
+      "condition": "[[Sells item::+]][[Has vendor::~As*]]",
       "errorCode": "maxlag",
       "reason": "Waiting for 10.64.16.79: 6.9 seconds lagged.",
       "attempts": 5
@@ -238,6 +239,36 @@ One refused section is worth carrying on past. Three in a row is the wiki
 declining to answer this address at all, and the run stops there rather than
 spending a full attempt ladder per section to be told the same thing 36 times.
 Whatever was collected up to that point is kept and the wiki cache is saved.
+
+## Splitting an oversized query
+
+The SMW API pages through at most ~5,500 results for one query condition. Past
+that, the scrape splits the query by vendor-name prefix: `[[Has vendor::~A*]]`,
+then `[[Has vendor::~Ab*]]`, and so on, up to `--max-depth`.
+
+Which characters the split uses is not a free choice. SMW compiles `~As*` to
+`smw_sortkey LIKE 'As%'` against a `VARBINARY(255)` column, so the comparison
+is byte-wise and **case-sensitive**, and the sortkey is the page title with
+underscores turned back into spaces. Vendor names are Title Case, so the first
+character is upper case but the ones after it usually are not: `~AS*` matches
+nothing at all, while the sixteen `Astral Ward *` merchants sit under `As`. The
+character set therefore spans upper case, lower case, digits and the
+punctuation that appears in real names, including a space, an apostrophe, a
+slash, a parenthesis and a leading double quote. `docs/ARCHITECTURE.md` section
+T.9 records where each of those properties is readable in SMW's own source.
+
+Each child costs one request whether or not it holds rows, so the size of that
+set is the price of an overflow: 73 requests per partition that overflows. A
+level is only reached where the level above it overflowed.
+
+**The arithmetic is checked.** A partition that overflowed returned more rows
+than one query can page through, so at least one of its children must hold
+rows. If every child answers with none, that is a contradiction: the split is
+not reaching the names rather than the names not existing. The partition is
+recorded UNRESOLVED and the coverage check blocks the write. A partition that
+overflows at `--max-depth`, whose remaining rows this run will never ask for,
+is recorded the same way; raise `--max-depth` (or `MAX_DEPTH` in the wrapper
+script) to split it further.
 
 ## Remembered misses
 
