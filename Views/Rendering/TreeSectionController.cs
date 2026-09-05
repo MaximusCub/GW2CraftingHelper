@@ -252,6 +252,11 @@ namespace TaimisToolbench.Views.Rendering
         private int _pillColumnWidth = PlanRelayoutMath.TreePillColumnWidth;
         private int _planPillRequiredFloor;
 
+        // Widest pill run each row has drawn while THIS plan has been on
+        // screen. The IGNORE key answers to this rather than to the run
+        // the row currently draws - see Services/TreePillRunInkFloor.
+        private readonly TreePillRunInkFloor _planPillRunInk = new TreePillRunInkFloor();
+
         // How much of THIS render's pill column was claimed from the cost
         // column's reserve above what its rows draw
         // (TreePillColumnMath.RightClaim). EffectiveCostColumnWidth hands
@@ -335,6 +340,7 @@ namespace TaimisToolbench.Views.Rendering
             // fact and is cleared with it.
             _planCostColumnFloor = TreeCostColumnMath.CostColumnWidths.Empty;
             _planPillRequiredFloor = 0;
+            _planPillRunInk.Clear();
             _pillColumnCostClaim = 0;
             _sourceHeaderInkWidth = 0;
             _lastResult = result;
@@ -2014,7 +2020,9 @@ namespace TaimisToolbench.Views.Rendering
             int keyRightEdge = pillColX;
             if (anchoredIndex >= 0)
             {
-                int keyX = TreePillRunLayout.AnchoredSlotX(maxRightEdge, anchoredWidth);
+                int keyX = TreeIgnoreKeyPlacement.SlotX(
+                    maxRightEdge, CostInkX(handle, pillColX), anchoredWidth, PillGap,
+                    pillColX + _planPillRunInk.Widen(node.NodeId, runRightEdge - pillColX));
                 keyRightEdge = keyX + anchoredWidth;
                 placements.Add(new PillPlacement(anchoredIndex, keyX, anchoredWidth, 0));
             }
@@ -2305,6 +2313,24 @@ namespace TaimisToolbench.Views.Rendering
             {
                 _treeHeaderRelayout?.Invoke(panelWidth);
             }
+        }
+
+        /// <summary>
+        /// Leftmost pixel the cost column's values reach on any row of
+        /// this tree, which is the line the IGNORE key may not cross
+        /// (Services/TreeIgnoreKeyPlacement). The scan behind
+        /// LeftmostInkReach measures coin and currency runs only, so a
+        /// tree with nothing priced reports 0 and this yields the column's
+        /// own left edge - conceding the whole reserve to the unmeasured
+        /// dash those rows draw, exactly as EffectiveCostColumnWidth does.
+        /// </summary>
+        private static int CostInkX(TreeRowHandle handle, int pillColX)
+        {
+            int costRightEdge = pillColX + handle.PillColumnWidth + handle.CostColumnWidth;
+            int reach = handle.ColumnWidths.LeftmostInkReach;
+            return reach > 0 && reach < handle.CostColumnWidth
+                ? costRightEdge - reach
+                : costRightEdge - handle.CostColumnWidth;
         }
 
         /// <summary>
