@@ -51,7 +51,7 @@ namespace VendorOfferUpdater
     /// </summary>
     public class UnresolvedSection
     {
-        // "partition", "probe" or "item-batch".
+        // "partition" or "item-batch".
         public string Kind { get; set; } = string.Empty;
 
         public string Label { get; set; } = string.Empty;

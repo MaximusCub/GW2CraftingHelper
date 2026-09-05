@@ -66,10 +66,10 @@ namespace VendorOfferUpdater.Tests
             {
                 new UnresolvedSection
                 {
-                    Kind = "probe",
-                    Label = "AS",
-                    Prefix = "AS",
-                    Condition = "[[Sells item::+]][[Has vendor::~AS*]]",
+                    Kind = "partition",
+                    Label = "As",
+                    Prefix = "As",
+                    Condition = "[[Sells item::+]][[Has vendor::~As*]]",
                     ErrorCode = "maxlag",
                     Reason = "Waiting for 10.64.16.79: 6.9 seconds lagged.",
                     Attempts = 5,
@@ -211,9 +211,9 @@ namespace VendorOfferUpdater.Tests
 
                 using var doc = JsonDocument.Parse(File.ReadAllText(written!));
                 var section = doc.RootElement.GetProperty("sections")[0];
-                Assert.Equal("probe", section.GetProperty("kind").GetString());
+                Assert.Equal("partition", section.GetProperty("kind").GetString());
                 Assert.Equal(
-                    "[[Sells item::+]][[Has vendor::~AS*]]",
+                    "[[Sells item::+]][[Has vendor::~As*]]",
                     section.GetProperty("condition").GetString());
                 Assert.Equal(5, section.GetProperty("attempts").GetInt32());
                 Assert.False(string.IsNullOrEmpty(
