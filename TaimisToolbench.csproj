@@ -284,6 +284,7 @@
     <Compile Include="Views\Rendering\PressFeedback.cs" />
     <Compile Include="Views\Rendering\ClickSound.cs" />
     <Compile Include="Views\Rendering\ClipCutoff.cs" />
+    <Compile Include="Views\Rendering\CaretKeyButton.cs" />
     <Compile Include="Views\Rendering\CloseKeyButton.cs" />
     <Compile Include="Views\Rendering\FeedbackButton.cs" />
     <Compile Include="Views\Rendering\PillColors.cs" />
@@ -308,6 +309,7 @@
     <Compile Include="Views\Rendering\SummarySectionRenderer.cs" />
     <Compile Include="Views\Rendering\IconNameRowHelpers.cs" />
     <Compile Include="Views\Rendering\RowRelayoutHelpers.cs" />
+    <Compile Include="Views\Rendering\RowActionKey.cs" />
     <Compile Include="Views\Rendering\TreeSectionController.cs" />
     <Compile Include="Views\Rendering\TreeToolbarCommands.cs" />
     <Compile Include="Views\DialogWindow.cs" />

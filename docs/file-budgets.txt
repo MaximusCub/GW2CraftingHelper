@@ -112,7 +112,7 @@ Services/DialogLayoutMath.cs                                                    
 Services/DisciplinesColumnMath.cs                                                       148
 Services/ExcessCraftOutputCalculator.cs                                                 158
 Services/FirstLoadSnapshotGate.cs                                                       86
-Services/GlyphButtonMetrics.cs                                                          60
+Services/GlyphButtonMetrics.cs                                                          69
 Services/GridLayout.cs                                                                  93
 Services/Gw2AccountRecipeClient.cs                                                      30
 Services/Gw2AccountSnapshotService.cs                                                   491
@@ -291,13 +291,14 @@ Views/ModalDialog.cs                                                            
 Views/PlanHistoryTabContent.cs                                                          1487
 Views/RankerTabContent.cs                                                               3025
 Views/Rendering/ClickSound.cs                                                           197
-Views/Rendering/CloseKeyButton.cs                                                       119
+Views/Rendering/CaretKeyButton.cs                                                       109
+Views/Rendering/CloseKeyButton.cs                                                       64
 Views/Rendering/CoinCurrencyRenderer.cs                                                 671
 Views/Rendering/ColumnHeaderRowRenderer.cs                                              221
 Views/Rendering/CraftStepsSectionRenderer.cs                                            264
 Views/Rendering/DisciplinesSectionRenderer.cs                                           288
 Views/Rendering/EmptyPlanStateRenderer.cs                                               81
-Views/Rendering/FeedbackButton.cs                                                       265
+Views/Rendering/FeedbackButton.cs                                                       240
 Views/Rendering/HeaderBands.cs                                                          207
 Views/Rendering/HeaderCellPlan.cs                                                       99
 Views/Rendering/HoverChainResync.cs                                                     75
@@ -317,6 +318,7 @@ Views/Rendering/RarityColors.cs                                                 
 Views/Rendering/RecipesSectionRenderer.cs                                               365
 Views/Rendering/RichTooltipSurface.cs                                                   609
 Views/Rendering/RowRelayoutHelpers.cs                                                   72
+Views/Rendering/RowActionKey.cs                                                         103
 Views/Rendering/ShoppingBadgeColors.cs                                                  72
 Views/Rendering/ShoppingListSectionRenderer.cs                                          550
 Views/Rendering/SortIndicator.cs                                                        145
@@ -566,7 +568,7 @@ tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                  
 tests/TaimisToolbench.Tests/Services/StickyHeaderLayoutTests.cs                         266
 tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                   1327
 tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                             198
-tests/TaimisToolbench.Tests/Services/GlyphButtonMetricsTests.cs                         111
+tests/TaimisToolbench.Tests/Services/GlyphButtonMetricsTests.cs                         143
 tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                        332
 tests/TaimisToolbench.Tests/Services/TextWrapMathTests.cs                               297
 tests/TaimisToolbench.Tests/Services/TooltipComposerContentTests.cs                     215
