@@ -1996,32 +1996,34 @@ namespace TaimisToolbench.Views.Rendering
                 x += width + PillGap;
             }
 
-            if (anchoredIndex >= 0)
+            // Right edge of this row's flowed run, including the "+N" chip
+            // the loop below draws from the same x. Read off the run
+            // rather than off the placements, because the anchored key
+            // that follows is not part of it.
+            int runRightEdge = pillColX;
+            if (fit.VisibleCount > 0)
             {
-                placements.Add(new PillPlacement(
-                    anchoredIndex,
-                    TreePillRunLayout.AnchoredSlotX(maxRightEdge, anchoredWidth),
-                    anchoredWidth,
-                    0));
+                runRightEdge = x - PillGap;
             }
 
-            // Right edge of this row's INK, which the "Source" header
-            // centres over. Taken off the resolved placements rather than
-            // off the column's reserve: the anchored IGNORE slot is
-            // already among them at the column's own right edge, so a row
-            // that has one reports the full column and a root row that
-            // does not reports just its badges.
-            int inkRightEdge = pillColX;
+            if (fit.HiddenCount > 0)
+            {
+                runRightEdge = x + fit.OverflowPillWidth;
+            }
+
+            int keyRightEdge = pillColX;
+            if (anchoredIndex >= 0)
+            {
+                int keyX = TreePillRunLayout.AnchoredSlotX(maxRightEdge, anchoredWidth);
+                keyRightEdge = keyX + anchoredWidth;
+                placements.Add(new PillPlacement(anchoredIndex, keyX, anchoredWidth, 0));
+            }
 
             foreach (var placement in placements)
             {
                 var spec = specs[placement.SpecIndex];
                 int pillWidth = placement.Width;
                 int textWidth = placement.TextWidth;
-                if (placement.X + pillWidth > inkRightEdge)
-                {
-                    inkRightEdge = placement.X + pillWidth;
-                }
 
                 PillColors.GetPillColors(spec.Kind, node.IsIgnored, out Color borderColor, out Color fillColor);
 
@@ -2264,13 +2266,10 @@ namespace TaimisToolbench.Views.Rendering
                 pillPanels.Add(
                     RenderOverflowPill(rowPanel, specs, fit, font, x, pillY, dimmed));
                 pillOffsets.Add(x - pillColX);
-                if (x + fit.OverflowPillWidth > inkRightEdge)
-                {
-                    inkRightEdge = x + fit.OverflowPillWidth;
-                }
             }
 
-            NoteSourceHeaderInk(inkRightEdge - pillColX);
+            NoteSourceHeaderInk(
+                TreePillRunLayout.HeaderInkWidth(pillColX, runRightEdge, keyRightEdge));
         }
 
         /// <summary>

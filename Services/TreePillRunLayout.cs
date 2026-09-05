@@ -66,6 +66,23 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// Width the "Source" header centres over on one row, measured
+        /// from the pill column's left rule: the further right of the
+        /// row's flowed pill run and its IGNORE key. A row that draws the
+        /// key reports the whole column, because the key is pinned to the
+        /// column's right edge (<see cref="AnchoredSlotX"/>); a plan root,
+        /// which never gets one (DecisionPillPlanner.AppendOwnershipPills),
+        /// reports just its badges.
+        /// <paramref name="keyRightEdge"/> is
+        /// <paramref name="pillColX"/> on a row with no key.
+        /// </summary>
+        public static int HeaderInkWidth(int pillColX, int runRightEdge, int keyRightEdge)
+        {
+            int right = runRightEdge > keyRightEdge ? runRightEdge : keyRightEdge;
+            return right > pillColX ? right - pillColX : 0;
+        }
+
+        /// <summary>
         /// Left edge of the "Source" header, centred over the INK the
         /// pill runs cover rather than over the column's fixed reserve
         /// (PlanRelayoutMath.TreePillColumnWidth). The pills stay
