@@ -513,6 +513,11 @@ namespace TaimisToolbench.Views.Rendering
                 case TooltipSpanRole.Rarity:
                     return RarityColors.GetRarityNameColor(span.RarityKey);
 
+                // Blish's own constant for the game's warm tan, and it is
+                // the measured currency-name colour to the unit.
+                case TooltipSpanRole.CurrencyName:
+                    return ContentService.Colors.Chardonnay;
+
                 // MEASURED on live/eq-weapon-full.png (2026-08-25,
                 // lossless) across six independent lines - two sigil
                 // names, a sigil description, the +8 Agony Infusion pair,

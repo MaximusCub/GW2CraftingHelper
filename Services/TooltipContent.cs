@@ -85,8 +85,9 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// The icon+name row every in-game item tooltip opens with: a
-        /// ~34x34 framed item icon with the name set to its right and
-        /// vertically centred on it (KNOWN-ISSUES #42, gap G11). A taller
+        /// framed icon at <see cref="ItemIconTier.TooltipHeader"/> with the
+        /// name set to its right and vertically centred on it
+        /// (KNOWN-ISSUES #42, gap G11). A taller
         /// row than a prose one, and the only line kind that carries an
         /// icon - which is why it is a KIND rather than another span role.
         /// <para>
@@ -99,8 +100,15 @@ namespace TaimisToolbench.Services
         /// </summary>
         public static TooltipLine HeaderLine(string iconUrl, string name, TooltipHeaderSubject subject)
         {
+            // A currency has no rarity to colour by and does not fall back
+            // to the unknown-rarity grey: the game gives it a colour of its
+            // own (see TooltipSpanRole.CurrencyName).
+            TooltipSpan nameSpan = subject.IsCurrency
+                ? TooltipSpan.Styled(name ?? "", TooltipSpanRole.CurrencyName)
+                : TooltipSpan.RarityText(name ?? "", subject.RarityKey);
+
             return new TooltipLine(
-                new List<TooltipSpan> { TooltipSpan.RarityText(name ?? "", subject.RarityKey) },
+                new List<TooltipSpan> { nameSpan },
                 TooltipLineKind.Header,
                 iconUrl ?? "",
                 subject);
@@ -265,6 +273,15 @@ namespace TaimisToolbench.Services
         /// <summary>An item name, coloured by the rarity carried on the
         /// span itself (<see cref="TooltipSpan.RarityKey"/>).</summary>
         Rarity,
+
+        /// <summary>
+        /// A wallet currency's name in a tooltip header. The game's warm
+        /// tan rather than any rarity colour, measured (255,204,119) on a
+        /// currency tooltip. NOT a generic heading colour: an item's name
+        /// is measured at its rarity colour, white included for Basic, so
+        /// only a subject with no rarity to have reaches this.
+        /// </summary>
+        CurrencyName,
 
         /// <summary>An upgrade's granted bonus - a rune bonus line, a
         /// sigil or infusion buff. NOT a food's nourishment line, which

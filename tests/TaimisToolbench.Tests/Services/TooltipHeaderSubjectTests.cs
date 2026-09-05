@@ -37,11 +37,30 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void ACurrencyNameTakesItsOwnColourRoleRatherThanARarityOne()
+        {
+            // The game colours a currency's name in a warm tan of its own.
+            // An item's name is its rarity colour - white for Basic - so an
+            // item whose rarity nobody resolved still asks for the rarity
+            // role and its neutral fallback, not for the currency colour.
+            Assert.Equal(
+                TooltipSpanRole.CurrencyName,
+                CurrencyContent().Lines[0].Spans.Single().Role);
+
+            var item = ItemRowTooltipComposer.BuildRowContent(
+                (ItemStatBlock)null,
+                ItemTooltipIdentity.ForItem("Unlooked Thing", ItemIcon, null),
+                extraLines: null);
+
+            Assert.Equal(TooltipSpanRole.Rarity, item.Lines[0].Spans.Single().Role);
+        }
+
+        [Fact]
         public void ACurrencyAndARaritylessItemAreStillToldApart()
         {
-            // Both colour their name neutral, and before the subject
-            // existed both reached the icon layer as a null rarity string -
-            // which is how the currency ended up in an item's frame.
+            // Before the subject existed both reached the icon layer as a
+            // null rarity string - which is how the currency ended up in an
+            // item's frame.
             var currency = SubjectOfFirstLine(CurrencyContent());
             var item = SubjectOfFirstLine(ItemRowTooltipComposer.BuildRowContent(
                 (ItemStatBlock)null,
