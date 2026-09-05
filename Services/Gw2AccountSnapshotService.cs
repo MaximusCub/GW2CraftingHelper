@@ -104,6 +104,8 @@ namespace TaimisToolbench.Services
                         ItemId = item.Id,
                         Count = item.Count,
                         Source = "Bank",
+                        Upgrades = SocketedIds(item.Upgrades),
+                        Infusions = SocketedIds(item.Infusions),
                     });
                 }
             }
@@ -133,6 +135,8 @@ namespace TaimisToolbench.Services
                         ItemId = item.Id,
                         Count = item.Count,
                         Source = "SharedInventory",
+                        Upgrades = SocketedIds(item.Upgrades),
+                        Infusions = SocketedIds(item.Infusions),
                     });
                 }
             }
@@ -294,6 +298,8 @@ namespace TaimisToolbench.Services
                                 ItemId = item.Id,
                                 Count = item.Count,
                                 Source = AccountItemIndex.CharacterSourcePrefix + characterName,
+                                Upgrades = SocketedIds(item.Upgrades),
+                                Infusions = SocketedIds(item.Infusions),
                             });
                         }
                     }
@@ -367,6 +373,24 @@ namespace TaimisToolbench.Services
             }
 
             return (true, disciplines);
+        }
+
+        /// <summary>
+        /// One stack's socketed item ids in the shape
+        /// <see cref="SnapshotItemEntry.Upgrades"/> documents. Gw2Sharp
+        /// surfaces the API's omitted field as null; an empty list is
+        /// folded to null as well, so only one of the two ever reaches
+        /// disk.
+        /// </summary>
+        private static List<int> SocketedIds(IEnumerable<int> ids)
+        {
+            if (ids == null)
+            {
+                return null;
+            }
+
+            var copied = new List<int>(ids);
+            return copied.Count > 0 ? copied : null;
         }
 
         private async Task ResolveItemDetailsAsync(List<SnapshotItemEntry> items, CancellationToken ct)
