@@ -73,19 +73,20 @@ namespace TaimisToolbench.Services
         public const int GlyphBoxInkPad = 1;
 
         // The coin art's own padding, MEASURED off the three 32x32 textures
-        // Blish fetches by asset id: gold 156904 and silver 156907 ink rows
-        // 5..26, copper 156902 rows 4..26. The LAST inked row is 26 on all
-        // three - copper's extra row is at the top - so a seat that works
-        // from the bottom reads one number for every denomination.
+        // Blish fetches by asset id, each source row composited over a dark
+        // row ground: rows 24, 25 and 26 come out DARKER than it on gold
+        // 156904, silver 156907 and copper 156902 alike, being the art's
+        // black bottom rim rather than coin. The last row that DRAWS is 23
+        // on all three, so a bottom seat has one number to read.
         private const int CoinArtTextureSize = 32;
-        private const int CoinArtLastInkRow = 26;
+        private const int CoinArtLastInkRow = 23;
 
         /// <summary>
         /// Where the coin art's lowest ink lands inside an icon box of
         /// <paramref name="iconSize"/> pixels, as an exclusive bottom edge.
         /// Point-sampled: a destination row carries ink while the source rows
         /// it covers still reach <c>CoinArtLastInkRow</c>, so the last inked
-        /// destination row is <c>26 * size / 32</c> and the edge below it is
+        /// destination row is <c>23 * size / 32</c> and the edge below it is
         /// one more. 0 for a non-positive size, which draws nothing.
         /// </summary>
         public static int CoinArtInkBottom(int iconSize)
@@ -95,10 +96,10 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Rows the game hangs a coin's ink BELOW the digits' ink bottom.
-        /// Derived, not chosen: the bar tier capture recorded in
-        /// <see cref="CurrencyIconTiers.VerticalAlignmentRule"/> is icon box
-        /// y114..129 against digit ink y115..126, and a 16px box puts the
-        /// art's last inked row at y127 (<see cref="CoinArtInkBottom"/>).
+        /// MEASURED ink against ink on a bar tier capture: the coin's lowest
+        /// drawn row is one below the digits' lowest. Not read off the icon
+        /// box's matched position - that is a template fit against art the
+        /// game rescales itself, and it does not resolve to the row.
         /// </summary>
         public const int CoinInkBelowBaseline = 1;
 
