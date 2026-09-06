@@ -929,7 +929,11 @@ namespace TaimisToolbench
                 // The wallet rows' currency tooltips read the same
                 // session cache WarmCurrencyMetadataForSettings fills, so
                 // the description arrives without a second fetch.
-                _currencyMetadataService.GetCached
+                _currencyMetadataService.GetCached,
+                // The socketed runes, sigils and infusions a snapshot row
+                // can name are components no plan ever asks for, so this
+                // tab is the only place that fetches them.
+                _warmItemStatsAsync
             );
 
             // The generate callback is always routed through the list
