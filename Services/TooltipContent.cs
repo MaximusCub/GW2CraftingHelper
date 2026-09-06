@@ -290,11 +290,11 @@ namespace TaimisToolbench.Services
         Bonus,
 
         /// <summary>
-        /// A bonus tier the wearer has not reached. Reserved and unused:
-        /// greying a tier needs the character's equipped count, which is
-        /// instance state /v2/items cannot carry (KNOWN-ISSUES #42). It
-        /// exists so an equipped-aware surface does not have to re-plumb
-        /// the role through every composer to get it.
+        /// A bonus tier the wearer has not reached. Carried by every tier
+        /// of a rune found SOCKETED in an owned stack, none of which can
+        /// be active: the snapshot reads no equipment endpoint, so every
+        /// such stack is unequipped (KNOWN-ISSUES #42). Naming the count
+        /// itself still needs the character's equipped set.
         /// </summary>
         BonusInactive,
 
