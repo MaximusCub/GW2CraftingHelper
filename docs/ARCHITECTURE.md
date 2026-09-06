@@ -3565,22 +3565,23 @@ deliberate change to one silently move the others.
 
 ### S2.4 Tooltip text: wrap seams and scope vocabulary
 
-**`ShoppingRowTooltipFormatter.BuildCurrencyLines` - why "THIS ROW" and
-"wallet" are load-bearing.** Both numbers on a shopping-row currency line
-are that *row's* own total (`cc.Amount`, one `PlanStep`'s
-`VendorCurrencyCosts`), never the whole plan's requirement for that
-currency id. Without a scope marker, two shopping rows drawing on the same
-wallet currency - Karma split across two vendor rows, say - can each
-independently read as "fully covered" and double-count the one wallet
-balance. That is the same misreading class `DecisionPillPlanner`'s
-plan-scope `HAVE {have}/{planTotal} TOTAL` pill
-(`AppendCurrencyOwnershipPill`) exists to avoid, via its own explicit
-"TOTAL" suffix; "THIS ROW" is the row-scope mirror of that convention, and
-the vocabulary must never look plan-scope when it is not. The "(wallet N)"
-aside is worded the same way for the same reason: "wallet" is the one term
-this codebase uses for a raw account-wide holding figure, matching the
-Summary column-header table's "Have" column and the tree's
-`HAVE x/y TOTAL` pill.
+**`ShoppingRowTooltipFormatter.BuildCurrencyLines` - why every line names
+its scope.** The cost on a shopping-row currency line is that *row's* own
+total (`cc.Amount`, one `PlanStep`'s `VendorCurrencyCosts`), never the
+whole plan's requirement for that currency id, and the holding beside it
+is the whole account's wallet balance. Without both scopes stated, two
+shopping rows drawing on the same wallet currency - Karma split across two
+vendor rows, say - can each independently read as "fully covered" and
+double-count the one balance. That is the same misreading class
+`DecisionPillPlanner`'s plan-scope `HAVE {have}/{planTotal} TOTAL` pill
+(`AppendCurrencyOwnershipPill`) exists to avoid.
+
+The lines used to carry that scope as the shouted markers "THIS ROW" and
+"(wallet N)". They now say it in a sentence - "this row costs 3660. You
+have 2812 in your wallet and need 848 more." - because these lines live in
+the module's own second tooltip box, where the standing rule is that text
+reads as prose. The scope claim is what must survive a rewording; the
+markers themselves are not sacred.
 
 **`TooltipLayoutMath.ItemTooltipMaxContentWidth` - the corpus.** The cap is
 derived from the game's own break decisions rather than from a game-pixel

@@ -268,7 +268,7 @@ Services/TreeChipStripLayout.cs                                                 
 Services/TreeCostColumnMath.cs                                                          663
 Services/TreeRowIdentity.cs                                                             94
 Services/TreeRowShapePlanner.cs                                                         133
-Services/TreeRowTooltipComposer.cs                                                      243
+Services/TreeRowTooltipComposer.cs                                                      245
 Services/TreeToolbarRowLayout.cs                                                        112
 Services/TypeRampMetrics.cs                                                             171
 Services/UiSpacing.cs                                                                   53
@@ -554,7 +554,7 @@ tests/TaimisToolbench.Tests/Services/SettingsFormLayoutTests.cs                 
 tests/TaimisToolbench.Tests/Services/SettingsInputParserTests.cs                        338
 tests/TaimisToolbench.Tests/Services/SettingsSaveBarLayoutTests.cs                      117
 tests/TaimisToolbench.Tests/Services/ShoppingColumnMathTests.cs                         630
-tests/TaimisToolbench.Tests/Services/ShoppingRowTooltipFormatterTests.cs                197
+tests/TaimisToolbench.Tests/Services/ShoppingRowTooltipFormatterTests.cs                246
 tests/TaimisToolbench.Tests/Services/ShoppingSourceBadgeTests.cs                        233
 tests/TaimisToolbench.Tests/Services/SnapshotCommitGateTests.cs                         239
 tests/TaimisToolbench.Tests/Services/SnapshotEpochGuardTests.cs                         33
