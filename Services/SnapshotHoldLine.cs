@@ -81,9 +81,13 @@ namespace TaimisToolbench.Services
                 return "";
             }
 
+            // Indexed loops throughout, here and in AppendCategory: foreach
+            // over IReadOnlyList boxes an enumerator, and a search rebuilds
+            // every row on screen on every keystroke.
             bool showCounts = false;
-            foreach (var location in locations)
+            for (int i = 0; i < locations.Count; i++)
             {
+                var location = locations[i];
                 if (location != null && location.Count != 1)
                 {
                     showCounts = true;
@@ -105,8 +109,8 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Appends one category's places, or nothing when no place is in it.
-        /// Scans the list twice and allocates nothing: this runs once per
-        /// category per row, and a search rebuilds every row on a keystroke.
+        /// Scans the list twice rather than collecting the matches: this runs
+        /// once per category per row.
         /// </summary>
         private static void AppendCategory(
             StringBuilder line,
@@ -117,8 +121,9 @@ namespace TaimisToolbench.Services
             SnapshotHoldLocation first = null;
             bool named = false;
 
-            foreach (var location in locations)
+            for (int i = 0; i < locations.Count; i++)
             {
+                var location = locations[i];
                 if (location == null || location.Category != category)
                 {
                     continue;
@@ -159,8 +164,9 @@ namespace TaimisToolbench.Services
             string separator = showCounts ? " " : ", ";
             bool wrote = false;
 
-            foreach (var location in locations)
+            for (int i = 0; i < locations.Count; i++)
             {
+                var location = locations[i];
                 if (location == null || location.Category != category)
                 {
                     continue;

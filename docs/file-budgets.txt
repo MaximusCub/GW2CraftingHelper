@@ -237,7 +237,7 @@ Services/SnapshotFailureKind.cs                                                 
 Services/SnapshotFetchFailedException.cs                                                69
 Services/SnapshotHeaderLayout.cs                                                        209
 Services/SnapshotHelpers.cs                                                             79
-Services/SnapshotHoldLine.cs                                                            215
+Services/SnapshotHoldLine.cs                                                            221
 Services/SnapshotItemGridLayout.cs                                                      250
 Services/SnapshotRefreshSlot.cs                                                         93
 Services/SnapshotResultLayout.cs                                                        90
