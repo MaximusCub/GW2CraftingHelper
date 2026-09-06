@@ -2533,7 +2533,7 @@ namespace TaimisToolbench.Views
 
             // The row's hover, composed once and stamped on every control
             // over the row - the icon included, by CreateItemIcon itself.
-            var hover = ItemRowHover(row, rarity, breakdown);
+            var hover = ItemRowHover(row, rarity);
 
             IconControls.CreateItemIcon(
                 rowPanel, row.IconUrl, ItemIconFrame.ForRarity(rarity),
@@ -2568,9 +2568,7 @@ namespace TaimisToolbench.Views
             // NOTHING else on the cell answers a hover: the item's tooltip
             // is carried by its icon alone (ItemIconTooltip.StampOnIconTree),
             // and the name, the amount, the source breakdown and the strip
-            // between them are not the item. The breakdown's full run is a
-            // line of that same tooltip, so nothing is lost by the column
-            // being too narrow to show it here.
+            // between them are not the item.
 
             // The cell's own Size is the grid's to write (LayoutResultGrid),
             // so this closure only re-fits what the new column width changed.
@@ -2613,14 +2611,14 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// One item row's hover: the item's own icon+name header, its stat
-        /// block if this session happens to hold one, and the whole source
-        /// breakdown - ALWAYS, not only when the line was shortened, since
-        /// the hover is where a reader goes for the run of it. The identity
+        /// One item row's hover: the item's own icon+name header and its
+        /// stat block, if this session happens to hold one. The identity
         /// still carries the header, because a hover can land before
-        /// IndexSockets' top-up has fetched that item's block.
+        /// IndexSockets' top-up has fetched that item's block. The source
+        /// breakdown is NOT here - the row already prints it under the
+        /// name, and a second tooltip box repeating it says nothing new.
         /// </summary>
-        private ItemIconTooltip ItemRowHover(SnapshotSearchRow row, string rarity, string breakdown)
+        private ItemIconTooltip ItemRowHover(SnapshotSearchRow row, string rarity)
         {
             int itemId = row.ItemId;
             var identity = ItemTooltipIdentity.ForItem(row.Name ?? "", row.IconUrl, rarity);
@@ -2634,16 +2632,10 @@ namespace TaimisToolbench.Views
             return ItemIconTooltip.Composed(identity, () =>
             {
                 var stats = hasStats ? _getItemStatBlock(itemId) : null;
-                var extras = new TooltipContentBuilder();
-                if (!string.IsNullOrEmpty(breakdown))
-                {
-                    extras.Text(breakdown).EndLine();
-                }
-
                 return ItemRowTooltipComposer.BuildRowContent(
                     ItemStatTooltipComposer.BuildContent(stats, SocketsFor(itemId), row.Skin),
                     identity,
-                    extras.Build());
+                    null);
             });
         }
 
