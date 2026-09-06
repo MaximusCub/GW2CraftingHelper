@@ -137,30 +137,31 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// Builds one <see cref="SnapshotSearchRow"/> per distinct itemId in
-        /// <paramref name="itemsById"/> that (a) matches
-        /// <paramref name="searchText"/> by case-insensitive substring against
-        /// the item's own name OR - for queries of at least
-        /// <see cref="MinCharacterSearchLength"/> characters - against the name
-        /// of a character holding it, and (b) has a positive total once
-        /// <paramref name="sourceFilter"/> has excluded any unchecked sources.
-        /// An item with zero quantity across the checked sources drops out.
+        /// <paramref name="itemsById"/> that (a) has a positive total once
+        /// <paramref name="sourceFilter"/> has excluded any unchecked sources
+        /// and (b) matches <paramref name="searchText"/> by case-insensitive
+        /// substring: against the item's own name, against any skin a copy of
+        /// it wears, or against a holding character's name (that last only
+        /// for queries of at least <see cref="MinCharacterSearchLength"/>).
         /// <para>
-        /// The two compose as a plain AND: only sources that survive the filter
-        /// are consulted for the character match, so an unchecked character's
-        /// rows stay hidden even when its own name is typed. A row surfaced by
-        /// a character match still reports the account-wide total and full
-        /// breakdown across the checked sources. Rows are sorted by name
-        /// (ordinal, case-insensitive). Returns an empty list, never null.
+        /// The two compose as a plain AND: only sources that survive the
+        /// filter are consulted for the character match, so an unchecked
+        /// character's rows stay hidden even when its own name is typed. Such
+        /// a row still reports the account-wide total and breakdown across the
+        /// checked sources. Rows sort by name (ordinal, case-insensitive).
+        /// Returns an empty list, never null.
         /// </para>
         /// <para>What itemsById must be, and what character matching costs:
-        /// docs/ARCHITECTURE.md, S2.5.</para>
+        /// docs/ARCHITECTURE.md, S2.5. Which name a row takes when its copies
+        /// wear a skin: Services.TransmutedNameIndex.</para>
         /// </summary>
         public static List<SnapshotSearchRow> BuildItemRows(
             IReadOnlyDictionary<int, SnapshotItemEntry> itemsById,
             AccountItemIndex index,
             string searchText,
             SnapshotSourceFilter sourceFilter,
-            string activeCharacterName)
+            string activeCharacterName,
+            IReadOnlyDictionary<int, TransmutedItemNames> transmutedNames = null)
         {
             var rows = new List<SnapshotSearchRow>();
 
@@ -177,9 +178,23 @@ namespace TaimisToolbench.Services
                 int itemId = kvp.Key;
 
                 // Never display raw item IDs (repo invariant).
-                string name = string.IsNullOrWhiteSpace(kvp.Value.Name) ? "Unknown Item" : kvp.Value.Name;
+                string ownName = string.IsNullOrWhiteSpace(kvp.Value.Name) ? "Unknown Item" : kvp.Value.Name;
 
-                bool nameMatches = !searching || name.IndexOf(trimmedSearch, StringComparison.OrdinalIgnoreCase) >= 0;
+                TransmutedItemNames skins = null;
+                if (transmutedNames != null)
+                {
+                    transmutedNames.TryGetValue(itemId, out skins);
+                }
+
+                string skinName = skins != null ? skins.DisplayName : string.Empty;
+                string name = skinName.Length > 0 ? skinName : ownName;
+
+                // Both spellings, always: the item's own name, and every
+                // skin any copy of it wears - which covers the shown name,
+                // since that is one of them.
+                bool nameMatches = !searching
+                    || ownName.IndexOf(trimmedSearch, StringComparison.OrdinalIgnoreCase) >= 0
+                    || AnySkinNameMatches(skins, trimmedSearch);
 
                 var prioritizedSources = AccountItemIndex.GetPrioritizedSources(itemId, index, activeCharacterName);
                 var breakdown = new List<SnapshotHoldLocation>();
@@ -232,6 +247,7 @@ namespace TaimisToolbench.Services
                     // character is the same item, so any of its entries
                     // carries the same captured rarity.
                     Rarity = kvp.Value.Rarity ?? string.Empty,
+                    SkinName = skinName,
                     TotalCount = total,
                     Breakdown = breakdown,
                 });
@@ -253,6 +269,31 @@ namespace TaimisToolbench.Services
                 return byName != 0 ? byName : a.ItemId.CompareTo(b.ItemId);
             });
             return rows;
+        }
+
+        /// <summary>
+        /// True when <paramref name="search"/> occurs (case-insensitively)
+        /// in any skin name a copy of the item wears. Runs once per item on
+        /// the keystroke path, over a list that is empty for all but the
+        /// handful of transmuted rows an account holds.
+        /// </summary>
+        private static bool AnySkinNameMatches(TransmutedItemNames skins, string search)
+        {
+            if (skins == null)
+            {
+                return false;
+            }
+
+            var names = skins.AllNames;
+            for (int i = 0; i < names.Count; i++)
+            {
+                if (names[i].IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

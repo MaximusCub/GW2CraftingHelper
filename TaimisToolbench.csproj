@@ -86,6 +86,7 @@
     <Compile Include="Models\AccountSnapshot.cs" />
     <Compile Include="Models\SnapshotItemEntry.cs" />
     <Compile Include="Models\SocketedUpgradeIds.cs" />
+    <Compile Include="Models\TransmutedItemNames.cs" />
     <Compile Include="Models\SnapshotWalletEntry.cs" />
     <Compile Include="Models\SnapshotCharacterDiscipline.cs" />
     <Compile Include="Models\SnapshotHoldLocation.cs" />
@@ -99,6 +100,7 @@
     <Compile Include="Services\SnapshotHoldLine.cs" />
     <Compile Include="Services\SnapshotSearchResultBuilder.cs" />
     <Compile Include="Services\SocketedUpgradeIndex.cs" />
+    <Compile Include="Services\TransmutedNameIndex.cs" />
     <Compile Include="Services\PanelChromeMath.cs" />
     <Compile Include="Services\SourceFilterFlowLayout.cs" />
     <Compile Include="Services\SnapshotStore.cs" />

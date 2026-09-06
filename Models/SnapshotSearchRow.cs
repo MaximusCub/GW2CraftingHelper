@@ -16,7 +16,20 @@ namespace TaimisToolbench.Models
     {
         public int ItemId { get; set; }
 
+        /// <summary>
+        /// What the row calls the item. This is the skin's name when every
+        /// copy wears the same skin, because that is the name the game
+        /// shows; see Services.TransmutedNameIndex.
+        /// </summary>
         public string Name { get; set; } = "";
+
+        /// <summary>
+        /// The skin name behind <see cref="Name"/>, or "" when the row
+        /// shows the item's own name. The tooltip needs the two apart: it
+        /// prints the skin's name as the heading and the item's own name
+        /// under a "Transmuted" line, the way the game does.
+        /// </summary>
+        public string SkinName { get; set; } = "";
 
         public string IconUrl { get; set; } = "";
 

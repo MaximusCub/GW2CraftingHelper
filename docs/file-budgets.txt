@@ -74,11 +74,12 @@ Models/SettingsFormState.cs                                                     
 Models/SnapshotCharacterDiscipline.cs                                                   24
 Models/SnapshotHoldLocation.cs                                                          45
 Models/SnapshotItemEntry.cs                                                             70
-Models/SnapshotSearchRow.cs                                                             50
+Models/SnapshotSearchRow.cs                                                             55
 Models/SnapshotSourceFilter.cs                                                          42
 Models/SnapshotWalletEntry.cs                                                           13
 Models/SocketedUpgradeIds.cs                                                            35
 Models/TimegatedItem.cs                                                                 37
+Models/TransmutedItemNames.cs                                                           33
 Models/UsedMaterial.cs                                                                  19
 Models/VendorItemCostLine.cs                                                            42
 Models/VendorOffer.cs                                                                   73
@@ -257,6 +258,7 @@ Services/StatusUpdateGuard.cs                                                   
 Services/StickyHeaderLayout.cs                                                          117
 Services/SummarySectionLayoutMath.cs                                                    853
 Services/TableSortState.cs                                                              114
+Services/TransmutedNameIndex.cs                                                         114
 Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
 Services/TextWrapMath.cs                                                                324
@@ -293,7 +295,7 @@ Views/ItemInputRowStrip.cs                                                      
 Views/ItemRowState.cs                                                                   39
 Views/LogTabContent.cs                                                                  1538
 Views/MainThreadMarshal.cs                                                              141
-Views/MainView.cs                                                                       2958
+Views/MainView.cs                                                                       2964
 Views/DialogWindow.cs                                                                   108
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    425

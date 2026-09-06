@@ -57,6 +57,11 @@ namespace TaimisToolbench.Views
         // stacks disagree - see SocketedUpgradeIndex.
         private IReadOnlyDictionary<int, SocketedUpgradeIds> _socketsByItemId;
 
+        // itemId -> the skin names its copies wear, built beside
+        // _itemsById once per snapshot. Absent for an id no copy of which
+        // is transmuted - see TransmutedNameIndex.
+        private IReadOnlyDictionary<int, TransmutedItemNames> _transmutedNamesByItemId;
+
         // Tops up the stat blocks the socket blocks are drawn FROM. Scoped
         // to the socketed ids and their hosts rather than to the whole
         // snapshot: an account's item list runs into the thousands, while
@@ -441,6 +446,7 @@ namespace TaimisToolbench.Views
             // a null items list, and so does BuildRepresentativeIndex.
             _accountItemIndex = new AccountItemIndex(_snapshot?.Items);
             _itemsById = SnapshotSearchResultBuilder.BuildRepresentativeIndex(_snapshot?.Items);
+            _transmutedNamesByItemId = TransmutedNameIndex.Build(_snapshot?.Items);
             _characterNames = SnapshotSearchResultBuilder.CollectCharacterNames(_snapshot);
             IndexSockets();
             _initialStatus = initialStatus;
@@ -471,6 +477,7 @@ namespace TaimisToolbench.Views
             _snapshot = snapshot;
             _accountItemIndex = new AccountItemIndex(_snapshot?.Items);
             _itemsById = SnapshotSearchResultBuilder.BuildRepresentativeIndex(_snapshot?.Items);
+            _transmutedNamesByItemId = TransmutedNameIndex.Build(_snapshot?.Items);
             IndexSockets();
 
             var characterNames = SnapshotSearchResultBuilder.CollectCharacterNames(_snapshot);
@@ -1886,7 +1893,8 @@ namespace TaimisToolbench.Views
                 };
 
                 itemRows = SnapshotSearchResultBuilder.BuildItemRows(
-                    _itemsById, _accountItemIndex, searchText, sourceFilter, GetActiveCharacterName());
+                    _itemsById, _accountItemIndex, searchText, sourceFilter,
+                    GetActiveCharacterName(), _transmutedNamesByItemId);
             }
 
             if (filter == "All" || filter == "Wallet")
@@ -2631,7 +2639,7 @@ namespace TaimisToolbench.Views
                 }
 
                 return ItemRowTooltipComposer.BuildRowContent(
-                    ItemStatTooltipComposer.BuildContent(stats, SocketsFor(itemId)),
+                    ItemStatTooltipComposer.BuildContent(stats, SocketsFor(itemId), row.SkinName),
                     identity,
                     extras.Build());
             });
