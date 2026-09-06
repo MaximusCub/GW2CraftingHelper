@@ -104,9 +104,10 @@ previously claimed otherwise. Decompiling `WindowBase2.ShowView`/`ClearView`
 shows `ClearView()` calls `Container.ClearChildren()` on the WINDOW itself
 (`while (_children.Count > 0) { _children[0].Parent = null; }`) - detaching
 only the outgoing view's top-level `ViewAdapter` panel, not anything below
-it - and `CurrentView.DoUnload()`, whose `Unload()` call is a no-op for every
-view in this module (`ViewAdapter` does not override `View<TPresenter>.
-Unload()`). Only `Control.Dispose()` nulls a control's own `Parent`
+it - and `CurrentView.DoUnload()`, whose `Unload()` call detaches nothing:
+`ViewAdapter.Unload()` (`Views/ViewAdapter.cs:250`) unsubscribes the
+window's `Resized` handler and leaves the control tree exactly where it is.
+Only `Control.Dispose()` nulls a control's own `Parent`
 (`Parent = null;` inside `Control.Dispose(bool disposing)`), and nothing on
 the tab-switch path calls it - that only happens when `Module.Unload()`
 disposes `_mainWindow`. Net effect: after a plain tab switch, every control

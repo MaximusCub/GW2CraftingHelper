@@ -220,7 +220,10 @@ row's bottom edge unpredictably depending on scroll phase. M36b gave
 gap for the vulnerable 44px/32px row types), proven immune by simulation
 across every row height and all four GW2 UI Size scale factors - this is
 machinery pinned by expensive evidence (see the policy note above), see
-`docs/ARCHITECTURE.md` section 3.
+`docs/ARCHITECTURE.md` section V.26 (`LabelHelpers`), which is where the
+scissor derivation lives. This entry cited section 3 until 2026-09-05;
+section 3 is scroll preserve/restore/verify and says nothing about
+dividers.
 Required Recipes and Crafting Steps were live pixel-scan verified at
 multiple scroll offsets after the fix; Required Disciplines (32px rows)
 was simulation-proven at the time but not yet individually pixel-scanned
@@ -555,6 +558,30 @@ changed; this round is comment-only. The class-sweep table's other rows and
 the `_buildComplete` keep-vs-remove decision were re-checked against the
 current code during this round and still hold as written.
 
+**Correction (2026-09-05).** Three statements above have drifted off the
+code. None of them changes a verdict; each sends a reader to the wrong
+place.
+
+- "`ViewAdapter` does not override `Unload()`" is false.
+  `Views/ViewAdapter.cs:250` overrides it. The override only unsubscribes
+  the window's `Resized` handler - it disposes nothing and reparents
+  nothing - so the conclusion it was offered in support of still stands:
+  a plain tab switch leaves every control below the top-level panel with
+  a non-null `Parent`. The same sentence appears in
+  `docs/ARCHITECTURE.md` Section 1 and is wrong there too.
+- The `CraftingPlanView` row cites `Views/CraftingPlanView.cs:1511` for
+  the `StopLiveTickers()` call in `Build()`. That call is now at line
+  2111; the method is defined at line 1542. It still cancels four
+  `SpriteScreen`-parented `FrameTicker`s from a ThreadPool-thread
+  `Build()`, so the row's OUT OF SCOPE hazard is unchanged.
+- "all six `RebuildRows()` call sites" is now four direct calls
+  (`Views/LogTabContent.cs:401` - the marshaled tail - plus `:504`,
+  `:541`, `:582`) reached through seven entry points, because a
+  `RebuildRowsIfBuilt()` wrapper (`:578`) and a delete-log-file
+  confirmation callback (`:628`) arrived later. Every one of them is
+  still either gated on `_buildComplete` or is the tail itself, so the
+  by-construction argument holds at the new count.
+
 **Validation:** `dotnet build -p:Platform=x64` - 0 errors. Module test suite
 (`tests/TaimisToolbench.Tests`) - 1101/1101 passing. VendorOfferUpdater
 suite (`tests/VendorOfferUpdater.Tests`) - 135/135 passing (re-measured a
@@ -631,6 +658,32 @@ computes none. Cited from `Models/ItemStatBlock.cs`,
 `Services/ItemMetadataService.cs`, `Services/ItemStatBlockFactory.cs` and
 `Views/Rendering/TreeSectionController.cs`. Full record:
 `dev/archive/known-issues/2026-08-23-item-stat-tooltips.md`.
+
+**The judgment call does not cover an owned copy (2026-09-05).** The
+sentence above is true of `/v2/items`, which describes an item type and so
+has no single answer to give. It was then read as a limit on what the
+module can know, and it is not one. The account endpoints report each
+owned stack's own state: `AccountItem` carries `Stats` ("the selected
+stats for the equipped item"), `Upgrades`, `Infusions`, `Binding`,
+`BoundTo` and `Charges` alongside `Id` and `Count` - measured in the
+vendored `Gw2Sharp` 1.7.4 model this module already calls
+(`Gw2Sharp/WebApi/V2/Models/Account/AccountItem.cs` at tag v1.7.4), which
+is the type `V2.Account.Bank`, `V2.Account.Inventory` and
+`V2.Characters[name].Inventory` all return.
+`Services/Gw2AccountSnapshotService.cs` reads `Id` and `Count` off each of
+those three and drops the rest (lines 104-106, 133-135, 294-296), and
+`Models/SnapshotItemEntry` has nowhere to put them. So for a Snapshot row
+- an item the account actually holds - there is no open question about
+which combination to compute, and no question about which copy the player
+is looking at either: the API names both. The same reasoning appears in
+`docs/ARCHITECTURE.md` section S1.4, where it also decides the bind-line
+wording ("Which copy the player is looking at is instance state
+`/v2/items` cannot carry"), and it is wrong there for the same reason.
+Nothing is changed here. Doing something with this needs decisions this
+entry cannot make on its own - what a stack of copies with different stats
+should show, and whether a snapshot schema bump is worth it (see section
+12) - and it does not touch the plan tree, where an item that is not owned
+yet really does have no answer.
 
 ### 41. Tooltip facility (one rich surface, four-edge clamp)
 
@@ -961,9 +1014,20 @@ also advances zero pixels, so neither a layout assertion nor a screenshot
 diff catches it. Plan History is fixed here - a Blish `Checkbox` for the
 pin, U+00D7 for the delete - and the class is gated by
 `docs/font-codepoints.txt` plus the "UI glyph escapes exist in the shipped
-font" step in `.github/workflows/tests.yml`. The Ranker's three are waived
-in that step until its own branch lands; the waiver fails the build once
-it goes stale. Full record: `dev/records/glyph-fixes.md`.
+font" step in `.github/workflows/tests.yml`. Full record:
+`dev/records/glyph-fixes.md`.
+
+**Correction (2026-09-05).** This entry said the Ranker's three escapes
+were waived in that step until its own branch landed. They are not waived
+any more: the step's `waived` set is empty, and the Ranker's reorder keys
+draw `UiGlyphs.CaretUp`/`CaretDown` (`Views/RankerTabContent.cs:1534`),
+which are real glyphs in the module's own atlas rather than codepoints
+Menomonia lacks. The sentence about the waiver going stale described
+machinery that no longer has anything to check. The rest of the entry
+stands, with one thing added that was not true when it was written: the
+module now ships a five-glyph font of its own (`ref/glyphs.fnt`, U+E100 to
+U+E104, named in `Services/UiGlyphs.cs`), so "the shipped font" is two
+fonts, and a geometric shape no longer has to be a texture.
 
 ### 65. First-paint viewport truncation (the resize that fixed it)
 
@@ -1004,20 +1068,71 @@ from items 31 and 32 below (marked as such) so this list covers every
 genuinely open item, not just the ones originally filed under a
 "DEFERRED" heading.
 
-- Dimmed IGNORE toggle's mark falls below the 3:1 non-text contrast
-  floor. `PillColors.DimmedPillFactor` (0.6) is applied as
-  `Control.Opacity`, which Blish multiplies into every `DrawOnCtrl`
-  colour, so the black mark AND the amber ON plate both composite toward
-  the backdrop together. Measured on the shipped colours (`#9C7327`
-  plate, black ink, sRGB relative luminance): **4.90:1 at full strength,
-  1.87:1 over a black backdrop and 2.04:1 over the row's own dark one.**
-  White ink in the dimmed state alone would read 4.41:1 / 4.04:1. It is
-  not changed because the glyph is specified black, and inverting it in
-  one state is a design decision rather than a correctness fix. The rule
-  that used to encode exactly this inversion
-  (`PillColors.GlyphColor`) went dead when the hand-drawn toggle became a
-  `FeedbackButton` and has been deleted; this entry is where the argument
-  it carried now lives.
+- Dimmed IGNORE toggle's mark: the ignored state falls below the 3:1
+  non-text contrast floor. The plain state clears it, and that half is
+  closed. Re-measured 2026-09-06, because the first measurement described
+  a control that no longer ships. That one was a hand-drawn `#9C7327`
+  plate carrying a black glyph, faded by `Control.Opacity`, and it read
+  4.90:1 at full strength, 1.87:1 over black and 2.04:1 over the row's
+  backdrop. The flat plate, the separate ink colour and the
+  `Control.Opacity` fade are all gone, so none of those numbers describes
+  anything on screen.
+
+  What ships is a `CloseKeyButton`
+  (`Views/Rendering/TreeSectionController.cs:2037`) deriving from
+  `RowActionKey`. It blits Blish HUD's own window-close texture
+  `button-exit` and multiplies a tint into it: white while the row is
+  plain, and `PillColors`' ignore-active amber `#9C7327` while the item is
+  ignored. A dimmed row's toggle is always disabled, and a disabled key
+  goes through `RowActionKey.Dimmed`, which returns `color * DisabledDim`
+  with `DisabledDim` read from `PillColors.DimmedPillFactor` (0.6).
+  `Color * float` scales alpha as well as RGB, so the whole key is drawn
+  at 0.6 alpha, and Blish's pipeline is premultiplied, so an opaque texel
+  lands on screen at `0.6 * texel * tint + 0.4 * backdrop`. The hover
+  texture `button-exit-active` never appears in this state, because
+  `RowActionKey.Face` picks it only while the key is enabled.
+
+  Method, so the numbers can be recomputed. `button-exit.png` comes out of
+  `ref.dat` in the Blish HUD install directory, which is a zip. It is
+  32x32 RGBA. The control samples (7, 6) 21x23 of it, and inside that the
+  plate is the 16x16 square at (9, 9). Splitting those 256 pixels by sRGB
+  relative luminance gives two clusters: 17 mark pixels below 0.02, most
+  commonly RGBA (8, 0, 0, 255), and 167 plate pixels above 0.50, most
+  commonly (231, 219, 214, 255). Both representatives are fully opaque, so
+  it does not matter whether the file is stored premultiplied. Nothing in
+  the module paints behind a tree row, because the row panel is
+  transparent and so is every panel above it, so the backdrop is the GW2
+  window art, asset 502049. Over the middle 60% of that texture it is a
+  flat dark grey: median (41, 40, 41), brightest opaque pixel (82, 81,
+  82). A hovered row adds `Color.White * 0.07f` on top, which puts the
+  median at (55, 54, 55). Ratios are the WCAG formula,
+  (L1 + 0.05) / (L2 + 0.05), on sRGB relative luminance.
+
+  The mark against its own plate:
+
+  | key state | over black | over (41,40,41) | over (55,54,55) | over (82,81,82) |
+  | --- | --- | --- | --- | --- |
+  | plain, enabled | 15.34:1 | 15.34:1 | 15.34:1 | 15.34:1 |
+  | plain, dimmed | 5.64:1 | 6.28:1 | 6.42:1 | 6.51:1 |
+  | ignored, enabled | 3.91:1 | 3.91:1 | 3.91:1 | 3.91:1 |
+  | ignored, dimmed | 2.02:1 | 2.34:1 | 2.43:1 | 2.55:1 |
+
+  An enabled key is fully opaque, so no backdrop reaches it and its row is
+  one number. **The plain dimmed key reads 6.28:1 over the real backdrop.
+  It clears 3:1 and it clears 4.5:1, so that half of this entry is closed.
+  The ignored dimmed key reads 2.34:1 and fails 3:1, so the entry stays
+  open on that one state.** The ignored enabled key reads 3.91:1, which
+  clears the 3:1 floor a mark is held to; 4.5:1 is the text threshold and
+  does not apply to a mark.
+
+  Still not changed, for the reason already recorded: the mark is
+  specified black, and inverting it in one state is a design decision
+  rather than a correctness fix. One fact behind that has moved. The mark
+  is now part of Blish's texture rather than a colour this module picks,
+  and the tint multiplies mark and plate together, so there is no ink
+  colour left to invert - a white mark would need different art. The rule
+  that used to encode the inversion (`PillColors.GlyphColor`) is deleted;
+  this entry is where the argument it carried lives.
 - Localization (en/de/fr/es via API lang param): deferred as not core
   functionality. Full-milestone scale when picked up.
 - Upstream Blish HUD issue/PR for the wheel-delta wrap: REMOVED from the
@@ -1033,17 +1148,50 @@ genuinely open item, not just the ones originally filed under a
   subpages; the items are still sold in-game under the split pages, but
   the seed's merchant-page linkage is now stale-shaped. Missing-offer/
   rename gap for a future re-scrape to follow up; not removed.
+  **Correction (2026-09-05): the scrape this rests on never ran
+  properly.** The 18 offers were called missing by a scraper that could
+  not reach large parts of the wiki at all - see the wiki-drift bullet
+  below for the defect and the proof. Whether these pages are split, or
+  were simply never asked for, is not settled by anything recorded here.
+  Re-check it against a validated scrape before treating the split as the
+  cause.
 - "Merchant (Untamed Crags)" vendor-page-name mismatch (#28, 1 offer):
   the Hydrocatalytic Reagent / 50 Research Note offer's exact vendor
   page no longer resolves on the wiki (no page, no redirect), while the
   item and cost remain valid via other crafting-material vendors.
   Deferred pending research into whether the page was renamed or the
-  original scrape mislabeled the vendor.
+  original scrape mislabeled the vendor. A third possibility, added
+  2026-09-05: the scrape that failed to resolve it is the one described
+  in the wiki-drift bullet below, which could not reach large parts of
+  the wiki. Re-check against a validated scrape before spending research
+  on a rename.
 - Wiki-drift missing-offers superset (#28, ~5,400 offers): M37's full
   from-scratch re-scrape (for cap seeding) incidentally picked up new
   Homestead recipes and unrelated vendor page changes beyond the
   stale-offer-sweep scope. Discarded uncommitted; recorded here as a
   candidate for a future dedicated "missing offers" pass.
+  **Correction (2026-09-05): this was never wiki drift.** The scrape it
+  was measured against had a defect that made whole sections of the wiki
+  unreachable, so the difference between two runs was partly the scraper
+  changing its mind about what exists, not the wiki changing.
+  `WikiSmwClient.PartitionPrefixes` held upper case letters and digits
+  only. Semantic MediaWiki's LIKE comparator becomes a SQL `LIKE` over
+  `smw_sortkey`, which `MySQLTableBuilder` declares `VARBINARY(255)`, and
+  `LIKE` over a binary column compares bytes - so the glob is
+  case-sensitive unless the wiki opts into a case-insensitive collation,
+  which this one does not. A depth-2 partition therefore asked
+  `[[Has vendor::~AS*]]` of names whose second letter is lower case, and
+  got nothing it could ever have got. A live run logged `[A]
+  sub-partitions done, 35/36 empty prefixes skipped`, naming `AS` among
+  them; the one non-empty child was `AC`, and `ACLM-0403` is the only
+  merchant in the corpus with two leading capitals. Fixed on branch
+  `w25-scraper-error-handling` (pull request 252, open against master at
+  the time of writing, not merged): the character set goes from 36 to 73,
+  adding lower case and the punctuation that appears in real merchant
+  names. The same partition then returned `[As] done: 825 rows in 3
+  requests`, and a validated scrape recovered 192 merchants and 6,103
+  offers. Until that lands and a full scrape is validated against it, no
+  count in this bullet or the two above it is a measurement of the wiki.
 - Character/total purchase caps (#28): the wiki's "Has character
   purchase cap" and "Has total purchase cap" SMW properties are real and
   populated (confirmed in M37) but remain deliberately unseeded - the
@@ -1080,8 +1228,9 @@ genuinely open item, not just the ones originally filed under a
   the M38 architecture proposal, section 5 (internal working document) -
   `Services/Pricing/`, `Services/Planning/`, `Services/Persistence/`,
   `Services/Vendor/`, `Services/Layout/`, `Services/Api/` - was never
-  built: none of the six directories exists, and `Services/` is 141 flat
-  files with two subdirectories (`Recipes/`, `Diagnostics/`) that arrived
+  built: none of the six directories exists, and `Services/` is 197
+  flat files (recounted 2026-09-05; it was 141 when this was written) with
+  two subdirectories (`Recipes/`, `Diagnostics/`) that arrived
   for unrelated reasons. Cut for the reason the plan itself flagged:
   `TaimisToolbench.csproj` lists every file explicitly, so each move is
   also a csproj path edit, and the plan's own sequencing note called out
@@ -1342,6 +1491,8 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Remaining-tabs design pass (2026-08-25)** - gate PASS 2026-08-25.
   Cited as: tab-design-pass.
   `dev/records/tab-design-pass.md`
+- **A module-owned button and a shipped glyph font (2026-08-27)** - the record names no gate.
+  `dev/records/2026-08-glyph-font.md`
 - **Invisible UI glyphs, the guidance behind them, and the gate (2026-08-27)** - gate owed.
   Cited as: glyph-fixes, KNOWN-ISSUES #64.
   `dev/records/glyph-fixes.md`
@@ -1351,9 +1502,42 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Barter-item valuation: the vendor offers the solver was throwing away (2026-08-28)** - gate NOT RUN (no live session available on this branch).
   Cited as: barter-item-valuation.
   `dev/records/barter-item-valuation.md`
+- **Content viewport falls short of the window bottom (2026-08-28)** - gate NOT RUN (no live game session available on that branch).
+  Cited as: KNOWN-ISSUES #66.
+  `dev/records/viewport-bottom-margin.md`
 - **The Battle Historian: a removed WvW vendor pricing legendary materials at zero (2026-08-29)** - gate not required (dev-tool and data change; verified by a byte-identical round trip and a `--diff-summary` showing 49 removed and nothing else touched).
   Cited as: w5-deadvendors.
   `dev/records/w5-deadvendors.md`
 - **Two "Gaeting Crystal" currency ids: one is retired (2026-08-29)** - gate not required (retired currency 39 and item 86094 removed, live currency 77 named).
   Cited as: gaeting-crystal-duplicate-ids.
   `dev/records/gaeting-crystal-duplicate-ids.md`
+- **A wave of field-test fixes: viewport, tables, icons, tree rows and dialogs (2026-08-29)** - gate NOT RUN (no live session available on that branch).
+  `dev/records/wave6-ui.md`
+- **Currency 77 is pinned to currency 28, and two false claims about it are corrected (2026-08-29)** - gate not required (a comment, a test assertion and two doc corrections; no runtime behaviour moves).
+  `dev/records/gaeting-equality-pin.md`
+- **Seven display fixes from one round of in-game field reports (2026-08-30)** - gate NOT RUN (no live confirmation recorded on that branch).
+  `dev/records/wave7-fieldtest.md`
+- **Defects in the sticky headers, the viewport cutoff, the tree columns and the dialog title (2026-09-02)** - gate NOT RUN (no live session recorded; the two largest changes are the ones no test can reach).
+  `dev/records/m40-review-findings.md`
+- **Three unrelated plan-tab defects reported from in-game use (2026-09-03)** - gate NOT RUN (no live check recorded on any commit).
+  `dev/records/w13-wave2-fixes.md`
+- **Sticky plan-tab headers, headings seated on the icon gutter, and Blish's own close key (2026-09-04)** - gate NOT RUN (no live check recorded on any commit).
+  `dev/records/w13-sticky-headers.md`
+- **Coin icons seat on the game's baseline, and Total Cost groups its non-coin rows (2026-09-04)** - gate NOT RUN (no live check recorded on that branch).
+  `dev/records/w17-coin-seat.md`
+- **Development-process residue removed from tracked prose and comments (2026-09-04)** - gate not required (comments, tracked prose and three test method names; no runtime surface).
+  `dev/records/cleanup-public-surfaces.md`
+- **Total Cost: the inventory rows get a real Have and Needed, and the group labels read as headings (2026-09-05)** - gate NOT RUN (no live check recorded on either commit).
+  `dev/records/w20-total-cost-groups.md`
+- **The plan tab's input strip reflowed in the middle of a drag (2026-09-05)** - gate NOT RUN (no live session recorded on that branch).
+  `dev/records/w22-resize-stretch.md`
+- **The recipe tree's IGNORE key moves into the gap between Source and Cost (2026-09-05)** - gate NOT RUN (no live confirmation recorded on that branch); superseded by `w23-ignore-trailing-column` below.
+  `dev/records/w18-ignore-x-gap.md`
+- **The module's currency tooltip is matched to the game's own (2026-09-05)** - gate NOT RUN (no live confirmation recorded, and the fix is a comparison against the game's own rendering).
+  `dev/records/w21-currency-tooltip-match.md`
+- **The coin seat hangs the art's disc on the digits, not its shadow (2026-09-05)** - gate NOT RUN (no live session recorded on that branch).
+  `dev/records/w19-coin-seat-2px.md`
+- **Ranker reorder keys are cut from the remove key beside them (2026-09-05)** - gate NOT RUN (no live check recorded on that branch).
+  `dev/records/w24-ranker-button-consistency.md`
+- **The Recipe Tree's ignore button gets a fixed column after Cost (2026-09-05)** - gate NOT RUN (no live session recorded on that branch).
+  `dev/records/w23-ignore-trailing-column.md`

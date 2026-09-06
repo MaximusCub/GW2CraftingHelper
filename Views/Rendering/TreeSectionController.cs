@@ -2054,11 +2054,11 @@ namespace TaimisToolbench.Views.Rendering
                     // always disabled, and CloseKeyButton fades a disabled
                     // key by exactly PillColors.DimmedPillFactor - the pills
                     // beside it get the same fraction, and a second wash
-                    // here would multiply the two. The key's mark then sits
-                    // at about 2:1 against its own plate, which is the art's
-                    // ratio rather than a colour anyone here picked:
-                    // docs/KNOWN-ISSUES.md, DEFERRED, "Dimmed IGNORE
-                    // toggle's mark".
+                    // here would multiply the two. Dimmed, a plain key's
+                    // mark reads 6.28:1 against its own plate and an ignored
+                    // key's reads 2.34:1 - the art's ratios rather than
+                    // colours anyone here picked: docs/KNOWN-ISSUES.md,
+                    // DEFERRED, "Dimmed IGNORE toggle's mark".
                     outer = toggle;
                 }
                 else
