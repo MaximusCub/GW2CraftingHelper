@@ -90,12 +90,11 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// A row's extra tooltip lines as content. Returns fresh, never-null
-        /// content (empty when nothing applies) so the caller can hand it
-        /// straight to <c>UpdateTreeRowTooltip</c> and capture the SAME
-        /// instance in its settle re-ellipsis closure - only the "is the name
-        /// actually truncated" line is reconsidered on resize, never this
-        /// content.
+        /// A row's extra tooltip lines as content - the second box of the
+        /// row's tooltip. Returns fresh, never-null content (empty when
+        /// nothing applies) so the caller can capture the SAME instance in
+        /// its settle re-ellipsis closure: nothing here depends on the
+        /// row's width, so a resize never has to recompose it.
         /// <para>
         /// The unit-price line keeps its gold figure as a coin span so the rich
         /// tooltip surface can draw it with real coin icons instead of spelling
@@ -214,13 +213,9 @@ namespace TaimisToolbench.Services
                 extraTooltipLines.Add(TooltipContent.TextLine(node.AcquisitionHint));
             }
 
-            // UI-bundle milestone, Feature C (receipt/what-if captions):
-            // sanctioned tooltip fallback. Inserted at the front, ahead of
-            // any unit-price/caveat lines already in extraTooltipLines -
-            // but on a row whose label got ellipsized, UpdateTreeRowTooltip
-            // itself prepends the full item name ahead of everything
-            // already in extraTooltipLines, so on those rows the caption
-            // reads second, after the name line, not first.
+            // First, ahead of any unit-price or caveat line already here:
+            // the caption says which group of children the row belongs to,
+            // and the rest of the box is about the row itself.
             if (!string.IsNullOrEmpty(captionText))
             {
                 extraTooltipLines.Insert(0, TooltipContent.TextLine(captionText));
