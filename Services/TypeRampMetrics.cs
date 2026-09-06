@@ -142,7 +142,7 @@ namespace TaimisToolbench.Services
         /// to. Named for the role so a caller putting a coin run on one
         /// baseline with Body text reads the ink the run is drawn in.
         /// </summary>
-        public static FontInk CoinDigitInk => Regular14;
+        public static FontInk CoinDigitInk => Regular16;
 
         /// <summary>
         /// Where the lowest ink of a line drawn at <paramref name="labelY"/>

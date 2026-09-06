@@ -56,19 +56,20 @@ namespace TaimisToolbench.Views.Rendering
 
         /// <summary>
         /// The digits in a coin run - the gold, silver and copper numbers
-        /// that each carry an icon. One step under <see cref="Body"/>, and
-        /// not a de-emphasis: the coin icon is fixed at 16px by the
-        /// measured wallet bar tier (Services/CurrencyIconTiers), so the
-        /// digits are the only side of that pair left to size.
+        /// that each carry an icon. Body, the same face as the caption
+        /// beside them.
         /// <para>
-        /// MEASURED in one screenshot holding this row beside the game's
-        /// own inventory coin row, so no UI scale is assumed: the game inks
-        /// its coin 0.80 as tall as its digits and we inked ours 0.64.
-        /// Menomonia 16-regular inks "841" 13 rows tall and 14-regular inks
-        /// it 11. The coin does not change, so the ratio moves to 0.75.
+        /// This was Caption, one step under Body, for one build. MEASURED
+        /// in a screenshot holding this row beside the game's own inventory
+        /// coin row, so no interface scale is assumed: at Body the digits
+        /// ink "841" 19 pixels wide, which is exactly the game's 19, and at
+        /// Caption they ink 17. Both faces ink 11 rows tall against the
+        /// game's 10, so the step down cost width and bought no height.
+        /// The role is kept as its own name so this decision has somewhere
+        /// to live.
         /// </para>
         /// </summary>
-        internal static BitmapFont CoinDigits => Caption;
+        internal static BitmapFont CoinDigits => Body;
 
         /// <summary>
         /// Every column header the module draws, and the Total Cost band's

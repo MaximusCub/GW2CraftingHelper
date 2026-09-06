@@ -206,26 +206,28 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void TheCoinSeat_HoldsItsRow_WhenTheDigitsDropOneRampStep()
+        public void TheCoinSeat_HoldsItsRow_WhateverFaceTheDigitsUse()
         {
-            // The snapshot coin row draws its digits in menomonia
-            // 14-regular and its "Coin" caption in 16-regular, on one
-            // baseline. 14-regular's '0' declares yoffset 2 height 13, so
-            // its ink stops at the exclusive edge 14 - MEASURED off the
-            // shipped face, the same way the 16 numbers above were.
+            // The snapshot coin row draws its digits and its "Coin" caption
+            // on one baseline. Whichever face the digits take, aligning it
+            // to that baseline has to leave the digits' ink bottom on the
+            // row it was already on, because the coin is seated on that ink
+            // bottom by measurement.
             int digitY = TypeRampMetrics.BaselineAlignedY(
                 TypeRampMetrics.CoinDigitInk, CaptionY + TypeRampMetrics.BodyInk.BaselineY);
 
-            int smallerFace = digitY
-                + CoinSegmentMath.CoinIconY(2, 13, CoinSegmentMath.CoinIconSize);
+            // The digits draw at Body, the caption's own face, so aligning
+            // them to its baseline moves them nowhere.
+            Assert.Equal(CaptionY, digitY);
+
+            int digitFace = digitY
+                + CoinSegmentMath.CoinIconY(
+                    BodyZeroYOffset, BodyZeroHeight, CoinSegmentMath.CoinIconSize);
             int bodyFace = CaptionY
                 + CoinSegmentMath.CoinIconY(
                     BodyZeroYOffset, BodyZeroHeight, CoinSegmentMath.CoinIconSize);
 
-            // The coin was seated on the digits' ink bottom by
-            // measurement. A smaller face on the same baseline leaves that
-            // ink bottom on the row it was already on.
-            Assert.Equal(bodyFace, smallerFace);
+            Assert.Equal(bodyFace, digitFace);
         }
 
         [Fact]
