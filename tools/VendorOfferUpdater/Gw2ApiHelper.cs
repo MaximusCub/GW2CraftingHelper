@@ -8,11 +8,13 @@ using System.Threading.Tasks;
 namespace VendorOfferUpdater
 {
     /// <summary>
-    /// Resolves currency names (from wiki) to GW2 API currency IDs.
+    /// Resolves currency names (from wiki) to GW2 API currency IDs, and
+    /// recipe sheet item IDs to the recipe they unlock.
     /// </summary>
     public class Gw2ApiHelper
     {
         private const string CurrenciesUrl = "https://api.guildwars2.com/v2/currencies";
+        private const string ItemsUrl = "https://api.guildwars2.com/v2/items";
         private readonly HttpClient _httpClient;
 
         // Null until LoadCurrenciesAsync completes; ResolveCurrencyId
@@ -94,6 +96,50 @@ namespace VendorOfferUpdater
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Returns the recipe a consumable recipe sheet unlocks, or null
+        /// when <paramref name="itemId"/> is not one.
+        /// <para>
+        /// A sheet is an item whose <c>details.type</c> is "Unlock" and
+        /// whose <c>details.unlock_type</c> is "CraftingRecipe"; its
+        /// <c>details.recipe_id</c> is the recipe the account learns.
+        /// A sheet covering several recipes also carries
+        /// <c>details.extra_recipe_ids</c> - item 101483 "Recipe: Legendary
+        /// Obsidian Armor" names recipe 14083 plus 17 more, one per armour
+        /// piece. Only <c>recipe_id</c> is returned: the account learns all
+        /// of them together, so any single one answers "is this unlocked".
+        /// </para>
+        /// </summary>
+        public async Task<int?> ResolveRecipeSheetRecipeIdAsync(int itemId)
+        {
+            string response = await _httpClient.GetStringAsync($"{ItemsUrl}/{itemId}");
+            using var doc = JsonDocument.Parse(response);
+
+            if (!doc.RootElement.TryGetProperty("details", out var details) ||
+                details.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            if (!IsStringProperty(details, "type", "Unlock") ||
+                !IsStringProperty(details, "unlock_type", "CraftingRecipe"))
+            {
+                return null;
+            }
+
+            return details.TryGetProperty("recipe_id", out var recipeId) &&
+                   recipeId.ValueKind == JsonValueKind.Number
+                ? recipeId.GetInt32()
+                : (int?)null;
+        }
+
+        private static bool IsStringProperty(JsonElement element, string name, string expected)
+        {
+            return element.TryGetProperty(name, out var value) &&
+                   value.ValueKind == JsonValueKind.String &&
+                   string.Equals(value.GetString(), expected, StringComparison.Ordinal);
         }
     }
 }
