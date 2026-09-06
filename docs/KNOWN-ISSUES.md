@@ -1101,17 +1101,50 @@ genuinely open item, not just the ones originally filed under a
   subpages; the items are still sold in-game under the split pages, but
   the seed's merchant-page linkage is now stale-shaped. Missing-offer/
   rename gap for a future re-scrape to follow up; not removed.
+  **Correction (2026-09-05): the scrape this rests on never ran
+  properly.** The 18 offers were called missing by a scraper that could
+  not reach large parts of the wiki at all - see the wiki-drift bullet
+  below for the defect and the proof. Whether these pages are split, or
+  were simply never asked for, is not settled by anything recorded here.
+  Re-check it against a validated scrape before treating the split as the
+  cause.
 - "Merchant (Untamed Crags)" vendor-page-name mismatch (#28, 1 offer):
   the Hydrocatalytic Reagent / 50 Research Note offer's exact vendor
   page no longer resolves on the wiki (no page, no redirect), while the
   item and cost remain valid via other crafting-material vendors.
   Deferred pending research into whether the page was renamed or the
-  original scrape mislabeled the vendor.
+  original scrape mislabeled the vendor. A third possibility, added
+  2026-09-05: the scrape that failed to resolve it is the one described
+  in the wiki-drift bullet below, which could not reach large parts of
+  the wiki. Re-check against a validated scrape before spending research
+  on a rename.
 - Wiki-drift missing-offers superset (#28, ~5,400 offers): M37's full
   from-scratch re-scrape (for cap seeding) incidentally picked up new
   Homestead recipes and unrelated vendor page changes beyond the
   stale-offer-sweep scope. Discarded uncommitted; recorded here as a
   candidate for a future dedicated "missing offers" pass.
+  **Correction (2026-09-05): this was never wiki drift.** The scrape it
+  was measured against had a defect that made whole sections of the wiki
+  unreachable, so the difference between two runs was partly the scraper
+  changing its mind about what exists, not the wiki changing.
+  `WikiSmwClient.PartitionPrefixes` held upper case letters and digits
+  only. Semantic MediaWiki's LIKE comparator becomes a SQL `LIKE` over
+  `smw_sortkey`, which `MySQLTableBuilder` declares `VARBINARY(255)`, and
+  `LIKE` over a binary column compares bytes - so the glob is
+  case-sensitive unless the wiki opts into a case-insensitive collation,
+  which this one does not. A depth-2 partition therefore asked
+  `[[Has vendor::~AS*]]` of names whose second letter is lower case, and
+  got nothing it could ever have got. A live run logged `[A]
+  sub-partitions done, 35/36 empty prefixes skipped`, naming `AS` among
+  them; the one non-empty child was `AC`, and `ACLM-0403` is the only
+  merchant in the corpus with two leading capitals. Fixed on branch
+  `w25-scraper-error-handling` (pull request 252, open against master at
+  the time of writing, not merged): the character set goes from 36 to 73,
+  adding lower case and the punctuation that appears in real merchant
+  names. The same partition then returned `[As] done: 825 rows in 3
+  requests`, and a validated scrape recovered 192 merchants and 6,103
+  offers. Until that lands and a full scrape is validated against it, no
+  count in this bullet or the two above it is a measurement of the wiki.
 - Character/total purchase caps (#28): the wiki's "Has character
   purchase cap" and "Has total purchase cap" SMW properties are real and
   populated (confirmed in M37) but remain deliberately unseeded - the
