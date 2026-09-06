@@ -41,7 +41,7 @@ namespace TaimisToolbench.Services
         // RowIconFrameSize rarity frame plus a 2px divider already exceeds
         // the tallest text run in them, so their heights are derived below
         // from the frame rather than pinned by ink arithmetic.
-        // CraftStepRowHeight's body text was already Font16 before the
+        // The craft-step row's body text was already Font16 before the
         // bump, so only its Font12 -> Font14 sublabel moved, and that
         // sublabel's ink clears its divider with the same margin it had at
         // the pre-tier-2 heights. The two 28px rows put a single line at
@@ -103,17 +103,7 @@ namespace TaimisToolbench.Services
 
         public const int UsedMaterialRowHeight = IconLedRowHeight;
         public const int ShoppingRowHeight = IconLedRowHeight;
-
-        /// <summary>y of the craft-step row's icon frame - the one icon-led
-        /// row whose icon is inset rather than flush, because the numbered
-        /// badge beside it needs breathing room above and below.</summary>
-        public const int CraftStepIconY = 5;
-
-        // Symmetric inset: CraftStepIconY above and below the frame
-        // (5 + 42 + 5 = 52). The divider then lands at rowHeight - 2 -
-        // IconRowDividerClearance = 49, 2px below the icon frame bottom
-        // (47) - the same 2px icon-to-divider gap the 44px shape had.
-        public const int CraftStepRowHeight = 2 * CraftStepIconY + RowIconFrameSize;
+        public const int CraftStepRowHeight = IconLedRowHeight;
 
         // 32, not the 28 a Body-16 header band needed: column headers moved
         // to the ColumnHeader tier (TypeRampMetrics.ColumnHeaderInk), whose
