@@ -260,7 +260,7 @@ namespace TaimisToolbench.Services
         /// (case-insensitive, with an ordinal tiebreak so two names differing
         /// only by case keep a deterministic order). Drives the Snapshot
         /// tab's per-character source checkboxes, so it deliberately merges
-        /// both rosters the snapshot carries: the character
+        /// both rosters the snapshot carries: the character-owned
         /// item sources AND CharacterDisciplines - a character holding no
         /// items at all still gets a checkbox as long as the snapshot saw it
         /// somewhere. Zero-count item entries are kept here (unlike
@@ -377,8 +377,8 @@ namespace TaimisToolbench.Services
         /// null filter is treated as "show everything" (matches the
         /// controls' own all-checked default), as is a character whose name
         /// is absent from SnapshotSourceFilter.UncheckedCharacters. A raw
-        /// source string that matches none of the four known shapes
-        /// (Bank/MaterialStorage/SharedInventory/LegendaryArmory/either
+        /// source string that matches none of the known shapes
+        /// (Bank/MaterialStorage/SharedInventory/LegendaryArmory, or either
         /// character encoding) is shown regardless -
         /// failing open rather than silently hiding real inventory data
         /// the module does not yet recognize (KNOWN-ISSUES #31's "never
