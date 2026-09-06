@@ -391,7 +391,7 @@ tests/TaimisToolbench.Tests/Services/BoundedConcurrencyTests.cs                 
 tests/TaimisToolbench.Tests/Services/ClickSoundVolumeTests.cs                           131
 tests/TaimisToolbench.Tests/Services/ClipTopSlipSimulationTests.cs                      158
 tests/TaimisToolbench.Tests/Services/CoinFormattingTests.cs                             211
-tests/TaimisToolbench.Tests/Services/CoinSegmentMathTests.cs                            540
+tests/TaimisToolbench.Tests/Services/CoinSegmentMathTests.cs                            557
 tests/TaimisToolbench.Tests/Services/ColumnBoardLayoutTests.cs                          193
 tests/TaimisToolbench.Tests/Services/CompetencyOpportunityCalculatorTests.cs            205
 tests/TaimisToolbench.Tests/Services/CompositeRecipeApiClientTests.cs                   221
@@ -479,7 +479,7 @@ tests/TaimisToolbench.Tests/Services/PlanHistoryRowLayoutTests.cs               
 tests/TaimisToolbench.Tests/Services/PlanHistoryStoreTests.cs                           323
 tests/TaimisToolbench.Tests/Services/PlanHistoryTableSorterTests.cs                     177
 tests/TaimisToolbench.Tests/Services/PlanPhaseTimingSummaryTests.cs                     201
-tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                           828
+tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                           829
 tests/TaimisToolbench.Tests/Services/PlanResultBuilderTests.cs                          1103
 tests/TaimisToolbench.Tests/Services/PlanRootIgnoreTests.cs                             412
 tests/TaimisToolbench.Tests/Services/PlanRootOwnedStockTests.cs                         228
