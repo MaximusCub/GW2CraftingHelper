@@ -99,6 +99,19 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void TheCoinDigits_AreARealStepUnderBody_AndNotBelowTheFloor()
+        {
+            var digits = TypeRampMetrics.CoinDigitInk;
+
+            // Sized against the 16px coin icon beside them, not against the
+            // prose: the game inks its coin 0.80 as tall as its digits and
+            // Body took us to 0.64. The floor still holds - a further step
+            // down would be smaller than anything else the module draws.
+            Assert.True(digits.CapHeight < TypeRampMetrics.BodyInk.CapHeight);
+            Assert.True(digits.LineHeight >= TypeRampMetrics.CaptionInk.LineHeight);
+        }
+
+        [Fact]
         public void InkBottom_IsWhereADividerHasToClear()
         {
             var header = TypeRampMetrics.ColumnHeaderInk;

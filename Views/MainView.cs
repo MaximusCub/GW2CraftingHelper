@@ -292,6 +292,7 @@ namespace TaimisToolbench.Views
 
         private const string CoinCaption = "Coin";
         private const int CoinCaptionGap = 8;
+        private const int CoinCaptionY = 2;
         private static readonly Color CoinCaptionColor = new Color(130, 130, 130);
 
         // Same rule under every section heading in the module - see
@@ -2921,30 +2922,38 @@ namespace TaimisToolbench.Views
 
             var (gold, silver, cop) = CoinSegmentMath.Split(copper);
 
-            var font = UiFonts.Body;
+            var captionFont = UiFonts.Body;
+            var digitFont = UiFonts.CoinDigits;
 
-            // Body, not Caption: this was the one text on the tab both
-            // smaller AND greyer than what it labels. One channel of
-            // de-emphasis, and it lines up with the numbers it introduces.
+            // Body, not the digits' own face: this was the one text on the
+            // tab both smaller AND greyer than what it labels. One channel
+            // of de-emphasis, not two.
             new Label()
             {
                 Text = CoinCaption,
-                Font = font,
+                Font = captionFont,
                 TextColor = CoinCaptionColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, 2),
+                Location = new Point(0, CoinCaptionY),
                 Parent = _coinBlockPanel,
             };
-            int captionWidth = (int)Math.Ceiling(font.MeasureString(CoinCaption).Width);
+            int captionWidth = (int)Math.Ceiling(captionFont.MeasureString(CoinCaption).Width);
+
+            // The digits are a step smaller than the caption, so they are
+            // drawn lower to keep the two on one baseline. That leaves the
+            // digits' ink bottom exactly where it was, and the coin seated
+            // on it (CoinCurrencyRenderer's CoinDigitSeat) does not move.
+            int digitY = TypeRampMetrics.BaselineAlignedY(
+                TypeRampMetrics.CoinDigitInk, CoinCaptionY + TypeRampMetrics.BodyInk.BaselineY);
 
             var segments = new List<CoinSegmentMath.CoinSegmentSpec>(3);
-            CoinCurrencyRenderer.AddSegmentSpec(segments, font, CoinSegmentMath.GoldAssetId, gold.ToString());
-            CoinCurrencyRenderer.AddSegmentSpec(segments, font, CoinSegmentMath.SilverAssetId, silver.ToString());
-            CoinCurrencyRenderer.AddSegmentSpec(segments, font, CoinSegmentMath.CopperAssetId, cop.ToString());
+            CoinCurrencyRenderer.AddSegmentSpec(segments, digitFont, CoinSegmentMath.GoldAssetId, gold.ToString());
+            CoinCurrencyRenderer.AddSegmentSpec(segments, digitFont, CoinSegmentMath.SilverAssetId, silver.ToString());
+            CoinCurrencyRenderer.AddSegmentSpec(segments, digitFont, CoinSegmentMath.CopperAssetId, cop.ToString());
 
             CoinCurrencyRenderer.LayoutCoinSegments(
-                _coinBlockPanel, segments, captionWidth + CoinCaptionGap, 2, font);
+                _coinBlockPanel, segments, captionWidth + CoinCaptionGap, digitY, digitFont);
 
             // The block's exact extent, from the same arithmetic that laid
             // it out - so nothing re-measures it to right-pin it.

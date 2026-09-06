@@ -291,7 +291,7 @@ Views/ItemInputRowStrip.cs                                                      
 Views/ItemRowState.cs                                                                   39
 Views/LogTabContent.cs                                                                  1538
 Views/MainThreadMarshal.cs                                                              141
-Views/MainView.cs                                                                       2958
+Views/MainView.cs                                                                       2967
 Views/DialogWindow.cs                                                                   108
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    425
@@ -385,7 +385,7 @@ tests/TaimisToolbench.Tests/Services/BoundedConcurrencyTests.cs                 
 tests/TaimisToolbench.Tests/Services/ClickSoundVolumeTests.cs                           131
 tests/TaimisToolbench.Tests/Services/ClipTopSlipSimulationTests.cs                      158
 tests/TaimisToolbench.Tests/Services/CoinFormattingTests.cs                             211
-tests/TaimisToolbench.Tests/Services/CoinSegmentMathTests.cs                            511
+tests/TaimisToolbench.Tests/Services/CoinSegmentMathTests.cs                            538
 tests/TaimisToolbench.Tests/Services/ColumnBoardLayoutTests.cs                          193
 tests/TaimisToolbench.Tests/Services/CompetencyOpportunityCalculatorTests.cs            205
 tests/TaimisToolbench.Tests/Services/CompositeRecipeApiClientTests.cs                   221
@@ -594,7 +594,7 @@ tests/TaimisToolbench.Tests/Services/TreeCostColumnMathTests.cs                 
 tests/TaimisToolbench.Tests/Services/TreeRowIdentityTests.cs                            246
 tests/TaimisToolbench.Tests/Services/TreeRowShapeGoldenTests.cs                         145
 tests/TaimisToolbench.Tests/Services/TreeRowTooltipComposerTests.cs                     538
-tests/TaimisToolbench.Tests/Services/TypeRampMetricsTests.cs                            150
+tests/TaimisToolbench.Tests/Services/TypeRampMetricsTests.cs                            163
 tests/TaimisToolbench.Tests/Services/ValueDetailTooltipBuilderTests.cs                  191
 tests/TaimisToolbench.Tests/Services/VendorOfferStoreTests.cs                           576
 tests/TaimisToolbench.Tests/Services/VendorUnlockRecipeTests.cs                         233
