@@ -1346,3 +1346,33 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Two "Gaeting Crystal" currency ids: one is retired (2026-08-29)** - gate not required (retired currency 39 and item 86094 removed, live currency 77 named).
   Cited as: gaeting-crystal-duplicate-ids.
   `dev/records/gaeting-crystal-duplicate-ids.md`
+- **A wave of field-test fixes: viewport, tables, icons, tree rows and dialogs (2026-08-29)** - gate NOT RUN (no live session available on that branch).
+  `dev/records/wave6-ui.md`
+- **Currency 77 is pinned to currency 28, and two false claims about it are corrected (2026-08-29)** - gate not required (a comment, a test assertion and two doc corrections; no runtime behaviour moves).
+  `dev/records/gaeting-equality-pin.md`
+- **Seven display fixes from one round of in-game field reports (2026-08-30)** - gate NOT RUN (no live confirmation recorded on that branch).
+  `dev/records/wave7-fieldtest.md`
+- **Defects in the sticky headers, the viewport cutoff, the tree columns and the dialog title (2026-09-02)** - gate NOT RUN (no live session recorded; the two largest changes are the ones no test can reach).
+  `dev/records/m40-review-findings.md`
+- **Three unrelated plan-tab defects reported from in-game use (2026-09-03)** - gate NOT RUN (no live check recorded on any commit).
+  `dev/records/w13-wave2-fixes.md`
+- **Sticky plan-tab headers, headings seated on the icon gutter, and Blish's own close key (2026-09-04)** - gate NOT RUN (no live check recorded on any commit).
+  `dev/records/w13-sticky-headers.md`
+- **Coin icons seat on the game's baseline, and Total Cost groups its non-coin rows (2026-09-04)** - gate NOT RUN (no live check recorded on that branch).
+  `dev/records/w17-coin-seat.md`
+- **Development-process residue removed from tracked prose and comments (2026-09-04)** - gate not required (comments, tracked prose and three test method names; no runtime surface).
+  `dev/records/cleanup-public-surfaces.md`
+- **Total Cost: the inventory rows get a real Have and Needed, and the group labels read as headings (2026-09-05)** - gate NOT RUN (no live check recorded on either commit).
+  `dev/records/w20-total-cost-groups.md`
+- **The plan tab's input strip reflowed in the middle of a drag (2026-09-05)** - gate NOT RUN (no live session recorded on that branch).
+  `dev/records/w22-resize-stretch.md`
+- **The recipe tree's IGNORE key moves into the gap between Source and Cost (2026-09-05)** - gate NOT RUN (no live confirmation recorded on that branch); superseded by `w23-ignore-trailing-column` below.
+  `dev/records/w18-ignore-x-gap.md`
+- **The module's currency tooltip is matched to the game's own (2026-09-05)** - gate NOT RUN (no live confirmation recorded, and the fix is a comparison against the game's own rendering).
+  `dev/records/w21-currency-tooltip-match.md`
+- **The coin seat hangs the art's disc on the digits, not its shadow (2026-09-05)** - gate NOT RUN (no live session recorded on that branch).
+  `dev/records/w19-coin-seat-2px.md`
+- **Ranker reorder keys are cut from the remove key beside them (2026-09-05)** - gate NOT RUN (no live check recorded on that branch).
+  `dev/records/w24-ranker-button-consistency.md`
+- **The Recipe Tree's ignore button gets a fixed column after Cost (2026-09-05)** - gate NOT RUN (no live session recorded on that branch).
+  `dev/records/w23-ignore-trailing-column.md`
