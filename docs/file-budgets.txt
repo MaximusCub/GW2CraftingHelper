@@ -355,7 +355,7 @@ tests/TaimisToolbench.Tests/Helpers/ModelGraphSignatures.cs                     
 tests/TaimisToolbench.Tests/Helpers/PipelineBuilder.cs                                  315
 tests/TaimisToolbench.Tests/Helpers/PlanResultDump.cs                                   192
 tests/TaimisToolbench.Tests/Helpers/RealItemFixtures.cs                                 56
-tests/TaimisToolbench.Tests/Helpers/RealItemJson.cs                                     63
+tests/TaimisToolbench.Tests/Helpers/RealItemJson.cs                                     81
 tests/TaimisToolbench.Tests/Helpers/RecipeNodeBuilders.cs                               97
 tests/TaimisToolbench.Tests/Helpers/RepoFileLocator.cs                                  42
 tests/TaimisToolbench.Tests/Helpers/ShippedSeedManifest.cs                              139
@@ -564,6 +564,7 @@ tests/TaimisToolbench.Tests/Services/SnapshotSearchResultBuilderTests.cs        
 tests/TaimisToolbench.Tests/Services/SnapshotSerializationTests.cs                      283
 tests/TaimisToolbench.Tests/Services/SnapshotStoreTests.cs                              330
 tests/TaimisToolbench.Tests/Services/SnapshotTableSorterTests.cs                        147
+tests/TaimisToolbench.Tests/Services/SocketedUpgradeTests.cs                            321
 tests/TaimisToolbench.Tests/Services/SortIndicatorLayoutTests.cs                        151
 tests/TaimisToolbench.Tests/Services/SourceFilterFlowLayoutTests.cs                     127
 tests/TaimisToolbench.Tests/Services/StatusStoreTests.cs                                116
