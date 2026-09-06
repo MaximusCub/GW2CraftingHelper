@@ -82,6 +82,10 @@ namespace TaimisToolbench.Tests.Services
         private const int BodyZeroHeight = 15;
         private const int BodyDigitInkBottom = 16;
 
+        // Where MainView draws the coin row's "Coin" caption inside its
+        // block panel. The digits are seated against this.
+        private const int CaptionY = 2;
+
         // The three shipped 32x32 coin textures, DRAWN rows MEASURED by
         // compositing each source row over a dark row ground: gold and
         // silver 5..23, copper 7..23. Rows 24..26 composite darker than the
@@ -199,6 +203,29 @@ namespace TaimisToolbench.Tests.Services
                     + CoinSegmentMath.CoinInkBelowBaseline,
                 y);
             Assert.Equal(7, y);
+        }
+
+        [Fact]
+        public void TheCoinSeat_HoldsItsRow_WhenTheDigitsDropOneRampStep()
+        {
+            // The snapshot coin row draws its digits in menomonia
+            // 14-regular and its "Coin" caption in 16-regular, on one
+            // baseline. 14-regular's '0' declares yoffset 2 height 13, so
+            // its ink stops at the exclusive edge 14 - MEASURED off the
+            // shipped face, the same way the 16 numbers above were.
+            int digitY = TypeRampMetrics.BaselineAlignedY(
+                TypeRampMetrics.CoinDigitInk, CaptionY + TypeRampMetrics.BodyInk.BaselineY);
+
+            int smallerFace = digitY
+                + CoinSegmentMath.CoinIconY(2, 13, CoinSegmentMath.CoinIconSize);
+            int bodyFace = CaptionY
+                + CoinSegmentMath.CoinIconY(
+                    BodyZeroYOffset, BodyZeroHeight, CoinSegmentMath.CoinIconSize);
+
+            // The coin was seated on the digits' ink bottom by
+            // measurement. A smaller face on the same baseline leaves that
+            // ink bottom on the row it was already on.
+            Assert.Equal(bodyFace, smallerFace);
         }
 
         [Fact]
