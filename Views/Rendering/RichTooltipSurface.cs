@@ -458,10 +458,10 @@ namespace TaimisToolbench.Views.Rendering
             {
                 Size = new Point(System.Math.Max(1, panelWidth), System.Math.Max(1, boxes.PanelHeight)),
                 Location = Point.Zero,
-                // No fill of its own: the canvas is painted across the
-                // whole box by PaintBeforeChildren, so a second fill here
-                // would be the stacked-translucency case that matches
-                // neither the game nor H6.
+                // No fill of its own: PaintBeforeChildren paints the
+                // canvas across each box, so a second fill here would be
+                // the stacked-translucency case that matches neither the
+                // game nor H6.
                 BackgroundColor = Color.Transparent,
                 ShowBorder = false,
                 Parent = this,
