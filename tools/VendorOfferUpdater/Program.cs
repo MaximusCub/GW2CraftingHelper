@@ -16,6 +16,9 @@ namespace VendorOfferUpdater
 {
     internal class Program
     {
+        /// <summary>Cap on deferred names listed by name. Counts are exact.</summary>
+        private const int DeferredNamesListed = 20;
+
         private static async Task<int> Main(string[] args)
         {
             using var cts = new CancellationTokenSource();
@@ -60,9 +63,12 @@ namespace VendorOfferUpdater
             bool skipItemResolution = false;
             bool resolveOnly = false;
             int maxDepth = 2;
-            int maxRequests = 2000;
+            int maxRequests = QueryOptions.DefaultMaxTotalRequests;
             int maxRuntimeMinutes = 30;
-            int delayMs = 250;
+            int delayMs = QueryOptions.DefaultDelayBetweenRequestsMs;
+            int maxAttempts = QueryOptions.DefaultMaxAttempts;
+            bool allowCoverageDrop = false;
+            bool recheckMisses = false;
             bool tagSeasonalFestivals = false;
             int maxSeasonalPages = 500;
             string? diffSummaryBefore = null;
@@ -123,6 +129,18 @@ namespace VendorOfferUpdater
                 {
                     mergeIntoPath = args[++i];
                 }
+                else if (args[i] == "--max-attempts" && i + 1 < args.Length)
+                {
+                    maxAttempts = int.Parse(args[++i]);
+                }
+                else if (args[i] == "--allow-coverage-drop")
+                {
+                    allowCoverageDrop = true;
+                }
+                else if (args[i] == "--recheck-misses")
+                {
+                    recheckMisses = true;
+                }
                 else if (args[i] == "--tag-seasonal-festivals")
                 {
                     tagSeasonalFestivals = true;
@@ -158,12 +176,20 @@ namespace VendorOfferUpdater
                 return await RunDiffSummaryAsync(diffSummaryBefore, diffSummaryAfter);
             }
 
+            if (maxAttempts <= 0)
+            {
+                Console.Error.WriteLine(
+                    $"ERROR: --max-attempts must be a positive integer, got {maxAttempts}.");
+                return 1;
+            }
+
             var queryOptions = new QueryOptions
             {
                 MaxPrefixDepth = maxDepth,
                 MaxTotalRequests = maxRequests,
                 MaxRuntime = TimeSpan.FromMinutes(maxRuntimeMinutes),
                 DelayBetweenRequestsMs = delayMs,
+                MaxAttempts = maxAttempts,
                 DryRun = dryRun,
             };
 
@@ -184,12 +210,18 @@ namespace VendorOfferUpdater
                 $"Limits: maxDepth={queryOptions.MaxPrefixDepth}, " +
                 $"maxRequests={queryOptions.MaxTotalRequests}, " +
                 $"maxRuntime={queryOptions.MaxRuntime.TotalMinutes:F0}min, " +
-                $"delay={Math.Max(200, queryOptions.DelayBetweenRequestsMs)}ms");
+                $"delay={Math.Max(200, queryOptions.DelayBetweenRequestsMs)}ms, " +
+                $"maxAttempts={queryOptions.MaxAttempts}");
             Console.WriteLine();
 
             using var httpClient = new HttpClient();
+
+            // MediaWiki's User-Agent policy asks for a way to contact whoever
+            // is running the client. Without one, an operator who wants this
+            // traffic to stop has no option but to block the address.
             httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(
-                "TaimisToolbench-VendorOfferUpdater/1.0");
+                "TaimisToolbench-VendorOfferUpdater/1.0 " +
+                "(+https://github.com/MaximusCub/TaimisToolbench)");
 
             // Step 1: Load currency mappings from GW2 API
             if (!dryRun)
@@ -286,7 +318,8 @@ namespace VendorOfferUpdater
                 string cachePath = Path.Combine(
                     Path.GetDirectoryName(outputPath) ?? ".",
                     "item_id_cache.json");
-                var itemIdCache = LoadItemIdCache(cachePath);
+                var itemIdCache = ItemIdCache.Load(cachePath);
+                ReportCachedMisses(itemIdCache, recheckMisses);
 
                 if (!skipItemResolution)
                 {
@@ -295,7 +328,7 @@ namespace VendorOfferUpdater
                         .Select(c => c.Currency)
                         .Where(name => !string.IsNullOrEmpty(name)
                             && !apiHelper.ResolveCurrencyId(name).HasValue
-                            && !itemIdCache.ContainsKey(name))
+                            && !itemIdCache.Contains(name))
                         // IsNullOrEmpty above already proved non-null/non-empty;
                         // the static element type just doesn't narrow across
                         // the Where lambda boundary.
@@ -307,24 +340,41 @@ namespace VendorOfferUpdater
                     {
                         Console.WriteLine(
                             $"Resolving {unknownCurrencyNames.Count} item-based currencies via wiki...");
-                        var freshResolved =
-                            await wikiClient.ResolveItemGameIdsAsync(unknownCurrencyNames, ct);
-                        Console.WriteLine(
-                            $"  Resolved {freshResolved.Count} of {unknownCurrencyNames.Count} item names.");
+                        var resolution =
+                            await wikiClient.ResolveItemGameIdsAsync(
+                                unknownCurrencyNames, ct, queryOptions);
 
-                        foreach (var name in unknownCurrencyNames)
+                        var update = itemIdCache.Record(
+                            unknownCurrencyNames, resolution, DateTime.UtcNow);
+
+                        Console.WriteLine(
+                            $"  Resolved {update.Hits} of {unknownCurrencyNames.Count} item names, " +
+                            $"cached {update.Misses} miss(es) the wiki answered for, " +
+                            $"left {update.Deferred.Count} to ask again.");
+
+                        if (update.Deferred.Count > 0)
                         {
-                            if (freshResolved.TryGetValue(name, out int id))
+                            // Nothing is cached for these. A cached miss is
+                            // permanent - the filter above never asks about a
+                            // cached name again - so recording one for a batch
+                            // the wiki never answered would retire a real item
+                            // from the dataset for good.
+                            Console.WriteLine(
+                                "  These names were never answered for, so nothing was cached " +
+                                "and the next run asks again:");
+                            foreach (var name in update.Deferred.Take(DeferredNamesListed))
                             {
-                                itemIdCache[name] = id;
+                                Console.WriteLine($"    - {name}");
                             }
-                            else
+
+                            if (update.Deferred.Count > DeferredNamesListed)
                             {
-                                itemIdCache[name] = -1; // miss sentinel
+                                Console.WriteLine(
+                                    $"    ... and {update.Deferred.Count - DeferredNamesListed} more");
                             }
                         }
 
-                        SaveItemIdCache(cachePath, itemIdCache);
+                        itemIdCache.Save(cachePath);
                         Console.WriteLine();
                     }
                     else if (itemIdCache.Count > 0)
@@ -341,15 +391,8 @@ namespace VendorOfferUpdater
                     Console.WriteLine();
                 }
 
-                // Build final map excluding misses
-                var itemIdMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                foreach (var kv in itemIdCache)
-                {
-                    if (kv.Value > 0)
-                    {
-                        itemIdMap[kv.Key] = kv.Value;
-                    }
-                }
+                var itemIdMap = new Dictionary<string, int>(
+                    itemIdCache.Ids, StringComparer.OrdinalIgnoreCase);
 
                 // Step 3.5: Resolve festival-vendor seasonal tags via wiki
                 // (opt-in, --tag-seasonal-festivals - see
@@ -523,6 +566,39 @@ namespace VendorOfferUpdater
                     Console.WriteLine();
                 }
 
+                // Step 5d: Report what the wiki never answered, and leave a
+                // sidecar naming those sections so the next run can re-target
+                // them by condition instead of scraping everything again.
+                var unresolved = wikiClient.UnresolvedSections;
+                PrintUnresolvedSections(unresolved);
+
+                string? sidecarPath = await UnresolvedSectionFile.SaveAsync(outputPath, unresolved);
+                if (sidecarPath != null)
+                {
+                    Console.WriteLine($"Written unresolved-section report to {sidecarPath}");
+                    Console.WriteLine();
+                }
+
+                // Step 5e: Coverage check. Rows a run never fetched are
+                // invisible to the merge guard above, which only protects rows
+                // already in the baseline.
+                var previousOffers = await LoadOffersForCoverageAsync(outputPath);
+                var coverage = CoverageGate.Evaluate(
+                    previousOffers,
+                    finalOffers,
+                    unresolved,
+                    CoverageGate.DefaultMaxDropFraction,
+                    allowCoverageDrop);
+                Console.Write(CoverageGate.Format(coverage));
+                Console.WriteLine();
+
+                if (coverage.Blocked)
+                {
+                    Console.Error.WriteLine(
+                        $"ERROR: coverage check blocked the write to {outputPath}.");
+                    return 3;
+                }
+
                 // Step 6: Write output
                 var dataset = new VendorOfferDataset
                 {
@@ -572,6 +648,69 @@ namespace VendorOfferUpdater
             }
         }
 
+        /// <summary>
+        /// Lists every section the wiki never answered, with the reason and
+        /// the query. A count alone was what made this class of loss
+        /// invisible, so each section is named.
+        /// </summary>
+        private static void PrintUnresolvedSections(IReadOnlyList<UnresolvedSection> unresolved)
+        {
+            if (unresolved.Count == 0)
+            {
+                Console.WriteLine("Unresolved sections: none.");
+                Console.WriteLine();
+                return;
+            }
+
+            Console.WriteLine($"=== UNRESOLVED SECTIONS ({unresolved.Count}) ===");
+            Console.WriteLine(
+                "  These were asked for and never answered. They are NOT empty, and the");
+            Console.WriteLine(
+                "  rows they hold are missing from this run's dataset.");
+            foreach (var section in unresolved)
+            {
+                Console.WriteLine(
+                    $"  - {section.Kind} [{section.Label}] after {section.Attempts} attempt(s): " +
+                    $"{section.ErrorCode}");
+                Console.WriteLine($"      reason: {section.Reason}");
+                Console.WriteLine($"      query:  {section.Condition}");
+            }
+
+            Console.WriteLine();
+        }
+
+        /// <summary>
+        /// Reads the dataset a write would replace, for the coverage check.
+        /// A missing or unreadable file is a first run, not a coverage
+        /// failure, so it yields no offers rather than an error.
+        /// </summary>
+        private static async Task<List<VendorOffer>> LoadOffersForCoverageAsync(string path)
+        {
+            if (!File.Exists(path))
+            {
+                return new List<VendorOffer>();
+            }
+
+            try
+            {
+                string existingJson = await File.ReadAllTextAsync(path);
+                var readOptions = new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    PropertyNameCaseInsensitive = true,
+                };
+                var existing = JsonSerializer.Deserialize<VendorOfferDataset>(existingJson, readOptions);
+                return existing?.Offers ?? new List<VendorOffer>();
+            }
+            catch (JsonException ex)
+            {
+                Console.WriteLine(
+                    $"  WARNING: could not read {path} for the coverage check ({ex.Message}). " +
+                    "Treating this run as the first.");
+                return new List<VendorOffer>();
+            }
+        }
+
         private static void PrintQuerySummary(QueryStats stats)
         {
             Console.WriteLine("=== Query Summary ===");
@@ -586,8 +725,9 @@ namespace VendorOfferUpdater
             {
                 Console.WriteLine();
                 Console.WriteLine(
-                    $"  WARNING: Found {stats.NonAlphaVendors.Count} vendor(s) with " +
-                    "non-alphanumeric names (not covered by prefix partitioning):");
+                    $"  WARNING: Found {stats.NonAlphaVendors.Count} vendor(s) whose " +
+                    "first character is outside the partition character set, so a " +
+                    "prefix split cannot reach them:");
                 foreach (var name in stats.NonAlphaVendors)
                 {
                     Console.WriteLine($"    - {name}");
@@ -1486,44 +1626,40 @@ namespace VendorOfferUpdater
             Console.WriteLine($"  Saved seasonal wikitext cache ({cache.Count} entries) to {path}");
         }
 
-        private static Dictionary<string, int> LoadItemIdCache(string path)
+        /// <summary>
+        /// Says how old the remembered misses are, and drops them when
+        /// --recheck-misses was passed. A miss is only ever as good as the
+        /// day it was recorded: an item the wiki had not documented yet is
+        /// indistinguishable from one that does not exist.
+        /// </summary>
+        private static void ReportCachedMisses(ItemIdCache cache, bool recheckMisses)
         {
-            var cache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            if (!File.Exists(path))
+            if (cache.Misses.Count == 0)
             {
-                return cache;
+                return;
             }
 
-            try
+            if (recheckMisses)
             {
-                string json = File.ReadAllText(path);
-                using var doc = JsonDocument.Parse(json);
-                foreach (var prop in doc.RootElement.EnumerateObject())
-                {
-                    cache[prop.Name] = prop.Value.GetInt32();
-                }
-
-                Console.WriteLine($"Loaded item ID cache ({cache.Count} entries) from {path}");
-            }
-            catch
-            {
-                // Ignore corrupt cache
+                int dropped = cache.ForgetMisses();
+                Console.WriteLine(
+                    $"  --recheck-misses: dropped {dropped} remembered miss(es); " +
+                    "they will be asked about again this run.");
+                return;
             }
 
-            return cache;
-        }
+            var oldest = cache.OldestMissAge(DateTime.UtcNow);
+            string age = oldest.HasValue
+                ? $"the oldest recorded {oldest.Value.TotalDays:F0} day(s) ago"
+                : "none of them dated";
+            int undated = cache.UndatedMissCount;
+            string undatedNote = undated > 0
+                ? $", {undated} carrying no date at all"
+                : string.Empty;
 
-        private static void SaveItemIdCache(
-            string path, Dictionary<string, int> cache)
-        {
-            var sorted = cache
-                .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(kv => kv.Key, kv => kv.Value);
-
-            var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(sorted, options);
-            File.WriteAllText(path, json);
-            Console.WriteLine($"  Saved item ID cache ({cache.Count} entries) to {path}");
+            Console.WriteLine(
+                $"  {cache.Misses.Count} remembered miss(es), {age}{undatedNote}. " +
+                "Pass --recheck-misses to ask the wiki about them again.");
         }
 
         /// <summary>
