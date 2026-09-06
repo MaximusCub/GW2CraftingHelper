@@ -126,15 +126,6 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// True when the source key belongs to a character, whether it holds
-        /// the item in bags or worn on the body.
-        /// </summary>
-        public static bool IsCharacterSource(string source)
-        {
-            return CharacterNameOffset(source) >= 0;
-        }
-
-        /// <summary>
         /// True when the source key belongs to a character, with that
         /// character's bare name in <paramref name="characterName"/>. The
         /// name is "" when the key is not a character key.

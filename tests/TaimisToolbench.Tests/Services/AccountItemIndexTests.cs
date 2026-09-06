@@ -214,7 +214,6 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(-1, AccountItemIndex.CharacterNameOffset(AccountItemIndex.SourceBank));
             Assert.Equal(-1, AccountItemIndex.CharacterNameOffset(null));
 
-            Assert.True(AccountItemIndex.IsCharacterSource(EquipSource("Alice")));
             Assert.True(AccountItemIndex.IsEquipmentSource(EquipSource("Alice")));
             Assert.False(AccountItemIndex.IsEquipmentSource(CharSource("Alice")));
         }
