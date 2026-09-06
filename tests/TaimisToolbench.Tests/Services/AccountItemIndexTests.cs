@@ -188,6 +188,24 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void GetPrioritizedSources_LegendaryArmoryRanksAfterBank()
+        {
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                Entry(100, 1, AccountItemIndex.SourceLegendaryArmory),
+                Entry(100, 2, AccountItemIndex.SourceBank),
+                Entry(100, 3, CharSource("Zed")),
+            });
+
+            var prioritized = AccountItemIndex.GetPrioritizedSources(100, index, null);
+
+            Assert.Equal(3, prioritized.Count);
+            Assert.Equal(AccountItemIndex.SourceBank, prioritized[0]);
+            Assert.Equal(AccountItemIndex.SourceLegendaryArmory, prioritized[1]);
+            Assert.Equal(CharSource("Zed"), prioritized[2]);
+        }
+
+        [Fact]
         public void CharacterNameOffset_ReadsBothCharacterEncodingsAndNothingElse()
         {
             Assert.Equal("Alice", NameAt(CharSource("Alice")));

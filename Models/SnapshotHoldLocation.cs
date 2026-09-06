@@ -12,7 +12,8 @@ namespace TaimisToolbench.Models
         Equipped = 2,
         Bank = 3,
         MaterialStorage = 4,
-        Unknown = 5,
+        LegendaryArmory = 5,
+        Unknown = 6,
     }
 
     /// <summary>

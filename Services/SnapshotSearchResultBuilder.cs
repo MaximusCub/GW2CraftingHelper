@@ -378,7 +378,8 @@ namespace TaimisToolbench.Services
         /// controls' own all-checked default), as is a character whose name
         /// is absent from SnapshotSourceFilter.UncheckedCharacters. A raw
         /// source string that matches none of the four known shapes
-        /// (Bank/MaterialStorage/SharedInventory/either character encoding) is shown regardless -
+        /// (Bank/MaterialStorage/SharedInventory/LegendaryArmory/either
+        /// character encoding) is shown regardless -
         /// failing open rather than silently hiding real inventory data
         /// the module does not yet recognize (KNOWN-ISSUES #31's "never
         /// silently mask data" posture); there is no such source today.
@@ -412,6 +413,7 @@ namespace TaimisToolbench.Services
                 case AccountItemIndex.SourceBank: return filter.Bank;
                 case AccountItemIndex.SourceMaterialStorage: return filter.MaterialStorage;
                 case AccountItemIndex.SourceSharedInventory: return filter.SharedInventory;
+                case AccountItemIndex.SourceLegendaryArmory: return filter.LegendaryArmory;
                 default: return true;
             }
         }

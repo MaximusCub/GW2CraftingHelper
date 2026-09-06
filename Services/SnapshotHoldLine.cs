@@ -57,6 +57,9 @@ namespace TaimisToolbench.Services
                 case AccountItemIndex.SourceMaterialStorage:
                     location.Category = SnapshotHoldCategory.MaterialStorage;
                     break;
+                case AccountItemIndex.SourceLegendaryArmory:
+                    location.Category = SnapshotHoldCategory.LegendaryArmory;
+                    break;
                 default:
                     location.Category = SnapshotHoldCategory.Unknown;
                     break;
@@ -100,22 +103,36 @@ namespace TaimisToolbench.Services
             return line.ToString();
         }
 
+        /// <summary>
+        /// Appends one category's places, or nothing when no place is in it.
+        /// Scans the list twice and allocates nothing: this runs once per
+        /// category per row, and a search rebuilds every row on a keystroke.
+        /// </summary>
         private static void AppendCategory(
             StringBuilder line,
             IReadOnlyList<SnapshotHoldLocation> locations,
             SnapshotHoldCategory category,
             bool showCounts)
         {
-            var places = new List<SnapshotHoldLocation>();
+            SnapshotHoldLocation first = null;
+            bool named = false;
+
             foreach (var location in locations)
             {
-                if (location != null && location.Category == category)
+                if (location == null || location.Category != category)
                 {
-                    places.Add(location);
+                    continue;
                 }
+
+                if (first == null)
+                {
+                    first = location;
+                }
+
+                named |= HasCharacterName(location);
             }
 
-            if (places.Count == 0)
+            if (first == null)
             {
                 return;
             }
@@ -125,18 +142,12 @@ namespace TaimisToolbench.Services
                 line.Append(CategorySeparator);
             }
 
-            line.Append(CategoryLabel(places[0]));
-
-            bool named = false;
-            foreach (var place in places)
-            {
-                named |= HasCharacterName(place);
-            }
+            line.Append(CategoryLabel(first));
 
             if (!showCounts && !named)
             {
                 // An account-wide place with nothing to say past its own
-                // name: "Bank", not "Bank:".
+                // name: "Bank", not "Bank: 1".
                 return;
             }
 
@@ -146,15 +157,22 @@ namespace TaimisToolbench.Services
             // bracketed count. With counts off, a comma is the only thing
             // separating two bare names.
             string separator = showCounts ? " " : ", ";
+            bool wrote = false;
 
-            for (int i = 0; i < places.Count; i++)
+            foreach (var location in locations)
             {
-                if (i > 0)
+                if (location == null || location.Category != category)
+                {
+                    continue;
+                }
+
+                if (wrote)
                 {
                     line.Append(separator);
                 }
 
-                AppendPlace(line, places[i], showCounts);
+                AppendPlace(line, location, showCounts);
+                wrote = true;
             }
         }
 
@@ -189,6 +207,7 @@ namespace TaimisToolbench.Services
                 case SnapshotHoldCategory.Equipped: return "Equipped";
                 case SnapshotHoldCategory.Bank: return "Bank";
                 case SnapshotHoldCategory.MaterialStorage: return "Material Storage";
+                case SnapshotHoldCategory.LegendaryArmory: return "Legendary Armory";
                 default: return location.RawSource.Length > 0 ? location.RawSource : "Unknown";
             }
         }

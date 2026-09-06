@@ -564,6 +564,37 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(new[] { "Divineaxe" }, SnapshotSearchResultBuilder.CollectCharacterNames(snapshot));
         }
 
+        [Fact]
+        public void BuildItemRows_LegendaryArmory_IsItsOwnAccountWidePlace()
+        {
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(100, "Bolt", 1, AccountItemIndex.SourceLegendaryArmory),
+            };
+            var index = new AccountItemIndex(items);
+
+            var result = SnapshotSearchResultBuilder.BuildItemRows(
+                ItemsById(items), index, "", new SnapshotSourceFilter(), null);
+
+            Assert.Single(result);
+            Assert.Equal(SnapshotHoldCategory.LegendaryArmory, result[0].Breakdown[0].Category);
+            Assert.Equal("", result[0].Breakdown[0].CharacterName);
+        }
+
+        [Fact]
+        public void BuildItemRows_LegendaryArmoryUnchecked_DropsThoseItems()
+        {
+            var items = new List<SnapshotItemEntry>
+            {
+                Entry(100, "Bolt", 1, AccountItemIndex.SourceLegendaryArmory),
+            };
+            var index = new AccountItemIndex(items);
+            var filter = new SnapshotSourceFilter { LegendaryArmory = false };
+
+            Assert.Empty(SnapshotSearchResultBuilder.BuildItemRows(
+                ItemsById(items), index, "", filter, null));
+        }
+
         // ---- BuildItemRows: per-character source filtering ----
         [Fact]
         public void BuildItemRows_UncheckedCharacter_HidesOnlyThatCharactersContribution()

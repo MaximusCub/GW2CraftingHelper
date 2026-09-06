@@ -81,6 +81,7 @@ namespace TaimisToolbench.Views
         private bool _bankEnabled = true;
         private bool _materialStorageEnabled = true;
         private bool _sharedInventoryEnabled = true;
+        private bool _legendaryArmoryEnabled = true;
 
         // Exclusion set, keyed by character name: absent means checked, so
         // a character new in a fresh snapshot defaults to visible. Stale
@@ -878,6 +879,7 @@ namespace TaimisToolbench.Views
             AddSourceCheckbox("Bank", _bankEnabled, isChecked => _bankEnabled = isChecked);
             AddSourceCheckbox("Material Storage", _materialStorageEnabled, isChecked => _materialStorageEnabled = isChecked);
             AddSourceCheckbox("Shared Inventory", _sharedInventoryEnabled, isChecked => _sharedInventoryEnabled = isChecked);
+            AddSourceCheckbox("Legendary Armory", _legendaryArmoryEnabled, isChecked => _legendaryArmoryEnabled = isChecked);
 
             // A master toggle earns its place only once there is more than
             // one character to cascade to.
@@ -1879,6 +1881,7 @@ namespace TaimisToolbench.Views
                     Bank = _bankEnabled,
                     MaterialStorage = _materialStorageEnabled,
                     SharedInventory = _sharedInventoryEnabled,
+                    LegendaryArmory = _legendaryArmoryEnabled,
                     UncheckedCharacters = new HashSet<string>(_uncheckedCharacters, StringComparer.Ordinal),
                 };
 

@@ -969,6 +969,24 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void Sourced_LegendaryArmoryCountsAsOwned()
+        {
+            var tree = Leaf(100, 1);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 1, AccountItemIndex.SourceLegendaryArmory),
+            });
+
+            var result = ReduceBelowRoot(tree, index, null);
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.Single(sources);
+            Assert.Equal(AccountItemIndex.SourceLegendaryArmory, sources[0].Source);
+            Assert.Equal(1, sources[0].Quantity);
+        }
+
+        [Fact]
         public void Sourced_ItemNotInIndex_NotReduced()
         {
             var tree = Leaf(100, 5);

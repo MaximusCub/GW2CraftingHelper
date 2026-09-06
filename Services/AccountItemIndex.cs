@@ -11,6 +11,12 @@ namespace TaimisToolbench.Services
         public const string SourceSharedInventory = "SharedInventory";
         public const string SourceBank = "Bank";
 
+        // The account-wide Legendary Armory, read from its own endpoint.
+        // A slot drawing a legendary out of the armory is reported once per
+        // slot per character, so the equipment fetch drops those and this
+        // source carries the account's real, already-deduplicated count.
+        public const string SourceLegendaryArmory = "LegendaryArmory";
+
         // A character's bag contents are stored as "Character:<name>" and the
         // gear worn on that character as "Equipped:<name>" (see
         // Gw2AccountSnapshotService). Both prefixes contain a colon, which no
@@ -206,7 +212,13 @@ namespace TaimisToolbench.Services
                 result.Add(SourceBank);
             }
 
-            // Priority 5: Remaining sources (other characters), sorted
+            // Priority 5: Legendary Armory
+            if (sourceSet.Remove(SourceLegendaryArmory))
+            {
+                result.Add(SourceLegendaryArmory);
+            }
+
+            // Priority 6: Remaining sources (other characters), sorted
             if (sourceSet.Count > 0)
             {
                 var remaining = sourceSet.ToList();

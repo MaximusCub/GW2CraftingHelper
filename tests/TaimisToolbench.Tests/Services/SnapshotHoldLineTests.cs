@@ -102,6 +102,30 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void LegendaryArmoryIsAccountWideAndReadsLastOfTheKnownPlaces()
+        {
+            var line = SnapshotHoldLine.Format(new List<SnapshotHoldLocation>
+            {
+                Place(SnapshotHoldCategory.LegendaryArmory, 1),
+                Place(SnapshotHoldCategory.Bank, 2),
+                Place(SnapshotHoldCategory.Equipped, 1, "Divineaxe"),
+            });
+
+            Assert.Equal("Equipped: Divineaxe (1)  Bank: 2  Legendary Armory: 1", line);
+        }
+
+        [Fact]
+        public void LegendaryArmoryHoldingOnePrintsNoCountLikeTheOtherAccountWidePlaces()
+        {
+            var line = SnapshotHoldLine.Format(new List<SnapshotHoldLocation>
+            {
+                SnapshotHoldLine.FromSource(AccountItemIndex.SourceLegendaryArmory, 1),
+            });
+
+            Assert.Equal("Legendary Armory", line);
+        }
+
+        [Fact]
         public void CharactersKeepTheOrderTheCallerSupplied()
         {
             // GetPrioritizedSources puts the active character first, and the
@@ -152,6 +176,9 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(
                 SnapshotHoldCategory.MaterialStorage,
                 SnapshotHoldLine.FromSource(AccountItemIndex.SourceMaterialStorage, 1).Category);
+            Assert.Equal(
+                SnapshotHoldCategory.LegendaryArmory,
+                SnapshotHoldLine.FromSource(AccountItemIndex.SourceLegendaryArmory, 1).Category);
         }
 
         [Fact]
