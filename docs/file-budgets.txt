@@ -173,6 +173,7 @@ Services/PlanHistoryTableSorter.cs                                              
 Services/PlanPhaseEvent.cs                                                              73
 Services/PlanRelayoutMath.cs                                                            479
 Services/PlanResultBuilder.cs                                                           375
+Services/PlanRootNodes.cs                                                               46
 Services/PlanSolver.cs                                                                  2323
 Services/PlanStore.cs                                                                   219
 Services/PlanStoreHelpers.cs                                                            374
@@ -418,7 +419,7 @@ tests/TaimisToolbench.Tests/Services/Gw2RecipeApiClientParseTests.cs            
 tests/TaimisToolbench.Tests/Services/HeaderCellMathTests.cs                             221
 tests/TaimisToolbench.Tests/Services/IconFrameGeometryTests.cs                          127
 tests/TaimisToolbench.Tests/Services/InlineSpinnerLayoutTests.cs                        87
-tests/TaimisToolbench.Tests/Services/InventoryReducerTests.cs                           1617
+tests/TaimisToolbench.Tests/Services/InventoryReducerTests.cs                           1714
 tests/TaimisToolbench.Tests/Services/ItemDescriptionSanitizerTests.cs                   155
 tests/TaimisToolbench.Tests/Services/ItemIconTiersTests.cs                              164
 tests/TaimisToolbench.Tests/Services/ItemInputGridLayoutTests.cs                        356
@@ -467,6 +468,7 @@ tests/TaimisToolbench.Tests/Services/PlanPhaseTimingSummaryTests.cs             
 tests/TaimisToolbench.Tests/Services/PlanRelayoutMathTests.cs                           828
 tests/TaimisToolbench.Tests/Services/PlanResultBuilderTests.cs                          1103
 tests/TaimisToolbench.Tests/Services/PlanRootIgnoreTests.cs                             412
+tests/TaimisToolbench.Tests/Services/PlanRootOwnedStockTests.cs                         228
 tests/TaimisToolbench.Tests/Services/PlanSolverBarterItemValuationTests.cs              425
 tests/TaimisToolbench.Tests/Services/PlanSolverCapNoticeSuppressionTests.cs             202
 tests/TaimisToolbench.Tests/Services/PlanSolverCoreDecisionTests.cs                     656
@@ -506,7 +508,7 @@ tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderShoppingListTests.cs   
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderStepSectionsTests.cs           784
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSublabelTests.cs               264
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSummaryTests.cs                1241
-tests/TaimisToolbench.Tests/Services/RankerCascadeIntegrationTests.cs                   354
+tests/TaimisToolbench.Tests/Services/RankerCascadeIntegrationTests.cs                   358
 tests/TaimisToolbench.Tests/Services/RankerPriorityCascadeTests.cs                      377
 tests/TaimisToolbench.Tests/Services/RankerPriorityOrderingTests.cs                     256
 tests/TaimisToolbench.Tests/Services/RankerRarityAdoptionTests.cs                       130

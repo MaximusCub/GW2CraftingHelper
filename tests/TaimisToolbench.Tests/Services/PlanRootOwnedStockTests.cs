@@ -10,8 +10,9 @@ using Xunit;
 namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
-    /// What a plan does with the item it was asked for when the account
-    /// already owns some of it.
+    /// The item a plan was asked for is planned as if the account owns
+    /// none of it, however many are already in the bank. Everything below
+    /// it in the tree still gets the ordinary owned-stock reduction.
     /// </summary>
     public class PlanRootOwnedStockTests
     {
@@ -50,7 +51,7 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public async Task OwningTheRequestedItem_CollapsesThePlan()
+        public async Task OwningTheRequestedItem_StillPlansToMakeIt()
         {
             var pipeline = RootAndIngredient().Build();
             var snapshot = new AccountSnapshot
@@ -62,20 +63,17 @@ namespace TaimisToolbench.Tests.Services
                 1, 1, snapshot, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
 
-            // The one owned copy is spent against the request, so nothing
-            // is left to make and the recipe below it is dropped.
-            Assert.Equal(0, result.CraftingTree.Quantity);
-            Assert.Equal(CraftingDecision.Have, result.CraftingTree.Decision);
-            Assert.Equal(1, result.CraftingTree.OwnedQuantityUsed);
-            Assert.Empty(result.CraftingTree.Children);
-            Assert.Empty(result.Plan.Steps);
-            Assert.Equal(0, result.Plan.TotalCoinCost);
-            Assert.Single(result.UsedMaterials);
-            Assert.Equal(1, result.UsedMaterials[0].ItemId);
+            Assert.Equal(1, result.CraftingTree.Quantity);
+            Assert.Equal(CraftingDecision.Craft, result.CraftingTree.Decision);
+            Assert.Equal(0, result.CraftingTree.OwnedQuantityUsed);
+            Assert.DoesNotContain(result.UsedMaterials, u => u.ItemId == 1);
+
+            // 5 x item 2 bought at 100 each, exactly as if nothing were owned.
+            Assert.Equal(500, result.Plan.TotalCoinCost);
         }
 
         [Fact]
-        public async Task OwningPartOfTheRequestedQuantity_PlansOnlyTheShortfall()
+        public async Task OwningPartOfTheRequestedQuantity_StillPlansThemAll()
         {
             var pipeline = RootAndIngredient().Build();
             var snapshot = new AccountSnapshot
@@ -87,9 +85,9 @@ namespace TaimisToolbench.Tests.Services
                 1, 3, snapshot, CancellationToken.None,
                 priceBasis: PriceBasis.InstantBuy);
 
-            Assert.Equal(1, result.CraftingTree.Quantity);
-            // One craft's worth of item 2 at 100 each, not three.
-            Assert.Equal(500, result.Plan.TotalCoinCost);
+            Assert.Equal(3, result.CraftingTree.Quantity);
+            // Three crafts' worth of item 2 at 100 each, not one.
+            Assert.Equal(1500, result.Plan.TotalCoinCost);
         }
 
         [Fact]
@@ -112,7 +110,59 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public async Task EveryRootOfABatch_CollapsesTheSameWay()
+        public async Task OwnedRootStock_IsStillAvailableToADeeperNodeOfTheSameItem()
+        {
+            // Item 1 is both the requested item and, one level down, an
+            // ingredient of its own ingredient. The root is planned in
+            // full; the deeper occurrence still draws on account stock.
+            var pipeline = PipelineBuilder.Create()
+                .WithSearchResult(1, 10)
+                .WithRecipe(new RawRecipe
+                {
+                    Id = 10,
+                    OutputItemId = 1,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 2, Count = 1 },
+                    },
+                })
+                .WithSearchResult(2, 11)
+                .WithRecipe(new RawRecipe
+                {
+                    Id = 11,
+                    OutputItemId = 2,
+                    OutputItemCount = 1,
+                    Ingredients = new List<RawIngredient>
+                    {
+                        new RawIngredient { Type = "Item", Id = 1, Count = 2 },
+                    },
+                })
+                .WithPrice(1, buyUnitPrice: 4000, sellUnitPrice: 9000)
+                .WithPrice(2, buyUnitPrice: 4000, sellUnitPrice: 9000)
+                .WithItem(1, "Target", "t.png")
+                .WithItem(2, "Middle", "m.png")
+                .WithInventoryReducer()
+                .Build();
+
+            var snapshot = new AccountSnapshot
+            {
+                Items = new List<SnapshotItemEntry> { Owned(1, 2) },
+            };
+
+            var result = await pipeline.GenerateStructuredAsync(
+                1, 1, snapshot, CancellationToken.None,
+                priceBasis: PriceBasis.InstantBuy);
+
+            Assert.Equal(1, result.CraftingTree.Quantity);
+            Assert.Equal(0, result.CraftingTree.OwnedQuantityUsed);
+            var middle = result.CraftingTree.Children.Single(c => c.ItemId == 2);
+            var deeperOccurrence = middle.Children.Single(c => c.ItemId == 1);
+            Assert.Equal(2, deeperOccurrence.OwnedQuantityUsed);
+        }
+
+        [Fact]
+        public async Task EveryRootOfABatch_IsPlannedInFull()
         {
             var pipeline = TwoRootBatch();
             var snapshot = new AccountSnapshot
@@ -125,9 +175,10 @@ namespace TaimisToolbench.Tests.Services
                 priceBasis: PriceBasis.InstantBuy);
 
             Assert.Equal(2, result.MultiItemRoots.Count);
-            Assert.All(result.MultiItemRoots, r => Assert.Equal(0, r.Quantity));
-            Assert.All(result.MultiItemRoots, r => Assert.Equal(CraftingDecision.Have, r.Decision));
-            Assert.Equal(0, result.Plan.TotalCoinCost);
+            Assert.All(result.MultiItemRoots, r => Assert.Equal(1, r.Quantity));
+            Assert.All(result.MultiItemRoots, r => Assert.Equal(CraftingDecision.Craft, r.Decision));
+            // 5 of item 2 for the first root and 2 for the second, at 100 each.
+            Assert.Equal(700, result.Plan.TotalCoinCost);
         }
 
         private static CraftingPlanPipeline TwoRootBatch()
