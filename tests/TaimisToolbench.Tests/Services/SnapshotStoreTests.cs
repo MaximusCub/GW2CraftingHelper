@@ -258,6 +258,81 @@ namespace TaimisToolbench.Tests.Services
             Assert.Null(loaded.Items[0].Infusions);
         }
 
+        // --- The skin a stack wears. ---
+        [Fact]
+        public void Save_Load_RoundTripsTheSkinAStackWears()
+        {
+            var snapshot = CreateSnapshot();
+            snapshot.Items.Add(new SnapshotItemEntry
+            {
+                ItemId = 2,
+                Name = "Zojja's Blade",
+                Count = 1,
+                Source = "Equipped:Anna",
+                SkinId = 5432,
+                SkinName = "Glyphic Edge",
+                SkinIconUrl = "https://render.guildwars2.com/file/skin.png",
+            });
+
+            _store.Save(snapshot);
+            string json = File.ReadAllText(SnapshotPath);
+            var loaded = _store.LoadLatest();
+
+            Assert.NotNull(loaded);
+            var skinned = loaded.Items.Find(i => i.ItemId == 2);
+            Assert.NotNull(skinned);
+            Assert.Equal(5432, skinned.SkinId);
+            Assert.Equal("Glyphic Edge", skinned.SkinName);
+            Assert.Equal("https://render.guildwars2.com/file/skin.png", skinned.SkinIconUrl);
+
+            // A stack wearing its own look writes neither field, the way a
+            // stack with nothing socketed writes no socket ids.
+            var bare = loaded.Items.Find(i => i.ItemId == 1);
+            Assert.NotNull(bare);
+            Assert.Equal(0, bare.SkinId);
+            Assert.Equal("", bare.SkinName);
+            Assert.Equal("", bare.SkinIconUrl);
+            Assert.Equal(1, CountOccurrences(json, "SkinId"));
+            Assert.Equal(1, CountOccurrences(json, "SkinName"));
+            Assert.Equal(1, CountOccurrences(json, "SkinIconUrl"));
+        }
+
+        [Fact]
+        public void Load_FileWithoutTheSkinFields_LoadsWithNoSkin()
+        {
+            // A snapshot.json exactly as the build before these fields
+            // shipped wrote it, for the same reason
+            // Load_FileWithoutTheSocketFields_LoadsWithThemNull gives.
+            File.WriteAllText(SnapshotPath, @"{
+  ""CapturedAt"": ""2025-06-15T12:00:00Z"",
+  ""CoinCopper"": 4242,
+  ""Items"": [
+    { ""ItemId"": 1, ""Name"": ""Item"", ""IconUrl"": """", ""Rarity"": ""Basic"", ""Count"": 5, ""Source"": ""Bank"" }
+  ],
+  ""Wallet"": []
+}");
+
+            var loaded = _store.LoadLatest();
+
+            Assert.NotNull(loaded);
+            Assert.Single(loaded.Items);
+            Assert.Equal(0, loaded.Items[0].SkinId);
+            Assert.Equal("", loaded.Items[0].SkinName);
+            Assert.Equal("", loaded.Items[0].SkinIconUrl);
+        }
+
+        private static int CountOccurrences(string haystack, string needle)
+        {
+            int count = 0;
+            for (int i = haystack.IndexOf(needle, StringComparison.Ordinal); i >= 0;
+                i = haystack.IndexOf(needle, i + needle.Length, StringComparison.Ordinal))
+            {
+                count++;
+            }
+
+            return count;
+        }
+
         [Fact]
         public void Load_SnapshotJsonWrittenBeforeEquipmentWasCaptured_StillLoads()
         {

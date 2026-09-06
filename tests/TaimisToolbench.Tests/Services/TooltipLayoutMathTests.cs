@@ -662,5 +662,68 @@ namespace TaimisToolbench.Tests.Services
             Assert.All(layout.Rows.Skip(1), r => Assert.Equal(0, r.IconAssetId));
             Assert.All(layout.Rows, r => Assert.Equal(21, r.Spans[0].X));
         }
+
+        [Fact]
+        public void Stack_WithNothingExtra_IsOneBoxAndNamesNoSecond()
+        {
+            var boxes = TooltipLayoutMath.Stack(100, 0, 4, 3, 18);
+
+            Assert.Equal(100, boxes.PanelHeight);
+            Assert.Equal(107, boxes.FirstBoxHeight);
+            Assert.Equal(0, boxes.ExtraContentTop);
+            Assert.Equal(0, boxes.SecondBoxTop);
+        }
+
+        [Fact]
+        public void Stack_PutsTheGapBetweenTheTwoFramesAndNotInsideEither()
+        {
+            var boxes = TooltipLayoutMath.Stack(100, 40, 4, 3, 18);
+
+            // First frame: 4 + 100 + 3.
+            Assert.Equal(107, boxes.FirstBoxHeight);
+
+            // The second frame opens 18px of nothing below it.
+            Assert.Equal(125, boxes.SecondBoxTop);
+            Assert.Equal(boxes.FirstBoxHeight + 18, boxes.SecondBoxTop);
+
+            // The content panel starts one top padding into the control,
+            // so the second box's text lands exactly one top padding
+            // inside the second frame - the same inset the first box has.
+            Assert.Equal(boxes.SecondBoxTop + 4, 4 + boxes.ExtraContentTop);
+
+            // The panel spans both contents and the run between them, so
+            // the control ends one bottom padding under the last line.
+            Assert.Equal(boxes.ExtraContentTop + 40, boxes.PanelHeight);
+            Assert.Equal(4 + boxes.PanelHeight + 3, boxes.SecondBoxTop + 4 + 40 + 3);
+        }
+
+        [Fact]
+        public void Stack_NegativeInputsCannotProduceANegativeBox()
+        {
+            var boxes = TooltipLayoutMath.Stack(-5, -5, -1, -1, -1);
+
+            Assert.Equal(0, boxes.PanelHeight);
+            Assert.Equal(0, boxes.FirstBoxHeight);
+            Assert.Equal(0, boxes.SecondBoxTop);
+        }
+
+        [Fact]
+        public void TheSecondBoxWrapsToTheFirstBoxsWidthRatherThanTheScreenCap()
+        {
+            var first = TooltipLayoutMath.LayoutContent(
+                new TooltipContentBuilder().Text("short").Build(),
+                500, 20, TenPxPerChar, FixedCoinWidth);
+
+            // What RichTooltipSurface.BuildContent does: the second box is
+            // laid out at the width the first one measured, never at the
+            // screen cap, so the pair reads as one column.
+            var second = TooltipLayoutMath.LayoutContent(
+                new TooltipContentBuilder().Text("aaa bbb ccc ddd eee").Build(),
+                first.Width, 20, TenPxPerChar, FixedCoinWidth);
+
+            Assert.Equal(50, first.Width);
+            Assert.True(second.Rows.Count > 1);
+            Assert.All(second.Rows, r => Assert.True(r.Width <= first.Width, r.Width.ToString()));
+        }
     }
 }

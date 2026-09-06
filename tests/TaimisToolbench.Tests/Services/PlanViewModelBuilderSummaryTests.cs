@@ -1182,9 +1182,9 @@ namespace TaimisToolbench.Tests.Services
         // PlanViewModelBuilder.Build's `PriceBasis = result.PriceBasis`
         // assignment is the SOLE feed for TreeSectionController's fell-
         // back-price tooltip caveat, which renders one of two OPPOSITE
-        // sentences depending on this value ("Buy-order price unavailable
-        // - instant-buy price shown" vs. "Instant-buy price unavailable -
-        // buy-order price shown"). Nothing previously asserted the
+        // sentences depending on this value: the buy-order price being
+        // unavailable, or the instant-buy price being unavailable.
+        // Nothing previously asserted the
         // assignment itself, so deleting it (or any future refactor that
         // silently drops it) would leave every BuyOrder-basis plan
         // rendering the InstantBuy-basis sentence - the exact inverse
