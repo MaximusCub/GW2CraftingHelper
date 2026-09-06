@@ -320,6 +320,7 @@ namespace VendorOfferUpdater
                     "item_id_cache.json");
                 var itemIdCache = ItemIdCache.Load(cachePath);
                 ReportCachedMisses(itemIdCache, recheckMisses);
+                RegisterCachedCurrencyNames(itemIdCache, apiHelper);
 
                 if (!skipItemResolution)
                 {
@@ -338,41 +339,13 @@ namespace VendorOfferUpdater
 
                     if (unknownCurrencyNames.Count > 0)
                     {
-                        Console.WriteLine(
-                            $"Resolving {unknownCurrencyNames.Count} item-based currencies via wiki...");
-                        var resolution =
-                            await wikiClient.ResolveItemGameIdsAsync(
-                                unknownCurrencyNames, ct, queryOptions);
-
-                        var update = itemIdCache.Record(
-                            unknownCurrencyNames, resolution, DateTime.UtcNow);
-
-                        Console.WriteLine(
-                            $"  Resolved {update.Hits} of {unknownCurrencyNames.Count} item names, " +
-                            $"cached {update.Misses} miss(es) the wiki answered for, " +
-                            $"left {update.Deferred.Count} to ask again.");
-
-                        if (update.Deferred.Count > 0)
-                        {
-                            // Nothing is cached for these. A cached miss is
-                            // permanent - the filter above never asks about a
-                            // cached name again - so recording one for a batch
-                            // the wiki never answered would retire a real item
-                            // from the dataset for good.
-                            Console.WriteLine(
-                                "  These names were never answered for, so nothing was cached " +
-                                "and the next run asks again:");
-                            foreach (var name in update.Deferred.Take(DeferredNamesListed))
-                            {
-                                Console.WriteLine($"    - {name}");
-                            }
-
-                            if (update.Deferred.Count > DeferredNamesListed)
-                            {
-                                Console.WriteLine(
-                                    $"    ... and {update.Deferred.Count - DeferredNamesListed} more");
-                            }
-                        }
+                        await ResolveUnknownCostNamesAsync(
+                            unknownCurrencyNames,
+                            wikiClient,
+                            apiHelper,
+                            itemIdCache,
+                            queryOptions,
+                            ct);
 
                         itemIdCache.Save(cachePath);
                         Console.WriteLine();
@@ -1660,6 +1633,199 @@ namespace VendorOfferUpdater
             Console.WriteLine(
                 $"  {cache.Misses.Count} remembered miss(es), {age}{undatedNote}. " +
                 "Pass --recheck-misses to ask the wiki about them again.");
+        }
+
+        /// <summary>
+        /// Re-registers the currency names a previous run settled, so a run
+        /// that resolves nothing new still prices those cost lines.
+        /// <para>
+        /// An entry the API no longer names is dropped rather than kept. The
+        /// cache is consulted before the wiki is, so a stale entry would go
+        /// on naming a currency that has left the game, and nothing would
+        /// ever ask again.
+        /// </para>
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static void RegisterCachedCurrencyNames(ItemIdCache cache, Gw2ApiHelper apiHelper)
+        {
+            if (cache.CurrencyNames.Count == 0)
+            {
+                return;
+            }
+
+            var stale = new List<string>();
+            foreach (var pair in cache.CurrencyNames)
+            {
+                if (!apiHelper.AddCurrencyAlias(pair.Key, pair.Value))
+                {
+                    stale.Add(pair.Key);
+                }
+            }
+
+            foreach (var name in stale)
+            {
+                cache.ForgetCurrencyName(name);
+            }
+
+            Console.WriteLine(
+                $"  {cache.CurrencyNames.Count} cached cost name(s) name a wallet currency." +
+                (stale.Count > 0
+                    ? $" Dropped {stale.Count} the API no longer names; they are asked again."
+                    : string.Empty));
+        }
+
+        /// <summary>
+        /// Settles the cost names neither the API's currency list nor the
+        /// cache knows, in two steps: ask the wiki which page each name
+        /// actually names, then decide whether that page is a currency or an
+        /// item.
+        /// <para>
+        /// A name whose title request went unanswered is left for the next
+        /// run rather than settled here. Nothing was asked about it, so there
+        /// is nothing to record either way, and a cached miss is permanent.
+        /// </para>
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static async Task ResolveUnknownCostNamesAsync(
+            IReadOnlyList<string> unknownNames,
+            WikiSmwClient wikiClient,
+            Gw2ApiHelper apiHelper,
+            ItemIdCache itemIdCache,
+            QueryOptions queryOptions,
+            CancellationToken ct)
+        {
+            Console.WriteLine(
+                $"Resolving {unknownNames.Count} unknown cost name(s) via the wiki...");
+
+            var titles = await wikiClient.ResolveTitlesAsync(unknownNames, ct, queryOptions);
+
+            var unanswered = new List<string>();
+            var itemQueries = new List<KeyValuePair<string, string>>();
+            int namedCurrencies = 0;
+
+            foreach (string name in unknownNames)
+            {
+                if (!titles.Answered.Contains(name))
+                {
+                    unanswered.Add(name);
+                    continue;
+                }
+
+                string title = titles.Resolved.TryGetValue(name, out var resolved)
+                    ? resolved
+                    : name;
+
+                if (apiHelper.AddCurrencyAlias(name, title))
+                {
+                    itemIdCache.RecordCurrencyName(name, title);
+                    namedCurrencies++;
+                }
+                else
+                {
+                    itemQueries.Add(new KeyValuePair<string, string>(name, title));
+                }
+            }
+
+            Console.WriteLine(
+                $"  {titles.Resolved.Count} of {unknownNames.Count} point at a page spelled " +
+                $"differently. {namedCurrencies} name a wallet currency outright, " +
+                $"{unanswered.Count} went unanswered.");
+
+            var update = new ItemIdCacheUpdate();
+            int itemsAsked = itemQueries.Count;
+            int reclassified = 0;
+
+            if (itemQueries.Count > 0)
+            {
+                var askedTitles = itemQueries
+                    .Select(query => query.Value)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                var resolution =
+                    await wikiClient.ResolveItemGameIdsAsync(askedTitles, ct, queryOptions);
+
+                var stillItems = new List<KeyValuePair<string, string>>();
+                foreach (var query in itemQueries)
+                {
+                    if (ClaimAsCurrency(query, resolution, apiHelper, itemIdCache))
+                    {
+                        reclassified++;
+                    }
+                    else
+                    {
+                        stillItems.Add(query);
+                    }
+                }
+
+                update = itemIdCache.Record(stillItems, resolution, DateTime.UtcNow);
+            }
+
+            Console.WriteLine(
+                $"  Of the {itemsAsked} asked about as items: {update.Hits} resolved, " +
+                $"{reclassified} turned out to be a currency, " +
+                $"{update.Misses} cached as a miss the wiki answered for, " +
+                $"{update.Deferred.Count} left to ask again.");
+
+            // A cached miss is permanent - the resolution filter never asks
+            // about a settled name again - so a name the wiki never answered
+            // about is cached neither way, at either step.
+            ReportUnsettled(
+                update.Deferred,
+                "These names were never answered for, so nothing was cached and the " +
+                "next run asks again:");
+            ReportUnsettled(
+                unanswered,
+                "The wiki never said which page these names point at, so they were " +
+                "asked no further and nothing was cached:");
+        }
+
+        /// <summary>
+        /// Settles one cost name as a currency when the wiki has answered
+        /// that the page it names carries no item id. A page is one thing or
+        /// the other, and this is the only point at which the wiki has said
+        /// which, so it is also the only point at which a name may be matched
+        /// against the currency list on anything looser than its exact text.
+        /// </summary>
+        private static bool ClaimAsCurrency(
+            KeyValuePair<string, string> query,
+            ItemIdResolution resolution,
+            Gw2ApiHelper apiHelper,
+            ItemIdCache itemIdCache)
+        {
+            bool hasItemId = resolution.Resolved.TryGetValue(query.Value, out int id) && id > 0;
+            if (hasItemId || !resolution.Answered.Contains(query.Value))
+            {
+                return false;
+            }
+
+            string? currencyName = apiHelper.MatchCurrencyName(query.Value);
+            if (currencyName == null || !apiHelper.AddCurrencyAlias(query.Key, currencyName))
+            {
+                return false;
+            }
+
+            itemIdCache.RecordCurrencyName(query.Key, currencyName);
+            return true;
+        }
+
+        private static void ReportUnsettled(IReadOnlyList<string> names, string heading)
+        {
+            if (names.Count == 0)
+            {
+                return;
+            }
+
+            Console.WriteLine($"  {heading}");
+            foreach (var name in names.Take(DeferredNamesListed))
+            {
+                Console.WriteLine($"    - {name}");
+            }
+
+            if (names.Count > DeferredNamesListed)
+            {
+                Console.WriteLine($"    ... and {names.Count - DeferredNamesListed} more");
+            }
         }
 
         /// <summary>
