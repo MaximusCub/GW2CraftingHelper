@@ -42,8 +42,8 @@ namespace TaimisToolbench.Services
         }
 
         // The 5 independent top-level account-data sources tallied for
-        // success/failure. Per-character inventory failures are not
-        // counted individually - they are tolerated as a partial
+        // success/failure. Per-character inventory and equipment failures
+        // are not counted individually - they are tolerated as a partial
         // Characters-source degradation.
         private const int SourceCount = 5;
 
@@ -194,21 +194,25 @@ namespace TaimisToolbench.Services
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    // Inventory and crafting are fired concurrently so the
-                    // wall-clock cost stays roughly one round trip per
-                    // character within the hard snapshot timeout. Each
-                    // task catches its own failures internally, so
-                    // Task.WhenAll only faults on genuine cancellation.
+                    // Inventory, equipment and crafting are fired
+                    // concurrently so the wall-clock cost stays roughly one
+                    // round trip per character within the hard snapshot
+                    // timeout. Each task catches its own failures
+                    // internally, so Task.WhenAll only faults on genuine
+                    // cancellation.
                     var inventoryTask = FetchCharacterInventoryItemsAsync(name, ct);
+                    var equipmentTask = FetchCharacterEquipmentItemsAsync(name, ct);
                     var craftingTask = FetchCharacterCraftingAsync(name, ct);
-                    await Task.WhenAll(inventoryTask, craftingTask);
+                    await Task.WhenAll(inventoryTask, equipmentTask, craftingTask);
 
-                    // Inventory: a failure is tolerated - this character's
-                    // items are simply missing, a conservative under-count
-                    // (inflates buy cost, never fabricates a claim). Does
-                    // not set characterDisciplineDataDegraded; the two are
+                    // Inventory and equipment: a failure is tolerated -
+                    // this character's items are simply missing, a
+                    // conservative under-count (inflates buy cost, never
+                    // fabricates a claim). Does not set
+                    // characterDisciplineDataDegraded; the two are
                     // independent signals.
                     snapshot.Items.AddRange(inventoryTask.Result);
+                    snapshot.Items.AddRange(equipmentTask.Result);
 
                     // Crafting disciplines: unlike Inventory, ANY failure
                     // flips characterDisciplineDataDegraded so the whole
@@ -306,6 +310,81 @@ namespace TaimisToolbench.Services
             }
 
             return items;
+        }
+
+        /// <summary>
+        /// What this character is wearing, plus what its saved equipment
+        /// tabs hold, as one entry per physical item under the same
+        /// "Character:&lt;name&gt;" source its bags use.
+        /// <para>
+        /// /v2/characters/:id/equipment returns each physical item once and
+        /// names every tab it sits in, so an item shared by three loadouts
+        /// is one entry, not three (/v2/characters/:id/equipmenttabs is the
+        /// per-tab view that would repeat it). Location says which store
+        /// the slot draws from: "Equipped" and "Armory" are items this
+        /// character holds; the two Legendary Armory values are an
+        /// account-wide shared copy reported once per slot per character,
+        /// so counting them would multiply one legendary by the number of
+        /// slots using it. Never throws, like the inventory fetch.
+        /// </para>
+        /// </summary>
+        private async Task<List<SnapshotItemEntry>> FetchCharacterEquipmentItemsAsync(string characterName, CancellationToken ct)
+        {
+            var items = new List<SnapshotItemEntry>();
+            try
+            {
+                var equipment = await _apiManager.Gw2ApiClient.V2.Characters[characterName].Equipment.GetAsync(ct);
+                if (equipment?.Equipment != null)
+                {
+                    foreach (var item in equipment.Equipment)
+                    {
+                        if (item == null || !IsHeldByCharacter(item))
+                        {
+                            continue;
+                        }
+
+                        items.Add(new SnapshotItemEntry
+                        {
+                            ItemId = item.Id,
+                            Count = 1,
+                            Source = AccountItemIndex.CharacterSourcePrefix + characterName,
+                        });
+                    }
+                }
+            }
+            catch (Exception ex) when (!(ex is OperationCanceledException))
+            {
+                Logger.Warn(ex, "Failed to fetch equipment for character {CharacterName}", characterName);
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch equipment for character {characterName}: {ex.GetType().Name} - {ex.Message}");
+            }
+
+            return items;
+        }
+
+        /// <summary>
+        /// Whether an equipment slot holds an item this character owns a
+        /// copy of, rather than one drawn from the account-wide Legendary
+        /// Armory - see FetchCharacterEquipmentItemsAsync. The literal wire
+        /// string decides, the same way RarityOf reads rarity, so a value
+        /// Gw2Sharp's enum does not recognise is left out rather than
+        /// counted as something it is not.
+        /// </summary>
+        private static bool IsHeldByCharacter(CharacterEquipmentItem item)
+        {
+            var location = item.Location;
+            if (location == null)
+            {
+                return false;
+            }
+
+            string raw = location.RawValue;
+            if (string.IsNullOrEmpty(raw))
+            {
+                raw = location.Value.ToString();
+            }
+
+            return string.Equals(raw, "Equipped", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(raw, "Armory", StringComparison.OrdinalIgnoreCase);
         }
 
         // One bounded retry: the all-or-nothing rule means a single
