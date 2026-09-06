@@ -206,6 +206,9 @@ namespace TaimisToolbench.Services
             long fallbackNonCoinUnits = 0;
             int fallbackSingleLineId = -1;
             bool fallbackSingleLineIsBarter = false;
+            // Whether the winning fallback offer charges a cost line this
+            // module cannot price at all. Ranked ahead of coin cost below.
+            bool fallbackHasBarterLine = false;
 
             List<VendorItemCostLine> bestComparableItemCosts = null;
             bool bestComparableHasRawCoin = false;
@@ -686,18 +689,33 @@ namespace TaimisToolbench.Services
                     singleLineIsBarter ? BarterLineId(itemCostRaw) : currencyCosts[0].Id;
                 long totalNonCoinUnits = totalCurrencyUnits + totalBarterUnits;
 
+                // Ranking key, most significant first: carries a barter
+                // line, then coin cost, then the unit tie-break above.
+                //
+                // A barter line is a cost this module cannot price, so it
+                // contributes nothing to totalCoinCost. Ranking on coin
+                // alone therefore reads an unpriceable cost as a cheap one:
+                // an offer charging one account-bound chest scored 0 and
+                // beat the same item's flat 250-map-currency price, and the
+                // plan then told the player to acquire a chest it cannot
+                // cost, buy or craft. Both offers stay selectable; only the
+                // order changes.
+                bool hasBarterLine = barterLineCount > 0;
                 bool better =
                     !fallbackCoinCost.HasValue ||
-                    totalCoinCost < fallbackCoinCost.Value ||
-                    (totalCoinCost == fallbackCoinCost.Value &&
-                     singleLineId != -1 &&
-                     singleLineIsBarter == fallbackSingleLineIsBarter &&
-                     singleLineId == fallbackSingleLineId &&
-                     totalNonCoinUnits < fallbackNonCoinUnits);
+                    (fallbackHasBarterLine && !hasBarterLine) ||
+                    (fallbackHasBarterLine == hasBarterLine &&
+                     (totalCoinCost < fallbackCoinCost.Value ||
+                      (totalCoinCost == fallbackCoinCost.Value &&
+                       singleLineId != -1 &&
+                       singleLineIsBarter == fallbackSingleLineIsBarter &&
+                       singleLineId == fallbackSingleLineId &&
+                       totalNonCoinUnits < fallbackNonCoinUnits)));
 
                 if (better)
                 {
                     fallbackIsDominatedByCraft = dominated;
+                    fallbackHasBarterLine = hasBarterLine;
                     fallbackCoinCost = totalCoinCost;
                     fallbackCurrencyCosts = scaledCurrencyCosts;
                     fallbackNonCoinUnits = totalNonCoinUnits;

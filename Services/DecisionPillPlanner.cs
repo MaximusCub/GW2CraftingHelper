@@ -92,6 +92,14 @@ namespace TaimisToolbench.Services
         public const string IgnoredPillText = "IGNORED";
 
         /// <summary>
+        /// Leading word of the currency trade-up pill. Two OwnedInfo pills
+        /// can share a row, so this prefix is how
+        /// <see cref="PillTooltipTextComposer"/> tells them apart - the
+        /// same job the Ignore toggle's text does for its two states.
+        /// </summary>
+        internal const string CurrencyTradeUpPillPrefix = "BUYS ";
+
+        /// <summary>
         /// True when <paramref name="text"/> would render identically to a
         /// module-owned source badge. Case-insensitive: nothing
         /// upper-cases a badge on the way to the screen, so "Vendor"
@@ -257,14 +265,14 @@ namespace TaimisToolbench.Services
                     ? node.AcquisitionBadge
                     : "UNKNOWN";
                 specs.Add(new PillSpec(badgeText, null, PillKind.Locked));
-                AppendOwnershipPills(specs, node);
+                AppendOwnershipPills(specs, node, ownedCurrencyAmounts);
                 return specs;
             }
 
             if (options.Count == 1)
             {
                 specs.Add(new PillSpec(options[0].text, null, PillKind.Locked));
-                AppendOwnershipPills(specs, node);
+                AppendOwnershipPills(specs, node, ownedCurrencyAmounts);
                 return specs;
             }
 
@@ -315,7 +323,7 @@ namespace TaimisToolbench.Services
                     subduingResult));
             }
 
-            AppendOwnershipPills(specs, node);
+            AppendOwnershipPills(specs, node, ownedCurrencyAmounts);
             return specs;
         }
 
@@ -404,8 +412,37 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Appends the two owned-materials pills shared by every
-        /// non-Have/non-Currency return path: the non-interactive
+        /// Appends "BUYS {n}/{needed} NEEDED" to a row the plan buys for
+        /// one wallet currency and nothing else (see
+        /// <see cref="CurrencyTradeUpRow"/>). The numerator is how many of
+        /// this row's items the held currency pays for right now, so the
+        /// remainder is what the player still has to earn. Omitted when
+        /// the holding is unknown, which is not the same as zero.
+        /// <para>
+        /// "BUYS" rather than "HAVE": the player holds the currency, not
+        /// the item, and HAVE means held stock everywhere else.
+        /// </para>
+        /// </summary>
+        private static void AppendCurrencyTradeUpPill(
+            List<PillSpec> specs,
+            CraftingTreeNode node,
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts)
+        {
+            if (!CurrencyTradeUpRow.TryGetAffordableNow(node, ownedCurrencyAmounts, out int affordable))
+            {
+                return;
+            }
+
+            specs.Add(new PillSpec(
+                CurrencyTradeUpPillPrefix + $"{affordable}/{node.Quantity} NEEDED",
+                null,
+                PillKind.OwnedInfo));
+        }
+
+        /// <summary>
+        /// Appends the annotation pills shared by every
+        /// non-Have/non-Currency return path: the currency trade-up pill
+        /// (see AppendCurrencyTradeUpPill), the non-interactive
         /// "HAVE {used}/{total} NEEDED" annotation (only when this node's
         /// demand was partly covered by real inventory; total =
         /// OwnedQuantityUsed + Quantity, the original pre-reduction
@@ -421,8 +458,13 @@ namespace TaimisToolbench.Services
         /// BuildPillSpecs.
         /// </para>
         /// </summary>
-        private static void AppendOwnershipPills(List<PillSpec> specs, CraftingTreeNode node)
+        private static void AppendOwnershipPills(
+            List<PillSpec> specs,
+            CraftingTreeNode node,
+            IReadOnlyDictionary<int, int> ownedCurrencyAmounts)
         {
+            AppendCurrencyTradeUpPill(specs, node, ownedCurrencyAmounts);
+
             if (node.OwnedQuantityUsed > 0)
             {
                 int totalDemand = node.OwnedQuantityUsed + node.Quantity;
