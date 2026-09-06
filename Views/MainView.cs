@@ -62,7 +62,7 @@ namespace TaimisToolbench.Views
         // snapshot: an account's item list runs into the thousands, while
         // the objects that carry a rune, sigil or infusion outside its
         // equipped gear number in the tens.
-        private readonly ItemStatWarmer _socketWarmer;
+        private readonly ItemStatWarmer _statWarmer;
 
         private string _initialStatus;
         private readonly Func<Task<AccountSnapshot>> _refreshAsync;
@@ -420,12 +420,13 @@ namespace TaimisToolbench.Views
             // above: before /v2/currencies has landed the hover shows the
             // name and balance the row already holds, without its prose.
             Func<int, CurrencyMetadata> getCurrencyMetadata = null,
-            // Background stat top-up for the socketed components, which no
-            // other tab has any reason to fetch. Optional: without it the
-            // rows keep the tooltips they had, minus the socket blocks.
+            // Background stat top-up for every item this tab can draw and
+            // for the components socketed into them, which no other tab
+            // has any reason to fetch. Optional: without it the rows keep
+            // the identity-only tooltips they had.
             Func<IReadOnlyList<int>, Task<int>> warmItemStatsAsync = null)
         {
-            _socketWarmer = new ItemStatWarmer(warmItemStatsAsync, "snapshot");
+            _statWarmer = new ItemStatWarmer(warmItemStatsAsync, "snapshot");
             _snapshot = snapshot;
             // The constructor sets _snapshot directly, bypassing
             // SetSnapshot - the index needs its own build call here too,
@@ -2579,9 +2580,9 @@ namespace TaimisToolbench.Views
         /// One item row's hover: the item's own icon+name header, its stat
         /// block if this session happens to hold one, and the whole source
         /// breakdown - ALWAYS, not only when the line was shortened, since
-        /// the hover is where a reader goes for the run of it. A stat block
-        /// is the exception rather than the rule on this tab (see
-        /// RarityFor), which is why the identity carries the header.
+        /// the hover is where a reader goes for the run of it. The identity
+        /// still carries the header, because a hover can land before
+        /// IndexSockets' top-up has fetched that item's block.
         /// </summary>
         private ItemIconTooltip ItemRowHover(SnapshotSearchRow row, string rarity, string breakdown)
         {
@@ -2612,14 +2613,52 @@ namespace TaimisToolbench.Views
 
         /// <summary>
         /// Rebuilds the per-item socket index for the current snapshot and
-        /// starts the background top-up its blocks need. Once per snapshot,
-        /// not once per keystroke: the index is read by every hover but
-        /// changes only when the snapshot does.
+        /// starts the background stat top-up every row hover needs. Once
+        /// per snapshot, not once per keystroke: both the index and the id
+        /// set are read by every hover but change only when the snapshot
+        /// does.
+        /// <para>
+        /// The capture itself cannot supply the blocks.
+        /// Gw2AccountSnapshotService takes name, icon and rarity out of
+        /// Gw2Sharp's item model and keeps nothing else, so no
+        /// ItemStatBlock exists for a snapshot item until something fetches
+        /// it through ItemMetadataService. Without this warm the only rows
+        /// that hover with stats are the ones some plan happened to touch.
+        /// </para>
         /// </summary>
         private void IndexSockets()
         {
             _socketsByItemId = SocketedUpgradeIndex.Build(_snapshot?.Items);
-            _socketWarmer.Start(SocketedUpgradeIndex.ItemIdsToResolve(_socketsByItemId));
+            _statWarmer.Start(StatIdsForSnapshot());
+        }
+
+        /// <summary>Every id a snapshot row hover can ask for: the rows'
+        /// own items, then the components socketed into them.</summary>
+        private IReadOnlyList<int> StatIdsForSnapshot()
+        {
+            var ids = new List<int>();
+            var seen = new HashSet<int>();
+
+            if (_snapshot != null && _snapshot.Items != null)
+            {
+                foreach (var entry in _snapshot.Items)
+                {
+                    if (entry != null && entry.ItemId > 0 && seen.Add(entry.ItemId))
+                    {
+                        ids.Add(entry.ItemId);
+                    }
+                }
+            }
+
+            foreach (int id in SocketedUpgradeIndex.ItemIdsToResolve(_socketsByItemId))
+            {
+                if (seen.Add(id))
+                {
+                    ids.Add(id);
+                }
+            }
+
+            return ids;
         }
 
         /// <summary>What this row's stacks agree is socketed into them,
