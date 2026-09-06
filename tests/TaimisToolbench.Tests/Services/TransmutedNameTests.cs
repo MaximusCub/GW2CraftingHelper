@@ -423,5 +423,19 @@ namespace TaimisToolbench.Tests.Services
                 Assert.DoesNotContain("Transmuted", lines);
             }
         }
+
+        [Fact]
+        public void TheNoSkinsIndex_RefusesAWriteThroughACast()
+        {
+            // Every snapshot with no skinned copy in it is answered with
+            // one shared instance, so a write through a cast back to
+            // Dictionary would land on all of them.
+            var empty = TransmutedNameIndex.Build(new List<SnapshotItemEntry>());
+
+            Assert.Same(empty, TransmutedNameIndex.Build(null));
+            Assert.Empty(empty);
+            Assert.Throws<NotSupportedException>(
+                () => ((IDictionary<int, IReadOnlyList<TransmutedItemCopy>>)empty).Add(1, null));
+        }
     }
 }

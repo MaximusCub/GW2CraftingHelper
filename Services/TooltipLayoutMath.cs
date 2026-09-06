@@ -221,6 +221,10 @@ namespace TaimisToolbench.Services
         /// A line with no spans is a deliberate blank separator and still
         /// produces a row, so vertical rhythm survives the layout.
         /// </summary>
+        /// <param name="separateEntriesWhenAnyWraps">
+        /// For a box whose lines are unrelated statements rather than one
+        /// passage - see <see cref="SeparateEntries"/>.
+        /// </param>
         public static Layout LayoutContent(
             TooltipContent content,
             int maxWidth,
@@ -231,7 +235,8 @@ namespace TaimisToolbench.Services
             int headerRowHeight = 0,
             int headerIndent = 0,
             int effectIndent = 0,
-            int slotIndent = 0)
+            int slotIndent = 0,
+            bool separateEntriesWhenAnyWraps = false)
         {
             if (measureText == null)
             {
@@ -257,8 +262,10 @@ namespace TaimisToolbench.Services
 
             int effectiveMax = Math.Max(1, maxWidth);
             int y = 0;
+            var lineStarts = new List<int>();
             foreach (var line in content.Lines)
             {
+                lineStarts.Add(rows.Count);
                 bool isHeader = line.Kind == TooltipLineKind.Header;
                 bool isEffect = line.Kind == TooltipLineKind.Effect;
                 bool isSlot = line.Kind == TooltipLineKind.Slot;
@@ -369,6 +376,11 @@ namespace TaimisToolbench.Services
                 BreakRow();
             }
 
+            if (separateEntriesWhenAnyWraps)
+            {
+                rows = SeparateEntries(rows, lineStarts, rowHeight, out y);
+            }
+
             int width = 0;
             foreach (var row in rows)
             {
@@ -379,6 +391,73 @@ namespace TaimisToolbench.Services
             }
 
             return new Layout(rows, width, Math.Max(0, y));
+        }
+
+        /// <summary>
+        /// A blank row between every pair of adjacent entries, and the
+        /// height that leaves, when at least one entry wrapped onto a
+        /// second row. A reader cannot tell a continuation row from the
+        /// next entry, and the rows are unrelated statements.
+        /// <para>
+        /// All or nothing: separating only the pairs that wrap would leave
+        /// two unwrapped entries adjacent, reading as one wrapped entry.
+        /// A neighbour that is already a blank line gets no second blank.
+        /// </para>
+        /// </summary>
+        private static List<LaidOutRow> SeparateEntries(
+            List<LaidOutRow> rows, List<int> lineStarts, int rowHeight, out int height)
+        {
+            height = 0;
+            foreach (var row in rows)
+            {
+                height = Math.Max(height, row.Y + row.Height);
+            }
+
+            bool anyWrapped = false;
+            for (int i = 0; i < lineStarts.Count && !anyWrapped; i++)
+            {
+                int end = i + 1 < lineStarts.Count ? lineStarts[i + 1] : rows.Count;
+                anyWrapped = end - lineStarts[i] > 1;
+            }
+
+            if (!anyWrapped || lineStarts.Count < 2)
+            {
+                return rows;
+            }
+
+            var spaced = new List<LaidOutRow>(rows.Count + lineStarts.Count);
+            int y = 0;
+            for (int i = 0; i < lineStarts.Count; i++)
+            {
+                int start = lineStarts[i];
+                int end = i + 1 < lineStarts.Count ? lineStarts[i + 1] : rows.Count;
+                if (i > 0 && !IsBlank(rows, lineStarts, i) && !IsBlank(rows, lineStarts, i - 1))
+                {
+                    spaced.Add(new LaidOutRow(new List<PlacedSpan>(), 0, y, rowHeight, null));
+                    y += rowHeight;
+                }
+
+                for (int r = start; r < end; r++)
+                {
+                    var row = rows[r];
+                    spaced.Add(new LaidOutRow(
+                        row.Spans, row.Width, y, row.Height, row.IconUrl, row.Kind,
+                        row.HeaderSubject, row.IconAssetId));
+                    y += row.Height;
+                }
+            }
+
+            height = y;
+            return spaced;
+        }
+
+        /// <summary>Whether one content line laid out as a single empty
+        /// row - the deliberate blank separator.</summary>
+        private static bool IsBlank(List<LaidOutRow> rows, List<int> lineStarts, int index)
+        {
+            int start = lineStarts[index];
+            int end = index + 1 < lineStarts.Count ? lineStarts[index + 1] : rows.Count;
+            return end - start == 1 && rows[start].Spans.Count == 0;
         }
 
         /// <summary>
