@@ -1185,10 +1185,10 @@ namespace TaimisToolbench
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156699),
                 () => new ViewAdapter(
-                    "Snapshot",
+                    "Account Snapshot",
                     c => _snapshotContent.Build(c),
                     b => _snapshotContent.BuildHeaderActions(b)),
-                "Snapshot"));
+                "Account Snapshot"));
 
             _rankerContent = new RankerTabContent(
                 _craftingPipeline,
