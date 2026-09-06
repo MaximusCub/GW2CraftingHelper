@@ -79,7 +79,7 @@ Models/SnapshotSourceFilter.cs                                                  
 Models/SnapshotWalletEntry.cs                                                           13
 Models/SocketedUpgradeIds.cs                                                            35
 Models/TimegatedItem.cs                                                                 37
-Models/TransmutedItemNames.cs                                                           34
+Models/TransmutedItemNames.cs                                                           39
 Models/TransmutedSkin.cs                                                                38
 Models/UsedMaterial.cs                                                                  19
 Models/VendorItemCostLine.cs                                                            42
@@ -259,7 +259,7 @@ Services/StatusUpdateGuard.cs                                                   
 Services/StickyHeaderLayout.cs                                                          117
 Services/SummarySectionLayoutMath.cs                                                    913
 Services/TableSortState.cs                                                              114
-Services/TransmutedNameIndex.cs                                                         124
+Services/TransmutedNameIndex.cs                                                         130
 Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
 Services/TextWrapMath.cs                                                                324
@@ -595,7 +595,7 @@ tests/TaimisToolbench.Tests/Services/TooltipTextFormatTests.cs                  
 tests/TaimisToolbench.Tests/Services/TopRegionLayoutMathTests.cs                        147
 tests/TaimisToolbench.Tests/Services/TradingPostMathTests.cs                            70
 tests/TaimisToolbench.Tests/Services/TradingPostServiceTests.cs                         507
-tests/TaimisToolbench.Tests/Services/TransmutedNameTests.cs                             350
+tests/TaimisToolbench.Tests/Services/TransmutedNameTests.cs                             376
 tests/TaimisToolbench.Tests/Services/TreeChipStripLayoutTests.cs                        283
 tests/TaimisToolbench.Tests/Services/TreeCostColumnMathTests.cs                         768
 tests/TaimisToolbench.Tests/Services/TreeRowIdentityTests.cs                            246

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using TaimisToolbench.Models;
 
 namespace TaimisToolbench.Services
@@ -25,8 +26,13 @@ namespace TaimisToolbench.Services
     /// </summary>
     internal static class TransmutedNameIndex
     {
-        private static readonly Dictionary<int, TransmutedItemNames> NoSkins =
-            new Dictionary<int, TransmutedItemNames>();
+        // Wrapped, not a bare Dictionary: this instance is handed to every
+        // caller that asks about a snapshot with no skins in it, and a
+        // caller that cast the returned interface back to Dictionary would
+        // be writing into all of them. ReadOnlyDictionary throws instead.
+        private static readonly IReadOnlyDictionary<int, TransmutedItemNames> NoSkins =
+            new ReadOnlyDictionary<int, TransmutedItemNames>(
+                new Dictionary<int, TransmutedItemNames>());
 
         public static IReadOnlyDictionary<int, TransmutedItemNames> Build(
             IReadOnlyList<SnapshotItemEntry> items)

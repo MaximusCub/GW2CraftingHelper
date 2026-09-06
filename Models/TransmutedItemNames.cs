@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace TaimisToolbench.Models
 {
@@ -9,7 +10,11 @@ namespace TaimisToolbench.Models
     /// </summary>
     internal sealed class TransmutedItemNames
     {
-        private static readonly IReadOnlyList<string> NoNames = new List<string>();
+        // Wrapped, not a bare List: every instance built without names
+        // shares this one, so a caller that cast AllNames back to
+        // List<string> would be writing into all of them.
+        private static readonly IReadOnlyList<string> NoNames =
+            new ReadOnlyCollection<string>(new List<string>());
 
         internal TransmutedItemNames(TransmutedSkin display, IReadOnlyList<string> allNames)
         {

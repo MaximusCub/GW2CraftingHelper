@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -345,6 +346,31 @@ namespace TaimisToolbench.Tests.Services
                 Assert.Equal("Zojja's Warfists", lines[0]);
                 Assert.DoesNotContain("Transmuted", lines);
             }
+        }
+
+        [Fact]
+        public void TheNoSkinsIndex_RefusesAWriteThroughACast()
+        {
+            // Every snapshot with no skinned copy in it is answered with
+            // one shared instance, so a write through a cast back to
+            // Dictionary would land on all of them.
+            var empty = TransmutedNameIndex.Build(new List<SnapshotItemEntry>());
+
+            Assert.Same(empty, TransmutedNameIndex.Build(null));
+            Assert.Empty(empty);
+            Assert.Throws<NotSupportedException>(
+                () => ((IDictionary<int, TransmutedItemNames>)empty).Add(1, null));
+        }
+
+        [Fact]
+        public void TheEmptyNameList_RefusesAWriteThroughACast()
+        {
+            // Same shared-instance hazard as the index above: one list
+            // stands in for every item id that wears no skin name.
+            var names = new TransmutedItemNames(TransmutedSkin.None, null).AllNames;
+
+            Assert.Empty(names);
+            Assert.Throws<NotSupportedException>(() => ((IList<string>)names).Add("x"));
         }
     }
 }
