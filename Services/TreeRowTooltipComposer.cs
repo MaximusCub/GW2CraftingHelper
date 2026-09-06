@@ -228,10 +228,35 @@ namespace TaimisToolbench.Services
             // real page at all.
             if (WikiLinkBuilder.HasWikiPage(node.Name))
             {
-                extraTooltipLines.Add(TooltipContent.TextLine("Right-click: Open wiki page"));
+                extraTooltipLines.Add(TooltipContent.TextLine(
+                    CurrencyTradeUpRow.Matches(node)
+                        ? "Right-click: Open wiki acquisition options"
+                        : "Right-click: Open wiki page"));
             }
 
             return TooltipContent.FromLines(extraTooltipLines);
+        }
+
+        /// <summary>
+        /// The page the row's right-click opens. A currency trade-up row
+        /// (see <see cref="CurrencyTradeUpRow"/>) opens the item's
+        /// Acquisition section, because the module deliberately plans no
+        /// route to the currency and that section is where the player's
+        /// options are listed. Every other row opens the plain item page.
+        /// Null when the name has no wiki page, which is the same test the
+        /// tooltip line above uses, so the affordance and the link can
+        /// never disagree.
+        /// </summary>
+        public static string BuildWikiUrl(CraftingTreeNode node)
+        {
+            if (node == null)
+            {
+                return null;
+            }
+
+            return CurrencyTradeUpRow.Matches(node)
+                ? WikiLinkBuilder.BuildItemAcquisitionUrl(node.Name)
+                : WikiLinkBuilder.BuildItemPageUrl(node.Name);
         }
     }
 }

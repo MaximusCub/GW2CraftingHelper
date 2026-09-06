@@ -105,9 +105,10 @@ Services/CurrencyDisplayResolver.cs                                             
 Services/CurrencyMetadataService.cs                                                     159
 Services/CurrencyTooltipComposer.cs                                                     93
 Services/CurrencyTooltipFacts.cs                                                        80
+Services/CurrencyTradeUpRow.cs                                                          74
 Services/CurrencyValuationSerializer.cs                                                 221
 Services/DailyCooldownItemService.cs                                                    77
-Services/DecisionPillPlanner.cs                                                         441
+Services/DecisionPillPlanner.cs                                                         483
 Services/Diagnostics/PlanPhaseTimingSummary.cs                                          215
 Services/Diagnostics/PlanTimingAnalyzer.cs                                              100
 Services/DialogLayoutMath.cs                                                            472
@@ -164,7 +165,7 @@ Services/PanelChromeMath.cs                                                     
 Services/PhaseOrdinalGuard.cs                                                           40
 Services/PillSubduingEvaluator.cs                                                       280
 Services/PillSubduingTooltipBuilder.cs                                                  101
-Services/PillTooltipTextComposer.cs                                                     232
+Services/PillTooltipTextComposer.cs                                                     249
 Services/PlanContentHeightMath.cs                                                       495
 Services/PlanHistoryBlobStore.cs                                                        216
 Services/PlanHistoryDedupKey.cs                                                         104
@@ -268,7 +269,7 @@ Services/TreeChipStripLayout.cs                                                 
 Services/TreeCostColumnMath.cs                                                          663
 Services/TreeRowIdentity.cs                                                             94
 Services/TreeRowShapePlanner.cs                                                         133
-Services/TreeRowTooltipComposer.cs                                                      243
+Services/TreeRowTooltipComposer.cs                                                      262
 Services/TreeToolbarRowLayout.cs                                                        112
 Services/TypeRampMetrics.cs                                                             171
 Services/UiSpacing.cs                                                                   53
@@ -409,6 +410,7 @@ tests/TaimisToolbench.Tests/Services/CraftingTreeBuilderTests.cs                
 tests/TaimisToolbench.Tests/Services/CurrencyDisplayResolverTests.cs                    459
 tests/TaimisToolbench.Tests/Services/CurrencyMetadataServiceTests.cs                    409
 tests/TaimisToolbench.Tests/Services/CurrencyTooltipComposerTests.cs                    169
+tests/TaimisToolbench.Tests/Services/CurrencyTradeUpRowTests.cs                         242
 tests/TaimisToolbench.Tests/Services/CurrencyValuationSerializerTests.cs                274
 tests/TaimisToolbench.Tests/Services/DailyCooldownItemServiceTests.cs                   209
 tests/TaimisToolbench.Tests/Services/DecisionPillPlannerSubduingTests.cs                187

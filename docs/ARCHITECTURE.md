@@ -3202,6 +3202,22 @@ pills means a real choice, exactly one means the source is locked. The
 `default` arm of its source switch is a non-crashing safety net for a future
 regression, not a real code path.
 
+A row the plan buys for one wallet currency and nothing else is a
+*currency trade-up* row (`Services/CurrencyTradeUpRow.cs`). Three Secrets
+of the Obscure materials are the live case: 250 map currency each, from
+several merchants, at one fixed price. The module deliberately plans no
+route to the currency itself - it is earned several ways, capped
+differently per way, and there is no cheapest answer to optimize - so the
+row states what the held currency buys now and leaves the earning to the
+player. Two things follow from that. The row gains a
+`BUYS {n}/{needed} NEEDED` annotation pill whose tooltip names the
+remainder, and its right-click opens the item's wiki Acquisition section
+(`WikiLinkBuilder.BuildItemAcquisitionUrl`) rather than the page top,
+because that section is where the player's options are listed. Both
+decisions are made in Blish-free classes -
+`DecisionPillPlanner.AppendCurrencyTradeUpPill` and
+`TreeRowTooltipComposer.BuildWikiUrl` - so the view only wires them up.
+
 `Services/PlanRelayoutMath.cs` fits those pills into the row.
 `ComputeVisiblePillCount` is the primitive: at least one pill is always
 drawn even when it alone overruns, because a completely empty pill column
