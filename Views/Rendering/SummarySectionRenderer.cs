@@ -25,8 +25,7 @@ namespace TaimisToolbench.Views.Rendering
 
         // Registers one control as a scroll anchor under a stable key
         // (Services/ScrollAnchorMath). Optional - a null one simply leaves
-        // the non-coin table without its own anchors, the way this
-        // renderer shipped before they existed.
+        // the non-coin table without anchors of its own.
         private readonly Action<string, Control> _registerScrollAnchor;
 
         internal SummarySectionRenderer(
