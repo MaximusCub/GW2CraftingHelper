@@ -282,7 +282,8 @@ namespace VendorOfferUpdater
                     Console.WriteLine();
                 }
 
-                // Step 3: Resolve item-based currencies via wiki
+                // Step 3: Resolve item-based currencies and unlock recipe
+                // sheet names via wiki
                 string cachePath = Path.Combine(
                     Path.GetDirectoryName(outputPath) ?? ".",
                     "item_id_cache.json");
@@ -290,9 +291,14 @@ namespace VendorOfferUpdater
 
                 if (!skipItemResolution)
                 {
-                    var unknownCurrencyNames = wikiResults
+                    var unknownItemNames = wikiResults
                         .SelectMany(r => r.CostEntries)
                         .Select(c => c.Currency)
+                        // An unlock requirement names a recipe sheet by the
+                        // same item name a cost line would, and needs the
+                        // same name-to-id resolution.
+                        .Concat(wikiResults.Select(r =>
+                            VendorUnlockRequirementParser.ExtractRecipeSheetName(r.Requirement)))
                         .Where(name => !string.IsNullOrEmpty(name)
                             && !apiHelper.ResolveCurrencyId(name).HasValue
                             && !itemIdCache.ContainsKey(name))
@@ -303,16 +309,16 @@ namespace VendorOfferUpdater
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
 
-                    if (unknownCurrencyNames.Count > 0)
+                    if (unknownItemNames.Count > 0)
                     {
                         Console.WriteLine(
-                            $"Resolving {unknownCurrencyNames.Count} item-based currencies via wiki...");
+                            $"Resolving {unknownItemNames.Count} item names via wiki...");
                         var freshResolved =
-                            await wikiClient.ResolveItemGameIdsAsync(unknownCurrencyNames, ct);
+                            await wikiClient.ResolveItemGameIdsAsync(unknownItemNames, ct);
                         Console.WriteLine(
-                            $"  Resolved {freshResolved.Count} of {unknownCurrencyNames.Count} item names.");
+                            $"  Resolved {freshResolved.Count} of {unknownItemNames.Count} item names.");
 
-                        foreach (var name in unknownCurrencyNames)
+                        foreach (var name in unknownItemNames)
                         {
                             if (freshResolved.TryGetValue(name, out int id))
                             {
@@ -330,14 +336,14 @@ namespace VendorOfferUpdater
                     else if (itemIdCache.Count > 0)
                     {
                         Console.WriteLine(
-                            $"All item-based currencies resolved from cache ({itemIdCache.Count} entries).");
+                            $"All item names resolved from cache ({itemIdCache.Count} entries).");
                         Console.WriteLine();
                     }
                 }
                 else
                 {
                     Console.WriteLine(
-                        "Skipping item-based currency resolution (--skip-item-resolution).");
+                        "Skipping item name resolution (--skip-item-resolution).");
                     Console.WriteLine();
                 }
 
@@ -350,6 +356,14 @@ namespace VendorOfferUpdater
                         itemIdMap[kv.Key] = kv.Value;
                     }
                 }
+
+                // Step 3.4: Resolve the recipe each unlock sheet named by a
+                // "Has requirement" value actually unlocks. Costs one GW2
+                // API item lookup per DISTINCT sheet, and no wiki traffic
+                // at all - measured over the full 70,644-row scrape that is
+                // one lookup, for Lyhr's "Recipe: Legendary Obsidian Armor".
+                var unlockRecipeIdByItemId =
+                    await ResolveUnlockRecipeIdsAsync(wikiResults, itemIdMap, apiHelper, ct);
 
                 // Step 3.5: Resolve festival-vendor seasonal tags via wiki
                 // (opt-in, --tag-seasonal-festivals - see
@@ -413,7 +427,8 @@ namespace VendorOfferUpdater
                         continue;
                     }
 
-                    var offer = ConvertToOffer(result, apiHelper, itemIdMap);
+                    var offer = ConvertToOffer(
+                        result, apiHelper, itemIdMap, unlockRecipeIdByItemId);
                     if (offer != null)
                     {
                         offers.Add(offer);
@@ -1009,7 +1024,8 @@ namespace VendorOfferUpdater
         internal static VendorOffer? ConvertToOffer(
             WikiVendorResult result,
             Gw2ApiHelper apiHelper,
-            Dictionary<string, int> itemIdMap)
+            Dictionary<string, int> itemIdMap,
+            IReadOnlyDictionary<int, int>? unlockRecipeIdByItemId = null)
         {
             int outputCount = result.OutputQuantity ?? 1;
             if (outputCount <= 0)
@@ -1116,6 +1132,24 @@ namespace VendorOfferUpdater
                     "{{Temporary}} template - left untagged (no invented festival mapping).");
             }
 
+            // Both ids stay null unless the requirement parses AND the
+            // sheet's own item id and the recipe it unlocks are both known.
+            // A half-resolved gate would name a sheet whose ownership the
+            // module could never check. Deliberately not passed to
+            // ComputeOfferId below - see Models/VendorOffer.cs.
+            int? unlockRecipeItemId = null;
+            int? unlockRecipeId = null;
+            string? unlockSheetName =
+                VendorUnlockRequirementParser.ExtractRecipeSheetName(result.Requirement);
+            if (unlockSheetName != null &&
+                itemIdMap.TryGetValue(unlockSheetName, out int sheetItemId) &&
+                unlockRecipeIdByItemId != null &&
+                unlockRecipeIdByItemId.TryGetValue(sheetItemId, out int sheetRecipeId))
+            {
+                unlockRecipeItemId = sheetItemId;
+                unlockRecipeId = sheetRecipeId;
+            }
+
             string offerId = VendorOfferHasher.ComputeOfferId(
                 result.GameId,
                 outputCount,
@@ -1140,7 +1174,69 @@ namespace VendorOfferUpdater
                 HomesteadTier = homesteadTier,
                 SeasonalCap = result.SeasonalCap,
                 SeasonalFestival = seasonalFestival,
+                UnlockRecipeItemId = unlockRecipeItemId,
+                UnlockRecipeId = unlockRecipeId,
             };
+        }
+
+        /// <summary>
+        /// Maps every recipe sheet item id named by a row's "Has
+        /// requirement" to the recipe that sheet unlocks, via
+        /// Gw2ApiHelper.ResolveRecipeSheetRecipeIdAsync - one lookup per
+        /// DISTINCT sheet, against api.guildwars2.com and never the wiki.
+        /// A sheet that unlocks no crafting recipe, or whose lookup fails,
+        /// is warned about and left out, so ConvertToOffer leaves that
+        /// offer's gate untagged rather than half-tagged.
+        /// </summary>
+        // internal for testability (VendorOfferUpdater.Tests)
+        internal static async Task<Dictionary<int, int>> ResolveUnlockRecipeIdsAsync(
+            IReadOnlyList<WikiVendorResult> wikiResults,
+            IReadOnlyDictionary<string, int> itemIdMap,
+            Gw2ApiHelper apiHelper,
+            CancellationToken ct)
+        {
+            var sheetItemIds = new SortedSet<int>();
+            foreach (var result in wikiResults)
+            {
+                string? sheetName =
+                    VendorUnlockRequirementParser.ExtractRecipeSheetName(result.Requirement);
+                if (sheetName != null && itemIdMap.TryGetValue(sheetName, out int itemId))
+                {
+                    sheetItemIds.Add(itemId);
+                }
+            }
+
+            var resolved = new Dictionary<int, int>();
+            foreach (int itemId in sheetItemIds)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                int? recipeId;
+                try
+                {
+                    recipeId = await apiHelper.ResolveRecipeSheetRecipeIdAsync(itemId);
+                }
+                catch (HttpRequestException ex)
+                {
+                    Console.WriteLine(
+                        $"  WARNING: unlock requirement item {itemId} could not be looked " +
+                        $"up ({ex.Message}) - offers gated on it stay untagged.");
+                    continue;
+                }
+
+                if (recipeId.HasValue)
+                {
+                    resolved[itemId] = recipeId.Value;
+                }
+                else
+                {
+                    Console.WriteLine(
+                        $"  WARNING: unlock requirement item {itemId} unlocks no crafting " +
+                        "recipe - offers gated on it stay untagged.");
+                }
+            }
+
+            return resolved;
         }
 
         /// <summary>
