@@ -58,7 +58,7 @@ Models/PlanRequestItem.cs                                                       
 Models/PlanSolveContext.cs                                                              212
 Models/PlanStatus.cs                                                                    11
 Models/PlanStep.cs                                                                      72
-Models/PlanViewModel.cs                                                                 455
+Models/PlanViewModel.cs                                                                 466
 Models/PriceBasis.cs                                                                    32
 Models/RankerRowMetrics.cs                                                              152
 Models/RankerSlotAvailability.cs                                                        59
@@ -184,7 +184,7 @@ Services/PlanStripStatusBoard.cs                                                
 Services/PlanStripTickDecision.cs                                                       97
 Services/PlanStructuralValidator.cs                                                     597
 Services/PlanTableSorter.cs                                                             261
-Services/PlanViewModelBuilder.cs                                                        1725
+Services/PlanViewModelBuilder.cs                                                        1727
 Services/RankerPriorityCascade.cs                                                       364
 Services/RankerPriorityOrdering.cs                                                      183
 Services/RankerRarityAdoption.cs                                                        87
@@ -253,7 +253,7 @@ Services/StatusStore.cs                                                         
 Services/StatusText.cs                                                                  286
 Services/StatusUpdateGuard.cs                                                           38
 Services/StickyHeaderLayout.cs                                                          117
-Services/SummarySectionLayoutMath.cs                                                    853
+Services/SummarySectionLayoutMath.cs                                                    913
 Services/TableSortState.cs                                                              114
 Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
@@ -285,7 +285,7 @@ Services/WindowSizing.cs                                                        
 Views/AboutTabContent.cs                                                                1000
 Views/ApiAccessDialog.cs                                                                231
 Views/AutocompleteTextBox.cs                                                            45
-Views/CraftingPlanView.cs                                                               5200
+Views/CraftingPlanView.cs                                                               5233
 Views/FocusRelease.cs                                                                   159
 Views/ItemInputRowStrip.cs                                                              465
 Views/ItemRowState.cs                                                                   39
@@ -333,7 +333,7 @@ Views/Rendering/SortableHeaderBlock.cs                                          
 Views/Rendering/SortableHeaderCells.cs                                                  249
 Views/Rendering/SortableHeaderLabel.cs                                                  38
 Views/Rendering/StickyHeaderHost.cs                                                     404
-Views/Rendering/SummarySectionRenderer.cs                                               1107
+Views/Rendering/SummarySectionRenderer.cs                                               1137
 Views/Rendering/TextRowRenderer.cs                                                      36
 Views/Rendering/TooltipFacility.cs                                                      288
 Views/Rendering/TreeSectionController.cs                                                2530
@@ -514,7 +514,7 @@ tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSellEconomicsTests.cs  
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderShoppingListTests.cs           444
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderStepSectionsTests.cs           784
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSublabelTests.cs               264
-tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSummaryTests.cs                1241
+tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSummaryTests.cs                1314
 tests/TaimisToolbench.Tests/Services/RankerCascadeIntegrationTests.cs                   358
 tests/TaimisToolbench.Tests/Services/RankerPriorityCascadeTests.cs                      377
 tests/TaimisToolbench.Tests/Services/RankerPriorityOrderingTests.cs                     256
@@ -544,7 +544,7 @@ tests/TaimisToolbench.Tests/Services/RequiredRecipesVisibilityTests.cs          
 tests/TaimisToolbench.Tests/Services/ResizeSettleDebounceTests.cs                       353
 tests/TaimisToolbench.Tests/Services/RestoredRequestInputsTests.cs                      240
 tests/TaimisToolbench.Tests/Services/RowDividerScissorSimulationTests.cs                265
-tests/TaimisToolbench.Tests/Services/ScrollAnchorMathTests.cs                           239
+tests/TaimisToolbench.Tests/Services/ScrollAnchorMathTests.cs                           398
 tests/TaimisToolbench.Tests/Services/ScrollMathTests.cs                                 104
 tests/TaimisToolbench.Tests/Services/SeasonalOfferFilterTests.cs                        86
 tests/TaimisToolbench.Tests/Services/SeasonalVendorTipCalculatorTests.cs                237
@@ -576,7 +576,7 @@ tests/TaimisToolbench.Tests/Services/StatusStoreTests.cs                        
 tests/TaimisToolbench.Tests/Services/StatusTextTests.cs                                 345
 tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                          33
 tests/TaimisToolbench.Tests/Services/StickyHeaderLayoutTests.cs                         266
-tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                   1327
+tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                   1445
 tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                             198
 tests/TaimisToolbench.Tests/Services/GlyphButtonMetricsTests.cs                         143
 tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                        332

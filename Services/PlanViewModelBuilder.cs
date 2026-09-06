@@ -632,6 +632,7 @@ namespace TaimisToolbench.Services
                     Label = currencyName,
                     Quantity = required,
                     IconUrl = iconUrl,
+                    NonCoinCostKey = SummarySectionLayoutMath.WalletCurrencyCostKey(cc.CurrencyId),
                     CurrencyDescription = CurrencyDisplayResolver.ResolveDescription(
                         cc.CurrencyId, result.CurrencyMetadata),
                 };
@@ -664,6 +665,7 @@ namespace TaimisToolbench.Services
                     RowType = PlanRowType.CurrencyCost,
                     IsBarterItemCost = true,
                     ItemId = bc.ItemId,
+                    NonCoinCostKey = SummarySectionLayoutMath.BarterItemCostKey(bc.ItemId),
                     Label = ResolveName(bc.ItemId, result.ItemMetadata),
                     Quantity = ClampToInt(bc.Amount),
                     IconUrl = ResolveIconUrl(bc.ItemId, result.ItemMetadata),
