@@ -736,16 +736,19 @@ of its own kind, so only the slots left over print an unused-slot line. An
 item id whose stacks disagree reports nothing rather than one stack's
 reading, because a Snapshot row sums every stack of an id.
 
-Two residuals, both wanting character equipment the module does not fetch.
-First, the `(n/m)` set counter the game prints beside a socketed rune: the
-denominator is `details.bonuses.length` and is known, but the numerator is
-how many pieces of that set are equipped on the character being played, so
-no honest number exists here and none is printed. Second, and following
-from it, every tier of a socketed rune's ladder renders inactive - true of
-the piece itself, which is by construction not equipped, and a divergence
-from the game whenever the same rune is worn elsewhere. Both close together
-if a snapshot ever reads `/v2/characters/:id/equipment`, which returns the
-same `upgrades` and `infusions` arrays per slot.
+A snapshot now reads `/v2/characters/:id/equipment` as well, so an equipped
+piece records its sockets the same way a bag stack does, and the Snapshot
+tab names the runes and infusions a character is wearing.
+
+Two residuals remain. First, the `(n/m)` set counter the game prints beside
+a socketed rune: the denominator is `details.bonuses.length` and is known,
+but the numerator is how many pieces of that set are equipped on the
+character being played. The endpoint carries what each character wears, but
+a snapshot row is one item id summed over every stack of it, with no
+character or slot kept, so that count is not available at the point the
+tooltip is drawn and none is printed. Second, and following from it, every
+tier of a socketed rune's ladder renders inactive - a divergence from the
+game whenever the same rune is worn on the character being played.
 
 ### 43. Tooltip text wrapping and Blish's 500px cap (audit batches A+B+C)
 

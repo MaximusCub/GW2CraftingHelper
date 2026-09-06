@@ -117,7 +117,7 @@ Services/FirstLoadSnapshotGate.cs                                               
 Services/GlyphButtonMetrics.cs                                                          69
 Services/GridLayout.cs                                                                  93
 Services/Gw2AccountRecipeClient.cs                                                      30
-Services/Gw2AccountSnapshotService.cs                                                   570
+Services/Gw2AccountSnapshotService.cs                                                   596
 Services/Gw2ItemApiClient.cs                                                            261
 Services/Gw2PriceApiClient.cs                                                           66
 Services/Gw2RecipeApiClient.cs                                                          206
@@ -143,7 +143,7 @@ Services/ItemSearchProviderFactory.cs                                           
 Services/ItemSlotFacts.cs                                                               141
 Services/ItemStatBlockFactory.cs                                                        207
 Services/ItemStatMath.cs                                                                64
-Services/ItemStatTooltipComposer.cs                                                     738
+Services/ItemStatTooltipComposer.cs                                                     766
 Services/JsonSeedReader.cs                                                              46
 Services/LogGutterLayout.cs                                                             147
 Services/LogLineFormat.cs                                                               137
@@ -323,7 +323,7 @@ Views/Rendering/PressFeedback.cs                                                
 Views/Rendering/RankerReadinessColors.cs                                                99
 Views/Rendering/RarityColors.cs                                                         199
 Views/Rendering/RecipesSectionRenderer.cs                                               365
-Views/Rendering/RichTooltipSurface.cs                                                   636
+Views/Rendering/RichTooltipSurface.cs                                                   639
 Views/Rendering/RowRelayoutHelpers.cs                                                   72
 Views/Rendering/RowActionKey.cs                                                         103
 Views/Rendering/ShoppingBadgeColors.cs                                                  72
@@ -358,7 +358,7 @@ tests/TaimisToolbench.Tests/Helpers/ModelGraphSignatures.cs                     
 tests/TaimisToolbench.Tests/Helpers/PipelineBuilder.cs                                  315
 tests/TaimisToolbench.Tests/Helpers/PlanResultDump.cs                                   192
 tests/TaimisToolbench.Tests/Helpers/RealItemFixtures.cs                                 56
-tests/TaimisToolbench.Tests/Helpers/RealItemJson.cs                                     81
+tests/TaimisToolbench.Tests/Helpers/RealItemJson.cs                                     99
 tests/TaimisToolbench.Tests/Helpers/RecipeNodeBuilders.cs                               97
 tests/TaimisToolbench.Tests/Helpers/RepoFileLocator.cs                                  42
 tests/TaimisToolbench.Tests/Helpers/ShippedSeedManifest.cs                              139
@@ -567,7 +567,7 @@ tests/TaimisToolbench.Tests/Services/SnapshotRefreshSlotTests.cs                
 tests/TaimisToolbench.Tests/Services/SnapshotResultLayoutTests.cs                       94
 tests/TaimisToolbench.Tests/Services/SnapshotSearchResultBuilderTests.cs                1069
 tests/TaimisToolbench.Tests/Services/SnapshotSerializationTests.cs                      283
-tests/TaimisToolbench.Tests/Services/SnapshotStoreTests.cs                              330
+tests/TaimisToolbench.Tests/Services/SnapshotStoreTests.cs                              358
 tests/TaimisToolbench.Tests/Services/SnapshotTableSorterTests.cs                        147
 tests/TaimisToolbench.Tests/Services/SocketedUpgradeTests.cs                            321
 tests/TaimisToolbench.Tests/Services/SortIndicatorLayoutTests.cs                        151

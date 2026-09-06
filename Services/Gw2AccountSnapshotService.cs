@@ -354,6 +354,8 @@ namespace TaimisToolbench.Services
                             ItemId = item.Id,
                             Count = 1,
                             Source = AccountItemIndex.CharacterSourcePrefix + characterName,
+                            Upgrades = SocketedIds(item.Upgrades),
+                            Infusions = SocketedIds(item.Infusions),
                         });
                     }
                 }
