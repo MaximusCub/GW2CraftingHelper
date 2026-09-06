@@ -164,7 +164,7 @@ namespace TaimisToolbench.Views
         /// <summary>What the status line reads while a refresh is in
         /// flight, clicked or automatic. Paired with the spinner beside
         /// it, so the two are written together.</summary>
-        private const string RefreshingStatusText = "Updating";
+        private const string RefreshingStatusText = "Updating...";
 
         // The status label gets its own full-width row rather than sharing
         // the button band - a long status string slid under the button row
