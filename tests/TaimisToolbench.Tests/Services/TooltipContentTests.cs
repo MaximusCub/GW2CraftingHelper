@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using TaimisToolbench.Models;
 using TaimisToolbench.Services;
@@ -175,6 +176,33 @@ namespace TaimisToolbench.Tests.Services
             Assert.False(new TooltipContentBuilder().Text("x").Build().WithExtra(null).HasExtra);
             Assert.False(
                 new TooltipContentBuilder().Text("x").Build().WithExtra(TooltipContent.Empty).HasExtra);
+        }
+
+        [Fact]
+        public void Append_RefusesContentThatCarriesASecondBox()
+        {
+            // A builder has one box. Flattening the second one into it
+            // would put the module's own lines inside the game's block,
+            // which is the distinction the second box exists to draw.
+            var stacked = new TooltipContentBuilder().Text("first").Build()
+                .WithExtra(new TooltipContentBuilder().Text("second").Build());
+            Assert.True(stacked.HasExtra);
+
+            var builder = new TooltipContentBuilder().Text("head");
+
+            Assert.Throws<ArgumentException>(() => builder.Append(stacked));
+
+            // The rejected call left the builder as it was.
+            Assert.Equal(new[] { "head" }, builder.Build().ToPlainLines());
+        }
+
+        [Fact]
+        public void Append_TakesContentThatIsAllOneBox()
+        {
+            var builder = new TooltipContentBuilder().Text("head");
+            builder.Append(new TooltipContentBuilder().Text("body").Build());
+
+            Assert.Equal(new[] { "head", "body" }, builder.Build().ToPlainLines());
         }
     }
 }

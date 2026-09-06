@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace TaimisToolbench.Services
@@ -647,17 +648,30 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Appends another block's lines. Only its FIRST box: a builder has
-        /// no second box to append one to, so content carrying a
-        /// <see cref="TooltipContent.Extra"/> would lose it here. Nothing
-        /// appends such content today, and a caller that starts to must
-        /// re-attach the second box itself.
+        /// Appends another block's lines into the box being built. A
+        /// builder has one box, so content carrying a
+        /// <see cref="TooltipContent.Extra"/> has nowhere to put its
+        /// second one and is rejected rather than silently flattened. Only
+        /// Services.ItemRowTooltipComposer builds two-box content, and it
+        /// does so as its last step; a caller that needs to append such
+        /// content must append the two boxes separately and re-attach the
+        /// second with <see cref="TooltipContent.WithExtra"/>.
         /// </summary>
+        /// <exception cref="ArgumentException">
+        /// <paramref name="other"/> carries a second box.
+        /// </exception>
         public TooltipContentBuilder Append(TooltipContent other)
         {
             if (other == null || other.IsEmpty)
             {
                 return this;
+            }
+
+            if (other.HasExtra)
+            {
+                throw new ArgumentException(
+                    "Content with a second box cannot be appended into one box.",
+                    nameof(other));
             }
 
             if (_current != null)

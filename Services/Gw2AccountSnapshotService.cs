@@ -557,20 +557,44 @@ namespace TaimisToolbench.Services
                         .ToList();
                 }
 
+                // The catch is per chunk, not around the loop. A full
+                // account resolves thousands of ids in ItemBulkLimit-sized
+                // requests, and one request the API refuses used to skip
+                // every later chunk AND the apply pass below, so a single
+                // bad id cost the names of every item after it.
+                int failedChunks = 0;
+                Exception firstChunkFailure = null;
+
                 for (int i = 0; i < uncachedIds.Count; i += ItemBulkLimit)
                 {
                     ct.ThrowIfCancellationRequested();
                     var chunk = uncachedIds.Skip(i).Take(ItemBulkLimit);
-                    var fetched = await _apiManager.Gw2ApiClient.V2.Items.ManyAsync(chunk, ct);
-                    lock (_cacheLock)
+                    try
                     {
-                        foreach (var item in fetched)
+                        var fetched = await _apiManager.Gw2ApiClient.V2.Items.ManyAsync(chunk, ct);
+                        lock (_cacheLock)
                         {
-                            var url = item.Icon.Url;
-                            _itemCache[item.Id] =
-                                (item.Name ?? "", url != null ? url.AbsoluteUri : "", RarityOf(item));
+                            foreach (var item in fetched)
+                            {
+                                var url = item.Icon.Url;
+                                _itemCache[item.Id] =
+                                    (item.Name ?? "", url != null ? url.AbsoluteUri : "", RarityOf(item));
+                            }
                         }
                     }
+                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    {
+                        failedChunks++;
+                        if (firstChunkFailure == null)
+                        {
+                            firstChunkFailure = ex;
+                        }
+                    }
+                }
+
+                if (firstChunkFailure != null)
+                {
+                    LogChunkFailures("item names/icons", failedChunks, firstChunkFailure);
                 }
 
                 lock (_cacheLock)
@@ -653,20 +677,40 @@ namespace TaimisToolbench.Services
                         .ToList();
                 }
 
+                // Per chunk, for the reason ResolveItemDetailsAsync gives.
+                int failedChunks = 0;
+                Exception firstChunkFailure = null;
+
                 for (int i = 0; i < uncachedIds.Count; i += ItemBulkLimit)
                 {
                     ct.ThrowIfCancellationRequested();
                     var chunk = uncachedIds.Skip(i).Take(ItemBulkLimit);
-                    var fetched = await _apiManager.Gw2ApiClient.V2.Skins.ManyAsync(chunk, ct);
-                    lock (_cacheLock)
+                    try
                     {
-                        foreach (var skin in fetched)
+                        var fetched = await _apiManager.Gw2ApiClient.V2.Skins.ManyAsync(chunk, ct);
+                        lock (_cacheLock)
                         {
-                            var url = skin.Icon.Url;
-                            _skinCache[skin.Id] =
-                                (skin.Name ?? "", url != null ? url.AbsoluteUri : "");
+                            foreach (var skin in fetched)
+                            {
+                                var url = skin.Icon.Url;
+                                _skinCache[skin.Id] =
+                                    (skin.Name ?? "", url != null ? url.AbsoluteUri : "");
+                            }
                         }
                     }
+                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    {
+                        failedChunks++;
+                        if (firstChunkFailure == null)
+                        {
+                            firstChunkFailure = ex;
+                        }
+                    }
+                }
+
+                if (firstChunkFailure != null)
+                {
+                    LogChunkFailures("skin names", failedChunks, firstChunkFailure);
                 }
 
                 lock (_cacheLock)
@@ -686,6 +730,21 @@ namespace TaimisToolbench.Services
                 Logger.Warn(ex, "Failed to resolve skin names");
                 ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to resolve skin names: {ex.GetType().Name} - {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// One warning for a whole resolve pass, naming how many bulk
+        /// requests failed and carrying the first exception. Per-chunk
+        /// logging would put one line per request in the module log, and a
+        /// full account issues tens of them.
+        /// </summary>
+        private static void LogChunkFailures(string what, int failedChunks, Exception first)
+        {
+            Logger.Warn(first, "Failed to resolve " + what + " for " + failedChunks + " request(s)");
+            ModuleLog.Shared.Write(
+                ModuleLogLevel.Warn,
+                "snapshot-fetch",
+                $"Failed to resolve {what} for {failedChunks} request(s): {first.GetType().Name} - {first.Message}");
         }
 
         private async Task ResolveCurrencyDetailsAsync(List<SnapshotWalletEntry> wallet, CancellationToken ct)
