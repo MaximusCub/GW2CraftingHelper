@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -58,15 +59,57 @@ namespace TaimisToolbench.Tests.Services
         private static List<SnapshotSearchRow> Rows(
             IReadOnlyList<SnapshotItemEntry> items,
             string searchText,
-            IReadOnlyDictionary<int, TransmutedItemNames> transmuted)
+            IReadOnlyDictionary<int, IReadOnlyList<TransmutedItemCopy>> transmuted,
+            SnapshotSourceFilter sourceFilter = null)
         {
             return SnapshotSearchResultBuilder.BuildItemRows(
                 SnapshotSearchResultBuilder.BuildRepresentativeIndex(items),
                 new AccountItemIndex(items),
                 searchText,
-                new SnapshotSourceFilter(),
+                sourceFilter ?? new SnapshotSourceFilter(),
                 activeCharacterName: null,
-                transmutedNames: transmuted);
+                transmutedCopies: transmuted);
+        }
+
+        // The whole account is checked, so every copy counts.
+        private static TransmutedSkin Shown(
+            IReadOnlyDictionary<int, IReadOnlyList<TransmutedItemCopy>> index)
+        {
+            return TransmutedNameIndex.AgreedSkin(index[Warfists], null);
+        }
+
+        private static string[] SkinNamesFinding(
+            IReadOnlyDictionary<int, IReadOnlyList<TransmutedItemCopy>> index,
+            params string[] searches)
+        {
+            var found = new List<string>();
+            foreach (string search in searches)
+            {
+                if (TransmutedNameIndex.AnySkinNameMatches(index[Warfists], search, null))
+                {
+                    found.Add(search);
+                }
+            }
+
+            return found.ToArray();
+        }
+
+        private static SnapshotSourceFilter WithoutCharacter(string name)
+        {
+            return new SnapshotSourceFilter
+            {
+                UncheckedCharacters = new HashSet<string>(StringComparer.Ordinal) { name },
+            };
+        }
+
+        // One transmuted copy on a character, one bare copy in the bank.
+        private static List<SnapshotItemEntry> OneSkinnedOneBare()
+        {
+            return new List<SnapshotItemEntry>
+            {
+                Skinned("Character:Alice", 5432, "Glyphic Gauntlets"),
+                Stack("Bank"),
+            };
         }
 
         // ---- TransmutedNameIndex ----
@@ -78,8 +121,10 @@ namespace TaimisToolbench.Tests.Services
                 Skinned("Bank", 5432, "Glyphic Gauntlets"),
             });
 
-            Assert.Equal("Glyphic Gauntlets", index[Warfists].Display.Name);
-            Assert.Equal(new[] { "Glyphic Gauntlets" }, index[Warfists].AllNames);
+            Assert.Equal("Glyphic Gauntlets", Shown(index).Name);
+            Assert.Equal(
+                new[] { "Glyphic Gauntlets" },
+                SkinNamesFinding(index, "Glyphic Gauntlets", "Chaos Gloves"));
         }
 
         [Fact]
@@ -91,7 +136,7 @@ namespace TaimisToolbench.Tests.Services
                 Skinned("Equipped:Taimi", 5432, "Glyphic Gauntlets"),
             });
 
-            Assert.Equal("Glyphic Gauntlets", index[Warfists].Display.Name);
+            Assert.Equal("Glyphic Gauntlets", Shown(index).Name);
         }
 
         [Fact]
@@ -115,8 +160,10 @@ namespace TaimisToolbench.Tests.Services
                 Skinned("Equipped:Taimi", 99, "Chaos Gloves"),
             });
 
-            Assert.False(index[Warfists].Display.IsPresent);
-            Assert.Equal(new[] { "Glyphic Gauntlets", "Chaos Gloves" }, index[Warfists].AllNames);
+            Assert.False(Shown(index).IsPresent);
+            Assert.Equal(
+                new[] { "Glyphic Gauntlets", "Chaos Gloves" },
+                SkinNamesFinding(index, "Glyphic Gauntlets", "Chaos Gloves"));
         }
 
         [Fact]
@@ -128,8 +175,10 @@ namespace TaimisToolbench.Tests.Services
                 Stack("Character:Taimi"),
             });
 
-            Assert.False(index[Warfists].Display.IsPresent);
-            Assert.Equal(new[] { "Glyphic Gauntlets" }, index[Warfists].AllNames);
+            Assert.False(Shown(index).IsPresent);
+            Assert.Equal(
+                new[] { "Glyphic Gauntlets" },
+                SkinNamesFinding(index, "Glyphic Gauntlets", "Chaos Gloves"));
         }
 
         [Fact]
@@ -176,7 +225,7 @@ namespace TaimisToolbench.Tests.Services
                 Skinned("Equipped:Taimi", 99, "Glyphic Gauntlets", "https://example.invalid/other.png"),
             });
 
-            Assert.False(index[Warfists].Display.IsPresent);
+            Assert.False(Shown(index).IsPresent);
         }
 
         [Fact]
@@ -256,6 +305,34 @@ namespace TaimisToolbench.Tests.Services
             // Neither spelling may lose an item the row does not name.
             Assert.Equal("Zojja's Warfists", Assert.Single(Rows(items, "Glyphic", index)).Name);
             Assert.Equal("Zojja's Warfists", Assert.Single(Rows(items, "Chaos", index)).Name);
+        }
+
+        [Fact]
+        public void BuildItemRows_FilterLeavesOnlyTheTransmutedCopy_RowIsNamedAfterTheSkin()
+        {
+            var items = OneSkinnedOneBare();
+            var index = TransmutedNameIndex.Build(items);
+            var filter = new SnapshotSourceFilter { Bank = false };
+
+            var row = Assert.Single(Rows(items, "", index, filter));
+            Assert.Equal("Glyphic Gauntlets", row.Name);
+            Assert.Equal(IconFor("Glyphic Gauntlets"), row.IconUrl);
+            Assert.True(row.Skin.IsPresent);
+        }
+
+        [Fact]
+        public void BuildItemRows_FilterHidesTheTransmutedCopy_SkinNameFindsNothing()
+        {
+            var items = OneSkinnedOneBare();
+            var index = TransmutedNameIndex.Build(items);
+            var filter = WithoutCharacter("Alice");
+
+            Assert.Empty(Rows(items, "Glyphic", index, filter));
+
+            // The bank copy is still there under the item's own name.
+            Assert.Equal(
+                "Zojja's Warfists",
+                Assert.Single(Rows(items, "Zojja", index, filter)).Name);
         }
 
         [Fact]

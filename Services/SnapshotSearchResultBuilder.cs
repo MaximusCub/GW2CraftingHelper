@@ -140,16 +140,16 @@ namespace TaimisToolbench.Services
         /// <paramref name="itemsById"/> that (a) has a positive total once
         /// <paramref name="sourceFilter"/> has excluded any unchecked sources
         /// and (b) matches <paramref name="searchText"/> by case-insensitive
-        /// substring: against the item's own name, against any skin a copy of
-        /// it wears, or against a holding character's name (that last only
+        /// substring: against the item's own name, against a skin a surviving
+        /// copy wears, or against a holding character's name (that last only
         /// for queries of at least <see cref="MinCharacterSearchLength"/>).
         /// <para>
-        /// The two compose as a plain AND: only sources that survive the
-        /// filter are consulted for the character match, so an unchecked
-        /// character's rows stay hidden even when its own name is typed. Such
-        /// a row still reports the account-wide total and breakdown across the
-        /// checked sources. Rows sort by name (ordinal, case-insensitive).
-        /// Returns an empty list, never null.
+        /// The two compose as a plain AND. Only surviving sources are
+        /// consulted, for the skin as much as for the character, so an
+        /// unchecked character's rows stay hidden even when its own name or
+        /// the skin it alone wears is typed. Such a row still reports the
+        /// account-wide total across the checked sources. Rows sort by name
+        /// (ordinal, case-insensitive). Returns an empty list, never null.
         /// </para>
         /// <para>What itemsById must be, and what character matching costs:
         /// docs/ARCHITECTURE.md, S2.5. Which name a row takes when its copies
@@ -161,7 +161,7 @@ namespace TaimisToolbench.Services
             string searchText,
             SnapshotSourceFilter sourceFilter,
             string activeCharacterName,
-            IReadOnlyDictionary<int, TransmutedItemNames> transmutedNames = null)
+            IReadOnlyDictionary<int, IReadOnlyList<TransmutedItemCopy>> transmutedCopies = null)
         {
             var rows = new List<SnapshotSearchRow>();
 
@@ -173,6 +173,11 @@ namespace TaimisToolbench.Services
             string trimmedSearch = (searchText ?? string.Empty).Trim();
             bool searching = trimmedSearch.Length > 0;
 
+            // Allocated once per call, not once per row: the skin helpers
+            // ask it about a stack's raw source, which is the same question
+            // the breakdown loop below already answers for itself.
+            Func<string, bool> sourceVisible = source => IsSourceEnabled(source, sourceFilter);
+
             foreach (var kvp in itemsById)
             {
                 int itemId = kvp.Key;
@@ -180,21 +185,14 @@ namespace TaimisToolbench.Services
                 // Never display raw item IDs (repo invariant).
                 string ownName = string.IsNullOrWhiteSpace(kvp.Value.Name) ? "Unknown Item" : kvp.Value.Name;
 
-                TransmutedItemNames skins = null;
-                if (transmutedNames != null)
+                IReadOnlyList<TransmutedItemCopy> copies = null;
+                if (transmutedCopies != null)
                 {
-                    transmutedNames.TryGetValue(itemId, out skins);
+                    transmutedCopies.TryGetValue(itemId, out copies);
                 }
 
-                var skin = skins != null ? skins.Display : TransmutedSkin.None;
-                string name = skin.IsPresent ? skin.Name : ownName;
-
-                // Both spellings, always: the item's own name, and every
-                // skin any copy of it wears - which covers the shown name,
-                // since that is one of them.
                 bool nameMatches = !searching
-                    || ownName.IndexOf(trimmedSearch, StringComparison.OrdinalIgnoreCase) >= 0
-                    || AnySkinNameMatches(skins, trimmedSearch);
+                    || ownName.IndexOf(trimmedSearch, StringComparison.OrdinalIgnoreCase) >= 0;
 
                 var prioritizedSources = AccountItemIndex.GetPrioritizedSources(itemId, index, activeCharacterName);
                 var breakdown = new List<SnapshotHoldLocation>();
@@ -231,10 +229,26 @@ namespace TaimisToolbench.Services
                     continue;
                 }
 
+                // Both spellings, always: the item's own name, and every
+                // skin a copy this row counted wears - which covers the
+                // shown name, since that is one of them.
+                if (!nameMatches
+                    && TransmutedNameIndex.AnySkinNameMatches(
+                        copies, trimmedSearch, sourceVisible))
+                {
+                    nameMatches = true;
+                }
+
                 if (!nameMatches && !characterMatches)
                 {
                     continue;
                 }
+
+                // Read off the copies this row counted, the same set its
+                // breakdown lists. A copy the filter hid can neither name
+                // the row nor stop another copy from naming it.
+                var skin = TransmutedNameIndex.AgreedSkin(copies, sourceVisible);
+                string name = skin.IsPresent ? skin.Name : ownName;
 
                 rows.Add(new SnapshotSearchRow
                 {
@@ -272,31 +286,6 @@ namespace TaimisToolbench.Services
                 return byName != 0 ? byName : a.ItemId.CompareTo(b.ItemId);
             });
             return rows;
-        }
-
-        /// <summary>
-        /// True when <paramref name="search"/> occurs (case-insensitively)
-        /// in any skin name a copy of the item wears. Runs once per item on
-        /// the keystroke path, over a list that is empty for all but the
-        /// handful of transmuted rows an account holds.
-        /// </summary>
-        private static bool AnySkinNameMatches(TransmutedItemNames skins, string search)
-        {
-            if (skins == null)
-            {
-                return false;
-            }
-
-            var names = skins.AllNames;
-            for (int i = 0; i < names.Count; i++)
-            {
-                if (names[i].IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         /// <summary>
