@@ -514,7 +514,7 @@ tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSellEconomicsTests.cs  
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderShoppingListTests.cs           444
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderStepSectionsTests.cs           784
 tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSublabelTests.cs               264
-tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSummaryTests.cs                1241
+tests/TaimisToolbench.Tests/Services/PlanViewModelBuilderSummaryTests.cs                1314
 tests/TaimisToolbench.Tests/Services/RankerCascadeIntegrationTests.cs                   358
 tests/TaimisToolbench.Tests/Services/RankerPriorityCascadeTests.cs                      377
 tests/TaimisToolbench.Tests/Services/RankerPriorityOrderingTests.cs                     256
@@ -544,7 +544,7 @@ tests/TaimisToolbench.Tests/Services/RequiredRecipesVisibilityTests.cs          
 tests/TaimisToolbench.Tests/Services/ResizeSettleDebounceTests.cs                       353
 tests/TaimisToolbench.Tests/Services/RestoredRequestInputsTests.cs                      240
 tests/TaimisToolbench.Tests/Services/RowDividerScissorSimulationTests.cs                265
-tests/TaimisToolbench.Tests/Services/ScrollAnchorMathTests.cs                           239
+tests/TaimisToolbench.Tests/Services/ScrollAnchorMathTests.cs                           398
 tests/TaimisToolbench.Tests/Services/ScrollMathTests.cs                                 104
 tests/TaimisToolbench.Tests/Services/SeasonalOfferFilterTests.cs                        86
 tests/TaimisToolbench.Tests/Services/SeasonalVendorTipCalculatorTests.cs                237
@@ -576,7 +576,7 @@ tests/TaimisToolbench.Tests/Services/StatusStoreTests.cs                        
 tests/TaimisToolbench.Tests/Services/StatusTextTests.cs                                 345
 tests/TaimisToolbench.Tests/Services/StatusUpdateGuardTests.cs                          33
 tests/TaimisToolbench.Tests/Services/StickyHeaderLayoutTests.cs                         266
-tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                   1327
+tests/TaimisToolbench.Tests/Services/SummarySectionLayoutMathTests.cs                   1445
 tests/TaimisToolbench.Tests/Services/TableSortStateTests.cs                             198
 tests/TaimisToolbench.Tests/Services/GlyphButtonMetricsTests.cs                         143
 tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                        332

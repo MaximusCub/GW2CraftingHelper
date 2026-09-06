@@ -1237,5 +1237,77 @@ namespace TaimisToolbench.Tests.Services
                 },
             };
         }
+
+        // --- Non-coin cost row identity (the scroll anchor's key) ---
+        [Fact]
+        public void CurrencyTable_EveryRowCarriesAnIdentity_AndTheTwoIdSpacesDoNotCollide()
+        {
+            // Id 24 is a real item AND the currency "Pristine Fractal
+            // Relics". Both rows are in one table, so the id alone cannot
+            // identify a row; the scroll anchor registry would key them
+            // both to whichever control registered last.
+            var result = MakeResult(
+                currencyCosts: new List<CurrencyCost>
+                {
+                    new CurrencyCost { CurrencyId = 24, Amount = 5 },
+                });
+            result.Plan.BarterItemCosts = new List<BarterItemCost>
+            {
+                new BarterItemCost { ItemId = 24, Amount = 3 },
+            };
+
+            var rows = _builder.Build(result).Sections[0].Rows
+                .Where(r => r.RowType == PlanRowType.CurrencyCost)
+                .ToList();
+
+            Assert.Equal(2, rows.Count);
+            Assert.All(rows, r => Assert.False(string.IsNullOrEmpty(r.NonCoinCostKey)));
+            Assert.Equal(2, rows.Select(r => r.NonCoinCostKey).Distinct().Count());
+        }
+
+        [Fact]
+        public void CurrencyTable_ReSolveGainingARow_LeavesTheOtherRowsKeysAlone()
+        {
+            // What the scroll anchor depends on: a row's key must survive
+            // the re-solve that adds rows around it, or the restore has no
+            // element to put back on the line the user was reading.
+            var before = _builder.Build(MakeResult(
+                currencyCosts: new List<CurrencyCost>
+                {
+                    new CurrencyCost { CurrencyId = 3, Amount = 5 },
+                }));
+            var after = _builder.Build(MakeResult(
+                currencyCosts: new List<CurrencyCost>
+                {
+                    new CurrencyCost { CurrencyId = 2, Amount = 9 },
+                    new CurrencyCost { CurrencyId = 3, Amount = 5 },
+                }));
+
+            string keyBefore = before.Sections[0].Rows
+                .Single(r => r.RowType == PlanRowType.CurrencyCost).NonCoinCostKey;
+            var keysAfter = after.Sections[0].Rows
+                .Where(r => r.RowType == PlanRowType.CurrencyCost)
+                .Select(r => r.NonCoinCostKey)
+                .ToList();
+
+            Assert.Equal(2, keysAfter.Count);
+            Assert.Contains(keyBefore, keysAfter);
+        }
+
+        [Fact]
+        public void CurrencyTable_RowsOtherThanCostRows_CarryNoIdentity()
+        {
+            var result = MakeResult(
+                currencyCosts: new List<CurrencyCost>
+                {
+                    new CurrencyCost { CurrencyId = 3, Amount = 5 },
+                });
+
+            var rows = _builder.Build(result).Sections[0].Rows;
+
+            Assert.All(
+                rows.Where(r => r.RowType != PlanRowType.CurrencyCost),
+                r => Assert.Null(r.NonCoinCostKey));
+        }
     }
 }
