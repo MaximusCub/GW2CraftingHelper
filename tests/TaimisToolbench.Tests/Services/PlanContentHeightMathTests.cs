@@ -378,6 +378,31 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void CraftStepBadge_CentresOnTheBandAReaderSees()
+        {
+            // The numbered badge used to centre on the full row height,
+            // which counts the rule and its clearance pixel as space. That
+            // put 8px over the badge and 4px under it. Centred on
+            // IconLedRowVisibleHeight the two gaps match.
+            Assert.Equal(47, PlanContentHeightMath.IconLedRowVisibleHeight);
+
+            int dividerTop = PlanContentHeightMath.CraftStepRowHeight
+                - PlanContentHeightMath.RowDividerHeight
+                - PlanContentHeightMath.IconRowDividerClearance;
+            int badgeTop = PlanContentHeightMath.CraftStepBadgeY;
+            int badgeBottom = badgeTop + PlanContentHeightMath.CraftStepBadgeSize;
+
+            // Below: the rule this row draws. Above: the rule the row
+            // before it drew, whose clearance pixel is already blank.
+            int gapBelow = dividerTop - badgeBottom;
+            int gapAbove = (PlanContentHeightMath.CraftStepRowHeight + badgeTop)
+                - (dividerTop + PlanContentHeightMath.RowDividerHeight);
+
+            Assert.Equal(gapAbove, gapBelow);
+            Assert.Equal(6, gapBelow);
+        }
+
+        [Fact]
         public void TreeRowHeight_PadsTheTierTwoIconLikeTheRankersTierOneRows()
         {
             // Tree rows draw indent guidelines instead of dividers, so

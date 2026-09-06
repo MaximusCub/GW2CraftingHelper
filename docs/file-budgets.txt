@@ -165,7 +165,7 @@ Services/PhaseOrdinalGuard.cs                                                   
 Services/PillSubduingEvaluator.cs                                                       280
 Services/PillSubduingTooltipBuilder.cs                                                  101
 Services/PillTooltipTextComposer.cs                                                     232
-Services/PlanContentHeightMath.cs                                                       495
+Services/PlanContentHeightMath.cs                                                       500
 Services/PlanHistoryBlobStore.cs                                                        216
 Services/PlanHistoryDedupKey.cs                                                         104
 Services/PlanHistoryLabels.cs                                                           118
@@ -463,7 +463,7 @@ tests/TaimisToolbench.Tests/Services/PillSubduingEvaluatorTests.cs              
 tests/TaimisToolbench.Tests/Services/PillSubduingTooltipBuilderTests.cs                 130
 tests/TaimisToolbench.Tests/Services/PillTooltipTextComposerTests.cs                    306
 tests/TaimisToolbench.Tests/Services/PlanCompatibilityFixtureTests.cs                   371
-tests/TaimisToolbench.Tests/Services/PlanContentHeightMathTests.cs                      632
+tests/TaimisToolbench.Tests/Services/PlanContentHeightMathTests.cs                      657
 tests/TaimisToolbench.Tests/Services/PlanHistoryBlobStoreTests.cs                       324
 tests/TaimisToolbench.Tests/Services/PlanHistoryDedupKeyTests.cs                        94
 tests/TaimisToolbench.Tests/Services/PlanHistoryLabelsTests.cs                          138

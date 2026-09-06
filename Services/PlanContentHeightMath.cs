@@ -105,6 +105,26 @@ namespace TaimisToolbench.Services
         public const int ShoppingRowHeight = IconLedRowHeight;
         public const int CraftStepRowHeight = IconLedRowHeight;
 
+        /// <summary>
+        /// Height of the band a reader sees in an icon-led row (47). The
+        /// row draws its rule over its own last RowDividerHeight plus
+        /// IconRowDividerClearance pixels, and none of those are space.
+        /// Centre a control on this rather than on IconLedRowHeight.
+        /// Centring on the full height counts the rule as visible space
+        /// and sets the control too low.
+        /// </summary>
+        public const int IconLedRowVisibleHeight =
+            IconLedRowHeight - RowDividerHeight - IconRowDividerClearance;
+
+        /// <summary>Edge of the numbered badge a Crafting Steps row draws
+        /// to the left of its icon.</summary>
+        public const int CraftStepBadgeSize = 36;
+
+        /// <summary>y of that badge. Centred on the band, which puts the
+        /// same gap above it and below it.</summary>
+        public const int CraftStepBadgeY =
+            (IconLedRowVisibleHeight - CraftStepBadgeSize) / 2;
+
         // 32, not the 28 a Body-16 header band needed: column headers moved
         // to the ColumnHeader tier (TypeRampMetrics.ColumnHeaderInk), whose
         // lowest ink is 26 rather than 21. ColumnHeaderLabelY 4 reproduces

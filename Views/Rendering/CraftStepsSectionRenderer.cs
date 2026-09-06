@@ -122,10 +122,13 @@ namespace TaimisToolbench.Views.Rendering
             int maxSublabelWidth, bool isLast)
         {
             const int rowHeight = PlanContentHeightMath.CraftStepRowHeight;
-            const int badgeSize = 36;
+            const int badgeSize = PlanContentHeightMath.CraftStepBadgeSize;
             const int badgeX = 8;
 
-            const int badgeY = (rowHeight - badgeSize) / 2;
+            // Centred on the band a reader sees, not on rowHeight. The rule
+            // and its clearance pixel are not space, so counting them left
+            // 8px over the badge and 4px under it.
+            const int badgeY = PlanContentHeightMath.CraftStepBadgeY;
 
             var rowPanel = new ClippedPanel() { Size = new Point(panelWidth, rowHeight), Parent = parent };
 
