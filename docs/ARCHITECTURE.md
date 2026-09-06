@@ -2269,10 +2269,13 @@ plus divider) and 52px (Crafting Steps): the simulation, re-derived from the
 decompiled `ScaleBy` floor/ceil semantics and validated by reproducing the
 numbers above, shows BOTH new heights are in the vulnerable class at clearance
 0 (45px: 18.0% of phases at 0.81, 7.0% at 0.897; 52px: 10.3% at 0.897) and
-immune at clearance 1 at all four scales. The flush fit survives because the
-tier-2 heights absorb the clearance pixel in their own derivation:
-`42 + 2 + 1 = 45` puts the divider at 42..44, exactly under the 0..42 icon
-frame. The proof is executable - `RowDividerScissorSimulationTests` sweeps
+immune at clearance 1 at all four scales. One padded height later replaced
+those two. Every icon-led plan row is now
+`PlanContentHeightMath.IconLedRowHeight`, which is 50. The icon frame sits at
+y=2, so `2 + 42 + 3 + 2 + 1 = 50` puts the divider at 47..48. A reader sees 3px
+of clear space over the frame and 3px under it. The row still absorbs the
+clearance pixel in its own derivation, so the sweep covers 50 at clearance 1.
+The proof is executable - `RowDividerScissorSimulationTests` sweeps
 every shipped (`rowHeight`, `clearance`) pair at all four scales and fails on
 any vanish - so a future height change re-runs it by construction.
 
@@ -2533,6 +2536,34 @@ collected with it.
 `ApplyPlain` routes through `TooltipTextFormat`, the wrap seam this facility
 inherits from the tier-1 tooltip work. `ApplyRich` exists for anything a string
 tooltip could only spell out as "1g 23s 45c", and for every item hover.
+
+### V.32a The two-box rule
+
+An item tooltip is not a place to put plan details. The first box carries what
+closely mirrors the game's own content for that item or currency, and nothing
+else. Anything this module adds - a unit price, a wallet holding, an
+acquisition hint, a caption, the wiki right-click affordance - goes in a second
+box drawn during the same hover, directly under the first.
+
+The game does this itself: hovering an item that fits several slots draws a
+"Currently Equipped" comparison box under or beside the item's own. Both boxes
+here share one background, border, padding and font, because they are drawn by
+one surface.
+
+Box two never measures itself. It is laid out at the width box one arrived at,
+so the pair reads as one column whatever the module has to say. `TooltipContent`
+carries the second box as `Extra`; `ItemRowTooltipComposer.BuildRowContent` is
+the one place that attaches it, so no surface can put its own lines inside the
+item's box by accident. `TooltipLayoutMath.Stack` holds the geometry - both
+frames' chrome and the measured gap between them - and is tested without a live
+control.
+
+Content that has nothing in box one keeps its lines in box one: a second box
+under an empty one is a blank frame. A tooltip the module wrote in full - a
+decision pill, a value breakdown - is one box, because none of it is the game's.
+
+Every line in box two reads as a sentence. No shouting, and no dashes doing a
+comma's job.
 
 ### V.33 `TreeSectionController`: heights, in-place refresh, and the pill column
 
@@ -3537,22 +3568,23 @@ deliberate change to one silently move the others.
 
 ### S2.4 Tooltip text: wrap seams and scope vocabulary
 
-**`ShoppingRowTooltipFormatter.BuildCurrencyLines` - why "THIS ROW" and
-"wallet" are load-bearing.** Both numbers on a shopping-row currency line
-are that *row's* own total (`cc.Amount`, one `PlanStep`'s
-`VendorCurrencyCosts`), never the whole plan's requirement for that
-currency id. Without a scope marker, two shopping rows drawing on the same
-wallet currency - Karma split across two vendor rows, say - can each
-independently read as "fully covered" and double-count the one wallet
-balance. That is the same misreading class `DecisionPillPlanner`'s
-plan-scope `HAVE {have}/{planTotal} TOTAL` pill
-(`AppendCurrencyOwnershipPill`) exists to avoid, via its own explicit
-"TOTAL" suffix; "THIS ROW" is the row-scope mirror of that convention, and
-the vocabulary must never look plan-scope when it is not. The "(wallet N)"
-aside is worded the same way for the same reason: "wallet" is the one term
-this codebase uses for a raw account-wide holding figure, matching the
-Summary column-header table's "Have" column and the tree's
-`HAVE x/y TOTAL` pill.
+**`ShoppingRowTooltipFormatter.BuildCurrencyLines` - why every line names
+its scope.** The cost on a shopping-row currency line is that *row's* own
+total (`cc.Amount`, one `PlanStep`'s `VendorCurrencyCosts`), never the
+whole plan's requirement for that currency id, and the holding beside it
+is the whole account's wallet balance. Without both scopes stated, two
+shopping rows drawing on the same wallet currency - Karma split across two
+vendor rows, say - can each independently read as "fully covered" and
+double-count the one balance. That is the same misreading class
+`DecisionPillPlanner`'s plan-scope `HAVE {have}/{planTotal} TOTAL` pill
+(`AppendCurrencyOwnershipPill`) exists to avoid.
+
+The lines used to carry that scope as the shouted markers "THIS ROW" and
+"(wallet N)". They now say it in a sentence - "this row costs 3660. You
+have 2812 in your wallet and need 848 more." - because these lines live in
+the module's own second tooltip box, where the standing rule is that text
+reads as prose. The scope claim is what must survive a rewording; the
+markers themselves are not sacred.
 
 **`TooltipLayoutMath.ItemTooltipMaxContentWidth` - the corpus.** The cap is
 derived from the game's own break decisions rather than from a game-pixel

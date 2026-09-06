@@ -55,6 +55,22 @@ namespace TaimisToolbench.Views.Rendering
         internal static BitmapFont Caption => GameService.Content.DefaultFont14;
 
         /// <summary>
+        /// The digits in a coin run - the gold, silver and copper numbers
+        /// that each carry an icon. One step under <see cref="Body"/>, and
+        /// not a de-emphasis: the coin icon is fixed at 16px by the
+        /// measured wallet bar tier (Services/CurrencyIconTiers), so the
+        /// digits are the only side of that pair left to size.
+        /// <para>
+        /// MEASURED in one screenshot holding this row beside the game's
+        /// own inventory coin row, so no UI scale is assumed: the game inks
+        /// its coin 0.80 as tall as its digits and we inked ours 0.64.
+        /// Menomonia 16-regular inks "841" 13 rows tall and 14-regular inks
+        /// it 11. The coin does not change, so the ratio moves to 0.75.
+        /// </para>
+        /// </summary>
+        internal static BitmapFont CoinDigits => Caption;
+
+        /// <summary>
         /// Every column header the module draws, and the Total Cost band's
         /// tile captions. Bold, because headers used to be the same size and
         /// weight as the rows under them.

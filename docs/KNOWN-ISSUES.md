@@ -247,6 +247,14 @@ own derivation. The proof is now executable and runs in CI:
 sweeps every shipped (rowHeight, clearance) pair at all four scales and
 fails on any vanish.
 
+Padded fit (2026-09-06): the 45px and 52px above are the heights of that
+day, and are no longer shipped. Reported in game, twice: the rule read as
+drawing over the icon, and the Crafting Steps rule sat off centre between
+rows. Every icon-led plan row is now one height,
+`PlanContentHeightMath.IconLedRowHeight` (50), with the frame at y=2 and
+3px of clear space over and under it. The sweep already covered 50 at
+clearance 1, so the proof needed no new case.
+
 ### 39. M38 view-decomposition entries (WP-21 through WP-25)
 
 Numbered late, on 2026-08-25, so `Views/Rendering/ISectionRelayoutSink.cs`
@@ -1568,7 +1576,7 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
   `dev/records/cleanup-public-surfaces.md`
 - **Total Cost: the inventory rows get a real Have and Needed, and the group labels read as headings (2026-09-05)** - gate NOT RUN (no live check recorded on either commit).
   `dev/records/w20-total-cost-groups.md`
-- **The plan tab's input strip reflowed in the middle of a drag (2026-09-05)** - gate NOT RUN (no live session recorded on that branch).
+- **The plan tab's input strip reflowed in the middle of a drag (2026-09-05)** - gate NOT RUN (no live session recorded on that branch); superseded by `w40-reflow-on-release` below.
   `dev/records/w22-resize-stretch.md`
 - **The recipe tree's IGNORE key moves into the gap between Source and Cost (2026-09-05)** - gate NOT RUN (no live confirmation recorded on that branch); superseded by `w23-ignore-trailing-column` below.
   `dev/records/w18-ignore-x-gap.md`
@@ -1580,3 +1588,5 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
   `dev/records/w24-ranker-button-consistency.md`
 - **The Recipe Tree's ignore button gets a fixed column after Cost (2026-09-05)** - gate NOT RUN (no live session recorded on that branch).
   `dev/records/w23-ignore-trailing-column.md`
+- **The input strip reflows when the resize drag ends, not when the hand pauses (2026-09-06)** - gate NOT RUN (no live session recorded on that branch).
+  `dev/records/w40-reflow-on-release.md`

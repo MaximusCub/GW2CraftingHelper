@@ -41,7 +41,7 @@ namespace TaimisToolbench.Services
         // RowIconFrameSize rarity frame plus a 2px divider already exceeds
         // the tallest text run in them, so their heights are derived below
         // from the frame rather than pinned by ink arithmetic.
-        // CraftStepRowHeight's body text was already Font16 before the
+        // The craft-step row's body text was already Font16 before the
         // bump, so only its Font12 -> Font14 sublabel moved, and that
         // sublabel's ink clears its divider with the same margin it had at
         // the pre-tier-2 heights. The two 28px rows put a single line at
@@ -103,17 +103,27 @@ namespace TaimisToolbench.Services
 
         public const int UsedMaterialRowHeight = IconLedRowHeight;
         public const int ShoppingRowHeight = IconLedRowHeight;
+        public const int CraftStepRowHeight = IconLedRowHeight;
 
-        /// <summary>y of the craft-step row's icon frame - the one icon-led
-        /// row whose icon is inset rather than flush, because the numbered
-        /// badge beside it needs breathing room above and below.</summary>
-        public const int CraftStepIconY = 5;
+        /// <summary>
+        /// Height of the band a reader sees in an icon-led row (47). The
+        /// row draws its rule over its own last RowDividerHeight plus
+        /// IconRowDividerClearance pixels, and none of those are space.
+        /// Centre a control on this rather than on IconLedRowHeight.
+        /// Centring on the full height counts the rule as visible space
+        /// and sets the control too low.
+        /// </summary>
+        public const int IconLedRowVisibleHeight =
+            IconLedRowHeight - RowDividerHeight - IconRowDividerClearance;
 
-        // Symmetric inset: CraftStepIconY above and below the frame
-        // (5 + 42 + 5 = 52). The divider then lands at rowHeight - 2 -
-        // IconRowDividerClearance = 49, 2px below the icon frame bottom
-        // (47) - the same 2px icon-to-divider gap the 44px shape had.
-        public const int CraftStepRowHeight = 2 * CraftStepIconY + RowIconFrameSize;
+        /// <summary>Edge of the numbered badge a Crafting Steps row draws
+        /// to the left of its icon.</summary>
+        public const int CraftStepBadgeSize = 36;
+
+        /// <summary>y of that badge. Centred on the band, which puts the
+        /// same gap above it and below it.</summary>
+        public const int CraftStepBadgeY =
+            (IconLedRowVisibleHeight - CraftStepBadgeSize) / 2;
 
         // 32, not the 28 a Body-16 header band needed: column headers moved
         // to the ColumnHeader tier (TypeRampMetrics.ColumnHeaderInk), whose

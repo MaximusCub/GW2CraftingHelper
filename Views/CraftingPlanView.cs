@@ -591,10 +591,14 @@ namespace TaimisToolbench.Views
         private DateTime _lastResizeEventUtc;
         private bool _resizeSettlePending;
 
-        // Ceiling on how long a held pointer may hold the strip's reflow
-        // back, and not a second debounce - DeferredReflowGate.TryTake owns
-        // the rule and why the number is this far above ResizeDebounceMs.
-        private const int StripReflowStallMs = 2000;
+        // Ceiling on how long a drag that still reads as running may hold
+        // the strip's reflow back, and not a debounce - the rule lives in
+        // DeferredReflowGate.TryTake. Ten seconds is far longer than any
+        // pause a hand makes mid-drag, which is the point: this fires only
+        // when a drag flag outlives its drag (Blish clears WindowBase2's
+        // Resizing from a global mouse-release handler that no-ops while
+        // the window is hidden), never on a pause the user would see.
+        private const int StripReflowStallMs = 10000;
 
         // The item input strip's column count is a step function of the
         // panel width, so re-seating it on every drag tick stretches each
@@ -605,7 +609,7 @@ namespace TaimisToolbench.Views
         // height and the strip it reserves for have to move on the same
         // frame or the content jumps ahead of the strip.
         private readonly DeferredReflowGate _stripReflow =
-            new DeferredReflowGate(ResizeDebounceMs, StripReflowStallMs);
+            new DeferredReflowGate(StripReflowStallMs);
 
         #endregion // Resize relayout: the closure registries - KNOWN-ISSUES #13/#19
 
@@ -1257,7 +1261,10 @@ namespace TaimisToolbench.Views
         // Section anchor keys are per PlanSectionType (one section, one
         // key); tree rows key off the solver NodeId the row draws - the
         // same identity TreeSectionController's own in-place row pairing
-        // already treats as stable across a re-solve.
+        // already treats as stable across a re-solve. The Total Cost
+        // table's own row and group-heading keys are built in
+        // Services/SummarySectionLayoutMath, which is Blish-free and so
+        // can be tested.
         internal static string SectionAnchorKey(PlanSectionType sectionKey)
         {
             return "section:" + sectionKey;
@@ -2959,7 +2966,7 @@ namespace TaimisToolbench.Views
             // below can never move ahead of the strip above it. The panel
             // itself still takes the live width - it is the clipping frame
             // for cells that a narrowing drag has not re-seated yet.
-            _stripReflow.Observe(w, nowUtc, PointerHeld());
+            _stripReflow.Observe(w, nowUtc);
             var layout = ComputeTopRegionLayout(_stripReflow.AppliedWidth);
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
 
@@ -3355,7 +3362,7 @@ namespace TaimisToolbench.Views
             }
 
             int settledWidth;
-            if (!_stripReflow.TryTake(DateTime.UtcNow, PointerHeld(), out settledWidth))
+            if (!_stripReflow.TryTake(DateTime.UtcNow, ResizeDragActive(), out settledWidth))
             {
                 return;
             }
@@ -3365,14 +3372,40 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// Whether the left mouse button is down, which for a window being
-        /// dragged by an edge or a corner means the drag is still running.
-        /// Releasing it ends a drag with no quiet period, so the settle
-        /// gate counts a release as a settle in its own right rather than
-        /// making the user watch the strip re-seat itself after they let go.
+        /// Whether a drag that is resizing this view is still running. The
+        /// strip's reflow waits for this to go false and for nothing else,
+        /// so it lands on the frame the user lets go.
+        /// <para>
+        /// Blish sets WindowBase2.Resizing when the left button goes down
+        /// on the window's resize handle and clears it from a handler on
+        /// the global left-button-release event, and its resize loop writes
+        /// the window size only while that flag is set. So every resize
+        /// event the drag produces arrives on a frame where this reads
+        /// true, wherever the pointer has moved to.
+        /// </para>
+        /// <para>
+        /// The button itself is read as well, for the resize this window
+        /// does not drive: dragging the game client's own border resizes
+        /// the sprite screen, and ResizableTabbedWindow refits this window
+        /// to each new screen size.
+        /// </para>
         /// </summary>
-        private static bool PointerHeld()
+        private bool ResizeDragActive()
         {
+            for (Control control = _buildPanel; control != null; control = control.Parent)
+            {
+                var window = control as WindowBase2;
+                if (window != null)
+                {
+                    if (window.Resizing)
+                    {
+                        return true;
+                    }
+
+                    break;
+                }
+            }
+
             return GameService.Input?.Mouse?.State.LeftButton
                 == Microsoft.Xna.Framework.Input.ButtonState.Pressed;
         }
@@ -4923,7 +4956,7 @@ namespace TaimisToolbench.Views
                     // Row rendering (the cost-tile row, the
                     // MultiItemNote banner, and the per-currency rows) moved
                     // to Views/Rendering/SummarySectionRenderer.
-                    new SummarySectionRenderer(this, _getItemStatBlock)
+                    new SummarySectionRenderer(this, _getItemStatBlock, RegisterScrollAnchor)
                         .Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.UsedMaterials:

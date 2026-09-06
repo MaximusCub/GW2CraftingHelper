@@ -155,12 +155,12 @@ namespace TaimisToolbench.Tests.Services
         {
             // Why IconRowDividerClearance exists: the tier-2 flush sum
             // WITHOUT it (icon frame + divider = 44) and the naive
-            // bottom-flush variants of both shipped heights all vanish.
-            // This is the assertion that keeps the clearance pixel from
-            // being "simplified" away as slack.
+            // bottom-flush variant of the shipped icon-led height both
+            // vanish. This is the assertion that keeps the clearance pixel
+            // from being "simplified" away as slack.
             Assert.True(VanishCount(PlanContentHeightMath.RowIconFrameSize + DividerHeight, 0, 0.897f) > 0);
-            Assert.True(VanishCount(PlanContentHeightMath.UsedMaterialRowHeight, 0, 0.81f) > 0);
-            Assert.True(VanishCount(PlanContentHeightMath.CraftStepRowHeight, 0, 0.897f) > 0);
+            Assert.True(VanishCount(PlanContentHeightMath.IconLedRowHeight, 0, 0.81f) > 0);
+            Assert.True(VanishCount(PlanContentHeightMath.IconLedRowHeight, 0, 0.897f) > 0);
         }
 
         [Fact]
@@ -181,17 +181,16 @@ namespace TaimisToolbench.Tests.Services
             // Every CreateRowDivider caller's (rowHeight, bottomClearance),
             // plus the section header band divider built the same way.
             // Deduplicated because xUnit collapses identical theory cases
-            // anyway (the three flush tier-2 rows share one geometry).
+            // anyway (the four padded tier-2 rows share one geometry).
             int iconClearance = PlanContentHeightMath.IconRowDividerClearance;
             var pairs = new List<(int RowHeight, int Clearance)>
             {
                 // UsedMaterialsSectionRenderer / ShoppingListSectionRenderer
-                // / RecipesSectionRenderer: the tier-2 flush fit.
+                // / RecipesSectionRenderer / CraftStepsSectionRenderer: the
+                // tier-2 padded fit.
                 (PlanContentHeightMath.UsedMaterialRowHeight, iconClearance),
                 (PlanContentHeightMath.ShoppingRowHeight, iconClearance),
                 (PlanContentHeightMath.RecipeRowHeight, iconClearance),
-
-                // CraftStepsSectionRenderer: the inset tier-2 row.
                 (PlanContentHeightMath.CraftStepRowHeight, iconClearance),
 
                 // DisciplinesSectionRenderer passes 1 (belt-and-braces on
