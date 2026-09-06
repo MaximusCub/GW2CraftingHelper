@@ -2534,6 +2534,34 @@ collected with it.
 inherits from the tier-1 tooltip work. `ApplyRich` exists for anything a string
 tooltip could only spell out as "1g 23s 45c", and for every item hover.
 
+### V.32a The two-box rule
+
+An item tooltip is not a place to put plan details. The first box carries what
+closely mirrors the game's own content for that item or currency, and nothing
+else. Anything this module adds - a unit price, a wallet holding, an
+acquisition hint, a caption, the wiki right-click affordance - goes in a second
+box drawn during the same hover, directly under the first.
+
+The game does this itself: hovering an item that fits several slots draws a
+"Currently Equipped" comparison box under or beside the item's own. Both boxes
+here share one background, border, padding and font, because they are drawn by
+one surface.
+
+Box two never measures itself. It is laid out at the width box one arrived at,
+so the pair reads as one column whatever the module has to say. `TooltipContent`
+carries the second box as `Extra`; `ItemRowTooltipComposer.BuildRowContent` is
+the one place that attaches it, so no surface can put its own lines inside the
+item's box by accident. `TooltipLayoutMath.Stack` holds the geometry - both
+frames' chrome and the measured gap between them - and is tested without a live
+control.
+
+Content that has nothing in box one keeps its lines in box one: a second box
+under an empty one is a blank frame. A tooltip the module wrote in full - a
+decision pill, a value breakdown - is one box, because none of it is the game's.
+
+Every line in box two reads as a sentence. No shouting, and no dashes doing a
+comma's job.
+
 ### V.33 `TreeSectionController`: heights, in-place refresh, and the pill column
 
 `RefreshTreeContainerHeights` replaced `InvalidateUpToContentPanel`, which only

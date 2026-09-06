@@ -42,6 +42,25 @@ namespace TaimisToolbench.Views.Rendering
         private const int ChromeWidth = 10;
 
         /// <summary>
+        /// The vertical halves of that same <c>Thickness(4f, 4f, 3f, 6f)</c>:
+        /// 4px above the content and 3px below it. Needed only because the
+        /// second box has to know where the first one's frame ends.
+        /// </summary>
+        private const int ChromeTop = 4;
+
+        private const int ChromeBottom = 3;
+
+        /// <summary>
+        /// The transparent gap between the two boxes. MEASURED on the
+        /// game's own stacked "Currently Equipped" comparison boxes: the
+        /// upper box's bottom border sits on row 322 and the lower box's
+        /// top border on row 341, at the game's 16px line pitch. The one
+        /// border row that reads darkest is ambiguous by a pixel, so the
+        /// true gap is 18 or 19.
+        /// </summary>
+        private const int BoxGap = 18;
+
+        /// <summary>
         /// FALLBACK canvas only: the game-derived art's median tint at its
         /// measured coverage, used when the "tooltip" texture cannot be
         /// loaded, and for the strips of a pathological box that outruns
@@ -170,6 +189,15 @@ namespace TaimisToolbench.Views.Rendering
 
         private Panel _contentPanel;
 
+        /// <summary>
+        /// The first box's full height, chrome included, in this control's
+        /// own coordinates. The whole height when there is no second box.
+        /// </summary>
+        private int _firstBoxHeight;
+
+        /// <summary>Top of the second box, or 0 when there is only one.</summary>
+        private int _secondBoxTop;
+
         internal RichTooltipSurface(Func<Control, TooltipContent> resolveContent)
         {
             _resolveContent = resolveContent ?? throw new ArgumentNullException(nameof(resolveContent));
@@ -218,6 +246,27 @@ namespace TaimisToolbench.Views.Rendering
                 art = _canvasArt = GameService.Content.GetTexture("tooltip", null);
             }
 
+            if (_secondBoxTop <= 0 || _secondBoxTop >= bounds.Height)
+            {
+                PaintBox(spriteBatch, pixel, art, bounds);
+                return;
+            }
+
+            // Two frames, one hover: the game's own content above, this
+            // module's additions below. Each box crops the canvas art from
+            // its own top-left, which is how the game composites a box.
+            PaintBox(
+                spriteBatch, pixel, art,
+                new Rectangle(bounds.X, bounds.Y, bounds.Width, _firstBoxHeight));
+            PaintBox(
+                spriteBatch, pixel, art,
+                new Rectangle(
+                    bounds.X, bounds.Y + _secondBoxTop,
+                    bounds.Width, bounds.Height - _secondBoxTop));
+        }
+
+        private void PaintBox(SpriteBatch spriteBatch, Texture2D pixel, Texture2D art, Rectangle bounds)
+        {
             if (art == null)
             {
                 spriteBatch.DrawOnCtrl(this, pixel, bounds, SurfaceBackgroundColor);
@@ -382,7 +431,61 @@ namespace TaimisToolbench.Views.Rendering
                 ChromeWidth,
                 TooltipLayoutMath.ItemTooltipMaxContentWidth);
 
-            var layout = TooltipLayoutMath.LayoutContent(
+            var layout = BuildLayout(content, maxWidth, font, lineHeight, coinIconSize);
+
+            // The second box NEVER measures itself. It wraps to the width
+            // the first box arrived at, so the two read as one column
+            // whatever this module has to add.
+            TooltipLayoutMath.Layout extraLayout = content.HasExtra
+                ? BuildLayout(
+                    content.Extra, System.Math.Max(1, layout.Width),
+                    font, lineHeight, coinIconSize)
+                : null;
+
+            var boxes = TooltipLayoutMath.Stack(
+                layout.Height, extraLayout == null ? 0 : extraLayout.Height,
+                ChromeTop, ChromeBottom, BoxGap);
+            _firstBoxHeight = boxes.FirstBoxHeight;
+            _secondBoxTop = boxes.SecondBoxTop;
+
+            // A width the wrap could not honour - a coin run is atomic and
+            // never splits - would otherwise clip, so both boxes take the
+            // wider of the two and stay equal.
+            int panelWidth = System.Math.Max(
+                layout.Width, extraLayout == null ? 0 : extraLayout.Width);
+
+            _contentPanel = new Panel()
+            {
+                Size = new Point(System.Math.Max(1, panelWidth), System.Math.Max(1, boxes.PanelHeight)),
+                Location = Point.Zero,
+                // No fill of its own: the canvas is painted across the
+                // whole box by PaintBeforeChildren, so a second fill here
+                // would be the stacked-translucency case that matches
+                // neither the game nor H6.
+                BackgroundColor = Color.Transparent,
+                ShowBorder = false,
+                Parent = this,
+            };
+
+            RenderRows(layout.Rows, 0, font, lineHeight, coinIconSize);
+            if (extraLayout != null)
+            {
+                RenderRows(extraLayout.Rows, boxes.ExtraContentTop, font, lineHeight, coinIconSize);
+            }
+
+            // Sized NOW rather than on the next update tick. The content
+            // panel's extent is explicit, so the base RecalculateLayout has
+            // everything it needs, and Show()'s Reposition below would
+            // otherwise clamp against the PREVIOUS hover's size for one
+            // frame - Blish only recalculates a container's layout while it
+            // is parented, and this one is parented by Show().
+            RecalculateLayout();
+        }
+
+        private TooltipLayoutMath.Layout BuildLayout(
+            TooltipContent content, int maxWidth, BitmapFont font, int lineHeight, int coinIconSize)
+        {
+            return TooltipLayoutMath.LayoutContent(
                 content, maxWidth, lineHeight,
                 s => (int)System.Math.Ceiling(font.MeasureString(s).Width),
                 copper => CoinSegmentMath.TotalCoinSegmentsWidth(
@@ -395,40 +498,24 @@ namespace TaimisToolbench.Views.Rendering
                 headerIndent: HeaderIconFrameSize + HeaderIconGap,
                 effectIndent: EffectTextIndent,
                 slotIndent: SlotTextIndent);
+        }
 
-            _contentPanel = new Panel()
-            {
-                Size = new Point(System.Math.Max(1, layout.Width), System.Math.Max(1, layout.Height)),
-                Location = Point.Zero,
-                // No fill of its own: the canvas is painted across the
-                // whole box by PaintBeforeChildren, so a second fill here
-                // would be the stacked-translucency case that matches
-                // neither the game nor H6.
-                BackgroundColor = Color.Transparent,
-                ShowBorder = false,
-                Parent = this,
-            };
-
-            var rows = layout.Rows;
+        private void RenderRows(
+            IReadOnlyList<TooltipLayoutMath.LaidOutRow> rows, int yOffset,
+            BitmapFont font, int lineHeight, int coinIconSize)
+        {
             for (int i = 0; i < rows.Count; i++)
             {
-                RenderRow(rows, i, font, lineHeight, coinIconSize);
+                RenderRow(rows, i, yOffset, font, lineHeight, coinIconSize);
             }
-
-            // Sized NOW rather than on the next update tick. The content
-            // panel's extent is explicit, so the base RecalculateLayout has
-            // everything it needs, and Show()'s Reposition below would
-            // otherwise clamp against the PREVIOUS hover's size for one
-            // frame - Blish only recalculates a container's layout while it
-            // is parented, and this one is parented by Show().
-            RecalculateLayout();
         }
 
         private void RenderRow(
-            IReadOnlyList<TooltipLayoutMath.LaidOutRow> rows, int index,
+            IReadOnlyList<TooltipLayoutMath.LaidOutRow> rows, int index, int yOffset,
             BitmapFont font, int lineHeight, int coinIconSize)
         {
             var row = rows[index];
+            int rowY = row.Y + yOffset;
             if (row.IconAssetId != 0)
             {
                 // The game's own slot art, by asset id rather than by
@@ -439,7 +526,7 @@ namespace TaimisToolbench.Views.Rendering
                 int size = System.Math.Min(SlotIconSize, row.Height);
                 IconControls.CreateAssetIcon(
                     _contentPanel, row.IconAssetId, 0,
-                    row.Y + System.Math.Max(0, (row.Height - size) / 2), size, null);
+                    rowY + System.Math.Max(0, (row.Height - size) / 2), size, null);
             }
             else if (row.IconUrl != null && row.Kind == TooltipLineKind.Effect)
             {
@@ -457,7 +544,7 @@ namespace TaimisToolbench.Views.Rendering
                 }
 
                 int size = System.Math.Min(EffectIconSize, blockBottom - row.Y);
-                IconControls.CreateUnframedIcon(_contentPanel, row.IconUrl, 0, row.Y, size);
+                IconControls.CreateUnframedIcon(_contentPanel, row.IconUrl, 0, rowY, size);
             }
             else if (row.IconUrl != null)
             {
@@ -473,13 +560,13 @@ namespace TaimisToolbench.Views.Rendering
                     : ItemIconFrame.Explicit(HeaderIconFrameColor);
                 IconControls.CreateItemIcon(
                     _contentPanel, row.IconUrl, frame,
-                    0, row.Y, ItemIconTier.TooltipHeader,
+                    0, rowY, ItemIconTier.TooltipHeader,
                     ItemIconTooltip.None(ItemIconSilence.DrawnInsideATooltip));
             }
 
             // The name is centred on the icon, not top-aligned (measured,
             // KNOWN-ISSUES #42); every other row kind sits at its top.
-            int textY = row.Y + System.Math.Max(0, (row.Height - lineHeight) / 2);
+            int textY = rowY + System.Math.Max(0, (row.Height - lineHeight) / 2);
 
             foreach (var placed in row.Spans)
             {
@@ -628,6 +715,8 @@ namespace TaimisToolbench.Views.Rendering
             }
 
             _contentPanel = null;
+            _firstBoxHeight = 0;
+            _secondBoxTop = 0;
         }
 
         protected override void DisposeControl()

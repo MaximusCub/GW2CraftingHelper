@@ -382,6 +382,68 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
+        /// The two stacked boxes' geometry - see <see cref="Stack"/>.
+        /// Heights and tops in the surface's own coordinates, so a caller
+        /// that has laid out both contents needs no arithmetic of its own.
+        /// </summary>
+        public readonly struct StackedBoxes
+        {
+            internal StackedBoxes(int panelHeight, int extraContentTop, int firstBoxHeight, int secondBoxTop)
+            {
+                PanelHeight = panelHeight;
+                ExtraContentTop = extraContentTop;
+                FirstBoxHeight = firstBoxHeight;
+                SecondBoxTop = secondBoxTop;
+            }
+
+            /// <summary>Both contents plus the run between them, which is
+            /// what the one content panel spanning both boxes measures.</summary>
+            public int PanelHeight { get; }
+
+            /// <summary>Top of the second box's CONTENT inside that panel,
+            /// 0 when there is no second box.</summary>
+            public int ExtraContentTop { get; }
+
+            /// <summary>The first box's full height, its chrome included.</summary>
+            public int FirstBoxHeight { get; }
+
+            /// <summary>Top of the second box's FRAME, 0 when there is no
+            /// second box.</summary>
+            public int SecondBoxTop { get; }
+        }
+
+        /// <summary>
+        /// Stacks the module's own second box under the game's first one:
+        /// the first box's chrome closes, <paramref name="gap"/> pixels of
+        /// nothing follow, and the second box opens with chrome of its own.
+        /// A non-positive <paramref name="extraHeight"/> means there is
+        /// only one box, and every second-box figure comes back 0.
+        /// <para>
+        /// The two boxes are one hover and are placed as one unit, so the
+        /// gap is inside the placed rectangle rather than between two
+        /// independently placed ones.
+        /// </para>
+        /// </summary>
+        public static StackedBoxes Stack(
+            int firstHeight, int extraHeight, int chromeTop, int chromeBottom, int gap)
+        {
+            int first = Math.Max(0, firstHeight);
+            int extra = Math.Max(0, extraHeight);
+            int top = Math.Max(0, chromeTop);
+            int bottom = Math.Max(0, chromeBottom);
+            int firstBox = top + first + bottom;
+
+            if (extra <= 0)
+            {
+                return new StackedBoxes(first, 0, firstBox, 0);
+            }
+
+            int extraContentTop = first + bottom + Math.Max(0, gap) + top;
+            return new StackedBoxes(
+                extraContentTop + extra, extraContentTop, firstBox, firstBox + Math.Max(0, gap));
+        }
+
+        /// <summary>
         /// Where the finished box goes, given the cursor and the screen.
         ///
         /// Horizontal: at the cursor, flipped to the cursor's left when the
