@@ -144,7 +144,7 @@ Services/ItemSearchProviderFactory.cs                                           
 Services/ItemSlotFacts.cs                                                               141
 Services/ItemStatBlockFactory.cs                                                        207
 Services/ItemStatMath.cs                                                                64
-Services/ItemStatTooltipComposer.cs                                                     766
+Services/ItemStatTooltipComposer.cs                                                     818
 Services/JsonSeedReader.cs                                                              46
 Services/LogGutterLayout.cs                                                             147
 Services/LogLineFormat.cs                                                               137

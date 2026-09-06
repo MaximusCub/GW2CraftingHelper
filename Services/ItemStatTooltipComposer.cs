@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using TaimisToolbench.Models;
@@ -42,6 +43,10 @@ namespace TaimisToolbench.Services
         /// precedent as <see cref="SelectStatsPrompt"/>.</summary>
         private const string ConsumePrompt = "Double-click to consume.";
 
+        /// <summary>The game's own word for an item wearing another item's
+        /// skin, read off the capture BuildTransmutedBlock cites.</summary>
+        private const string TransmutedLabel = "Transmuted";
+
         public static TooltipContent BuildContent(ItemStatBlock stats)
         {
             return BuildContent(stats, SocketedUpgradeView.None);
@@ -57,10 +62,28 @@ namespace TaimisToolbench.Services
         /// </summary>
         public static TooltipContent BuildContent(ItemStatBlock stats, SocketedUpgradeView sockets)
         {
+            return BuildContent(stats, sockets, null);
+        }
+
+        /// <summary>
+        /// The same tooltip for a stack wearing a skin.
+        /// <paramref name="transmutedSkinName"/> is the skin's own name, and
+        /// it takes the heading, because that is the name the game shows.
+        /// The item's own name moves down to the "Transmuted" block. Pass
+        /// null or "" for a stack wearing its own look.
+        /// </summary>
+        public static TooltipContent BuildContent(
+            ItemStatBlock stats, SocketedUpgradeView sockets, string transmutedSkinName)
+        {
             if (stats == null)
             {
                 return TooltipContent.Empty;
             }
+
+            string ownName = string.IsNullOrEmpty(stats.Name) ? "Unknown Item" : stats.Name;
+            string skinName = transmutedSkinName ?? "";
+            bool transmuted = skinName.Length > 0
+                && !string.Equals(skinName, ownName, StringComparison.Ordinal);
 
             // The icon+name header row every in-game item tooltip opens
             // with (gap G11). The standing comment claiming the game shows
@@ -68,8 +91,10 @@ namespace TaimisToolbench.Services
             var builder = new TooltipContentBuilder();
             builder.Header(
                 stats.IconUrl,
-                string.IsNullOrEmpty(stats.Name) ? "Unknown Item" : stats.Name,
+                transmuted ? skinName : ownName,
                 TooltipHeaderSubject.ItemOfRarity(stats.Rarity));
+
+            var transmutedBlock = BuildTransmutedBlock(transmuted ? ownName : null);
 
             var facts = BuildFacts(stats, out bool bodyOpensUnderHeader);
 
@@ -93,9 +118,15 @@ namespace TaimisToolbench.Services
 
                 builder.Append(facts);
                 builder.Append(descriptionBlock);
+                if (!transmutedBlock.IsEmpty)
+                {
+                    builder.Separator();
+                    builder.Append(transmutedBlock);
+                }
+
                 if (!identity.IsEmpty)
                 {
-                    if (!descriptionBlock.IsEmpty)
+                    if (!descriptionBlock.IsEmpty || !transmutedBlock.IsEmpty)
                     {
                         builder.Separator();
                     }
@@ -110,9 +141,10 @@ namespace TaimisToolbench.Services
             // Blocks are collected first and joined with exactly one blank
             // line each, so an empty block never leaves a separator behind
             // and a name-only block never ends on a stray blank row.
-            var blocks = new List<TooltipContent>(3);
+            var blocks = new List<TooltipContent>(4);
             AddBlock(blocks, facts);
             AddBlock(blocks, BuildSlots(stats, sockets));
+            AddBlock(blocks, transmutedBlock);
             AddBlock(blocks, BuildIdentityBlock(stats, includeDescription: true));
 
             for (int i = 0; i < blocks.Count; i++)
@@ -447,6 +479,26 @@ namespace TaimisToolbench.Services
             }
 
             return slots.Build();
+        }
+
+        /// <summary>
+        /// The two lines the game prints for a transmuted item, between the
+        /// socket blocks and the identity block: the word "Transmuted",
+        /// then the item's own name. Measured on an ascended-sword capture
+        /// (2026-09-06) - both lines are plain body white, and one blank
+        /// row sits above the pair and one below it.
+        /// </summary>
+        private static TooltipContent BuildTransmutedBlock(string ownName)
+        {
+            if (string.IsNullOrEmpty(ownName))
+            {
+                return TooltipContent.Empty;
+            }
+
+            var block = new TooltipContentBuilder();
+            block.Text(TransmutedLabel).EndLine();
+            block.Text(ownName).EndLine();
+            return block.Build();
         }
 
         private static string SlotLineText(ItemSlotKind kind)
