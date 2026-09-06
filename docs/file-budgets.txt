@@ -594,6 +594,7 @@ tests/TaimisToolbench.Tests/Services/TooltipTextFormatTests.cs                  
 tests/TaimisToolbench.Tests/Services/TopRegionLayoutMathTests.cs                        147
 tests/TaimisToolbench.Tests/Services/TradingPostMathTests.cs                            70
 tests/TaimisToolbench.Tests/Services/TradingPostServiceTests.cs                         507
+tests/TaimisToolbench.Tests/Services/TransmutedNameTests.cs                             271
 tests/TaimisToolbench.Tests/Services/TreeChipStripLayoutTests.cs                        283
 tests/TaimisToolbench.Tests/Services/TreeCostColumnMathTests.cs                         768
 tests/TaimisToolbench.Tests/Services/TreeRowIdentityTests.cs                            246
