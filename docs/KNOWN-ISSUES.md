@@ -795,17 +795,27 @@ exactly 29,160c, which is what the wiki says Lyhr's offer is.
 
 **Gates this model still does not have (REPORTED, not implemented).** The
 wiki names three conditions that decide whether a route is available at
-all, and the module expresses none of them:
+all. One is now implemented; the other two are not:
 
 - **"Recipe: Legendary Obsidian Armor"**, the item that unlocks Lyhr's
-  exchange. The module has vocabulary for a recipe gate (`RequiredRecipe`,
-  `learnedRecipeIds` from `/v2/account/recipes`) but it is CRAFT-side
-  only: an offer has no notion of a required item, and `VendorOffer` has
-  no field for one. Without it the plan can recommend a vendor route the
-  player cannot use until they buy a 60-Provisioner-Token recipe sheet
-  first. This is the one worth doing: it needs a `VendorOffer` field, a
-  `tools/VendorOfferUpdater` scrape for it, and a check beside the
-  existing discipline gate.
+  exchange (FIXED). `VendorOffer` now carries `UnlockRecipeItemId` and
+  `UnlockRecipeId`: the recipe sheet the account must own, and the recipe
+  that sheet unlocks. When a committed vendor step's offer names one, the
+  sheet appears in Required Recipes, marked Missing! or Learned from the
+  same `/v2/account/recipes` set a craft recipe is marked from. The route
+  is never hidden and its cost never changes - hiding a route the player
+  could actually take is the worse failure. `tools/VendorOfferUpdater`
+  fills the fields from the wiki's `Has requirement` property: the value
+  must be exactly a `Recipe:` title (`VendorUnlockRequirementParser`), and
+  the GW2 API then supplies the recipe from the sheet item's
+  `details.recipe_id`. Measured over the full 70,644-row wiki scrape, that
+  rule matches 18 rows, all Lyhr's, and nothing else. The two ids are
+  deliberately NOT hashed into `offerId`, exactly like `SeasonalFestival`:
+  in that same corpus no two offers differ only by an item-valued
+  requirement, so no id collides, and back-filling a shipped row leaves
+  the id every consumer keys on untouched. `ref/vendor_offers.json` has
+  not been re-scraped yet, so every shipped offer still carries both
+  fields null.
 - **The "Astral Heartbeat" achievement** gating 100509 Arcanum of Astral
   Heartbeat, the one cost item in this chain with no recipe at all. The
   module reads achievement *bits* (`AchievementBitDedupPrePass`,
@@ -823,10 +833,11 @@ all, and the module expresses none of them:
   Purely informational in effect - the cost is right, the trip is longer
   than the plan implies.
 
-None of the three changes a COST, which is why none was implemented here:
-each turns a route from available into unavailable, and getting that
-wrong hides a route the player can actually take - the failure this whole
-item is about, in the other direction.
+None of the three changes a COST. The recipe gate was implemented by
+naming the unlock rather than acting on it; the other two are not, because
+acting on either turns a route from available into unavailable, and
+getting that wrong hides a route the player can actually take - the
+failure this whole item is about, in the other direction.
 
 ### 45. W3B: generation progress + rich logging
 
