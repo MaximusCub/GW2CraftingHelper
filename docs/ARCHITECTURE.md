@@ -2269,10 +2269,13 @@ plus divider) and 52px (Crafting Steps): the simulation, re-derived from the
 decompiled `ScaleBy` floor/ceil semantics and validated by reproducing the
 numbers above, shows BOTH new heights are in the vulnerable class at clearance
 0 (45px: 18.0% of phases at 0.81, 7.0% at 0.897; 52px: 10.3% at 0.897) and
-immune at clearance 1 at all four scales. The flush fit survives because the
-tier-2 heights absorb the clearance pixel in their own derivation:
-`42 + 2 + 1 = 45` puts the divider at 42..44, exactly under the 0..42 icon
-frame. The proof is executable - `RowDividerScissorSimulationTests` sweeps
+immune at clearance 1 at all four scales. One padded height later replaced
+those two. Every icon-led plan row is now
+`PlanContentHeightMath.IconLedRowHeight`, which is 50. The icon frame sits at
+y=2, so `2 + 42 + 3 + 2 + 1 = 50` puts the divider at 47..48. A reader sees 3px
+of clear space over the frame and 3px under it. The row still absorbs the
+clearance pixel in its own derivation, so the sweep covers 50 at clearance 1.
+The proof is executable - `RowDividerScissorSimulationTests` sweeps
 every shipped (`rowHeight`, `clearance`) pair at all four scales and fails on
 any vanish - so a future height change re-runs it by construction.
 
