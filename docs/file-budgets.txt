@@ -73,12 +73,14 @@ Models/SeasonalVendorTip.cs                                                     
 Models/SettingsFormState.cs                                                             149
 Models/SnapshotCharacterDiscipline.cs                                                   24
 Models/SnapshotHoldLocation.cs                                                          45
-Models/SnapshotItemEntry.cs                                                             45
-Models/SnapshotSearchRow.cs                                                             50
+Models/SnapshotItemEntry.cs                                                             80
+Models/SnapshotSearchRow.cs                                                             58
 Models/SnapshotSourceFilter.cs                                                          42
 Models/SnapshotWalletEntry.cs                                                           13
 Models/SocketedUpgradeIds.cs                                                            35
 Models/TimegatedItem.cs                                                                 37
+Models/TransmutedItemNames.cs                                                           34
+Models/TransmutedSkin.cs                                                                38
 Models/UsedMaterial.cs                                                                  19
 Models/VendorItemCostLine.cs                                                            42
 Models/VendorOffer.cs                                                                   73
@@ -118,7 +120,7 @@ Services/FirstLoadSnapshotGate.cs                                               
 Services/GlyphButtonMetrics.cs                                                          69
 Services/GridLayout.cs                                                                  93
 Services/Gw2AccountRecipeClient.cs                                                      30
-Services/Gw2AccountSnapshotService.cs                                                   653
+Services/Gw2AccountSnapshotService.cs                                                   734
 Services/Gw2ItemApiClient.cs                                                            261
 Services/Gw2PriceApiClient.cs                                                           66
 Services/Gw2RecipeApiClient.cs                                                          206
@@ -144,7 +146,7 @@ Services/ItemSearchProviderFactory.cs                                           
 Services/ItemSlotFacts.cs                                                               141
 Services/ItemStatBlockFactory.cs                                                        207
 Services/ItemStatMath.cs                                                                64
-Services/ItemStatTooltipComposer.cs                                                     766
+Services/ItemStatTooltipComposer.cs                                                     821
 Services/JsonSeedReader.cs                                                              46
 Services/LogGutterLayout.cs                                                             147
 Services/LogLineFormat.cs                                                               137
@@ -257,6 +259,7 @@ Services/StatusUpdateGuard.cs                                                   
 Services/StickyHeaderLayout.cs                                                          117
 Services/SummarySectionLayoutMath.cs                                                    853
 Services/TableSortState.cs                                                              114
+Services/TransmutedNameIndex.cs                                                         124
 Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
 Services/TextWrapMath.cs                                                                324
@@ -293,7 +296,7 @@ Views/ItemInputRowStrip.cs                                                      
 Views/ItemRowState.cs                                                                   39
 Views/LogTabContent.cs                                                                  1538
 Views/MainThreadMarshal.cs                                                              141
-Views/MainView.cs                                                                       2958
+Views/MainView.cs                                                                       2964
 Views/DialogWindow.cs                                                                   108
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    425
@@ -570,7 +573,7 @@ tests/TaimisToolbench.Tests/Services/SnapshotRefreshSlotTests.cs                
 tests/TaimisToolbench.Tests/Services/SnapshotResultLayoutTests.cs                       94
 tests/TaimisToolbench.Tests/Services/SnapshotSearchResultBuilderTests.cs                1152
 tests/TaimisToolbench.Tests/Services/SnapshotSerializationTests.cs                      283
-tests/TaimisToolbench.Tests/Services/SnapshotStoreTests.cs                              358
+tests/TaimisToolbench.Tests/Services/SnapshotStoreTests.cs                              433
 tests/TaimisToolbench.Tests/Services/SnapshotTableSorterTests.cs                        147
 tests/TaimisToolbench.Tests/Services/SocketedUpgradeTests.cs                            321
 tests/TaimisToolbench.Tests/Services/SortIndicatorLayoutTests.cs                        151
@@ -592,6 +595,7 @@ tests/TaimisToolbench.Tests/Services/TooltipTextFormatTests.cs                  
 tests/TaimisToolbench.Tests/Services/TopRegionLayoutMathTests.cs                        147
 tests/TaimisToolbench.Tests/Services/TradingPostMathTests.cs                            70
 tests/TaimisToolbench.Tests/Services/TradingPostServiceTests.cs                         507
+tests/TaimisToolbench.Tests/Services/TransmutedNameTests.cs                             350
 tests/TaimisToolbench.Tests/Services/TreeChipStripLayoutTests.cs                        283
 tests/TaimisToolbench.Tests/Services/TreeCostColumnMathTests.cs                         768
 tests/TaimisToolbench.Tests/Services/TreeRowIdentityTests.cs                            246

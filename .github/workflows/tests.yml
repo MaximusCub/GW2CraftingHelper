@@ -207,28 +207,31 @@ jobs:
             exit 1
           fi
 
-      - name: Every socketable stack records what is fitted into it
+      - name: Every stack records what is fitted into it and what it wears
         shell: bash
         run: |
           # The snapshot builds a row per stack from five account sources,
-          # and a row that drops its socketed ids loses them for good: the
-          # tooltip and the Snapshot hover read the stored row, never the
-          # API. Equipped gear reached the snapshot after the bag sources
-          # already recorded sockets, and its rows were built without them.
-          # `item.Id` is what marks a row built from an account API item;
-          # material storage builds from `mat` and has no sockets to lose.
+          # and a row that drops its socketed ids or its skin loses them for
+          # good: the tooltip and the Snapshot hover read the stored row,
+          # never the API. Equipped gear reached the snapshot after the bag
+          # sources already recorded sockets, and its rows were built
+          # without them. `item.Id` is what marks a row built from an
+          # account API item; material storage builds from `mat` and
+          # carries neither field.
           f=Services/Gw2AccountSnapshotService.cs
           rows=$(grep -c 'ItemId = item.Id,' "$f" || true)
           ups=$(grep -c 'Upgrades = SocketedIds(item.Upgrades),' "$f" || true)
           infs=$(grep -c 'Infusions = SocketedIds(item.Infusions),' "$f" || true)
-          if [ "$rows" -lt 1 ] || [ "$ups" -ne "$rows" ] || [ "$infs" -ne "$rows" ]; then
+          skins=$(grep -c 'SkinId = SkinIdOf(item.Skin),' "$f" || true)
+          if [ "$rows" -lt 1 ] || [ "$ups" -ne "$rows" ] || [ "$infs" -ne "$rows" ] \
+              || [ "$skins" -ne "$rows" ]; then
             echo "$f builds $rows rows from an account API item, but records"
-            echo "Upgrades on $ups of them and Infusions on $infs."
-            echo "Every such row must carry both, the way the bank rows do."
+            echo "Upgrades on $ups of them, Infusions on $infs and SkinId on $skins."
+            echo "Every such row must carry all three, the way the bank rows do."
             grep -n 'ItemId = item.Id,' "$f"
             exit 1
           fi
-          echo "$rows rows built from an account item; all record both socket fields."
+          echo "$rows rows built from an account item; all record sockets and skin."
 
       - name: Live docs cite source paths that exist
         shell: bash

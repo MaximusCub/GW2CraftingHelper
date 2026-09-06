@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using Newtonsoft.Json;
 
 namespace TaimisToolbench.Models
@@ -41,5 +42,39 @@ namespace TaimisToolbench.Models
         /// </summary>
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
         public List<int> Infusions { get; set; }
+
+        /// <summary>
+        /// The skin applied to this stack, or 0 when it wears its own
+        /// look. Held per stack because the game applies a skin per copy:
+        /// two copies of one sword can wear different skins.
+        /// <para>
+        /// /v2/account/materials and /v2/account/legendaryarmory carry no
+        /// skin field, so their rows are always 0. Written only when set,
+        /// so a snapshot.json from before this field loads to 0.
+        /// </para>
+        /// </summary>
+        [DefaultValue(0)]
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public int SkinId { get; set; }
+
+        /// <summary>
+        /// The skin's own name, resolved from /v2/skins at capture time
+        /// the way <see cref="Name"/> is resolved from /v2/items. Empty
+        /// when no skin is applied, and empty as well when the lookup did
+        /// not answer, so a reader never has an id it cannot name.
+        /// </summary>
+        [DefaultValue("")]
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public string SkinName { get; set; } = "";
+
+        /// <summary>
+        /// The skin's own icon, from the same /v2/skins response
+        /// <see cref="SkinName"/> comes from, so it costs no additional
+        /// request. Empty on the same terms. Models.TransmutedSkin says why
+        /// a reader must not take one of the two without the other.
+        /// </summary>
+        [DefaultValue("")]
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public string SkinIconUrl { get; set; } = "";
     }
 }
