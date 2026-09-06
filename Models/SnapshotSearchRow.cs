@@ -30,21 +30,13 @@ namespace TaimisToolbench.Models
 
         public int TotalCount { get; set; }
 
-        public List<SnapshotSourceCount> Breakdown { get; set; } = new List<SnapshotSourceCount>();
-    }
-
-    /// <summary>
-    /// One source's contribution to a <see cref="SnapshotSearchRow"/>'s
-    /// total - Label is already the display-formatted source name (e.g.
-    /// "Material Storage", "Character: Zaeed"), never the raw
-    /// AccountItemIndex source key (repo invariant: source strings are
-    /// already display names, but the raw "Character:" prefix is an
-    /// internal encoding token that must never reach the UI verbatim).
-    /// </summary>
-    internal class SnapshotSourceCount
-    {
-        public string Label { get; set; } = "";
-
-        public int Count { get; set; }
+        /// <summary>
+        /// Every place holding some of <see cref="TotalCount"/>, in the
+        /// order AccountItemIndex.GetPrioritizedSources produced. Not
+        /// display text: Services.SnapshotHoldLine turns the whole list into
+        /// one line, because whether a place prints its count depends on the
+        /// other places in the same list.
+        /// </summary>
+        public List<SnapshotHoldLocation> Breakdown { get; set; } = new List<SnapshotHoldLocation>();
     }
 }

@@ -72,6 +72,7 @@ Models/RequiredRecipe.cs                                                        
 Models/SeasonalVendorTip.cs                                                             48
 Models/SettingsFormState.cs                                                             149
 Models/SnapshotCharacterDiscipline.cs                                                   24
+Models/SnapshotHoldLocation.cs                                                          45
 Models/SnapshotItemEntry.cs                                                             45
 Models/SnapshotSearchRow.cs                                                             50
 Models/SnapshotSourceFilter.cs                                                          42
@@ -86,7 +87,7 @@ Module.cs                                                                       
 Properties/AssemblyInfo.cs                                                              12
 Services/AboutLayoutMath.cs                                                             163
 Services/AccountCurrencyIndex.cs                                                        44
-Services/AccountItemIndex.cs                                                            145
+Services/AccountItemIndex.cs                                                            232
 Services/AchievementBitDedupPrePass.cs                                                  197
 Services/AcquisitionHintService.cs                                                      75
 Services/BoundedConcurrency.cs                                                          51
@@ -117,7 +118,7 @@ Services/FirstLoadSnapshotGate.cs                                               
 Services/GlyphButtonMetrics.cs                                                          69
 Services/GridLayout.cs                                                                  93
 Services/Gw2AccountRecipeClient.cs                                                      30
-Services/Gw2AccountSnapshotService.cs                                                   596
+Services/Gw2AccountSnapshotService.cs                                                   653
 Services/Gw2ItemApiClient.cs                                                            261
 Services/Gw2PriceApiClient.cs                                                           66
 Services/Gw2RecipeApiClient.cs                                                          206
@@ -236,6 +237,7 @@ Services/SnapshotFailureKind.cs                                                 
 Services/SnapshotFetchFailedException.cs                                                69
 Services/SnapshotHeaderLayout.cs                                                        209
 Services/SnapshotHelpers.cs                                                             79
+Services/SnapshotHoldLine.cs                                                            221
 Services/SnapshotItemGridLayout.cs                                                      250
 Services/SnapshotRefreshSlot.cs                                                         93
 Services/SnapshotResultLayout.cs                                                        90
@@ -376,7 +378,7 @@ tests/TaimisToolbench.Tests/Models/PlanHistorySchemaMemberSetTests.cs           
 tests/TaimisToolbench.Tests/Models/SettingsFormStateTests.cs                            326
 tests/TaimisToolbench.Tests/Services/AboutLayoutMathTests.cs                            209
 tests/TaimisToolbench.Tests/Services/AccountCurrencyIndexTests.cs                       80
-tests/TaimisToolbench.Tests/Services/AccountItemIndexTests.cs                           355
+tests/TaimisToolbench.Tests/Services/AccountItemIndexTests.cs                           417
 tests/TaimisToolbench.Tests/Services/AchievementBitDedupPrePassTests.cs                 290
 tests/TaimisToolbench.Tests/Services/AcquisitionHintSeedVendorAgreementTests.cs         142
 tests/TaimisToolbench.Tests/Services/AcquisitionHintServiceTests.cs                     245
@@ -425,7 +427,7 @@ tests/TaimisToolbench.Tests/Services/Gw2RecipeApiClientParseTests.cs            
 tests/TaimisToolbench.Tests/Services/HeaderCellMathTests.cs                             221
 tests/TaimisToolbench.Tests/Services/IconFrameGeometryTests.cs                          127
 tests/TaimisToolbench.Tests/Services/InlineSpinnerLayoutTests.cs                        87
-tests/TaimisToolbench.Tests/Services/InventoryReducerTests.cs                           1714
+tests/TaimisToolbench.Tests/Services/InventoryReducerTests.cs                           1775
 tests/TaimisToolbench.Tests/Services/ItemDescriptionSanitizerTests.cs                   155
 tests/TaimisToolbench.Tests/Services/ItemIconTiersTests.cs                              164
 tests/TaimisToolbench.Tests/Services/ItemInputGridLayoutTests.cs                        356
@@ -562,10 +564,11 @@ tests/TaimisToolbench.Tests/Services/SnapshotFailureClassifierTests.cs          
 tests/TaimisToolbench.Tests/Services/SnapshotFetchFailedExceptionTests.cs               75
 tests/TaimisToolbench.Tests/Services/SnapshotHeaderLayoutTests.cs                       441
 tests/TaimisToolbench.Tests/Services/SnapshotHelpersTests.cs                            95
+tests/TaimisToolbench.Tests/Services/SnapshotHoldLineTests.cs                           206
 tests/TaimisToolbench.Tests/Services/SnapshotItemGridLayoutTests.cs                     336
 tests/TaimisToolbench.Tests/Services/SnapshotRefreshSlotTests.cs                        241
 tests/TaimisToolbench.Tests/Services/SnapshotResultLayoutTests.cs                       94
-tests/TaimisToolbench.Tests/Services/SnapshotSearchResultBuilderTests.cs                1069
+tests/TaimisToolbench.Tests/Services/SnapshotSearchResultBuilderTests.cs                1152
 tests/TaimisToolbench.Tests/Services/SnapshotSerializationTests.cs                      283
 tests/TaimisToolbench.Tests/Services/SnapshotStoreTests.cs                              358
 tests/TaimisToolbench.Tests/Services/SnapshotTableSorterTests.cs                        147

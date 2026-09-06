@@ -81,6 +81,7 @@ namespace TaimisToolbench.Views
         private bool _bankEnabled = true;
         private bool _materialStorageEnabled = true;
         private bool _sharedInventoryEnabled = true;
+        private bool _legendaryArmoryEnabled = true;
 
         // Exclusion set, keyed by character name: absent means checked, so
         // a character new in a fresh snapshot defaults to visible. Stale
@@ -878,6 +879,7 @@ namespace TaimisToolbench.Views
             AddSourceCheckbox("Bank", _bankEnabled, isChecked => _bankEnabled = isChecked);
             AddSourceCheckbox("Material Storage", _materialStorageEnabled, isChecked => _materialStorageEnabled = isChecked);
             AddSourceCheckbox("Shared Inventory", _sharedInventoryEnabled, isChecked => _sharedInventoryEnabled = isChecked);
+            AddSourceCheckbox("Legendary Armory", _legendaryArmoryEnabled, isChecked => _legendaryArmoryEnabled = isChecked);
 
             // A master toggle earns its place only once there is more than
             // one character to cascade to.
@@ -1879,6 +1881,7 @@ namespace TaimisToolbench.Views
                     Bank = _bankEnabled,
                     MaterialStorage = _materialStorageEnabled,
                     SharedInventory = _sharedInventoryEnabled,
+                    LegendaryArmory = _legendaryArmoryEnabled,
                     UncheckedCharacters = new HashSet<string>(_uncheckedCharacters, StringComparer.Ordinal),
                 };
 
@@ -2700,17 +2703,12 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// The row's source breakdown as one line, or "". NOT the Amount
-        /// column's prefix notation, and the one deliberate exemption from
-        /// it: these labels are LOCATIONS. "20x Bank" parses as
-        /// twenty banks, and "10x Character: Maximus Test" collides with
-        /// the label's own colon.
+        /// The row's line of holding places, or "". The wording is
+        /// SnapshotHoldLine's, which is where it can be tested.
         /// </summary>
         private static string BreakdownText(SnapshotSearchRow row)
         {
-            return row.Breakdown == null || row.Breakdown.Count == 0
-                ? ""
-                : string.Join("   ", row.Breakdown.Select(b => $"{b.Label} {b.Count}"));
+            return SnapshotHoldLine.Format(row.Breakdown);
         }
 
         /// <summary>The rarity this tab can know for an item, or null -

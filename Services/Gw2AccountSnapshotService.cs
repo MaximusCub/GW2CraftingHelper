@@ -41,16 +41,27 @@ namespace TaimisToolbench.Services
             return _apiManager.HasPermissions(RequiredPermissions);
         }
 
-        // The 5 independent top-level account-data sources tallied for
+        // The 6 independent top-level account-data sources tallied for
         // success/failure. Per-character inventory and equipment failures
         // are not counted individually - they are tolerated as a partial
         // Characters-source degradation.
-        private const int SourceCount = 5;
+        private const int SourceCount = 6;
+
+        // /v2/account/legendaryarmory needs the "unlocks" scope, which
+        // manifest.json declares optional. A token without it cannot serve
+        // that endpoint, so the fetch is not attempted and the account has
+        // one source fewer rather than one failed source.
+        private static readonly TokenPermission[] LegendaryArmoryPermissions =
+        {
+            TokenPermission.Unlocks,
+        };
 
         public async Task<AccountSnapshot> FetchSnapshotAsync(CancellationToken ct)
         {
             var snapshot = new AccountSnapshot { CapturedAt = DateTime.UtcNow };
             int failedSources = 0;
+            bool canReadLegendaryArmory = _apiManager.HasPermissions(LegendaryArmoryPermissions);
+            int totalSources = canReadLegendaryArmory ? SourceCount : SourceCount - 1;
 
             // Per-source failure type names, captured here (where Gw2Sharp
             // exception types are in scope) as plain strings so the
@@ -179,6 +190,45 @@ namespace TaimisToolbench.Services
 
             ct.ThrowIfCancellationRequested();
 
+            // Legendary Armory
+            //
+            // Read from its own endpoint rather than inferred from
+            // equipment slots. A slot drawing a legendary out of the armory
+            // reports it once per slot per character, so the equipment
+            // fetch drops those entries (IsHeldByCharacter); this endpoint
+            // reports each item once for the whole account, with a count of
+            // how many an equipment template can draw at a time.
+            if (canReadLegendaryArmory)
+            {
+                try
+                {
+                    var armory = await _apiManager.Gw2ApiClient.V2.Account.LegendaryArmory.GetAsync(ct);
+                    foreach (var entry in armory)
+                    {
+                        if (entry == null || entry.Count <= 0)
+                        {
+                            continue;
+                        }
+
+                        snapshot.Items.Add(new SnapshotItemEntry
+                        {
+                            ItemId = entry.Id,
+                            Count = entry.Count,
+                            Source = AccountItemIndex.SourceLegendaryArmory,
+                        });
+                    }
+                }
+                catch (Exception ex) when (!(ex is OperationCanceledException))
+                {
+                    Logger.Warn(ex, "Failed to fetch legendary armory");
+                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch legendary armory: {ex.GetType().Name} - {ex.Message}");
+                    failedSources++;
+                    failedSourceExceptionTypeNames.Add(ex.GetType().Name);
+                }
+
+                ct.ThrowIfCancellationRequested();
+            }
+
             // Character inventories + crafting disciplines
             try
             {
@@ -259,7 +309,7 @@ namespace TaimisToolbench.Services
             // a prior good fetch (see SnapshotFetchFailedException).
             if (failedSources > 0)
             {
-                throw new SnapshotFetchFailedException(failedSources, SourceCount, failedSourceExceptionTypeNames);
+                throw new SnapshotFetchFailedException(failedSources, totalSources, failedSourceExceptionTypeNames);
             }
 
             // Resolve display names and icon URLs
@@ -320,8 +370,9 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// What this character is wearing, plus what its saved equipment
-        /// tabs hold, as one entry per physical item under the same
-        /// "Character:&lt;name&gt;" source its bags use.
+        /// tabs hold, as one entry per physical item under the
+        /// "Equipped:&lt;name&gt;" source, which is not the source its bags
+        /// use.
         /// <para>
         /// /v2/characters/:id/equipment returns each physical item once and
         /// names every tab it sits in, so an item shared by three loadouts
@@ -331,7 +382,9 @@ namespace TaimisToolbench.Services
         /// character holds; the two Legendary Armory values are an
         /// account-wide shared copy reported once per slot per character,
         /// so counting them would multiply one legendary by the number of
-        /// slots using it. Never throws, like the inventory fetch.
+        /// slots using it - the account's own
+        /// /v2/account/legendaryarmory read carries those instead. Never
+        /// throws, like the inventory fetch.
         /// </para>
         /// </summary>
         private async Task<List<SnapshotItemEntry>> FetchCharacterEquipmentItemsAsync(string characterName, CancellationToken ct)
@@ -353,7 +406,11 @@ namespace TaimisToolbench.Services
                         {
                             ItemId = item.Id,
                             Count = 1,
-                            Source = AccountItemIndex.CharacterSourcePrefix + characterName,
+
+                            // Worn gear gets its own source encoding so the
+                            // snapshot can tell it apart from this same
+                            // character's bag contents.
+                            Source = AccountItemIndex.CharacterEquipmentSourcePrefix + characterName,
                             Upgrades = SocketedIds(item.Upgrades),
                             Infusions = SocketedIds(item.Infusions),
                         });
