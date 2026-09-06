@@ -290,7 +290,7 @@ Services/WindowSizing.cs                                                        
 Views/AboutTabContent.cs                                                                1000
 Views/ApiAccessDialog.cs                                                                231
 Views/AutocompleteTextBox.cs                                                            45
-Views/CraftingPlanView.cs                                                               5233
+Views/CraftingPlanView.cs                                                               5228
 Views/FocusRelease.cs                                                                   159
 Views/ItemInputRowStrip.cs                                                              465
 Views/ItemRowState.cs                                                                   39

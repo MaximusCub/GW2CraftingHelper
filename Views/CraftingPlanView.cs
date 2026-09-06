@@ -603,12 +603,13 @@ namespace TaimisToolbench.Views
         // panel width, so re-seating it on every drag tick stretches each
         // cell between two boundaries and repacks the whole strip at each
         // one. This gate holds the newest width and releases it once the
-        // drag ends. Everything whose position derives from the strip's
-        // width reads AppliedWidth, never the live width: the reserved
-        // height and the strip it reserves for have to move on the same
-        // frame or the content jumps ahead of the strip.
+        // drag ends, or once a resize no drag drove goes quiet. Everything
+        // whose position derives from the strip's width reads AppliedWidth,
+        // never the live width: the reserved height and the strip it
+        // reserves for have to move on the same frame or the content jumps
+        // ahead of the strip.
         private readonly DeferredReflowGate _stripReflow =
-            new DeferredReflowGate(StripReflowStallMs);
+            new DeferredReflowGate(ResizeDebounceMs, StripReflowStallMs);
 
         #endregion // Resize relayout: the closure registries - KNOWN-ISSUES #13/#19
 
@@ -2965,7 +2966,7 @@ namespace TaimisToolbench.Views
             // below can never move ahead of the strip above it. The panel
             // itself still takes the live width - it is the clipping frame
             // for cells that a narrowing drag has not re-seated yet.
-            _stripReflow.Observe(w, nowUtc);
+            _stripReflow.Observe(w, nowUtc, ResizeDragActive());
             var layout = ComputeTopRegionLayout(_stripReflow.AppliedWidth);
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
 
@@ -3386,8 +3387,8 @@ namespace TaimisToolbench.Views
         /// An alt-tab mid-drag would otherwise leave the flag set.
         /// </para>
         /// <para>
-        /// A resize this window does not drive reads false here, and its
-        /// ticks are applied on the first take that follows.
+        /// A resize this window does not drive reads false here. The gate
+        /// collapses that burst on its quiet interval instead.
         /// </para>
         /// </summary>
         private bool ResizeDragActive()

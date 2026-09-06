@@ -8,8 +8,8 @@ namespace TaimisToolbench.Services
     /// seats another column every time the window crosses a column-count
     /// boundary, so a drag that crosses several boundaries repacks the
     /// whole strip once per boundary and stretches every cell in between.
-    /// The gate holds the newest width and hands it back exactly once, on
-    /// the first take after the drag stops - see <see cref="TryTake"/>.
+    /// The gate holds the newest width and hands it back exactly once - see
+    /// <see cref="TryTake"/> for when.
     /// <para>
     /// Blish-free and clock-injected: the caller passes the time and
     /// whether a drag is still running, so the state machine is decidable
@@ -18,16 +18,21 @@ namespace TaimisToolbench.Services
     /// </summary>
     internal sealed class DeferredReflowGate
     {
+        private readonly double _settleMs;
         private readonly double _stallMs;
         private bool _pending;
+        private bool _dragSeenWhilePending;
         private int _pendingWidth;
         private DateTime _pendingSinceUtc;
 
+        /// <param name="settleMs">Quiet interval that releases a reflow no
+        /// drag drove.</param>
         /// <param name="stallMs">Ceiling on how long a drag that reads as
         /// still running may hold a reflow back - see <see cref="TryTake"/>.
         /// </param>
-        public DeferredReflowGate(double stallMs)
+        public DeferredReflowGate(double settleMs, double stallMs)
         {
+            _settleMs = settleMs > 0 ? settleMs : 0;
             _stallMs = stallMs > 0 ? stallMs : 0;
         }
 
@@ -61,6 +66,7 @@ namespace TaimisToolbench.Services
             AppliedWidth = width;
             _pendingWidth = width;
             _pending = false;
+            _dragSeenWhilePending = false;
         }
 
         /// <summary>Abandons a deferred width without applying it - the
@@ -69,6 +75,7 @@ namespace TaimisToolbench.Services
         {
             _pendingWidth = AppliedWidth;
             _pending = false;
+            _dragSeenWhilePending = false;
         }
 
         /// <summary>
@@ -76,8 +83,14 @@ namespace TaimisToolbench.Services
         /// reflow is pending afterwards. A width equal to the applied one
         /// cancels the pending reflow rather than scheduling a no-op: a
         /// drag that returns to where it started has nothing to re-seat.
+        /// <para>
+        /// <paramref name="dragActive"/> is what makes this pending width a
+        /// DRAG's rather than a resize the window performed on its own. It
+        /// is recorded here as well as at the take, so a drag whose ticks
+        /// all land before the first take is still recognised as one.
+        /// </para>
         /// </summary>
-        public bool Observe(int width, DateTime nowUtc)
+        public bool Observe(int width, DateTime nowUtc, bool dragActive)
         {
             if (width == AppliedWidth)
             {
@@ -86,6 +99,7 @@ namespace TaimisToolbench.Services
             }
 
             _pending = true;
+            _dragSeenWhilePending |= dragActive;
             _pendingWidth = width;
             _pendingSinceUtc = nowUtc;
             return true;
@@ -96,17 +110,19 @@ namespace TaimisToolbench.Services
         /// counts it as applied from that moment, so a caller that takes a
         /// width must be able to act on it.
         /// <para>
-        /// The release is the end of the drag and nothing else. No quiet
-        /// interval releases a reflow: a hand steady for a moment is
-        /// ordinary inside a drag, and re-seating the strip on that pause
-        /// is what the drag felt clunky for.
+        /// A drag releases on the frame it ends and on nothing else. A
+        /// hand steady for a moment is ordinary inside a drag, and
+        /// re-seating the strip on that pause is what felt clunky.
         /// </para>
         /// <para>
-        /// <c>stallMs</c> bounds the wait, because a drag flag can outlive
-        /// the drag. It runs from the last width observed, so a live drag
-        /// reaches it only by holding the grip still for the whole of it,
-        /// and the number the caller passes has to be far longer than any
-        /// pause a person makes mid-drag.
+        /// A resize no drag drove - a resolution change, a fullscreen
+        /// toggle - has no release to wait for and arrives as a burst of
+        /// ticks, so <c>settleMs</c> collapses it to one reflow.
+        /// </para>
+        /// <para>
+        /// <c>stallMs</c> bounds the drag's wait, because a drag flag can
+        /// outlive the drag. It runs from the last width observed, so a
+        /// live drag reaches it only by holding the grip still.
         /// </para>
         /// </summary>
         public bool TryTake(DateTime nowUtc, bool dragActive, out int width)
@@ -117,7 +133,16 @@ namespace TaimisToolbench.Services
                 return false;
             }
 
-            if (dragActive && (nowUtc - _pendingSinceUtc).TotalMilliseconds < _stallMs)
+            double sincePending = (nowUtc - _pendingSinceUtc).TotalMilliseconds;
+            if (dragActive)
+            {
+                _dragSeenWhilePending = true;
+                if (sincePending < _stallMs)
+                {
+                    return false;
+                }
+            }
+            else if (!_dragSeenWhilePending && sincePending < _settleMs)
             {
                 return false;
             }
@@ -125,6 +150,7 @@ namespace TaimisToolbench.Services
             width = _pendingWidth;
             AppliedWidth = _pendingWidth;
             _pending = false;
+            _dragSeenWhilePending = false;
             return true;
         }
     }
