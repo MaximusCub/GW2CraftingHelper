@@ -85,6 +85,7 @@
   <ItemGroup>
     <Compile Include="Models\AccountSnapshot.cs" />
     <Compile Include="Models\SnapshotItemEntry.cs" />
+    <Compile Include="Models\SocketedUpgradeIds.cs" />
     <Compile Include="Models\SnapshotWalletEntry.cs" />
     <Compile Include="Models\SnapshotCharacterDiscipline.cs" />
     <Compile Include="Models\SnapshotSearchRow.cs" />
@@ -95,6 +96,7 @@
     <Compile Include="Services\SnapshotHeaderLayout.cs" />
     <Compile Include="Services\SnapshotHelpers.cs" />
     <Compile Include="Services\SnapshotSearchResultBuilder.cs" />
+    <Compile Include="Services\SocketedUpgradeIndex.cs" />
     <Compile Include="Services\PanelChromeMath.cs" />
     <Compile Include="Services\SourceFilterFlowLayout.cs" />
     <Compile Include="Services\SnapshotStore.cs" />
@@ -223,6 +225,8 @@
     <Compile Include="Services\ItemDescriptionSanitizer.cs" />
     <Compile Include="Services\ItemStatBlockFactory.cs" />
     <Compile Include="Services\ItemStatTooltipComposer.cs" />
+    <Compile Include="Services\SocketedUpgradeView.cs" />
+    <Compile Include="Services\UpgradeEffectLines.cs" />
     <Compile Include="Services\ItemRowTooltipComposer.cs" />
     <Compile Include="Services\ItemTooltipIdentity.cs" />
     <Compile Include="Services\ExcessCraftOutputCalculator.cs" />

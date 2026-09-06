@@ -52,6 +52,18 @@ namespace TaimisToolbench.Views
         // every call. See SnapshotSearchResultBuilder.BuildRepresentativeIndex.
         private Dictionary<int, SnapshotItemEntry> _itemsById;
 
+        // itemId -> what every stack of it agrees is socketed into it,
+        // built beside _itemsById once per snapshot. Absent for an id whose
+        // stacks disagree - see SocketedUpgradeIndex.
+        private IReadOnlyDictionary<int, SocketedUpgradeIds> _socketsByItemId;
+
+        // Tops up the stat blocks the socket blocks are drawn FROM. Scoped
+        // to the socketed ids and their hosts rather than to the whole
+        // snapshot: an account's item list runs into the thousands, while
+        // the objects that carry a rune, sigil or infusion outside its
+        // equipped gear number in the tens.
+        private readonly ItemStatWarmer _socketWarmer;
+
         private string _initialStatus;
         private readonly Func<Task<AccountSnapshot>> _refreshAsync;
         private readonly ApiAccessDialog _apiAccessDialog;
@@ -407,8 +419,13 @@ namespace TaimisToolbench.Views
             // a pure cache read on the same terms as the item lookup
             // above: before /v2/currencies has landed the hover shows the
             // name and balance the row already holds, without its prose.
-            Func<int, CurrencyMetadata> getCurrencyMetadata = null)
+            Func<int, CurrencyMetadata> getCurrencyMetadata = null,
+            // Background stat top-up for the socketed components, which no
+            // other tab has any reason to fetch. Optional: without it the
+            // rows keep the tooltips they had, minus the socket blocks.
+            Func<IReadOnlyList<int>, Task<int>> warmItemStatsAsync = null)
         {
+            _socketWarmer = new ItemStatWarmer(warmItemStatsAsync, "snapshot");
             _snapshot = snapshot;
             // The constructor sets _snapshot directly, bypassing
             // SetSnapshot - the index needs its own build call here too,
@@ -418,6 +435,7 @@ namespace TaimisToolbench.Views
             _accountItemIndex = new AccountItemIndex(_snapshot?.Items);
             _itemsById = SnapshotSearchResultBuilder.BuildRepresentativeIndex(_snapshot?.Items);
             _characterNames = SnapshotSearchResultBuilder.CollectCharacterNames(_snapshot);
+            IndexSockets();
             _initialStatus = initialStatus;
             _refreshAsync = refreshAsync;
             _apiAccessDialog = apiAccessDialog;
@@ -446,6 +464,7 @@ namespace TaimisToolbench.Views
             _snapshot = snapshot;
             _accountItemIndex = new AccountItemIndex(_snapshot?.Items);
             _itemsById = SnapshotSearchResultBuilder.BuildRepresentativeIndex(_snapshot?.Items);
+            IndexSockets();
 
             var characterNames = SnapshotSearchResultBuilder.CollectCharacterNames(_snapshot);
             bool rosterChanged = !RosterEquals(_characterNames, characterNames);
@@ -2567,13 +2586,55 @@ namespace TaimisToolbench.Views
         private ItemIconTooltip ItemRowHover(SnapshotSearchRow row, string rarity, string breakdown)
         {
             int itemId = row.ItemId;
-            return ItemIconTooltip.ForItem(
-                ItemTooltipIdentity.ForItem(row.Name ?? "", row.IconUrl, rarity),
-                _getItemStatBlock == null || itemId <= 0 ? (Func<ItemStatBlock>)null
-                    : () => _getItemStatBlock(itemId),
-                () => string.IsNullOrEmpty(breakdown)
-                    ? (IReadOnlyList<string>)null
-                    : new List<string> { breakdown });
+            var identity = ItemTooltipIdentity.ForItem(row.Name ?? "", row.IconUrl, rarity);
+            bool hasStats = _getItemStatBlock != null && itemId > 0;
+
+            // Composed rather than ForItem: the socket blocks are CONTENT
+            // (coloured spans and per-component icons), and they belong
+            // inside the stat block's own line order, not appended after it
+            // as prose. Everything is read at hover time, so a stat block
+            // the socket top-up lands after the row was built still shows.
+            return ItemIconTooltip.Composed(identity, () =>
+            {
+                var stats = hasStats ? _getItemStatBlock(itemId) : null;
+                var extras = new TooltipContentBuilder();
+                if (!string.IsNullOrEmpty(breakdown))
+                {
+                    extras.Text(breakdown).EndLine();
+                }
+
+                return ItemRowTooltipComposer.BuildRowContent(
+                    ItemStatTooltipComposer.BuildContent(stats, SocketsFor(itemId)),
+                    identity,
+                    extras.Build());
+            });
+        }
+
+        /// <summary>
+        /// Rebuilds the per-item socket index for the current snapshot and
+        /// starts the background top-up its blocks need. Once per snapshot,
+        /// not once per keystroke: the index is read by every hover but
+        /// changes only when the snapshot does.
+        /// </summary>
+        private void IndexSockets()
+        {
+            _socketsByItemId = SocketedUpgradeIndex.Build(_snapshot?.Items);
+            _socketWarmer.Start(SocketedUpgradeIndex.ItemIdsToResolve(_socketsByItemId));
+        }
+
+        /// <summary>What this row's stacks agree is socketed into them,
+        /// resolved against the session stat cache - empty when they
+        /// disagree, when nothing is socketed, or when the components'
+        /// stat blocks have not landed yet.</summary>
+        private SocketedUpgradeView SocketsFor(int itemId)
+        {
+            if (_socketsByItemId == null || _getItemStatBlock == null
+                || !_socketsByItemId.TryGetValue(itemId, out var ids))
+            {
+                return SocketedUpgradeView.None;
+            }
+
+            return SocketedUpgradeView.Resolve(ids, _getItemStatBlock);
         }
 
         /// <summary>

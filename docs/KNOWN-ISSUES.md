@@ -658,6 +658,28 @@ accepted divergence from the game's "Unused Infusion Slot" wording, and the
 warhelm first-band divergence (G15). Full record:
 `dev/archive/known-issues/2026-08-23-tooltip-authenticity.md`.
 
+**Follow-up (PARTLY FIXED): what is socketed is no longer unknowable.** The
+record above lists "what is actually socketed in the player's copy" among
+the things the API cannot tell us. That was true of `/v2/items`, which
+describes a definition, and false of `/v2/account/*`, which reports
+`upgrades` and `infusions` per owned stack. The Snapshot tab now names the
+runes, sigils, infusions and enrichments in a stack it holds, each with its
+own icon and effect text, where it previously printed an anonymous
+"Infusion Slot" line. A stack whose contents are still unknown keeps that
+line, and an item id whose stacks disagree reports nothing rather than one
+stack's reading, because a Snapshot row sums every stack of an id.
+
+Two residuals, both wanting character equipment the module does not fetch.
+First, the `(n/m)` set counter the game prints beside a socketed rune: the
+denominator is `details.bonuses.length` and is known, but the numerator is
+how many pieces of that set are equipped on the character being played, so
+no honest number exists here and none is printed. Second, and following
+from it, every tier of a socketed rune's ladder renders inactive - true of
+the piece itself, which is by construction not equipped, and a divergence
+from the game whenever the same rune is worn elsewhere. Both close together
+if a snapshot ever reads `/v2/characters/:id/equipment`, which returns the
+same `upgrades` and `infusions` arrays per slot.
+
 ### 43. Tooltip text wrapping and Blish's 500px cap (audit batches A+B+C)
 
 Blish's own tooltip already bounds width at 500px; what the module adds is
