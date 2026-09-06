@@ -823,11 +823,22 @@ plan. A barter line's own scaled quantity rides on
 
 An offer with at least one non-coin line that has **no** valuation
 (including when it is mixed with other, valued lines) is incomparable with
-coin costs and is reported only as a **fallback**, ranked by lowest coin
-part. A fallback coin-part tie is broken by unit count only when both
-offers cost the same single non-coin line, kind included; ties across
-different lines keep the first-listed offer, because ranking across them
-has no exchange rate and their unit counts must never be compared.
+coin costs and is reported only as a **fallback**. Fallback offers are
+ranked on three keys, most significant first: whether the offer carries a
+barter line, then its coin part, then unit count. A fallback coin-part tie
+is broken by unit count only when both offers cost the same single
+non-coin line, kind included; ties across different lines keep the
+first-listed offer, because ranking across them has no exchange rate and
+their unit counts must never be compared.
+
+The barter key comes first because a barter line contributes nothing to
+the coin part, so ranking on coin alone reads an unpriceable cost as a
+cheap one. Three Secrets of the Obscure materials are each sold for a flat
+250 map currency and are each also listed against several account-bound
+zone reward chests. Every chest offer scored a coin part of 0 and beat the
+flat price, and the plan told the player to acquire chests the module can
+neither price, buy nor craft. Both offers stay selectable; only the order
+changed.
 
 That coin part is a **partial** accounting of the offer, and how partial
 depends on which kind of line was left unvalued. An unvalued wallet
