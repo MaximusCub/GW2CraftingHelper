@@ -136,7 +136,7 @@ namespace TaimisToolbench.Services
         public static FontInk CaptionInk => Regular14;
 
         /// <summary>
-        /// The digits in a coin run, sized against the 16px coin icon
+        /// The digits in a coin run, sized against the 18px coin icon
         /// rather than against the prose around them - the measurement is
         /// on Views/Rendering/UiFonts.CoinDigits, the face this ink belongs
         /// to. Named for the role so a caller putting a coin run on one

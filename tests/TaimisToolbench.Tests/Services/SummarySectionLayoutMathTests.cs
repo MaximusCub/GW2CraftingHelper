@@ -212,8 +212,8 @@ namespace TaimisToolbench.Tests.Services
             // 6 margin + 6 pad + 29 caption line + 8 label-to-value gap
             // + 20 amount run + 6 pad + 6 margin. The amount run is 20
             // because the amount TEXT is 20; it read as "the coin icon" only
-            // while inline coins also drew at 20, and stayed 20 when they
-            // moved onto the 16px wallet BAR tier.
+            // while inline coins also drew at 20, and stayed 20 at the 18px
+            // wallet BAR tier.
             Assert.Equal(81, SummarySectionLayoutMath.CostBandHeight(false));
         }
 

@@ -207,7 +207,7 @@ namespace TaimisToolbench.Services
         // Spelled as CoinSegmentMath.CoinIconSize alone until the wallet BAR
         // tier made the icon the SHORTER of the pair: that only ever agreed
         // with the text by coincidence, and a reserve named after the icon
-        // now under-reserves by 4px.
+        // now under-reserves by 2px.
         public const int AmountTextLineHeight = 20;
         public const int AmountRunHeight =
             CoinSegmentMath.CoinIconSize > AmountTextLineHeight
@@ -261,9 +261,9 @@ namespace TaimisToolbench.Services
         // y is not a constant of the row at all.
         //
         // AmountRunHeight, never CoinSegmentMath.CoinIconSize: the run is as
-        // tall as the taller of its text and its icon, and since the coin
-        // runs moved onto the 16px wallet BAR tier that is the text. Naming
-        // the icon here would under-reserve the row by 4px.
+        // tall as the taller of its text and its icon, and at the 18px
+        // wallet BAR tier that is the text. Naming the icon here would
+        // under-reserve the row by 2px.
         //
         // This band carries no divider, so no RowDividerScissorSimulation
         // pair moves with it.

@@ -183,8 +183,8 @@ namespace TaimisToolbench.Services
         /// Height of the cost formula band's single tile row: the highlight
         /// box's margin+padding, a caption line, the gap, one amount run
         /// (PlanContentHeightMath.AmountRunHeight - the taller of the amount
-        /// text's line box and the coin icon beside it, which since the coin
-        /// runs moved onto the wallet BAR tier is the text, not the icon),
+        /// text's line box and the coin icon beside it, which at the wallet
+        /// BAR tier is the text, not the icon),
         /// and the disclosure line hanging under the amount when there is
         /// one. That line used to be counted BETWEEN the caption and a
         /// bottom-anchored amount, which dropped all three tiles' coin runs

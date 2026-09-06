@@ -164,10 +164,10 @@ namespace TaimisToolbench.Tests.Services
             // caption. The row height has to hold that stack plus the pad.
             //
             // AmountRunHeight, not CoinIconSize: the run is as tall as the
-            // taller of its text and its icon, and since the coins moved
-            // onto the 16px wallet BAR tier that is the text. Modelling the
-            // icon here would understate the run by 4px and let a band that
-            // actually overflows pass.
+            // taller of its text and its icon, and at the 18px wallet BAR
+            // tier that is the text. Modelling the icon here would
+            // understate the run by 2px and let a band that actually
+            // overflows pass.
             int amountY = PlanContentHeightMath.CostTileCaptionY
                 + TypeRampMetrics.ColumnHeaderInk.LineHeight
                 + PlanContentHeightMath.CostTileLabelToValueGap;

@@ -175,7 +175,7 @@ namespace TaimisToolbench.Views.Rendering
         /// <summary>
         /// The game's coin icon is ~0.8x its line height (~13px on a 16px
         /// line, measured on the steak capture) - not the module's shared
-        /// 20px table icon, which under the +2pt font wave reads small on
+        /// 18px table icon, which under the +2pt font wave reads small on
         /// a 22px line and tall on a 16px one. TOOLTIP-LOCAL for the same
         /// reason the item wrap cap is its own constant:
         /// <c>CoinSegmentMath.CoinIconSize</c>
