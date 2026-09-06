@@ -274,7 +274,7 @@ Services/TreeChipStripLayout.cs                                                 
 Services/TreeCostColumnMath.cs                                                          663
 Services/TreeRowIdentity.cs                                                             94
 Services/TreeRowShapePlanner.cs                                                         133
-Services/TreeRowTooltipComposer.cs                                                      262
+Services/TreeRowTooltipComposer.cs                                                      271
 Services/TreeToolbarRowLayout.cs                                                        112
 Services/TypeRampMetrics.cs                                                             171
 Services/UiSpacing.cs                                                                   53

@@ -235,8 +235,8 @@ namespace TaimisToolbench.Tests.Services
                 .BuildExtraTooltipContent(TradeUpNode(), null, null)
                 .ToPlainLines();
 
-            Assert.Contains("Right-click: Open wiki acquisition options", lines);
-            Assert.DoesNotContain("Right-click: Open wiki page", lines);
+            Assert.Contains(TreeRowTooltipComposer.WikiAcquisitionHintText, lines);
+            Assert.DoesNotContain(TreeRowTooltipComposer.WikiHintText, lines);
         }
     }
 }
