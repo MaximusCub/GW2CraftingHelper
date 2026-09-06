@@ -247,6 +247,14 @@ own derivation. The proof is now executable and runs in CI:
 sweeps every shipped (rowHeight, clearance) pair at all four scales and
 fails on any vanish.
 
+Padded fit (2026-09-06): the 45px and 52px above are the heights of that
+day, and are no longer shipped. Reported in game, twice: the rule read as
+drawing over the icon, and the Crafting Steps rule sat off centre between
+rows. Every icon-led plan row is now one height,
+`PlanContentHeightMath.IconLedRowHeight` (50), with the frame at y=2 and
+3px of clear space over and under it. The sweep already covered 50 at
+clearance 1, so the proof needed no new case.
+
 ### 39. M38 view-decomposition entries (WP-21 through WP-25)
 
 Numbered late, on 2026-08-25, so `Views/Rendering/ISectionRelayoutSink.cs`
