@@ -53,6 +53,14 @@ namespace MysticForgeSeeder
         private const int QueryLimit = 500;
 
         /// <summary>
+        /// The replication lag, in seconds, above which the wiki should
+        /// refuse this scrape rather than serve it. API:Etiquette asks a
+        /// non-interactive client to send the parameter and names 5 as the
+        /// value for a client in no hurry.
+        /// </summary>
+        private const string MaxLagSeconds = "5";
+
+        /// <summary>
         /// Shortest pause after a lag refusal. Manual:Maxlag parameter asks
         /// for at least five seconds.
         /// </summary>
@@ -516,6 +524,7 @@ namespace MysticForgeSeeder
                         {
                             ["action"] = "ask",
                             ["format"] = "json",
+                            ["maxlag"] = MaxLagSeconds,
                             ["query"] = query,
                         });
 

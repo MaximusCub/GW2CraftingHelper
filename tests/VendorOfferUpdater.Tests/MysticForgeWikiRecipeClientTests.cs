@@ -90,6 +90,18 @@ namespace MysticForgeSeeder.Tests
         }
 
         [Fact]
+        public async Task EveryQueryCarriesMaxlag()
+        {
+            using var handler = new ScriptedHandler(Answer(EmptyPage));
+            using var http = new HttpClient(handler);
+            var (client, _) = Build(http);
+
+            await client.QueryMysticForgeRecipesAsync();
+
+            Assert.Contains("maxlag=5", Assert.Single(handler.RequestBodies));
+        }
+
+        [Fact]
         public async Task EmptyResultPage_EndsTheScrapeWithoutError()
         {
             using var handler = new ScriptedHandler(Answer(EmptyPage));
