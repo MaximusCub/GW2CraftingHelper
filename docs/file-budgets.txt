@@ -75,6 +75,7 @@ Models/SnapshotItemEntry.cs                                                     
 Models/SnapshotSearchRow.cs                                                             50
 Models/SnapshotSourceFilter.cs                                                          42
 Models/SnapshotWalletEntry.cs                                                           13
+Models/SocketedUpgradeIds.cs                                                            35
 Models/TimegatedItem.cs                                                                 37
 Models/UsedMaterial.cs                                                                  19
 Models/VendorItemCostLine.cs                                                            42
@@ -140,7 +141,7 @@ Services/ItemRowTooltipComposer.cs                                              
 Services/ItemSearchProviderFactory.cs                                                   61
 Services/ItemStatBlockFactory.cs                                                        189
 Services/ItemStatMath.cs                                                                64
-Services/ItemStatTooltipComposer.cs                                                     731
+Services/ItemStatTooltipComposer.cs                                                     733
 Services/JsonSeedReader.cs                                                              46
 Services/LogGutterLayout.cs                                                             147
 Services/LogLineFormat.cs                                                               137
@@ -238,6 +239,8 @@ Services/SnapshotResultLayout.cs                                                
 Services/SnapshotSearchResultBuilder.cs                                                 501
 Services/SnapshotStore.cs                                                               98
 Services/SnapshotTableSorter.cs                                                         99
+Services/SocketedUpgradeIndex.cs                                                        146
+Services/SocketedUpgradeView.cs                                                         72
 Services/SolveResult.cs                                                                 21
 Services/SolverDecision.cs                                                              124
 Services/SortIndicatorLayout.cs                                                         101
@@ -266,6 +269,7 @@ Services/TreeRowTooltipComposer.cs                                              
 Services/TreeToolbarRowLayout.cs                                                        112
 Services/TypeRampMetrics.cs                                                             171
 Services/UiSpacing.cs                                                                   53
+Services/UpgradeEffectLines.cs                                                          133
 Services/ValueDetailTooltipBuilder.cs                                                   159
 Services/VendorBatchSolver.cs                                                           1171
 Services/VendorOfferLoader.cs                                                           51
