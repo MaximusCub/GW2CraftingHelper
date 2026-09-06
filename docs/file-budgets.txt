@@ -258,8 +258,8 @@ Services/TableSortState.cs                                                      
 Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
 Services/TextWrapMath.cs                                                                324
-Services/TooltipContent.cs                                                              641
-Services/TooltipLayoutMath.cs                                                           487
+Services/TooltipContent.cs                                                              687
+Services/TooltipLayoutMath.cs                                                           549
 Services/TooltipTextFormat.cs                                                           136
 Services/TopRegionLayoutMath.cs                                                         116
 Services/TradingPostMath.cs                                                             57
@@ -268,7 +268,7 @@ Services/TreeChipStripLayout.cs                                                 
 Services/TreeCostColumnMath.cs                                                          663
 Services/TreeRowIdentity.cs                                                             94
 Services/TreeRowShapePlanner.cs                                                         133
-Services/TreeRowTooltipComposer.cs                                                      243
+Services/TreeRowTooltipComposer.cs                                                      245
 Services/TreeToolbarRowLayout.cs                                                        112
 Services/TypeRampMetrics.cs                                                             171
 Services/UiSpacing.cs                                                                   53
@@ -323,7 +323,7 @@ Views/Rendering/PressFeedback.cs                                                
 Views/Rendering/RankerReadinessColors.cs                                                99
 Views/Rendering/RarityColors.cs                                                         199
 Views/Rendering/RecipesSectionRenderer.cs                                               365
-Views/Rendering/RichTooltipSurface.cs                                                   639
+Views/Rendering/RichTooltipSurface.cs                                                   728
 Views/Rendering/RowRelayoutHelpers.cs                                                   72
 Views/Rendering/RowActionKey.cs                                                         103
 Views/Rendering/ShoppingBadgeColors.cs                                                  72
@@ -363,7 +363,7 @@ tests/TaimisToolbench.Tests/Helpers/RecipeNodeBuilders.cs                       
 tests/TaimisToolbench.Tests/Helpers/RepoFileLocator.cs                                  42
 tests/TaimisToolbench.Tests/Helpers/ShippedSeedManifest.cs                              139
 tests/TaimisToolbench.Tests/Helpers/TempDirectory.cs                                    47
-tests/TaimisToolbench.Tests/Helpers/TooltipContentPlainText.cs                          99
+tests/TaimisToolbench.Tests/Helpers/TooltipContentPlainText.cs                         110
 tests/TaimisToolbench.Tests/Helpers/VendorOfferBuilders.cs                              123
 tests/TaimisToolbench.Tests/Models/AccountSnapshotSerializationTests.cs                 107
 tests/TaimisToolbench.Tests/Models/BarterItemDecisionDefaultsTests.cs                   145
@@ -435,7 +435,7 @@ tests/TaimisToolbench.Tests/Services/ItemMetadataServiceTests.cs                
 tests/TaimisToolbench.Tests/Services/ItemRarityResolutionTests.cs                       83
 tests/TaimisToolbench.Tests/Services/ItemRowRequestBuilderTests.cs                      132
 tests/TaimisToolbench.Tests/Services/ItemRowSelectionTests.cs                           258
-tests/TaimisToolbench.Tests/Services/ItemRowTooltipComposerTests.cs                     126
+tests/TaimisToolbench.Tests/Services/ItemRowTooltipComposerTests.cs                     132
 tests/TaimisToolbench.Tests/Services/ItemSearchProviderFactoryTests.cs                  84
 tests/TaimisToolbench.Tests/Services/ItemSlotFactsTests.cs                              142
 tests/TaimisToolbench.Tests/Services/ItemStatBlockFactoryTests.cs                       255
@@ -554,7 +554,7 @@ tests/TaimisToolbench.Tests/Services/SettingsFormLayoutTests.cs                 
 tests/TaimisToolbench.Tests/Services/SettingsInputParserTests.cs                        338
 tests/TaimisToolbench.Tests/Services/SettingsSaveBarLayoutTests.cs                      117
 tests/TaimisToolbench.Tests/Services/ShoppingColumnMathTests.cs                         630
-tests/TaimisToolbench.Tests/Services/ShoppingRowTooltipFormatterTests.cs                197
+tests/TaimisToolbench.Tests/Services/ShoppingRowTooltipFormatterTests.cs                246
 tests/TaimisToolbench.Tests/Services/ShoppingSourceBadgeTests.cs                        233
 tests/TaimisToolbench.Tests/Services/SnapshotCommitGateTests.cs                         239
 tests/TaimisToolbench.Tests/Services/SnapshotEpochGuardTests.cs                         33
@@ -582,8 +582,8 @@ tests/TaimisToolbench.Tests/Services/GlyphButtonMetricsTests.cs                 
 tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                        332
 tests/TaimisToolbench.Tests/Services/TextWrapMathTests.cs                               297
 tests/TaimisToolbench.Tests/Services/TooltipComposerContentTests.cs                     215
-tests/TaimisToolbench.Tests/Services/TooltipContentTests.cs                             152
-tests/TaimisToolbench.Tests/Services/TooltipLayoutMathTests.cs                          666
+tests/TaimisToolbench.Tests/Services/TooltipContentTests.cs                             180
+tests/TaimisToolbench.Tests/Services/TooltipLayoutMathTests.cs                          729
 tests/TaimisToolbench.Tests/Services/TooltipSpanRoleTests.cs                            108
 tests/TaimisToolbench.Tests/Services/TooltipTextFormatTests.cs                          138
 tests/TaimisToolbench.Tests/Services/TopRegionLayoutMathTests.cs                        147

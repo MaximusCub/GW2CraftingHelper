@@ -24,14 +24,53 @@ namespace TaimisToolbench.Services
 
         private readonly IReadOnlyList<TooltipLine> _lines;
 
+        private readonly TooltipContent _extra;
+
         internal TooltipContent(IReadOnlyList<TooltipLine> lines)
+            : this(lines, null)
+        {
+        }
+
+        private TooltipContent(IReadOnlyList<TooltipLine> lines, TooltipContent extra)
         {
             _lines = lines ?? new List<TooltipLine>();
+            _extra = extra;
         }
 
         public IReadOnlyList<TooltipLine> Lines => _lines;
 
         public bool IsEmpty => _lines.Count == 0;
+
+        /// <summary>
+        /// What the module adds on top of the game's own content, drawn as
+        /// a SECOND box under the first one rather than as more lines
+        /// inside it. Null when this content is all one box.
+        /// <para>
+        /// A reader has to be able to tell what the item itself says from
+        /// what this module is telling them, and a blank line inside one
+        /// box does not carry that. The second box is a box, and the game
+        /// itself stacks boxes this way for its equipped-item comparison.
+        /// </para>
+        /// </summary>
+        public TooltipContent Extra => _extra;
+
+        public bool HasExtra => _extra != null && !_extra.IsEmpty;
+
+        /// <summary>
+        /// The same first box with <paramref name="extra"/> as its second.
+        /// Only content that has something in the first box may carry a
+        /// second: an empty first box would render as an empty frame above
+        /// the only lines there are.
+        /// </summary>
+        public TooltipContent WithExtra(TooltipContent extra)
+        {
+            if (IsEmpty || extra == null || extra.IsEmpty)
+            {
+                return this;
+            }
+
+            return new TooltipContent(_lines, extra);
+        }
 
         /// <summary>
         /// Wraps a finished plain string (the shape most call sites still
@@ -607,6 +646,13 @@ namespace TaimisToolbench.Services
             return this;
         }
 
+        /// <summary>
+        /// Appends another block's lines. Only its FIRST box: a builder has
+        /// no second box to append one to, so content carrying a
+        /// <see cref="TooltipContent.Extra"/> would lose it here. Nothing
+        /// appends such content today, and a caller that starts to must
+        /// re-attach the second box itself.
+        /// </summary>
         public TooltipContentBuilder Append(TooltipContent other)
         {
             if (other == null || other.IsEmpty)
