@@ -87,6 +87,7 @@
     <Compile Include="Models\SnapshotItemEntry.cs" />
     <Compile Include="Models\SocketedUpgradeIds.cs" />
     <Compile Include="Models\TransmutedItemNames.cs" />
+    <Compile Include="Models\TransmutedSkin.cs" />
     <Compile Include="Models\SnapshotWalletEntry.cs" />
     <Compile Include="Models\SnapshotCharacterDiscipline.cs" />
     <Compile Include="Models\SnapshotHoldLocation.cs" />

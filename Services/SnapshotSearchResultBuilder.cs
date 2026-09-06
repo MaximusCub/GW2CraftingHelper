@@ -186,8 +186,8 @@ namespace TaimisToolbench.Services
                     transmutedNames.TryGetValue(itemId, out skins);
                 }
 
-                string skinName = skins != null ? skins.DisplayName : string.Empty;
-                string name = skinName.Length > 0 ? skinName : ownName;
+                var skin = skins != null ? skins.Display : TransmutedSkin.None;
+                string name = skin.IsPresent ? skin.Name : ownName;
 
                 // Both spellings, always: the item's own name, and every
                 // skin any copy of it wears - which covers the shown name,
@@ -240,14 +240,17 @@ namespace TaimisToolbench.Services
                 {
                     ItemId = itemId,
                     Name = name,
-                    IconUrl = kvp.Value.IconUrl ?? string.Empty,
+
+                    // Name and icon come off the same value, so a row can
+                    // never show one item's name over another's picture.
+                    IconUrl = skin.IsPresent ? skin.IconUrl : (kvp.Value.IconUrl ?? string.Empty),
 
                     // From the first entry seen for this id, like Name and
                     // IconUrl: the same item in a bank slot and on a
                     // character is the same item, so any of its entries
                     // carries the same captured rarity.
                     Rarity = kvp.Value.Rarity ?? string.Empty,
-                    SkinName = skinName,
+                    Skin = skin,
                     TotalCount = total,
                     Breakdown = breakdown,
                 });

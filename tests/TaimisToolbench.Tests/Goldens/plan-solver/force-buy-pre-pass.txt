@@ -181,6 +181,7 @@ result.SolveContext.AccountItems[0].Infusions = null
 result.SolveContext.AccountItems[0].ItemId = 2
 result.SolveContext.AccountItems[0].Name = 
 result.SolveContext.AccountItems[0].Rarity = 
+result.SolveContext.AccountItems[0].SkinIconUrl = 
 result.SolveContext.AccountItems[0].SkinId = 0
 result.SolveContext.AccountItems[0].SkinName = 
 result.SolveContext.AccountItems[0].Source = MaterialStorage

@@ -30,10 +30,12 @@ namespace TaimisToolbench.Services
 
         private readonly Dictionary<int, (string Name, string IconUrl)> _currencyCache = new Dictionary<int, (string, string)>();
 
-        // Skin id -> the name the game shows for an item wearing it.
+        // Skin id -> what the game shows for an item wearing it.
         // /v2/skins needs no API key and an account draws on few skins, so
         // this outlives a single fetch the way _itemCache does.
-        private readonly Dictionary<int, string> _skinCache = new Dictionary<int, string>();
+        private readonly Dictionary<int, (string Name, string IconUrl)> _skinCache =
+            new Dictionary<int, (string, string)>();
+
         private readonly object _cacheLock = new object();
 
         public Gw2AccountSnapshotService(Gw2ApiManager apiManager)
@@ -629,10 +631,11 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Fills in <see cref="SnapshotItemEntry.SkinName"/> for every
-        /// stack wearing a skin, batched and cached exactly the way
-        /// <see cref="ResolveItemDetailsAsync"/> resolves item names. A
-        /// failure leaves the names empty, which reads as "not
+        /// Fills in <see cref="SnapshotItemEntry.SkinName"/> and
+        /// <see cref="SnapshotItemEntry.SkinIconUrl"/> for every stack
+        /// wearing a skin, batched and cached exactly the way
+        /// <see cref="ResolveItemDetailsAsync"/> resolves item names and
+        /// icons. A failure leaves both empty, which reads as "not
         /// transmuted": an under-report, never a wrong name.
         /// </summary>
         private async Task ResolveSkinDetailsAsync(List<SnapshotItemEntry> items, CancellationToken ct)
@@ -659,7 +662,9 @@ namespace TaimisToolbench.Services
                     {
                         foreach (var skin in fetched)
                         {
-                            _skinCache[skin.Id] = skin.Name ?? "";
+                            var url = skin.Icon.Url;
+                            _skinCache[skin.Id] =
+                                (skin.Name ?? "", url != null ? url.AbsoluteUri : "");
                         }
                     }
                 }
@@ -668,9 +673,10 @@ namespace TaimisToolbench.Services
                 {
                     foreach (var entry in items)
                     {
-                        if (entry.SkinId > 0 && _skinCache.TryGetValue(entry.SkinId, out string name))
+                        if (entry.SkinId > 0 && _skinCache.TryGetValue(entry.SkinId, out var cached))
                         {
-                            entry.SkinName = name;
+                            entry.SkinName = cached.Name;
+                            entry.SkinIconUrl = cached.IconUrl;
                         }
                     }
                 }

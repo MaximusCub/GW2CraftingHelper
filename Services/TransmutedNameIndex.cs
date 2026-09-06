@@ -5,13 +5,14 @@ using TaimisToolbench.Models;
 namespace TaimisToolbench.Services
 {
     /// <summary>
-    /// The skin names a Snapshot row may show or match, keyed by item id.
+    /// The skin a Snapshot row may show, and the skin names it may match,
+    /// keyed by item id.
     /// <para>
     /// The game applies a skin per copy, and a Snapshot row is one item id
-    /// summed over every copy of it. So a row takes a skin's name as its
-    /// own only when every copy wears that same skin; when they differ it
-    /// keeps the item's name, because a name only one copy wears would
-    /// describe items the row also covers. Search is not held to that
+    /// summed over every copy of it. So a row takes a skin's name and icon
+    /// only when every copy wears that same skin; when they differ it keeps
+    /// the item's own name and icon, because a name only one copy wears
+    /// would describe items the row also covers. Search is not held to that
     /// rule - it matches any skin any copy wears, so the name the game
     /// shows always finds the item.
     /// </para>
@@ -41,7 +42,7 @@ namespace TaimisToolbench.Services
             var skinned = new HashSet<int>();
             foreach (var entry in items)
             {
-                if (entry != null && entry.ItemId > 0 && SkinNameOf(entry).Length > 0)
+                if (entry != null && entry.ItemId > 0 && SkinOf(entry).IsPresent)
                 {
                     skinned.Add(entry.ItemId);
                 }
@@ -61,24 +62,24 @@ namespace TaimisToolbench.Services
                     continue;
                 }
 
-                string skin = SkinNameOf(entry);
+                var skin = SkinOf(entry);
                 if (!states.TryGetValue(entry.ItemId, out var state))
                 {
                     state = new State { Agreed = skin, CopiesAgree = true };
                     states[entry.ItemId] = state;
                 }
-                else if (state.CopiesAgree && !string.Equals(state.Agreed, skin, StringComparison.Ordinal))
+                else if (state.CopiesAgree && !SameSkin(state.Agreed, skin))
                 {
                     // One bare copy and one skinned copy disagree as much
                     // as two differently skinned ones do: "no skin" is an
                     // answer, not a missing reading.
                     state.CopiesAgree = false;
-                    state.Agreed = "";
+                    state.Agreed = TransmutedSkin.None;
                 }
 
-                if (skin.Length > 0 && !state.Names.Contains(skin))
+                if (skin.IsPresent && !state.Names.Contains(skin.Name))
                 {
-                    state.Names.Add(skin);
+                    state.Names.Add(skin.Name);
                 }
             }
 
@@ -91,20 +92,29 @@ namespace TaimisToolbench.Services
             return result;
         }
 
-        private static string SkinNameOf(SnapshotItemEntry entry)
+        /// <summary>
+        /// What one stack wears, or <see cref="TransmutedSkin.None"/>. The
+        /// name and the icon are accepted or rejected together, so a row
+        /// can never draw the skin's name over the item's own picture.
+        /// </summary>
+        private static TransmutedSkin SkinOf(SnapshotItemEntry entry)
         {
-            string skin = entry.SkinName ?? "";
-            if (skin.Length == 0)
-            {
-                return "";
-            }
+            var skin = TransmutedSkin.Of(entry.SkinName, entry.SkinIconUrl);
+            return skin.IsPresent
+                && !string.Equals(skin.Name, entry.Name ?? "", StringComparison.Ordinal)
+                ? skin
+                : TransmutedSkin.None;
+        }
 
-            return string.Equals(skin, entry.Name ?? "", StringComparison.Ordinal) ? "" : skin;
+        private static bool SameSkin(TransmutedSkin left, TransmutedSkin right)
+        {
+            return string.Equals(left.Name, right.Name, StringComparison.Ordinal)
+                && string.Equals(left.IconUrl, right.IconUrl, StringComparison.Ordinal);
         }
 
         private sealed class State
         {
-            public string Agreed = "";
+            public TransmutedSkin Agreed = TransmutedSkin.None;
 
             public bool CopiesAgree;
 

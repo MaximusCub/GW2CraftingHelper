@@ -2639,7 +2639,7 @@ namespace TaimisToolbench.Views
                 }
 
                 return ItemRowTooltipComposer.BuildRowContent(
-                    ItemStatTooltipComposer.BuildContent(stats, SocketsFor(itemId), row.SkinName),
+                    ItemStatTooltipComposer.BuildContent(stats, SocketsFor(itemId), row.Skin),
                     identity,
                     extras.Build());
             });

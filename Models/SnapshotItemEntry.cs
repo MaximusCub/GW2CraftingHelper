@@ -66,5 +66,15 @@ namespace TaimisToolbench.Models
         [DefaultValue("")]
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
         public string SkinName { get; set; } = "";
+
+        /// <summary>
+        /// The skin's own icon, from the same /v2/skins response
+        /// <see cref="SkinName"/> comes from, so it costs no additional
+        /// request. Empty on the same terms. Models.TransmutedSkin says why
+        /// a reader must not take one of the two without the other.
+        /// </summary>
+        [DefaultValue("")]
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public string SkinIconUrl { get; set; } = "";
     }
 }

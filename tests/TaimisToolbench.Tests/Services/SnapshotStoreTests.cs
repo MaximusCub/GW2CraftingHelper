@@ -271,6 +271,7 @@ namespace TaimisToolbench.Tests.Services
                 Source = "Equipped:Anna",
                 SkinId = 5432,
                 SkinName = "Glyphic Edge",
+                SkinIconUrl = "https://render.guildwars2.com/file/skin.png",
             });
 
             _store.Save(snapshot);
@@ -282,6 +283,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.NotNull(skinned);
             Assert.Equal(5432, skinned.SkinId);
             Assert.Equal("Glyphic Edge", skinned.SkinName);
+            Assert.Equal("https://render.guildwars2.com/file/skin.png", skinned.SkinIconUrl);
 
             // A stack wearing its own look writes neither field, the way a
             // stack with nothing socketed writes no socket ids.
@@ -289,8 +291,10 @@ namespace TaimisToolbench.Tests.Services
             Assert.NotNull(bare);
             Assert.Equal(0, bare.SkinId);
             Assert.Equal("", bare.SkinName);
+            Assert.Equal("", bare.SkinIconUrl);
             Assert.Equal(1, CountOccurrences(json, "SkinId"));
             Assert.Equal(1, CountOccurrences(json, "SkinName"));
+            Assert.Equal(1, CountOccurrences(json, "SkinIconUrl"));
         }
 
         [Fact]
@@ -314,6 +318,7 @@ namespace TaimisToolbench.Tests.Services
             Assert.Single(loaded.Items);
             Assert.Equal(0, loaded.Items[0].SkinId);
             Assert.Equal("", loaded.Items[0].SkinName);
+            Assert.Equal("", loaded.Items[0].SkinIconUrl);
         }
 
         private static int CountOccurrences(string haystack, string needle)

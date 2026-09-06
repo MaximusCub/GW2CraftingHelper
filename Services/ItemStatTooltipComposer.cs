@@ -62,18 +62,19 @@ namespace TaimisToolbench.Services
         /// </summary>
         public static TooltipContent BuildContent(ItemStatBlock stats, SocketedUpgradeView sockets)
         {
-            return BuildContent(stats, sockets, null);
+            return BuildContent(stats, sockets, TransmutedSkin.None);
         }
 
         /// <summary>
         /// The same tooltip for a stack wearing a skin.
-        /// <paramref name="transmutedSkinName"/> is the skin's own name, and
-        /// it takes the heading, because that is the name the game shows.
-        /// The item's own name moves down to the "Transmuted" block. Pass
-        /// null or "" for a stack wearing its own look.
+        /// <paramref name="skin"/> takes the heading, name and icon
+        /// together, because that is what the game shows there. The item's
+        /// own name moves down to the "Transmuted" block. Pass
+        /// <see cref="TransmutedSkin.None"/> for a stack wearing its own
+        /// look.
         /// </summary>
         public static TooltipContent BuildContent(
-            ItemStatBlock stats, SocketedUpgradeView sockets, string transmutedSkinName)
+            ItemStatBlock stats, SocketedUpgradeView sockets, TransmutedSkin skin)
         {
             if (stats == null)
             {
@@ -81,17 +82,19 @@ namespace TaimisToolbench.Services
             }
 
             string ownName = string.IsNullOrEmpty(stats.Name) ? "Unknown Item" : stats.Name;
-            string skinName = transmutedSkinName ?? "";
-            bool transmuted = skinName.Length > 0
-                && !string.Equals(skinName, ownName, StringComparison.Ordinal);
+            var worn = skin ?? TransmutedSkin.None;
+            bool transmuted = worn.IsPresent
+                && !string.Equals(worn.Name, ownName, StringComparison.Ordinal);
 
             // The icon+name header row every in-game item tooltip opens
             // with (gap G11). The standing comment claiming the game shows
             // no icon was simply wrong - all three wiki captures show one.
+            // Name and icon are read off the same value, so the heading
+            // cannot name one item and draw another.
             var builder = new TooltipContentBuilder();
             builder.Header(
-                stats.IconUrl,
-                transmuted ? skinName : ownName,
+                transmuted ? worn.IconUrl : stats.IconUrl,
+                transmuted ? worn.Name : ownName,
                 TooltipHeaderSubject.ItemOfRarity(stats.Rarity));
 
             var transmutedBlock = BuildTransmutedBlock(transmuted ? ownName : null);

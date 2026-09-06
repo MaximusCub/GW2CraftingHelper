@@ -19,23 +19,40 @@ namespace TaimisToolbench.Tests.Services
     {
         private const int Warfists = 48074;
 
+        private const string ItemIcon = "https://render.guildwars2.com/file/item.png";
+
         private static SnapshotItemEntry Stack(
-            string source, string name = "Zojja's Warfists", int skinId = 0, string skinName = "")
+            string source, string name = "Zojja's Warfists", int skinId = 0,
+            string skinName = "", string skinIconUrl = "")
         {
             return new SnapshotItemEntry
             {
                 ItemId = Warfists,
                 Name = name,
+                IconUrl = ItemIcon,
                 Count = 1,
                 Source = source,
                 SkinId = skinId,
                 SkinName = skinName,
+                SkinIconUrl = skinIconUrl,
             };
         }
 
-        private static SnapshotItemEntry Skinned(string source, int skinId, string skinName)
+        // A skin the capture resolved whole: both halves present, which is
+        // the only shape TransmutedSkin accepts.
+        private static SnapshotItemEntry Skinned(
+            string source, int skinId, string skinName, string skinIconUrl = null)
         {
-            return Stack(source, skinId: skinId, skinName: skinName);
+            return Stack(
+                source,
+                skinId: skinId,
+                skinName: skinName,
+                skinIconUrl: skinIconUrl ?? IconFor(skinName));
+        }
+
+        private static string IconFor(string skinName)
+        {
+            return "https://render.guildwars2.com/file/" + skinName.Replace(" ", "") + ".png";
         }
 
         private static List<SnapshotSearchRow> Rows(
@@ -61,7 +78,7 @@ namespace TaimisToolbench.Tests.Services
                 Skinned("Bank", 5432, "Glyphic Gauntlets"),
             });
 
-            Assert.Equal("Glyphic Gauntlets", index[Warfists].DisplayName);
+            Assert.Equal("Glyphic Gauntlets", index[Warfists].Display.Name);
             Assert.Equal(new[] { "Glyphic Gauntlets" }, index[Warfists].AllNames);
         }
 
@@ -74,7 +91,7 @@ namespace TaimisToolbench.Tests.Services
                 Skinned("Equipped:Taimi", 5432, "Glyphic Gauntlets"),
             });
 
-            Assert.Equal("Glyphic Gauntlets", index[Warfists].DisplayName);
+            Assert.Equal("Glyphic Gauntlets", index[Warfists].Display.Name);
         }
 
         [Fact]
@@ -98,7 +115,7 @@ namespace TaimisToolbench.Tests.Services
                 Skinned("Equipped:Taimi", 99, "Chaos Gloves"),
             });
 
-            Assert.Equal("", index[Warfists].DisplayName);
+            Assert.False(index[Warfists].Display.IsPresent);
             Assert.Equal(new[] { "Glyphic Gauntlets", "Chaos Gloves" }, index[Warfists].AllNames);
         }
 
@@ -111,7 +128,7 @@ namespace TaimisToolbench.Tests.Services
                 Stack("Character:Taimi"),
             });
 
-            Assert.Equal("", index[Warfists].DisplayName);
+            Assert.False(index[Warfists].Display.IsPresent);
             Assert.Equal(new[] { "Glyphic Gauntlets" }, index[Warfists].AllNames);
         }
 
@@ -131,10 +148,35 @@ namespace TaimisToolbench.Tests.Services
         {
             var index = TransmutedNameIndex.Build(new List<SnapshotItemEntry>
             {
-                Skinned("Bank", 5432, ""),
+                Stack("Bank", skinId: 5432, skinIconUrl: IconFor("Glyphic Gauntlets")),
             });
 
             Assert.Empty(index);
+        }
+
+        [Fact]
+        public void Build_SkinIdWithNoResolvedIcon_ReadsAsNoSkin()
+        {
+            // Half a skin is not a skin. Taking the name here would draw
+            // the item's own picture under it.
+            var index = TransmutedNameIndex.Build(new List<SnapshotItemEntry>
+            {
+                Stack("Bank", skinId: 5432, skinName: "Glyphic Gauntlets"),
+            });
+
+            Assert.Empty(index);
+        }
+
+        [Fact]
+        public void Build_CopiesWearSkinsSharingANameButNotAnIcon_NameNeither()
+        {
+            var index = TransmutedNameIndex.Build(new List<SnapshotItemEntry>
+            {
+                Skinned("Bank", 5432, "Glyphic Gauntlets"),
+                Skinned("Equipped:Taimi", 99, "Glyphic Gauntlets", "https://example.invalid/other.png"),
+            });
+
+            Assert.False(index[Warfists].Display.IsPresent);
         }
 
         [Fact]
@@ -150,7 +192,12 @@ namespace TaimisToolbench.Tests.Services
             var index = TransmutedNameIndex.Build(new List<SnapshotItemEntry>
             {
                 null,
-                new SnapshotItemEntry { ItemId = 0, SkinName = "Glyphic Gauntlets" },
+                new SnapshotItemEntry
+                {
+                    ItemId = 0,
+                    SkinName = "Glyphic Gauntlets",
+                    SkinIconUrl = IconFor("Glyphic Gauntlets"),
+                },
                 Skinned("Bank", 5432, "Glyphic Gauntlets"),
             });
 
@@ -165,7 +212,12 @@ namespace TaimisToolbench.Tests.Services
             var row = Assert.Single(Rows(items, "", TransmutedNameIndex.Build(items)));
 
             Assert.Equal("Glyphic Gauntlets", row.Name);
-            Assert.Equal("Glyphic Gauntlets", row.SkinName);
+            Assert.Equal("Glyphic Gauntlets", row.Skin.Name);
+
+            // The picture moves with the name. A row naming one item and
+            // drawing another is the same fault in a different channel.
+            Assert.Equal(IconFor("Glyphic Gauntlets"), row.IconUrl);
+            Assert.Equal(IconFor("Glyphic Gauntlets"), row.Skin.IconUrl);
         }
 
         [Fact]
@@ -198,7 +250,8 @@ namespace TaimisToolbench.Tests.Services
 
             var row = Assert.Single(Rows(items, "", index));
             Assert.Equal("Zojja's Warfists", row.Name);
-            Assert.Equal("", row.SkinName);
+            Assert.Equal(ItemIcon, row.IconUrl);
+            Assert.False(row.Skin.IsPresent);
 
             // Neither spelling may lose an item the row does not name.
             Assert.Equal("Zojja's Warfists", Assert.Single(Rows(items, "Glyphic", index)).Name);
@@ -212,19 +265,25 @@ namespace TaimisToolbench.Tests.Services
 
             var row = Assert.Single(Rows(items, "", null));
             Assert.Equal("Zojja's Warfists", row.Name);
-            Assert.Equal("", row.SkinName);
+            Assert.Equal(ItemIcon, row.IconUrl);
+            Assert.False(row.Skin.IsPresent);
             Assert.Empty(Rows(items, "Glyphic", null));
         }
 
         // ---- the tooltip block ----
-        private static async Task<string[]> Tooltip(string skinName)
+        private static async Task<TooltipContent> TooltipContentFor(TransmutedSkin skin)
         {
             var raws = await RealItemFixtures.ParseAsync(RealItemJson.ZojjasWarfists);
             var stats = ItemStatBlockFactory.Build(raws[Warfists]);
-            return ItemStatTooltipComposer
-                .BuildContent(stats, SocketedUpgradeView.None, skinName)
-                .ToPlainLines()
-                .ToArray();
+            return ItemStatTooltipComposer.BuildContent(stats, SocketedUpgradeView.None, skin);
+        }
+
+        private static async Task<string[]> Tooltip(string skinName)
+        {
+            var skin = string.IsNullOrEmpty(skinName)
+                ? TransmutedSkin.None
+                : TransmutedSkin.Of(skinName, IconFor(skinName));
+            return (await TooltipContentFor(skin)).ToPlainLines().ToArray();
         }
 
         [Fact]
@@ -254,6 +313,26 @@ namespace TaimisToolbench.Tests.Services
 
             // Below the socket lines, not above them.
             Assert.True(System.Array.IndexOf(lines, "Unused Infusion Slot") < at);
+        }
+
+        [Fact]
+        public async Task Tooltip_TransmutedItem_HeadingDrawsTheSkinsIcon()
+        {
+            var skin = TransmutedSkin.Of("Glyphic Gauntlets", IconFor("Glyphic Gauntlets"));
+            var content = await TooltipContentFor(skin);
+
+            // The heading names the skin, so it must draw the skin.
+            Assert.Equal(IconFor("Glyphic Gauntlets"), content.Lines[0].IconUrl);
+        }
+
+        [Fact]
+        public async Task Tooltip_ItemWearingItsOwnLook_HeadingDrawsTheItemsIcon()
+        {
+            var content = await TooltipContentFor(TransmutedSkin.None);
+
+            Assert.Equal(
+                "https://render.guildwars2.com/file/BD20599D290345BE7D98BD270FBE502CF5212654/699217.png",
+                content.Lines[0].IconUrl);
         }
 
         [Fact]

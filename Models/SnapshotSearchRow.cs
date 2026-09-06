@@ -17,21 +17,24 @@ namespace TaimisToolbench.Models
         public int ItemId { get; set; }
 
         /// <summary>
-        /// What the row calls the item. This is the skin's name when every
-        /// copy wears the same skin, because that is the name the game
-        /// shows; see Services.TransmutedNameIndex.
+        /// What the row calls the item, and the picture it draws. Both are
+        /// the skin's when every copy wears the same skin, because that is
+        /// what the game shows; see Services.TransmutedNameIndex.
         /// </summary>
         public string Name { get; set; } = "";
 
-        /// <summary>
-        /// The skin name behind <see cref="Name"/>, or "" when the row
-        /// shows the item's own name. The tooltip needs the two apart: it
-        /// prints the skin's name as the heading and the item's own name
-        /// under a "Transmuted" line, the way the game does.
-        /// </summary>
-        public string SkinName { get; set; } = "";
-
+        /// <summary>See <see cref="Name"/>. Never the skin's name over the
+        /// item's own icon: <see cref="Skin"/> settles both at once.</summary>
         public string IconUrl { get; set; } = "";
+
+        /// <summary>
+        /// The skin behind <see cref="Name"/> and <see cref="IconUrl"/>, or
+        /// <see cref="TransmutedSkin.None"/> when the row shows the item's
+        /// own. The tooltip needs them apart: it draws the skin as the
+        /// heading and prints the item's own name under a "Transmuted"
+        /// line, the way the game does.
+        /// </summary>
+        public TransmutedSkin Skin { get; set; } = TransmutedSkin.None;
 
         /// <summary>
         /// The rarity captured with this item's name and icon, or "" for a
