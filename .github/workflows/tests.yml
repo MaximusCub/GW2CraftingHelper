@@ -804,6 +804,51 @@ jobs:
           print('The currency frame is still a ring with nothing painted inside it.')
           PY
 
+      - name: The Total Cost table registers its scroll anchors
+        shell: bash
+        run: |
+          # A renderer takes a Blish Control, and tests reference no UI code
+          # (repo invariant), so no unit test can call the renderer. Delete
+          # the two RegisterScrollAnchor calls and every test stays green
+          # while a re-solve that changes the table's row count drags the
+          # whole tree under the reader's cursor. ScrollAnchorMathTests pins
+          # the arithmetic those keys feed; this pins that the renderer
+          # hands them over, and that the view still spells the two key
+          # prefixes those tests carry as literals.
+          python3 - <<'PY'
+          import sys
+
+          def squeezed(path):
+              return ''.join(open(path, encoding='utf-8').read().split())
+
+          renderer = squeezed('Views/Rendering/SummarySectionRenderer.cs')
+          view = squeezed('Views/CraftingPlanView.cs')
+          fail = []
+
+          for key in ('NonCoinGroupAnchorKey', 'NonCoinRowAnchorKey'):
+              call = 'RegisterScrollAnchor(SummarySectionLayoutMath.%s(' % key
+              if call not in renderer:
+                  fail.append(
+                      'SummarySectionRenderer no longer registers a scroll anchor '
+                      'keyed by SummarySectionLayoutMath.%s.' % key)
+
+          if '_registerScrollAnchor(key,control)' not in renderer:
+              fail.append(
+                  'SummarySectionRenderer.RegisterScrollAnchor no longer forwards to '
+                  'the delegate the view hands it.')
+
+          for prefix in ('"section:"', '"node:"'):
+              if prefix not in view:
+                  fail.append(
+                      'CraftingPlanView no longer spells the %s anchor key prefix that '
+                      'ScrollAnchorMathTests pins as a literal.' % prefix)
+
+          if fail:
+              print('\n'.join(fail))
+              sys.exit(1)
+          print('The Total Cost table still registers its scroll anchors.')
+          PY
+
       - name: Module source cites no out-of-repo spec sections
         shell: bash
         run: |

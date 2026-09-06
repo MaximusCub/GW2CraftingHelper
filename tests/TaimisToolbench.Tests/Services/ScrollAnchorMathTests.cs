@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using TaimisToolbench.Models;
 using TaimisToolbench.Services;
@@ -101,6 +102,16 @@ namespace TaimisToolbench.Tests.Services
             return candidates;
         }
 
+        private static string BarterRowKey(int itemId)
+        {
+            return SummarySectionLayoutMath.NonCoinRowAnchorKey(new PlanRowViewModel
+            {
+                RowType = PlanRowType.CurrencyCost,
+                IsBarterItemCost = true,
+                NonCoinCostKey = SummarySectionLayoutMath.BarterItemCostKey(itemId),
+            });
+        }
+
         private static int TopOf(List<ScrollAnchorCandidate> layout, string key)
         {
             int? top = ScrollAnchorMath.FindTop(layout, new ScrollAnchor(key, 0));
@@ -202,6 +213,51 @@ namespace TaimisToolbench.Tests.Services
             }
 
             return kept;
+        }
+
+        [Fact]
+        public void EveryKeyInOneLayout_NamesExactlyOneCandidate()
+        {
+            // The cost table's keys go into the same candidate list as the
+            // plan view's section and tree-row keys, and FindTop matches on
+            // the whole key. Two candidates answering to one name would let
+            // a restore hold the wrong control.
+            var layout = CostTableLayout(1, 2, 3);
+            layout.Add(new ScrollAnchorCandidate(BarterRowKey(1), 900, 20));
+            layout.Add(new ScrollAnchorCandidate(BarterRowKey(3), 920, 20));
+            layout.Add(new ScrollAnchorCandidate(
+                SummarySectionLayoutMath.NonCoinGroupAnchorKey(isInventoryGroup: true), 940, 20));
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var candidate in layout)
+            {
+                Assert.True(seen.Add(candidate.Key), "two candidates answer to " + candidate.Key);
+                Assert.Equal(candidate.Top, TopOf(layout, candidate.Key));
+            }
+        }
+
+        [Fact]
+        public void TheCostTablesKeys_StayOutOfTheSectionAndTreeRowNamespaces()
+        {
+            // "section:" and "node:" are spelled as literals because the
+            // class that registers them, Views/CraftingPlanView, is
+            // Blish-bound and no test may reference it. The "Total Cost
+            // table registers its scroll anchors" step in
+            // .github/workflows/tests.yml fails if that class stops using
+            // these two prefixes.
+            foreach (string key in new[]
+            {
+                SummarySectionLayoutMath.NonCoinGroupAnchorKey(isInventoryGroup: false),
+                SummarySectionLayoutMath.NonCoinGroupAnchorKey(isInventoryGroup: true),
+                WalletRowKey(0),
+                WalletRowKey(int.MaxValue),
+                BarterRowKey(0),
+                BarterRowKey(int.MaxValue),
+            })
+            {
+                Assert.False(key.StartsWith("section:", StringComparison.Ordinal), key);
+                Assert.False(key.StartsWith("node:", StringComparison.Ordinal), key);
+            }
         }
 
         [Fact]
