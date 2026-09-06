@@ -345,32 +345,61 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void IconLedRowHeights_ShareTheTierTwoPaddedFit()
         {
-            // Used Materials, Shopping List and Required Recipes rows are
-            // the same padded shape: tier-2 icon frame at IconRowIconY,
-            // IconRowFramePadding of clear space between the frame and the
-            // divider on either side, clearance pixel absorbed by the
-            // height.
+            // Used Materials, Shopping List, Required Recipes and Crafting
+            // Steps rows are the same padded shape: tier-2 icon frame at
+            // IconRowIconY, IconRowFramePadding of clear space between the
+            // frame and the divider on either side, clearance pixel
+            // absorbed by the height.
             Assert.Equal(PlanContentHeightMath.RecipeRowHeight, PlanContentHeightMath.UsedMaterialRowHeight);
             Assert.Equal(PlanContentHeightMath.RecipeRowHeight, PlanContentHeightMath.ShoppingRowHeight);
+            Assert.Equal(PlanContentHeightMath.RecipeRowHeight, PlanContentHeightMath.CraftStepRowHeight);
         }
 
         [Fact]
-        public void CraftStepRowHeight_InsetsTheTierTwoIconSymmetrically()
+        public void CraftStepRowHeight_PadsTheIconEquallyAboveAndBelow()
         {
-            // The craft-step icon sits CraftStepIconY below the row top
-            // with the same margin below the frame (5 + 42 + 5 = 52). The
-            // divider then lands at rowHeight - 2 - clearance = 49, 2px
-            // below the icon frame bottom (47) - the same icon-to-divider
-            // gap the pre-tier-2 44px shape had.
-            Assert.Equal(
-                2 * PlanContentHeightMath.CraftStepIconY + PlanContentHeightMath.RowIconFrameSize,
-                PlanContentHeightMath.CraftStepRowHeight);
-            Assert.Equal(52, PlanContentHeightMath.CraftStepRowHeight);
+            // Reported in game: the craft-step rule sat 2px under the icon
+            // frame and 6px over the next one. The row now uses the shared
+            // padded fit, so the reader sees IconRowFramePadding on both
+            // sides. The numbered badge beside the icon centres itself in
+            // whatever the row height is, so it needs no separate inset.
+            Assert.Equal(50, PlanContentHeightMath.CraftStepRowHeight);
             int dividerTop = PlanContentHeightMath.CraftStepRowHeight
                 - PlanContentHeightMath.RowDividerHeight
                 - PlanContentHeightMath.IconRowDividerClearance;
-            int iconFrameBottom = PlanContentHeightMath.CraftStepIconY + PlanContentHeightMath.RowIconFrameSize;
-            Assert.Equal(2, dividerTop - iconFrameBottom);
+            int iconFrameBottom = PlanContentHeightMath.IconRowIconY + PlanContentHeightMath.RowIconFrameSize;
+            Assert.Equal(PlanContentHeightMath.IconRowFramePadding, dividerTop - iconFrameBottom);
+
+            int previousDividerBottom = dividerTop + PlanContentHeightMath.RowDividerHeight;
+            Assert.Equal(
+                PlanContentHeightMath.IconRowFramePadding,
+                (PlanContentHeightMath.CraftStepRowHeight + PlanContentHeightMath.IconRowIconY)
+                    - previousDividerBottom);
+        }
+
+        [Fact]
+        public void CraftStepBadge_CentresOnTheBandAReaderSees()
+        {
+            // The numbered badge used to centre on the full row height,
+            // which counts the rule and its clearance pixel as space. That
+            // put 8px over the badge and 4px under it. Centred on
+            // IconLedRowVisibleHeight the two gaps match.
+            Assert.Equal(47, PlanContentHeightMath.IconLedRowVisibleHeight);
+
+            int dividerTop = PlanContentHeightMath.CraftStepRowHeight
+                - PlanContentHeightMath.RowDividerHeight
+                - PlanContentHeightMath.IconRowDividerClearance;
+            int badgeTop = PlanContentHeightMath.CraftStepBadgeY;
+            int badgeBottom = badgeTop + PlanContentHeightMath.CraftStepBadgeSize;
+
+            // Below: the rule this row draws. Above: the rule the row
+            // before it drew, whose clearance pixel is already blank.
+            int gapBelow = dividerTop - badgeBottom;
+            int gapAbove = (PlanContentHeightMath.CraftStepRowHeight + badgeTop)
+                - (dividerTop + PlanContentHeightMath.RowDividerHeight);
+
+            Assert.Equal(gapAbove, gapBelow);
+            Assert.Equal(6, gapBelow);
         }
 
         [Fact]
