@@ -33,7 +33,7 @@ namespace TaimisToolbench.Tests.Services
             });
 
             Assert.Equal(
-                "Shared Inventory: 3  Bags: Apoyu (2) Divineaxe (2)  Equipped: Apoyu (1)  Bank: 1  Material Storage: 1",
+                "Shared Inventory (3)  Bags: Apoyu (2) Divineaxe (2)  Equipped: Apoyu (1)  Bank (1)  Material Storage (1)",
                 line);
         }
 
@@ -46,6 +46,28 @@ namespace TaimisToolbench.Tests.Services
             });
 
             Assert.Equal("Bags: Apoyu", line);
+        }
+
+        [Fact]
+        public void OneAccountWidePlaceHoldingTheWholeTotalPrintsNoCount()
+        {
+            var line = SnapshotHoldLine.Format(new List<SnapshotHoldLocation>
+            {
+                Place(SnapshotHoldCategory.MaterialStorage, 28),
+            });
+
+            Assert.Equal("Material Storage", line);
+        }
+
+        [Fact]
+        public void OneCharacterHoldingTheWholeTotalPrintsNoCount()
+        {
+            var line = SnapshotHoldLine.Format(new List<SnapshotHoldLocation>
+            {
+                Place(SnapshotHoldCategory.Bags, 4, "Divineaxe"),
+            });
+
+            Assert.Equal("Bags: Divineaxe", line);
         }
 
         [Fact]
@@ -97,7 +119,7 @@ namespace TaimisToolbench.Tests.Services
             });
 
             Assert.Equal(
-                "Shared Inventory: 1  Bags: Apoyu (2)  Equipped: Apoyu (1)  Bank: 5  Material Storage: 40",
+                "Shared Inventory (1)  Bags: Apoyu (2)  Equipped: Apoyu (1)  Bank (5)  Material Storage (40)",
                 line);
         }
 
@@ -111,7 +133,7 @@ namespace TaimisToolbench.Tests.Services
                 Place(SnapshotHoldCategory.Equipped, 1, "Divineaxe"),
             });
 
-            Assert.Equal("Equipped: Divineaxe (1)  Bank: 2  Legendary Armory: 1", line);
+            Assert.Equal("Equipped: Divineaxe (1)  Bank (2)  Legendary Armory (1)", line);
         }
 
         [Fact]
@@ -188,7 +210,7 @@ namespace TaimisToolbench.Tests.Services
 
             Assert.Equal(SnapshotHoldCategory.Unknown, location.Category);
             Assert.Equal(
-                "SomeFutureSource: 7",
+                "SomeFutureSource",
                 SnapshotHoldLine.Format(new List<SnapshotHoldLocation> { location }));
         }
 
@@ -205,7 +227,7 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void TwoUnrecognizedKeysEachPrintTheirOwnCount()
+        public void TwoUnrecognizedKeysEachPrintTheirOwnBracketedCount()
         {
             var line = SnapshotHoldLine.Format(new List<SnapshotHoldLocation>
             {
@@ -213,7 +235,7 @@ namespace TaimisToolbench.Tests.Services
                 SnapshotHoldLine.FromSource("FutureLocker", 2),
             });
 
-            Assert.Equal("FutureVault: 1  FutureLocker: 2", line);
+            Assert.Equal("FutureVault (1)  FutureLocker (2)", line);
         }
 
         [Fact]

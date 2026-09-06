@@ -11,10 +11,10 @@ namespace TaimisToolbench.Services
     /// <para>
     /// Counts are printed only when the reader cannot work the distribution
     /// out from the line itself. The row above the line already carries the
-    /// account-wide total, so when every named place holds exactly one, the
-    /// counts repeat what is on screen and are dropped. As soon as one place
-    /// holds more than one, every place prints its count, including the
-    /// places holding one.
+    /// account-wide total, so a single place holds all of it, and places
+    /// that each hold one are counted by reading their names. Both cases
+    /// print no counts. Otherwise every place prints its own count, in
+    /// parentheses, including the places holding one.
     /// </para>
     /// </summary>
     internal static class SnapshotHoldLine
@@ -84,16 +84,21 @@ namespace TaimisToolbench.Services
             // Indexed loops throughout, here and in AppendCategory: foreach
             // over IReadOnlyList boxes an enumerator, and a search rebuilds
             // every row on screen on every keystroke.
-            bool showCounts = false;
+            int places = 0;
+            bool anyPlaceHoldsOtherThanOne = false;
             for (int i = 0; i < locations.Count; i++)
             {
                 var location = locations[i];
-                if (location != null && location.Count != 1)
+                if (location == null)
                 {
-                    showCounts = true;
-                    break;
+                    continue;
                 }
+
+                places++;
+                anyPlaceHoldsOtherThanOne |= location.Count != 1;
             }
+
+            bool showCounts = places > 1 && anyPlaceHoldsOtherThanOne;
 
             var line = new StringBuilder();
 
@@ -139,7 +144,7 @@ namespace TaimisToolbench.Services
 
                 if (showCounts)
                 {
-                    line.Append(": ").Append(location.Count);
+                    AppendCount(line, location.Count);
                 }
             }
         }
@@ -186,10 +191,16 @@ namespace TaimisToolbench.Services
 
             line.Append(CategoryLabel(first));
 
-            if (!showCounts && !named)
+            if (!named)
             {
-                // An account-wide place with nothing to say past its own
-                // name: "Bank", not "Bank: 1".
+                // A place that holds for the whole account names nobody, so
+                // there is no list for a colon to introduce: "Bank", or
+                // "Bank (2)" when the counts are on.
+                if (showCounts)
+                {
+                    AppendEachCount(line, locations, category);
+                }
+
                 return;
             }
 
@@ -219,21 +230,52 @@ namespace TaimisToolbench.Services
             }
         }
 
+        /// <summary>
+        /// One named place. A category that names anybody can still hold a
+        /// place with no name, because a source key of "Character:" with
+        /// nothing after it reads as a character whose name is empty; that
+        /// place prints its count alone rather than disappearing
+        /// (KNOWN-ISSUES #31: never silently mask data).
+        /// </summary>
         private static void AppendPlace(
             StringBuilder line, SnapshotHoldLocation location, bool showCounts)
         {
-            if (HasCharacterName(location))
+            if (!HasCharacterName(location))
             {
-                line.Append(location.CharacterName);
-                if (showCounts)
-                {
-                    line.Append(" (").Append(location.Count).Append(")");
-                }
-
+                line.Append("(").Append(location.Count).Append(")");
                 return;
             }
 
-            line.Append(location.Count);
+            line.Append(location.CharacterName);
+            if (showCounts)
+            {
+                AppendCount(line, location.Count);
+            }
+        }
+
+        /// <summary>Appends one count per place in the category, for the
+        /// categories that name nobody. More than one place lands in such a
+        /// category only if a future source key maps into it.</summary>
+        private static void AppendEachCount(
+            StringBuilder line,
+            IReadOnlyList<SnapshotHoldLocation> locations,
+            SnapshotHoldCategory category)
+        {
+            for (int i = 0; i < locations.Count; i++)
+            {
+                var location = locations[i];
+                if (location != null && location.Category == category)
+                {
+                    AppendCount(line, location.Count);
+                }
+            }
+        }
+
+        /// <summary>Every count on the line is bracketed, whether its place
+        /// names a character or holds for the whole account.</summary>
+        private static void AppendCount(StringBuilder line, int count)
+        {
+            line.Append(" (").Append(count).Append(")");
         }
 
         private static bool HasCharacterName(SnapshotHoldLocation location)
