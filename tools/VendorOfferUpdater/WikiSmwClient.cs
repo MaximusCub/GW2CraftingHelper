@@ -21,29 +21,69 @@ namespace VendorOfferUpdater
     {
         private const string WikiApiUrl = "https://wiki.guildwars2.com/api.php";
         private const int QueryLimit = 500;
-        private const int MaxRetries = 3;
+
+        // Asks the server to refuse the query while its database replicas are
+        // more than this many seconds behind, which is MediaWiki's documented
+        // way of shedding load before it starts blocking a client outright.
+        // A refused maxlag query is an ordinary retryable API error here.
+        private const int MaxLagSeconds = 5;
 
         private readonly HttpClient _httpClient;
 
-        // Per-query state (set at the start of each QueryVendorItemsAsync
-        // call; null-forgiven here rather than made nullable since every
-        // other method that reads them is only ever called from within a
-        // QueryVendorItemsAsync call, after this initial assignment).
-        private QueryOptions _options = null!;
+        // Sections the wiki never answered. Accumulated across every call on
+        // this client, including ResolveItemGameIdsAsync, which has no
+        // QueryStats of its own.
+        private readonly List<UnresolvedSection> _unresolved = new List<UnresolvedSection>();
+
+        // Per-query state. _options carries a default so a client method
+        // reached without a QueryVendorItemsAsync call first still throttles
+        // and still retries; _stats and _stopwatch are null-forgiven because
+        // only the pagination path reads them.
+        private QueryOptions _options = new QueryOptions();
         private QueryStats _stats = null!;
         private Stopwatch _stopwatch = null!;
-        private int _effectiveDelay;
+        private int _effectiveDelay = QueryOptions.DefaultDelayBetweenRequestsMs;
+        private int _consecutiveUnresolved;
 
         public WikiSmwClient(HttpClient httpClient)
         {
             _httpClient = httpClient;
         }
 
-        // Characters used as prefixes when partitioning queries that exceed
-        // the wiki's ~5500 result offset limit.
-        private static readonly string[] PartitionPrefixes =
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        /// <summary>
+        /// Sections this client asked for and never got an answer to. Empty
+        /// on a clean run. Each entry carries the query that failed.
+        /// </summary>
+        public IReadOnlyList<UnresolvedSection> UnresolvedSections => _unresolved;
+
+        // Characters appended to a vendor-name prefix when splitting a query
+        // past the wiki's ~5500 result offset limit. Both the case and the
+        // punctuation are load-bearing, and neither is a free choice:
+        // the glob is a byte-wise LIKE over a sortkey, so it is
+        // case-sensitive, a space is a real character to split on and an
+        // underscore is not, and the leading double quote is the only way to
+        // reach five live merchants. Every character here appears in a
+        // merchant name in ref/vendor_offers.json. Widening the set costs one
+        // request per overflowing partition; the derivation, from Semantic
+        // MediaWiki's own source, is docs/ARCHITECTURE.md section T.9.
+        private static readonly string[] PartitionCharacters =
+            ("ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+             "abcdefghijklmnopqrstuvwxyz" +
+             "0123456789" +
+             " -'.,/():&\"")
                 .Select(c => c.ToString()).ToArray();
+
+        /// <summary>
+        /// What a partition's own query returned. A partition that was never
+        /// answered is not an empty one, and a parent that overflowed cannot
+        /// have children that are all empty.
+        /// </summary>
+        private enum PartitionOutcome
+        {
+            Rows,
+            NoRows,
+            Unresolved,
+        }
 
         // Note: the wiki also exposes "Has character purchase cap" and
         // "Has total purchase cap" on the same per-offer subobjects, but the
@@ -101,9 +141,8 @@ namespace VendorOfferUpdater
         ///   Has seasonal purchase cap - Wizard's Vault seasonal purchase limit
         ///                               (absent = uncapped or not a Vault offer)
         ///
-        /// Past the SMW API's ~5500-result pagination limit per query condition, the
-        /// query is automatically partitioned by vendor name prefix (e.g. [[Has
-        /// vendor::~A*]]), empty prefixes probed and skipped, under safety limits.
+        /// Past the SMW API's ~5500-result limit per condition, the query is
+        /// split by vendor name prefix: see PartitionCharacters.
         /// </summary>
         public async Task<(List<WikiVendorResult> Results, QueryStats Stats)> QueryVendorItemsAsync(
             string? queryCondition = null, QueryOptions? options = null, CancellationToken ct = default)
@@ -139,12 +178,16 @@ namespace VendorOfferUpdater
             _stats.Elapsed = _stopwatch.Elapsed;
             _stats.DistinctResults = seenKeys.Count;
 
-            // Detect non-alphanumeric vendor names in collected results
+            // Names whose first character no prefix can reach. Measured
+            // against the split's own character set rather than a separate
+            // notion of "alphanumeric": those two disagreeing is what makes a
+            // warning claim a gap that is not there, or miss one that is.
+            var firstCharacters = new HashSet<string>(PartitionCharacters, StringComparer.Ordinal);
             var nonAlpha = new HashSet<string>(StringComparer.Ordinal);
             foreach (var r in allResults)
             {
                 if (!string.IsNullOrEmpty(r.MerchantName) &&
-                    !char.IsLetterOrDigit(r.MerchantName[0]))
+                    !firstCharacters.Contains(r.MerchantName[0].ToString()))
                 {
                     nonAlpha.Add(r.MerchantName);
                 }
@@ -158,7 +201,7 @@ namespace VendorOfferUpdater
             return (allResults, _stats);
         }
 
-        private async Task PaginateConditionAsync(
+        private async Task<PartitionOutcome> PaginateConditionAsync(
             string baseCondition,
             string? vendorPrefix,
             int depth,
@@ -176,7 +219,15 @@ namespace VendorOfferUpdater
 
             int partitionRowsAdded = 0;
             int partitionHttpRequests = 0;
+
+            // Rows the wiki RETURNED, before deduplication. A sub-partition
+            // re-fetches from offset 0, so its rows are usually all duplicates
+            // of the parent's and add nothing; that is still an answer of
+            // "this prefix holds rows", which is what the overflow arithmetic
+            // below is checked against.
+            int partitionRowsReturned = 0;
             bool hitOffsetLimit = false;
+            bool sectionUnresolved = false;
             int offset = 0;
 
             while (true)
@@ -188,30 +239,56 @@ namespace VendorOfferUpdater
                     $"|limit={QueryLimit}" +
                     $"|offset={offset}";
 
-                var url = $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(query)}&format=json";
+                var url = BuildAskUrl(query);
 
                 _stats.TotalHttpRequests++;
                 partitionHttpRequests++;
 
-                var response = await FetchWithRetryAsync(url, ct);
+                string response;
+                try
+                {
+                    response = await FetchWithRetryAsync(url, label, condition, ct);
+                }
+                catch (HttpRequestException ex)
+                {
+                    RecordUnresolved("partition", label, vendorPrefix, condition, ex);
+                    sectionUnresolved = true;
+                    break;
+                }
+
                 using var doc = JsonDocument.Parse(response);
+                var reading = WikiAskResponse.Read(doc.RootElement);
+
+                if (reading.Shape == WikiAskShape.NoRows)
+                {
+                    RecordSectionAnswered();
+                    break;
+                }
+
+                if (reading.Shape != WikiAskShape.Rows)
+                {
+                    // Neither rows nor an empty result set. Not proof this
+                    // section is empty, so it is recorded, not skipped.
+                    RecordUnresolved(
+                        "partition",
+                        label,
+                        vendorPrefix,
+                        condition,
+                        reading.Error ?? UnreadableResponse());
+                    sectionUnresolved = true;
+                    break;
+                }
+
+                RecordSectionAnswered();
+
                 var root = doc.RootElement;
-
-                if (!root.TryGetProperty("query", out var queryElement) ||
-                    !queryElement.TryGetProperty("results", out var results))
-                {
-                    break;
-                }
-
-                // Empty results come back as [] instead of {}
-                if (results.ValueKind != JsonValueKind.Object)
-                {
-                    break;
-                }
+                var results = reading.Results;
 
                 int batchAdded = 0;
                 foreach (var resultProp in results.EnumerateObject())
                 {
+                    partitionRowsReturned++;
+
                     var parsed = ParseResult(resultProp.Name, resultProp.Value);
                     if (parsed == null)
                     {
@@ -263,80 +340,124 @@ namespace VendorOfferUpdater
             };
             _stats.Partitions.Add(pStats);
 
+            if (sectionUnresolved)
+            {
+                Console.WriteLine(
+                    $"  [{label}] UNRESOLVED: kept {partitionRowsAdded} row(s) already " +
+                    "collected, continuing with the rest of the run.");
+                return PartitionOutcome.Unresolved;
+            }
+
             if (!hitOffsetLimit)
             {
                 Console.WriteLine(
                     $"  [{label}] done: {partitionRowsAdded} rows in {partitionHttpRequests} requests");
-                return;
+                return partitionRowsReturned > 0 ? PartitionOutcome.Rows : PartitionOutcome.NoRows;
             }
 
             // OVERFLOW - check depth limit
             if (depth >= _options.MaxPrefixDepth)
             {
-                Console.WriteLine(
-                    $"  WARNING: Partition [{label}] overflowing at max depth {depth}. " +
-                    $"{partitionRowsAdded} rows collected, remaining truncated.");
                 pStats.WasTruncated = true;
                 _stats.TruncatedPartitions++;
-                return;
+
+                // Truncation is silent data loss, not a warning: this prefix
+                // holds rows past the offset limit that no query in this run
+                // will ask for. Recorded so the coverage gate can refuse to
+                // publish a dataset with a hole in it.
+                RecordUnresolved(
+                    "partition",
+                    label,
+                    vendorPrefix,
+                    condition,
+                    new WikiApiError(
+                        "truncated-at-max-depth",
+                        $"Overflowed the offset limit at max depth {depth} with " +
+                        $"{partitionRowsAdded} rows kept. Rows past that are not fetched. " +
+                        "Raise --max-depth to split this prefix further."));
+                return PartitionOutcome.Rows;
             }
 
             Console.WriteLine(
-                $"  [{label}] overflow at depth {depth}, probing sub-partitions...");
+                $"  [{label}] overflow at depth {depth}, splitting on the next character...");
 
-            // Probe + paginate sub-partitions (KEEP all rows already collected)
-            int skippedEmpty = 0;
-            foreach (var prefix in PartitionPrefixes)
+            // Split and paginate each child (KEEP all rows already collected).
+            // There is no separate probe request: an empty child costs one
+            // request to paginate and one to probe, so probing only added a
+            // request per non-empty child, and a second place to read a
+            // response and call it empty.
+            int childrenWithRows = 0;
+            int emptyChildren = 0;
+            int unresolvedChildren = 0;
+            var emptyPrefixes = new List<string>();
+
+            foreach (var character in PartitionCharacters)
             {
-                string subPrefix = (vendorPrefix ?? "") + prefix;
+                string subPrefix = (vendorPrefix ?? string.Empty) + character;
 
-                // Probe with limit=1 and no printouts (minimal payload)
-                CheckSafetyLimits(ct, $"probe {subPrefix}", depth + 1, seenKeys.Count);
-
-                string probeCondition = baseCondition + $"[[Has vendor::~{subPrefix}*]]";
-                string probeQuery = probeCondition + "|limit=1|offset=0";
-                string probeUrl =
-                    $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(probeQuery)}&format=json";
-
-                _stats.TotalHttpRequests++;
-
-                string probeResponse = await FetchWithRetryAsync(probeUrl, ct);
-                await Task.Delay(_effectiveDelay, ct);
-
-                bool hasResults = false;
-                using (var probeDoc = JsonDocument.Parse(probeResponse))
-                {
-                    var probeRoot = probeDoc.RootElement;
-                    if (probeRoot.TryGetProperty("query", out var pq) &&
-                        pq.TryGetProperty("results", out var pr) &&
-                        pr.ValueKind == JsonValueKind.Object)
-                    {
-                        // Check if there's at least one result
-                        using var enumerator = pr.EnumerateObject();
-                        hasResults = enumerator.MoveNext();
-                    }
-                }
-
-                if (!hasResults)
-                {
-                    skippedEmpty++;
-                    continue;
-                }
-
-                // Non-empty: paginate fully (re-fetches from offset=0; dedup handles overlap)
-                await PaginateConditionAsync(
+                var outcome = await PaginateConditionAsync(
                     baseCondition, subPrefix, depth + 1, allResults, seenKeys, ct);
+
+                switch (outcome)
+                {
+                    case PartitionOutcome.Rows:
+                        childrenWithRows++;
+                        break;
+                    case PartitionOutcome.NoRows:
+                        emptyChildren++;
+                        emptyPrefixes.Add($"'{subPrefix}'");
+                        break;
+                    default:
+                        unresolvedChildren++;
+                        break;
+                }
+
+                await Task.Delay(_effectiveDelay, ct);
             }
 
+            // The prefixes are named, not just counted: a count alone cannot
+            // tell "these prefixes hold no vendors" from "these queries never
+            // matched the way their names are actually spelled".
             Console.WriteLine(
-                $"  [{label}] sub-partitions done, " +
-                $"{skippedEmpty}/{PartitionPrefixes.Length} empty prefixes skipped");
+                $"  [{label}] split done: {childrenWithRows} with rows, " +
+                $"{emptyChildren} empty, {unresolvedChildren} unresolved" +
+                (emptyPrefixes.Count > 0 ? $". Empty: {string.Join(" ", emptyPrefixes)}" : string.Empty));
+
+            // The arithmetic that makes an unreachable prefix impossible to
+            // miss. This partition returned more rows than one query can
+            // page through, so at least one child must hold rows. Every child
+            // answering "none" is a contradiction, and it means the split is
+            // not reaching the names - not that the names are not there.
+            if (childrenWithRows == 0 && unresolvedChildren == 0)
+            {
+                RecordUnresolved(
+                    "partition",
+                    label,
+                    vendorPrefix,
+                    condition,
+                    new WikiApiError(
+                        "empty-subpartitions",
+                        $"Overflowed the offset limit, so this prefix holds more rows " +
+                        $"than one query returns, yet all {emptyChildren} sub-prefixes " +
+                        "returned none. The split is not reaching those names."));
+            }
+
+            return PartitionOutcome.Rows;
         }
 
         private void CheckSafetyLimits(
             CancellationToken ct, string label, int depth, int distinctCount)
         {
             ct.ThrowIfCancellationRequested();
+
+            if (HasStoppedAnswering())
+            {
+                throw new SafetyLimitException(
+                    $"{_consecutiveUnresolved} sections in a row went unanswered, " +
+                    $"the last at [{label}] depth={depth}. Stopping rather than " +
+                    "asking the wiki the same question section by section. " +
+                    $"Rows: {_stats.TotalRowsFetched} ({distinctCount} distinct).");
+            }
 
             if (_stats.TotalHttpRequests >= _options.MaxTotalRequests)
             {
@@ -367,21 +488,23 @@ namespace VendorOfferUpdater
             Console.WriteLine($"  Max total requests: {_options.MaxTotalRequests}");
             Console.WriteLine($"  Max runtime:        {_options.MaxRuntime.TotalMinutes:F0} min");
             Console.WriteLine($"  Delay between reqs: {_effectiveDelay} ms");
+            Console.WriteLine($"  Attempts per ask:   {Math.Max(1, _options.MaxAttempts)}");
             Console.WriteLine();
             Console.WriteLine("Traversal structure:");
             Console.WriteLine($"  Level 0: 1 root partition");
             for (int d = 1; d <= _options.MaxPrefixDepth; d++)
             {
-                int maxPartitions = (int)Math.Pow(PartitionPrefixes.Length, d);
+                double maxPartitions = Math.Pow(PartitionCharacters.Length, d);
                 Console.WriteLine(
-                    $"  Level {d}: up to {maxPartitions} prefixes " +
-                    $"({PartitionPrefixes.Length} per overflow at level {d - 1})");
+                    $"  Level {d}: up to {maxPartitions:N0} prefixes " +
+                    $"({PartitionCharacters.Length} per overflow at level {d - 1})");
             }
 
             Console.WriteLine();
             Console.WriteLine(
-                "Actual request count is unknown without probing - " +
-                "depends on data distribution.");
+                "A level is only reached where the level above it overflowed, so the "
+                + "actual request count depends on data distribution and is bounded by "
+                + $"--max-requests ({_options.MaxTotalRequests}).");
         }
 
         private static string ComputeCompositeKey(WikiVendorResult r)
@@ -406,9 +529,32 @@ namespace VendorOfferUpdater
             return $"{r.GameId}|{r.OutputQuantity ?? 1}|{merchant}|{string.Join(";", costs)}|{r.Requirement ?? ""}";
         }
 
-        private async Task<string> FetchWithRetryAsync(string url, CancellationToken ct)
+        /// <summary>
+        /// Issues one ask and returns its body, retrying the failures the
+        /// wiki is expected to produce: HTTP 403, 429 and 5xx, and an HTTP
+        /// 200 whose body is an API error rather than a result set. The last
+        /// of those is the reason this returns a body only when the body
+        /// holds an answer: every earlier caller had to decide for itself
+        /// what a refusal meant, and both decided it meant "no rows".
+        /// </summary>
+        /// <param name="url">The request URL.</param>
+        /// <param name="section">The section this request belongs to.</param>
+        /// <param name="condition">The query condition, for the log.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <param name="retryApiErrors">
+        /// Whether an HTTP 200 API error is retried and then thrown. False
+        /// returns the error body to the caller instead.
+        /// </param>
+        private async Task<string> FetchWithRetryAsync(
+            string url,
+            string section,
+            string condition,
+            CancellationToken ct,
+            bool retryApiErrors = true)
         {
-            for (int attempt = 0; attempt <= MaxRetries; attempt++)
+            int maxAttempts = Math.Max(1, _options.MaxAttempts);
+
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 ct.ThrowIfCancellationRequested();
 
@@ -421,15 +567,15 @@ namespace VendorOfferUpdater
                     {
                         // 403 is often a temporary block from the wiki.
                         // Use a long cooldown (30s base) with exponential backoff + jitter.
-                        if (attempt >= MaxRetries)
+                        if (attempt >= maxAttempts)
                         {
                             throw new HttpRequestException(
-                                $"HTTP 403 Forbidden after {MaxRetries + 1} attempts. " +
+                                $"HTTP 403 Forbidden after {maxAttempts} attempts. " +
                                 "The wiki may be rate-limiting this IP. " +
                                 "Try increasing --delay or waiting before retrying.");
                         }
 
-                        int cooldownMs = 30_000 * (1 << attempt);
+                        int cooldownMs = BackoffMs(attempt) * 30;
                         if (response.Headers.RetryAfter?.Delta is TimeSpan delta403)
                         {
                             cooldownMs = Math.Max(cooldownMs, (int)delta403.TotalMilliseconds);
@@ -443,45 +589,159 @@ namespace VendorOfferUpdater
                         Console.WriteLine(
                             $"    WARNING: HTTP 403 (possible rate-limit block), " +
                             $"cooling down {cooldownMs / 1000}s " +
-                            $"(attempt {attempt + 1}/{MaxRetries})...");
+                            $"(attempt {attempt}/{maxAttempts})...");
                         await Task.Delay(cooldownMs, ct);
                         continue;
                     }
 
                     if (statusCode == 429 || statusCode >= 500)
                     {
-                        if (attempt >= MaxRetries)
+                        if (attempt >= maxAttempts)
                         {
                             response.EnsureSuccessStatusCode();
                         }
 
-                        int backoffMs = 1000 * (1 << attempt);
+                        int backoffMs = BackoffMs(attempt);
                         if (response.Headers.RetryAfter?.Delta is TimeSpan delta)
                         {
                             backoffMs = Math.Max(backoffMs, (int)delta.TotalMilliseconds);
                         }
 
+                        // maxlag refusals arrive as 503 with the reason in the
+                        // body, so the body is read here too rather than only
+                        // on the 200 path.
+                        string failureBody = await response.Content.ReadAsStringAsync();
+                        var statusError = WikiAskResponse.ReadApiError(failureBody);
+
                         Console.WriteLine(
                             $"    HTTP {statusCode}, retrying in {backoffMs}ms " +
-                            $"(attempt {attempt + 1}/{MaxRetries})...");
+                            $"(attempt {attempt}/{maxAttempts})...");
+                        if (statusError != null)
+                        {
+                            LogApiError(statusError, section, condition, attempt, maxAttempts);
+                        }
+
                         await Task.Delay(backoffMs, ct);
                         continue;
                     }
 
                     response.EnsureSuccessStatusCode();
-                    return await response.Content.ReadAsStringAsync();
+                    string body = await response.Content.ReadAsStringAsync();
+
+                    var apiError = WikiAskResponse.ReadApiError(body);
+                    if (apiError == null || !retryApiErrors)
+                    {
+                        return body;
+                    }
+
+                    LogApiError(apiError, section, condition, attempt, maxAttempts);
+
+                    if (attempt >= maxAttempts)
+                    {
+                        throw new WikiApiErrorException(apiError, section, maxAttempts);
+                    }
+
+                    await Task.Delay(BackoffMs(attempt), ct);
                 }
-                catch (HttpRequestException) when (attempt < MaxRetries)
+                catch (WikiApiErrorException)
                 {
-                    int backoffMs = 1000 * (1 << attempt);
+                    throw;
+                }
+                catch (HttpRequestException) when (attempt < maxAttempts)
+                {
+                    int backoffMs = BackoffMs(attempt);
                     Console.WriteLine(
                         $"    Request failed, retrying in {backoffMs}ms " +
-                        $"(attempt {attempt + 1}/{MaxRetries})...");
+                        $"(attempt {attempt}/{maxAttempts})...");
                     await Task.Delay(backoffMs, ct);
                 }
             }
 
-            throw new HttpRequestException($"Failed after {MaxRetries + 1} attempts: {url}");
+            throw new HttpRequestException($"Failed after {maxAttempts} attempts: {url}");
+        }
+
+        private int BackoffMs(int attempt)
+        {
+            return Math.Max(0, _options.RetryBackoffBaseMs) * (1 << (attempt - 1));
+        }
+
+        private static string BuildAskUrl(string query)
+        {
+            return $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(query)}" +
+                   $"&format=json&maxlag={MaxLagSeconds}";
+        }
+
+        private static WikiApiError UnreadableResponse()
+        {
+            return new WikiApiError(
+                "unreadable-response",
+                "The response was neither a result set nor an API error.");
+        }
+
+        /// <summary>
+        /// Prints the refusal in full. Nothing recorded what these errors
+        /// actually say before this, so the code, the text, the query and the
+        /// attempt all go to the log rather than a summary count.
+        /// </summary>
+        private static void LogApiError(
+            WikiApiError error, string section, string condition, int attempt, int maxAttempts)
+        {
+            Console.WriteLine(
+                $"    WIKI API ERROR [{section}] attempt {attempt}/{maxAttempts}: code={error.Code}");
+            Console.WriteLine($"      info:  {error.Info}");
+            Console.WriteLine($"      query: {condition}");
+        }
+
+        private void RecordUnresolved(
+            string kind, string label, string? prefix, string condition, WikiApiError error)
+        {
+            RecordUnresolved(
+                kind, label, prefix, condition, error.Code, error.Info, Math.Max(1, _options.MaxAttempts));
+        }
+
+        private void RecordUnresolved(
+            string kind, string label, string? prefix, string condition, HttpRequestException ex)
+        {
+            bool refused = ex is WikiApiErrorException;
+            string code = refused ? ((WikiApiErrorException)ex).Error.Code : "transport";
+            int attempts = refused
+                ? ((WikiApiErrorException)ex).Attempts
+                : Math.Max(1, _options.MaxAttempts);
+            RecordUnresolved(kind, label, prefix, condition, code, ex.Message, attempts);
+        }
+
+        private void RecordUnresolved(
+            string kind,
+            string label,
+            string? prefix,
+            string condition,
+            string code,
+            string reason,
+            int attempts)
+        {
+            _unresolved.Add(new UnresolvedSection
+            {
+                Kind = kind,
+                Label = label,
+                Prefix = prefix,
+                Condition = condition,
+                ErrorCode = code,
+                Reason = reason,
+                Attempts = attempts,
+            });
+
+            _consecutiveUnresolved++;
+            Console.WriteLine($"    UNRESOLVED {kind} [{label}]: {code} - {reason}");
+        }
+
+        private void RecordSectionAnswered()
+        {
+            _consecutiveUnresolved = 0;
+        }
+
+        private bool HasStoppedAnswering()
+        {
+            return _consecutiveUnresolved >= _options.MaxConsecutiveUnresolvedSections;
         }
 
         private static WikiVendorResult? ParseResult(string pageName, JsonElement element)
@@ -620,11 +880,26 @@ namespace VendorOfferUpdater
         /// rather than matching on property values, which is more reliable across
         /// redirects and naming variants.
         /// Names are batched using [[A||B||C]] OR syntax to minimize requests.
+        /// <para>
+        /// Pass <paramref name="options"/> on a run that never called
+        /// QueryVendorItemsAsync: this method is the whole of the
+        /// --resolve-item-currencies-only pass, and without them it would use
+        /// the built-in delay and attempt count rather than the run's.
+        /// </para>
         /// </summary>
-        public async Task<Dictionary<string, int>> ResolveItemGameIdsAsync(
-            IEnumerable<string> itemNames, CancellationToken ct = default)
+        public async Task<ItemIdResolution> ResolveItemGameIdsAsync(
+            IEnumerable<string> itemNames,
+            CancellationToken ct = default,
+            QueryOptions? options = null)
         {
-            var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            if (options != null)
+            {
+                _options = options;
+                _effectiveDelay = options.DelayBetweenRequestsMs;
+            }
+
+            var resolution = new ItemIdResolution();
+            var result = resolution.Resolved;
             var names = itemNames.ToList();
 
             int delay = _effectiveDelay;
@@ -637,11 +912,23 @@ namespace VendorOfferUpdater
             {
                 ct.ThrowIfCancellationRequested();
 
+                if (HasStoppedAnswering())
+                {
+                    // Sections, not batches: the count carries over from the
+                    // vendor query on this same client, so a wiki that shut
+                    // during the scrape is not asked 111 more questions here.
+                    Console.WriteLine(
+                        $"  WARNING: {_consecutiveUnresolved} section(s) in a row went " +
+                        $"unanswered. Stopping with {result.Count} resolved.");
+                    break;
+                }
+
                 var batch = names.Skip(i).Take(batchSize).ToList();
                 var condition = "[[" + string.Join("||", batch) + "]]";
                 var query = condition + "|?Has game id";
 
-                var url = $"{WikiApiUrl}?action=ask&query={Uri.EscapeDataString(query)}&format=json";
+                var url = BuildAskUrl(query);
+                string label = $"item batch {i / batchSize + 1}";
 
                 Console.WriteLine(
                     $"  Resolving batch {i / batchSize + 1} ({batch.Count} items)...");
@@ -649,10 +936,26 @@ namespace VendorOfferUpdater
                 string response;
                 try
                 {
-                    response = await FetchWithRetryAsync(url, ct);
+                    response = await FetchWithRetryAsync(url, label, condition, ct);
+                }
+                catch (WikiApiErrorException ex)
+                {
+                    // A refusal is one batch's problem. The next batch is a
+                    // different query and may well be answered, so the run
+                    // continues and this batch is recorded for a re-target.
+                    RecordUnresolved("item-batch", label, null, condition, ex);
+                    if (i + batchSize < names.Count)
+                    {
+                        await Task.Delay(delay, ct);
+                    }
+
+                    continue;
                 }
                 catch (HttpRequestException ex)
                 {
+                    // Transport, not refusal: the wiki is unreachable rather
+                    // than unwilling, so pressing on would only add requests.
+                    RecordUnresolved("item-batch", label, null, condition, ex);
                     Console.WriteLine(
                         $"  WARNING: Item resolution interrupted at batch {i / batchSize + 1}: {ex.Message}");
                     Console.WriteLine(
@@ -661,13 +964,26 @@ namespace VendorOfferUpdater
                 }
 
                 using var doc = JsonDocument.Parse(response);
-                var root = doc.RootElement;
+                var reading = WikiAskResponse.Read(doc.RootElement);
 
-                if (root.TryGetProperty("query", out var queryElement) &&
-                    queryElement.TryGetProperty("results", out var results) &&
-                    results.ValueKind == JsonValueKind.Object)
+                if (reading.Shape == WikiAskShape.Rows || reading.Shape == WikiAskShape.NoRows)
                 {
-                    foreach (var prop in results.EnumerateObject())
+                    RecordSectionAnswered();
+
+                    // The wiki answered for this batch, so a name it returned
+                    // no id for is a genuine absence rather than a question
+                    // that was never put. Only the caller can act on that
+                    // difference, and only if it is told which names these
+                    // are - a flat dictionary of hits cannot say.
+                    foreach (var name in batch)
+                    {
+                        resolution.Answered.Add(name);
+                    }
+                }
+
+                if (reading.Shape == WikiAskShape.Rows)
+                {
+                    foreach (var prop in reading.Results.EnumerateObject())
                     {
                         if (prop.Value.TryGetProperty("printouts", out var printouts) &&
                             printouts.TryGetProperty("Has game id", out var gameIds) &&
@@ -681,6 +997,15 @@ namespace VendorOfferUpdater
                         }
                     }
                 }
+                else if (reading.Shape != WikiAskShape.NoRows)
+                {
+                    RecordUnresolved(
+                        "item-batch",
+                        label,
+                        null,
+                        condition,
+                        reading.Error ?? UnreadableResponse());
+                }
 
                 if (i + batchSize < names.Count)
                 {
@@ -688,7 +1013,7 @@ namespace VendorOfferUpdater
                 }
             }
 
-            return result;
+            return resolution;
         }
 
         /// <summary>
@@ -710,9 +1035,14 @@ namespace VendorOfferUpdater
         public async Task<string?> FetchWikitextAsync(string pageName, CancellationToken ct = default)
         {
             var url = $"{WikiApiUrl}?action=parse&page={Uri.EscapeDataString(pageName)}" +
-                       "&prop=wikitext&redirects=1&format=json";
+                       $"&prop=wikitext&redirects=1&format=json&maxlag={MaxLagSeconds}";
 
-            string response = await FetchWithRetryAsync(url, ct);
+            // retryApiErrors is off here because "missingtitle" is an ordinary
+            // outcome for this call: a vendor page named by a subobject may
+            // simply not exist, and retrying that five times would spend four
+            // requests to learn what the first answer already said.
+            string response = await FetchWithRetryAsync(
+                url, $"wikitext {pageName}", pageName, ct, retryApiErrors: false);
 
             using var doc = JsonDocument.Parse(response);
             var root = doc.RootElement;
@@ -726,6 +1056,25 @@ namespace VendorOfferUpdater
 
             return null;
         }
+    }
+
+    /// <summary>
+    /// What a resolution pass learned, and what it never got to ask.
+    /// <para>
+    /// <see cref="Resolved"/> alone cannot tell a name the wiki answered
+    /// nothing for from a name in a batch that was refused, failed, or was
+    /// never sent: both are simply absent from it. A caller that caches an
+    /// absence has to know the difference, so <see cref="Answered"/> names
+    /// every item in a batch the wiki did answer.
+    /// </para>
+    /// </summary>
+    public class ItemIdResolution
+    {
+        public Dictionary<string, int> Resolved { get; } =
+            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        public HashSet<string> Answered { get; } =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 
     public class WikiCostEntry

@@ -3963,3 +3963,42 @@ evidence that a `--merge-into` run does not silently drop tags. Coverage
 is deliberately partial: thousands of non-festival vendor pages remain
 untagged, since the pass covered the known festival vendor list rather
 than a full re-scrape (KNOWN-ISSUES #63).
+
+### T.9 `WikiSmwClient` partitioning: what the `~` glob actually matches
+
+A query past the SMW API's ~5500-result offset limit is split by vendor-name
+prefix, `[[Has vendor::~As*]]`. Four properties of that glob decide which
+characters the split has to cover, and all four are readable in Semantic
+MediaWiki's own source rather than inferred from behaviour:
+
+- `~` is `SMW_CMP_LIKE`, which `ComparatorMapper::mapComparator` maps to SQL
+  `LIKE`, rewriting `*` to `%` and `?` to `_`.
+- `ValueDescriptionInterpreter::interpretDescription` builds the condition as
+  `smw_sortkey <comparator> <value>` against the entity ID table for every
+  comparator except `=`. The match is on the sortkey, not the page id.
+- `TableSchemaManager` declares `smw_sortkey` as `FieldType::FIELD_TITLE`
+  unless the wiki opts into the `SMW_FIELDT_CHAR_NOCASE` feature flag, and
+  `MySQLTableBuilder` maps `title` to `VARBINARY(255)`. `LIKE` against a
+  binary column compares bytes, so **the match is case-sensitive**. The
+  opt-in alternative is `VARCHAR(255) ... COLLATE utf8_general_ci`, which
+  would be case-insensitive; the GW2 wiki does not have it on.
+- `WikiPage::getSortKey` returns the DB key with underscores replaced by
+  spaces, and `ComparatorMapper` escapes a literal `_` in the value to `\_`.
+  So a **space** is a real character to split on and an underscore is not:
+  no page title carries one.
+
+The consequence is why `PartitionCharacters` is not just `A-Z0-9`. Vendor
+names are Title Case, so a single-character prefix always matches, but every
+character after the first is usually lowercase: `[[Has vendor::~AS*]]`
+matches nothing at all, while the sixteen `Astral Ward *` merchants sit
+under `As`. A depth-2 split over an uppercase-only set therefore reported
+every sub-prefix as empty and kept only the first 5,500 rows of each
+overflowing letter, which is how a whole family of merchants stayed out of
+`ref/vendor_offers.json`.
+
+That failure was silent because "the probe returned no rows" and "no vendor
+starts with these characters" were recorded identically. The split now
+asserts the arithmetic instead: a partition that overflowed has more rows
+than it returned, so at least one child must hold rows. If every child
+answers with none, the partition is recorded UNRESOLVED rather than
+accepted, and the coverage gate blocks the write.

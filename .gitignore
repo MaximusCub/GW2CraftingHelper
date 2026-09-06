@@ -381,6 +381,11 @@ ref/wiki_vendor_cache.json
 ref/item_id_cache.json
 ref/seasonal_wikitext_cache.json
 
+# The sidecar naming the sections a scrape could not resolve. Run state for
+# the next run to re-target, not data: it describes one machine's run and is
+# deleted by the next run that resolves everything.
+ref/vendor_offers_unresolved.json
+
 # Private working state (owner direction 2026-08-30): kept local, never published
 dev/dev-notes/SESSION-STATE.md
 dev/dev-notes/FEEDBACK-BACKLOG.md

@@ -321,10 +321,17 @@ namespace VendorOfferUpdater.Tests
             Assert.Single(results);
             Assert.Equal(1, stats.TruncatedPartitions);
             Assert.True(stats.Partitions[0].WasTruncated);
+
+            // Truncation is rows this run will never ask for. Recorded as
+            // unresolved so the coverage gate refuses to publish a dataset
+            // with that hole in it, rather than only warning about it.
+            var section = Assert.Single(client.UnresolvedSections);
+            Assert.Equal("truncated-at-max-depth", section.ErrorCode);
+            Assert.Contains("--max-depth", section.Reason, StringComparison.Ordinal);
         }
 
         [Fact]
-        public async Task Overflow_ProbesSubPartitions()
+        public async Task Overflow_SplitsIntoSubPartitions()
         {
             var (client, handler, httpClient) = CreateClient();
             using var _ = httpClient;
@@ -336,35 +343,134 @@ namespace VendorOfferUpdater.Tests
                 .Build();
             handler.Enqueue(rootJson);
 
-            // Probes happen sequentially (A-Z, 0-9). When a probe is non-empty,
-            // the full pagination for that prefix runs IMMEDIATELY before the next probe.
-            // So the queue order is: A-probe -> A-pagination -> B-probe -> C-probe -> ...
-            string prefixAJson = new WikiJsonBuilder()
+            // Children are paginated directly, in character order. The first
+            // returns a row; every other one is empty and costs one request.
+            handler.Enqueue(new WikiJsonBuilder()
                 .AddResult("NPC#v2", gameId: 200, vendor: "Alpha Vendor")
-                .Build();
+                .Build());
 
-            for (int i = 0; i < 36; i++)
+            for (int i = 0; i < 200; i++)
             {
-                char c = i < 26 ? (char)('A' + i) : (char)('0' + i - 26);
-                if (c == 'A')
-                {
-                    // Non-empty probe, then immediately the full pagination response
-                    handler.Enqueue("{\"query\":{\"results\":{\"SomeResult\":{}}}}");
-                    handler.Enqueue(prefixAJson);
-                }
-                else
-                {
-                    handler.Enqueue(WikiJsonBuilder.BuildEmpty());
-                }
+                handler.Enqueue(WikiJsonBuilder.BuildEmpty());
             }
 
             var (results, stats) = await client.QueryVendorItemsAsync(
                 "[[Sells item::+]]", FastOptions(maxPrefixDepth: 1));
 
-            // Root result + prefix A result (dedup may merge if same composite key)
-            Assert.True(results.Count >= 1);
-            // 1 root + 36 probes + 1 full pagination = 38
-            Assert.Equal(38, stats.TotalHttpRequests);
+            Assert.Contains(results, r => r.GameId == 200);
+
+            // One root request plus one per child, and no separate probe:
+            // an empty child costs the same request either way, so probing
+            // only ever added one to every child that had rows.
+            //
+            // The character set IS the per-overflow request cost, so it is
+            // pinned here: widening it multiplies the requests a deep scrape
+            // makes against a rate-limited wiki, and that should be a visible
+            // change rather than a silent one.
+            int children = handler.RequestedUrls.Count - 1;
+            Assert.Equal(73, children);
+            Assert.Equal(children + 1, stats.TotalHttpRequests);
+        }
+
+        [Fact]
+        public async Task Overflow_SplitsOnLowercaseAndSpaceNotJustUppercase()
+        {
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
+
+            handler.Enqueue(new WikiJsonBuilder()
+                .AddResult("NPC#v1", gameId: 100, vendor: "Astral Ward Mage")
+                .WithContinueOffset(0)
+                .Build());
+
+            for (int i = 0; i < 200; i++)
+            {
+                handler.Enqueue(WikiJsonBuilder.BuildEmpty());
+            }
+
+            await client.QueryVendorItemsAsync("[[Sells item::+]]", FastOptions(maxPrefixDepth: 1));
+
+            var asked = handler.RequestedUrls
+                .Select(Uri.UnescapeDataString)
+                .ToList();
+
+            // "Astral Ward Mage" is only reachable through a lowercase
+            // continuation; an uppercase-only split asked for none of these.
+            Assert.Contains(asked, u => u.Contains("[[Has vendor::~a*]]", StringComparison.Ordinal));
+            Assert.Contains(asked, u => u.Contains("[[Has vendor::~s*]]", StringComparison.Ordinal));
+
+            // A space, a digit and the punctuation real names carry.
+            Assert.Contains(asked, u => u.Contains("[[Has vendor::~ *]]", StringComparison.Ordinal));
+            Assert.Contains(asked, u => u.Contains("[[Has vendor::~7*]]", StringComparison.Ordinal));
+            Assert.Contains(asked, u => u.Contains("[[Has vendor::~'*]]", StringComparison.Ordinal));
+            Assert.Contains(asked, u => u.Contains("[[Has vendor::~/*]]", StringComparison.Ordinal));
+            Assert.Contains(asked, u => u.Contains("[[Has vendor::~(*]]", StringComparison.Ordinal));
+            Assert.Contains(asked, u => u.Contains("[[Has vendor::~-*]]", StringComparison.Ordinal));
+
+            // An underscore is not a character any page title carries: SMW
+            // matches the sortkey, which has spaces, and escapes a literal
+            // underscore in the value. Asking for one would waste a request
+            // on every overflow.
+            Assert.DoesNotContain(asked, u => u.Contains("[[Has vendor::~_*]]", StringComparison.Ordinal));
+        }
+
+        [Fact]
+        public async Task OverflowWithEveryChildEmpty_IsRecordedUnresolved()
+        {
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
+
+            // The parent returned more rows than one query can page through,
+            // so at least one child must hold rows. All of them answering
+            // "none" is arithmetically impossible and means the split is not
+            // reaching the names.
+            handler.Enqueue(new WikiJsonBuilder()
+                .AddResult("NPC#v1", gameId: 100, vendor: "Astral Ward Mage")
+                .WithContinueOffset(0)
+                .Build());
+
+            for (int i = 0; i < 200; i++)
+            {
+                handler.Enqueue(WikiJsonBuilder.BuildEmpty());
+            }
+
+            var (_, stats) = await client.QueryVendorItemsAsync(
+                "[[Sells item::+]]", FastOptions(maxPrefixDepth: 1));
+
+            var section = Assert.Single(client.UnresolvedSections);
+            Assert.Equal("partition", section.Kind);
+            Assert.Equal("empty-subpartitions", section.ErrorCode);
+            Assert.Equal(0, stats.TruncatedPartitions);
+        }
+
+        [Fact]
+        public async Task OverflowWithOneChildHoldingRows_IsNotRecordedUnresolved()
+        {
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
+
+            handler.Enqueue(new WikiJsonBuilder()
+                .AddResult("NPC#v1", gameId: 100, vendor: "Alpha")
+                .WithContinueOffset(0)
+                .Build());
+
+            // The first child returns the same row the parent already had, so
+            // it adds nothing after deduplication. That is still an answer of
+            // "this prefix holds rows" and must not read as a contradiction.
+            handler.Enqueue(new WikiJsonBuilder()
+                .AddResult("NPC#v1", gameId: 100, vendor: "Alpha")
+                .Build());
+
+            for (int i = 0; i < 200; i++)
+            {
+                handler.Enqueue(WikiJsonBuilder.BuildEmpty());
+            }
+
+            var (results, _2) = await client.QueryVendorItemsAsync(
+                "[[Sells item::+]]", FastOptions(maxPrefixDepth: 1));
+
+            Assert.Single(results);
+            Assert.Empty(client.UnresolvedSections);
         }
 
         // -- Safety & cancellation tests ----------------------------
@@ -511,9 +617,9 @@ namespace VendorOfferUpdater.Tests
             var resolved = await client.ResolveItemGameIdsAsync(
                 new[] { "Iron Ore", "Copper Ore" });
 
-            Assert.Equal(2, resolved.Count);
-            Assert.Equal(19699, resolved["Iron Ore"]);
-            Assert.Equal(19697, resolved["Copper Ore"]);
+            Assert.Equal(2, resolved.Resolved.Count);
+            Assert.Equal(19699, resolved.Resolved["Iron Ore"]);
+            Assert.Equal(19697, resolved.Resolved["Copper Ore"]);
         }
 
         [Fact]
@@ -547,7 +653,7 @@ namespace VendorOfferUpdater.Tests
 
             var resolved = await client.ResolveItemGameIdsAsync(items);
 
-            Assert.Equal(15, resolved.Count);
+            Assert.Equal(15, resolved.Resolved.Count);
             // 2 batch requests made
             Assert.Equal(initialUrlCount + 2, handler.RequestedUrls.Count);
         }
@@ -571,9 +677,9 @@ namespace VendorOfferUpdater.Tests
             var resolved = await client.ResolveItemGameIdsAsync(
                 new[] { "Iron Ore", "Fake Item" });
 
-            Assert.Single(resolved);
-            Assert.True(resolved.ContainsKey("Iron Ore"));
-            Assert.False(resolved.ContainsKey("Fake Item"));
+            Assert.Single(resolved.Resolved);
+            Assert.True(resolved.Resolved.ContainsKey("Iron Ore"));
+            Assert.False(resolved.Resolved.ContainsKey("Fake Item"));
         }
 
         // Action=parse does not resolve redirects

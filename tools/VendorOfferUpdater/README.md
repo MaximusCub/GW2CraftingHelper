@@ -59,10 +59,13 @@ The tool auto-detects the repository root by walking up the directory tree looki
 | `--skip-item-resolution` | off | Skip item-based currency resolution; generate partial output and save wiki cache |
 | `--resolve-item-currencies-only` | off | Load wiki cache instead of scraping; resolve currencies and generate final output |
 | `--query <condition>` | `[[Sells item::+]]` | Override the SMW query condition (e.g. `[[Has vendor::"Miyani"]]`) |
-| `--max-depth <n>` | 2 | Max prefix partition depth for SMW queries |
+| `--max-depth <n>` | 2 | Max prefix partition depth for SMW queries. See "Splitting an oversized query" below |
 | `--max-requests <n>` | 2000 | Safety limit on total HTTP requests |
 | `--max-runtime <minutes>` | 30 | Safety limit on total execution time |
 | `--delay <ms>` | 250 | Delay between wiki API requests (minimum enforced: 200 ms) |
+| `--max-attempts <n>` | 5 | Attempts one wiki request gets before its section is recorded unresolved. Counts the first try |
+| `--allow-coverage-drop` | off | Write the dataset even though the coverage check objected. See "Coverage check" below |
+| `--recheck-misses` | off | Drop every remembered item-name miss from `ref/item_id_cache.json` so this run asks the wiki about those names again. See "Remembered misses" below |
 | `--dry-run` | off | Print query plan only, no HTTP calls to wiki |
 | `--tag-seasonal-festivals` | off | Fetch each distinct vendor page's wikitext and tag offers whose page carries a `{{Temporary\|...\|seasonal=}}`/`{{Temporary\|...\|event=}}` value matching one of the six known GW2 festivals. Opt-in: adds one extra HTTP request per distinct, not-yet-cached vendor page (see `--max-seasonal-pages`) |
 | `--diff-summary <old> <new>` | off | Read-only. Reports what changed between two vendor datasets and exits without touching the wiki, the API, or any file. See below |
@@ -75,10 +78,13 @@ The `refresh-vendor-data.sh` script accepts these environment variables:
 | Variable | Default | Used in |
 |----------|---------|---------|
 | `MAX_RUNTIME` | 20 | Pass 1 `--max-runtime` |
-| `MAX_REQUESTS` | 2000 | Pass 1 `--max-requests` |
+| `MAX_REQUESTS` | 4000 | Pass 1 `--max-requests` |
+| `MAX_DEPTH` | 2 | Pass 1 `--max-depth` - raise it if a run reports a partition truncated at max depth |
 | `DELAY_PASS1` | 250 | Pass 1 `--delay` |
 | `DELAY_PASS2` | 1500 | Pass 2 `--delay` |
 | `MAX_SEASONAL_PAGES` | 2500 | Pass 1 `--max-seasonal-pages` - sized to cover a from-scratch sweep of the measured ~2,088 distinct vendor pages in one run |
+| `ALLOW_COVERAGE_DROP` | unset | Set to any value to pass `--allow-coverage-drop` to both passes |
+| `RECHECK_MISSES` | unset | Set to any value to pass `--recheck-misses` to Pass 2 |
 
 Example:
 
@@ -146,7 +152,8 @@ datasets, the report is `repriced: 371, retagged: 492, rehashed: 48379`.
 | `ref/vendor_offers.json` | ~14.8 MB | **Baseline vendor offers** - loaded by the Blish HUD module at runtime. Contains deduplicated, ID-resolved vendor offers. Committed to repo and embedded in the `.bhm` package. Marked `-diff -merge linguist-generated` in `.gitattributes`. |
 | `ref/vendor_offers_manifest.json` | ~130 B | **Provenance record** for the file above - schema version, source, offer count, and the run's `generatedAt`. Everything run-scoped lives here so the payload stays byte-stable across a no-op refresh. Committed to repo. |
 | `ref/wiki_vendor_cache.json` | ~19.6 MB | **Wiki query cache** - raw SMW results from Pass 1. Used by Pass 2 for currency resolution. Supports incremental merging across multiple scrape runs. Gitignored (dev-local) since PR #92, and excluded from the packed `.bhm` since M38/WP-29 - see `docs/RELEASING.md`. |
-| `ref/item_id_cache.json` | ~40 KB | **Item ID cache** - maps item currency names to GW2 game IDs. Avoids re-resolving known items on subsequent runs. Gitignored (dev-local), same as the wiki cache above. |
+| `ref/item_id_cache.json` | ~40 KB | **Item ID cache** - maps item currency names to GW2 game IDs, and remembers the names the wiki answered no id for, with the date each was recorded. Avoids re-resolving known names on subsequent runs. See "Remembered misses" below. Gitignored (dev-local), same as the wiki cache above. |
+| `ref/vendor_offers_unresolved.json` | small | **Unresolved sections** from the last run - the queries the wiki never answered, for a follow-up run to re-target. Written only when a run leaves something unresolved, and deleted by the next clean run. Gitignored (dev-local, run state rather than data). |
 | `ref/seasonal_wikitext_cache.json` | small | **Seasonal festival tag cache** - maps vendor page name to its raw wiki `{{Temporary\|...}}` seasonal/event value (or `""` for "checked, not tagged"). Only populated by `--tag-seasonal-festivals`. Gitignored (dev-local, like `wiki_vendor_cache.json`/`item_id_cache.json`). |
 
 ## What It Queries
@@ -166,9 +173,149 @@ datasets, the report is `repriced: 371, retagged: 492, rehashed: 48379`.
 ## Rate Limiting
 
 - Configurable delay between wiki requests (default 250 ms, minimum 200 ms).
-- **HTTP 403** (wiki rate-limit block): 30-second base cooldown with exponential backoff and jitter, up to 3 retries.
-- **HTTP 429 / 5xx**: exponential backoff (1 s / 2 s / 4 s), up to 3 retries. Respects `Retry-After` header.
+- Every `action=ask` request sends `maxlag=5`, which asks the wiki to refuse
+  the query while its database replicas are lagging rather than serve it and
+  fall further behind. A refused query is retried like any other failure.
+- The `User-Agent` names the repository, per MediaWiki's User-Agent policy, so
+  an operator can open an issue instead of blocking the address.
+- **HTTP 403** (wiki rate-limit block): 30-second base cooldown with exponential backoff and jitter.
+- **HTTP 429 / 5xx**: exponential backoff (1 s / 2 s / 4 s / 8 s). Respects `Retry-After` header.
+- **HTTP 200 with an `error` body**: the same backoff as 429. See below.
+- Every one of those gets `--max-attempts` tries (default 5) before the section
+  is recorded unresolved.
 - Both query and currency resolution methods return partial results on failure rather than losing work.
+
+## When the wiki refuses a query
+
+`action=ask` answers in three shapes, and all three arrive as HTTP 200:
+
+| Body | Meaning |
+|---|---|
+| `{"query":{"results":{...}}}` | rows exist |
+| `{"query":{"results":[]}}` | genuinely no rows |
+| `{"error":{"code":...,"info":...}}` | the API refused the query |
+
+The tool reads all three through one reader (`WikiAskResponse`), so a refusal
+can never be mistaken for an empty result set. A refusal is expected rather
+than exceptional, and the goal is the most complete scrape possible, so it is
+retried on the same backoff ladder as an HTTP 429. Every refusal is logged in
+full: the error code, the info text, the query condition and the attempt.
+
+A section that is still refused after its last attempt is recorded as
+**unresolved** and the run continues. Unresolved sections are listed at the end
+of the run and written to a sidecar file beside the dataset:
+
+```jsonc
+{
+  "generatedAt": "2026-09-05T10:02:41.7712030Z",
+  "sections": [
+    {
+      "kind": "partition",
+      "label": "As",
+      "prefix": "As",
+      "condition": "[[Sells item::+]][[Has vendor::~As*]]",
+      "errorCode": "maxlag",
+      "reason": "Waiting for 10.64.16.79: 6.9 seconds lagged.",
+      "attempts": 5
+    }
+  ]
+}
+```
+
+`condition` is the query that failed, so a follow-up run can re-target exactly
+those sections rather than scraping the whole namespace again:
+
+```bash
+dotnet run --project tools/VendorOfferUpdater/VendorOfferUpdater.csproj -- \
+  --query "[[Sells item::+]][[Has vendor::~AS*]]" \
+  --merge-into ref/vendor_offers.json \
+  ref/vendor_offers.json
+```
+
+The sidecar is deleted by the next run that resolves everything, so its
+presence always describes the latest run.
+
+One refused section is worth carrying on past. Three in a row is the wiki
+declining to answer this address at all, and the run stops there rather than
+spending a full attempt ladder per section to be told the same thing 36 times.
+Whatever was collected up to that point is kept and the wiki cache is saved.
+
+## Splitting an oversized query
+
+The SMW API pages through at most ~5,500 results for one query condition. Past
+that, the scrape splits the query by vendor-name prefix: `[[Has vendor::~A*]]`,
+then `[[Has vendor::~Ab*]]`, and so on, up to `--max-depth`.
+
+Which characters the split uses is not a free choice. SMW compiles `~As*` to
+`smw_sortkey LIKE 'As%'` against a `VARBINARY(255)` column, so the comparison
+is byte-wise and **case-sensitive**, and the sortkey is the page title with
+underscores turned back into spaces. Vendor names are Title Case, so the first
+character is upper case but the ones after it usually are not: `~AS*` matches
+nothing at all, while the sixteen `Astral Ward *` merchants sit under `As`. The
+character set therefore spans upper case, lower case, digits and the
+punctuation that appears in real names, including a space, an apostrophe, a
+slash, a parenthesis and a leading double quote. `docs/ARCHITECTURE.md` section
+T.9 records where each of those properties is readable in SMW's own source.
+
+Each child costs one request whether or not it holds rows, so the size of that
+set is the price of an overflow: 73 requests per partition that overflows. A
+level is only reached where the level above it overflowed.
+
+**The arithmetic is checked.** A partition that overflowed returned more rows
+than one query can page through, so at least one of its children must hold
+rows. If every child answers with none, that is a contradiction: the split is
+not reaching the names rather than the names not existing. The partition is
+recorded UNRESOLVED and the coverage check blocks the write. A partition that
+overflows at `--max-depth`, whose remaining rows this run will never ask for,
+is recorded the same way; raise `--max-depth` (or `MAX_DEPTH` in the wrapper
+script) to split it further.
+
+## Remembered misses
+
+Item-based currency names ("Mystic Coin", "Glob of Ectoplasm") are resolved to
+game ids against the wiki and cached in `ref/item_id_cache.json`. Some names
+never resolve, and legitimately so: they are plural forms of a singular item,
+wallet currencies rather than items, or wiki table text with a typo in it (the
+live cache carries `Ancient  Coin`, with two spaces). Those names are cached as
+misses so that every future run does not ask about them again.
+
+A cached miss is permanent - the resolution pass only asks about names the
+cache has never settled - so it must only ever be recorded for a name the wiki
+actually answered about. `ResolveItemGameIdsAsync` reports which names were in
+a batch the wiki answered, alongside the ids it resolved, and a name in a batch
+that was refused, failed, or was never sent is cached neither way. It is
+reported at the end of the pass and asked about again next run.
+
+Every miss records the date it was written:
+
+```jsonc
+{
+  "cacheVersion": 2,
+  "ids": { "Mystic Coin": 19976 },
+  "misses": { "Ancient  Coin": "2026-09-05T21:02:41.7712030Z" }
+}
+```
+
+A run prints how many misses it is carrying and how old the oldest is.
+`--recheck-misses` drops them all so they are asked about again, which is how
+an operator retries a stale one without hand-editing the file. Resolved ids are
+untouched by it.
+
+A cache written in the older flat format (`{"name": 12345, "other": -1}`) is
+migrated on load rather than discarded: `-1` becomes a miss with no date,
+reported as undated, since that format recorded none. A missing cache file is
+an ordinary cold start, not an error.
+
+## Coverage check
+
+Before the dataset is written, the run compares it against the file it would
+replace, on total offers and on distinct merchants. The write is blocked when
+the run left any section unresolved, or when either count fell by more than 2%.
+The merge step's data-loss guard does not cover this: it protects rows already
+in the baseline, and says nothing about rows a run never fetched at all.
+
+Pass `--allow-coverage-drop` to write anyway. The reasons are printed either
+way; the flag decides whether they stop the write.
 
 ## Output Schema
 
@@ -218,6 +365,7 @@ every run whether or not a single price had moved.
 | 0 | Success - offers written | Commit updated `ref/vendor_offers.json` |
 | 1 | Error (network failure, unexpected exception) | Check error message; retry if transient |
 | 2 | Safety limit exceeded (max requests or max runtime) | Partial results saved to wiki cache. Increase `--max-runtime` or `--max-requests` and re-run |
+| 3 | Coverage check blocked the write | Nothing was written. Re-run the sections named in `ref/vendor_offers_unresolved.json`, or pass `--allow-coverage-drop` if the loss is intended |
 | 130 | Cancelled (Ctrl+C) | Partial results may be saved to wiki cache |
 
 ## When to Re-run
