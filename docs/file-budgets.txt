@@ -625,13 +625,13 @@ tools/VendorOfferUpdater/CoverageGate.cs                                        
 tools/VendorOfferUpdater/CoverageGate.cs                                                278
 tools/VendorOfferUpdater/Gw2ApiHelper.cs                                                231
 tools/VendorOfferUpdater/HomesteadTierResolver.cs                                       80
-tools/VendorOfferUpdater/ItemIdCache.cs                                                 297
+tools/VendorOfferUpdater/ItemIdCache.cs                                                 372
 tools/VendorOfferUpdater/Models/CostLine.cs                                             18
 tools/VendorOfferUpdater/Models/Gw2Constants.cs                                         77
 tools/VendorOfferUpdater/Models/VendorOffer.cs                                          62
 tools/VendorOfferUpdater/Models/VendorOfferDataset.cs                                   21
 tools/VendorOfferUpdater/Models/VendorOfferManifest.cs                                  33
-tools/VendorOfferUpdater/Program.cs                                                     1994
+tools/VendorOfferUpdater/Program.cs                                                     2160
 tools/VendorOfferUpdater/QueryOptions.cs                                                56
 tools/VendorOfferUpdater/QueryStats.cs                                                  79
 tools/VendorOfferUpdater/TemporaryTemplateParser.cs                                     122
