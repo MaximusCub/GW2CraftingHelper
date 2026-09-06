@@ -623,7 +623,7 @@ tools/MysticForgeSeeder/WikiRecipeClient.cs                                     
 tools/Shared/FileMysticForgeRecipeSource.cs                                             39
 tools/VendorOfferUpdater/CoverageGate.cs                                                278
 tools/VendorOfferUpdater/CoverageGate.cs                                                278
-tools/VendorOfferUpdater/Gw2ApiHelper.cs                                                99
+tools/VendorOfferUpdater/Gw2ApiHelper.cs                                                231
 tools/VendorOfferUpdater/HomesteadTierResolver.cs                                       80
 tools/VendorOfferUpdater/ItemIdCache.cs                                                 297
 tools/VendorOfferUpdater/Models/CostLine.cs                                             18
@@ -639,4 +639,4 @@ tools/VendorOfferUpdater/VendorOfferDiff.cs                                     
 tools/VendorOfferUpdater/VendorOfferHasher.cs                                           122
 tools/VendorOfferUpdater/WikiAskResponse.cs                                             216
 tools/VendorOfferUpdater/WikiAskResponse.cs                                             216
-tools/VendorOfferUpdater/WikiSmwClient.cs                                               1145
+tools/VendorOfferUpdater/WikiSmwClient.cs                                               1350
