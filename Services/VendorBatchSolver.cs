@@ -42,6 +42,17 @@ namespace TaimisToolbench.Services
             // DailyCap/WeeklyCap - FinalizeVendorBatches checks it
             // separately so an offer carrying both can surface both notices.
             public int? SeasonalCap;
+
+            // This offer's unlock gate (VendorOffer.UnlockRecipeItemId),
+            // carried so a merged step can report the sheet a player must
+            // own. Deliberately NOT compared by VendorBatchesEqual, for
+            // exactly the reason BarterItemCostLinesPerBatch is not: that
+            // comparison decides VendorBatchState.Conflict, which decides
+            // whether a merged step's coin total is re-derived at all, so
+            // widening it would move reported coin totals.
+            public int? UnlockRecipeItemId;
+
+            public int? UnlockRecipeId;
         }
 
         // Per-item-id (BuyFromVendor stepKey) bookkeeping built up across
@@ -655,6 +666,8 @@ namespace TaimisToolbench.Services
                                 DailyCap = offer.DailyCap,
                                 WeeklyCap = offer.WeeklyCap,
                                 SeasonalCap = offer.SeasonalCap,
+                                UnlockRecipeItemId = offer.UnlockRecipeItemId,
+                                UnlockRecipeId = offer.UnlockRecipeId,
                             };
                         }
 
@@ -701,6 +714,8 @@ namespace TaimisToolbench.Services
                         DailyCap = offer.DailyCap,
                         WeeklyCap = offer.WeeklyCap,
                         SeasonalCap = offer.SeasonalCap,
+                        UnlockRecipeItemId = offer.UnlockRecipeItemId,
+                        UnlockRecipeId = offer.UnlockRecipeId,
                     };
                 }
             }
@@ -921,6 +936,8 @@ namespace TaimisToolbench.Services
                     step.VendorBarterItemCosts = ScaleCostLines(batch.BarterItemCostLinesPerBatch, unitsNeeded);
                     step.VendorOfferOutputCount = batch.OutputCount;
                     step.VendorOfferCurrencyCostLinesPerBatch = batch.CurrencyCostLinesPerBatch;
+                    step.VendorUnlockRecipeItemId = batch.UnlockRecipeItemId;
+                    step.VendorUnlockRecipeId = batch.UnlockRecipeId;
 
                     int? cap = batch.DailyCap.HasValue && batch.DailyCap.Value > 0
                         ? batch.DailyCap

@@ -139,6 +139,20 @@ namespace TaimisToolbench.Views.Rendering
         private const int EffectTextIndent = 31;
 
         /// <summary>
+        /// The equipment slot glyph and the text column beside it. MEASURED
+        /// on a live ascended-staff tooltip at the game's 16px line pitch:
+        /// the glyph's box is 16px square at the tooltip's content edge -
+        /// its 14px of ink sits inside a 1px transparent border, which is
+        /// what the four upgrade and infusion lines' ink columns resolve to
+        /// - and the text starts 21px in. Absolute game pixels, not
+        /// multiples of the line height, for the reason
+        /// <see cref="EffectIconSize"/> gives.
+        /// </summary>
+        private const int SlotIconSize = 16;
+
+        private const int SlotTextIndent = 21;
+
+        /// <summary>
         /// The game's coin icon is ~0.8x its line height (~13px on a 16px
         /// line, measured on the steak capture) - not the module's shared
         /// 20px table icon, which under the +2pt font wave reads small on
@@ -379,7 +393,8 @@ namespace TaimisToolbench.Views.Rendering
                 coinRowHeight: System.Math.Max(lineHeight, coinIconSize),
                 headerRowHeight: System.Math.Max(lineHeight, HeaderIconFrameSize),
                 headerIndent: HeaderIconFrameSize + HeaderIconGap,
-                effectIndent: EffectTextIndent);
+                effectIndent: EffectTextIndent,
+                slotIndent: SlotTextIndent);
 
             _contentPanel = new Panel()
             {
@@ -414,7 +429,19 @@ namespace TaimisToolbench.Views.Rendering
             BitmapFont font, int lineHeight, int coinIconSize)
         {
             var row = rows[index];
-            if (row.IconUrl != null && row.Kind == TooltipLineKind.Effect)
+            if (row.IconAssetId != 0)
+            {
+                // The game's own slot art, by asset id rather than by
+                // render-service URL - the path the coin denominations
+                // already take. Bare, like the effect icon: the game frames
+                // only the header icon. Silent on hover, because the text
+                // one gap to its right already names the slot.
+                int size = System.Math.Min(SlotIconSize, row.Height);
+                IconControls.CreateAssetIcon(
+                    _contentPanel, row.IconAssetId, 0,
+                    row.Y + System.Math.Max(0, (row.Height - size) / 2), size, null);
+            }
+            else if (row.IconUrl != null && row.Kind == TooltipLineKind.Effect)
             {
                 // The effect block's inline icon: bare (the game frames
                 // only the header icon), ~26px spanning into the block's
@@ -530,10 +557,13 @@ namespace TaimisToolbench.Views.Rendering
                 case TooltipSpanRole.Bonus:
                     return new Color(85, 153, 255);
 
-                // A tier above the wearer's equipped count. Unreachable
-                // today - see TooltipSpanRole.BonusInactive.
+                // #AAA - a tier above the wearer's equipped count. MEASURED
+                // on a rune socketed at (0/4): the four bonus lines are
+                // neutral grey with a hard ceiling at 170-176 where the
+                // white lines of the same capture reach 255. The earlier
+                // 150 was a guess made while the role was unreachable.
                 case TooltipSpanRole.BonusInactive:
-                    return new Color(150, 150, 150);
+                    return new Color(170, 170, 170);
 
                 // #9ED - MEASURED saturating peak (p95 == max ==
                 // (153,238,221)) on three independent live3 flavour runs:

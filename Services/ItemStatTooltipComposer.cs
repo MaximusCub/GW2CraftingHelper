@@ -11,7 +11,7 @@ namespace TaimisToolbench.Services
     /// DOES (strength/defense, attributes, granted bonuses, or a
     /// consumable's use prompt and effect block), then - on materials,
     /// trophies and consumables - the description as its own block, the
-    /// infusion slots, the identity block (rarity word where the game
+    /// slot lines, the identity block (rarity word where the game
     /// shows one, type, level, equipment's description and flavour, the
     /// binding lines), and last of all, unlabelled and contiguous, the
     /// vendor value.
@@ -28,6 +28,7 @@ namespace TaimisToolbench.Services
     {
         private static readonly IReadOnlyList<ItemAttributeLine> EmptyAttributes = new List<ItemAttributeLine>();
         private static readonly IReadOnlyList<string> EmptyStrings = new List<string>();
+        private static readonly IReadOnlyList<ItemSlotKind> EmptySlots = new List<ItemSlotKind>();
 
         /// <summary>The game's own description string on a piece of gear
         /// whose stats have not been chosen yet (KNOWN-ISSUES #42, gap
@@ -42,6 +43,19 @@ namespace TaimisToolbench.Services
         private const string ConsumePrompt = "Double-click to consume.";
 
         public static TooltipContent BuildContent(ItemStatBlock stats)
+        {
+            return BuildContent(stats, SocketedUpgradeView.None);
+        }
+
+        /// <summary>
+        /// The same tooltip for a stack the account actually holds, whose
+        /// socketed components are known. They render where the game
+        /// renders them - between what the item does and its identity
+        /// block, in place of the anonymous slot lines
+        /// <see cref="BuildSlots"/> emits when the contents are
+        /// unknown.
+        /// </summary>
+        public static TooltipContent BuildContent(ItemStatBlock stats, SocketedUpgradeView sockets)
         {
             if (stats == null)
             {
@@ -98,7 +112,7 @@ namespace TaimisToolbench.Services
             // and a name-only block never ends on a stray blank row.
             var blocks = new List<TooltipContent>(3);
             AddBlock(blocks, facts);
-            AddBlock(blocks, BuildInfusionSlots(stats));
+            AddBlock(blocks, BuildSlots(stats, sockets));
             AddBlock(blocks, BuildIdentityBlock(stats, includeDescription: true));
 
             for (int i = 0; i < blocks.Count; i++)
@@ -249,41 +263,19 @@ namespace TaimisToolbench.Services
             // several attributes ("+5 Power, +5 Precision") is its own
             // distinct wording and still belongs.
             //
-            // The buff string carries API markup - a sigil's cooldown is
-            // "<br><c=@reminder>(Cooldown: 20 Seconds)</c>" INSIDE
-            // infix_upgrade.buff.description (measured on 24561) - so it
-            // goes through the sanitizer like a description does, with
-            // unmarked prose promoted to the bonus blue and the reminder
-            // run keeping its own grey, which is exactly the split the
-            // live3 sigil-rage capture shows (blue effect line, grey
-            // "(Cooldown: 20 Seconds)" line under it, 2026-08-26).
-            if (!buffAlreadyShown && !string.IsNullOrEmpty(stats.BuffDescription))
+            // Both texts carry API markup and both go through the one
+            // emitter that handles it - see UpgradeEffectLines, which the
+            // socketed-component path shares.
+            if (!buffAlreadyShown)
             {
-                var spans = ItemDescriptionSanitizer.SanitizeToSpans(stats.BuffDescription);
-                foreach (var span in spans)
-                {
-                    builder.Styled(
-                        span.Text,
-                        span.Role == TooltipSpanRole.Default ? TooltipSpanRole.Bonus : span.Role);
-                }
-
-                if (spans.Count > 0)
-                {
-                    builder.EndLine();
-                }
+                UpgradeEffectLines.AppendBuff(builder, stats.BuffDescription, TooltipSpanRole.Bonus);
             }
 
-            // A rune's bonuses are positional - the Nth entry is the bonus
-            // at N pieces equipped - so the index IS data, not decoration.
-            // All of them, none greyed and no (x/6) counter: that needs the
-            // character's equipped set, which is instance state /v2/items
-            // cannot carry, and an unequipped rune in a bag is exactly what
-            // the game shows this way (KNOWN-ISSUES #42).
-            var bonuses = stats.UpgradeBonuses ?? EmptyStrings;
-            for (int i = 0; i < bonuses.Count; i++)
-            {
-                builder.Styled($"({i + 1}): {bonuses[i]}", TooltipSpanRole.Bonus).EndLine();
-            }
+            // The loose component itself, not one socketed into armour: no
+            // (x/6) counter and no greyed tier, because no set is being
+            // worn to count against. The socketed case does differ - see
+            // UpgradeEffectLines.AppendSocketedBlock.
+            UpgradeEffectLines.AppendBonuses(builder, stats.UpgradeBonuses, TooltipSpanRole.Bonus);
         }
 
         /// <summary>
@@ -395,27 +387,76 @@ namespace TaimisToolbench.Services
         /// infusions each render as blank / block / blank, corroborated on
         /// spire, ascended_comparison LEFT and naptown RIGHT - not one
         /// contiguous run (gap G16, fidelity-audit F8).
+        /// <para>
+        /// Each carries the game's own glyph for its slot, and the game's
+        /// own "Unused" wording, which is a fact about a definition rather
+        /// than a guess about a copy - see KNOWN-ISSUES #42. A slot the
+        /// definition itself fills is already absent from
+        /// <see cref="ItemStatBlock.UnusedSlots"/>.
+        /// </para>
         /// </summary>
-        private static TooltipContent BuildInfusionSlots(ItemStatBlock stats)
+        private static TooltipContent BuildSlots(ItemStatBlock stats, SocketedUpgradeView sockets)
         {
             var slots = new TooltipContentBuilder();
+            var socketed = sockets ?? SocketedUpgradeView.None;
 
-            // The COUNT, never "unused": what is socketed in the player's
-            // own copy is instance state /v2/items cannot know, and
-            // claiming the slots are empty would be a guess. That wording
-            // difference is an accepted divergence from the game's
-            // "Unused Infusion Slot" - see KNOWN-ISSUES #42.
-            for (int i = 0; i < stats.InfusionSlotCount; i++)
+            // Infusions above upgrades, and both above the identity block:
+            // measured on one ascended-gloves capture whose agony infusion
+            // block sits between the attribute lines and the rune block.
+            // Separator() is a no-op on an empty builder, so the first
+            // block never opens on a blank row.
+            foreach (var infusion in socketed.Infusions)
             {
-                if (i > 0)
+                slots.Separator();
+                UpgradeEffectLines.AppendSocketedBlock(slots, infusion);
+            }
+
+            // A slot a reading already filled is not also reported unused.
+            // The reading is per stack and the slot list per definition, so
+            // each socketed block spends one slot of its own kind and only
+            // the remainder prints a line. Infusion readings spend
+            // enrichment slots too, because /v2/account/* reports an
+            // enrichment in the same infusions array.
+            int upgradesLeft = socketed.Upgrades.Count;
+            int infusionsLeft = socketed.Infusions.Count;
+            var unused = stats.UnusedSlots ?? EmptySlots;
+            for (int i = 0; i < unused.Count; i++)
+            {
+                if (unused[i] == ItemSlotKind.Upgrade)
                 {
-                    slots.Separator();
+                    if (upgradesLeft > 0)
+                    {
+                        upgradesLeft--;
+                        continue;
+                    }
+                }
+                else if (infusionsLeft > 0)
+                {
+                    infusionsLeft--;
+                    continue;
                 }
 
-                slots.Text("Infusion Slot").EndLine();
+                slots.Separator();
+                slots.SlotLine(ItemSlotFacts.SlotArtAssetId(unused[i]), SlotLineText(unused[i]));
+            }
+
+            foreach (var upgrade in socketed.Upgrades)
+            {
+                slots.Separator();
+                UpgradeEffectLines.AppendSocketedBlock(slots, upgrade);
             }
 
             return slots.Build();
+        }
+
+        private static string SlotLineText(ItemSlotKind kind)
+        {
+            switch (kind)
+            {
+                case ItemSlotKind.Upgrade: return "Unused Upgrade Slot";
+                case ItemSlotKind.Enrichment: return "Unused Enrichment Slot";
+                default: return "Unused Infusion Slot";
+            }
         }
 
         private static TooltipContent BuildIdentityBlock(ItemStatBlock stats, bool includeDescription)

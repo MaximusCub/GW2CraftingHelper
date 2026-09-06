@@ -627,5 +627,40 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(0, TooltipLayoutMath.CanvasArtSourceLength(100, 3, 3));
             Assert.Equal(0, TooltipLayoutMath.CanvasArtSourceLength(100, 0, 4));
         }
+
+        // --- Slot rows ---
+        [Fact]
+        public void ASlotRowStartsAtTheSlotIndentAndKeepsItsGlyph()
+        {
+            var content = new TooltipContentBuilder()
+                .Text("plain").EndLine()
+                .SlotLine(517197, "Unused Upgrade Slot")
+                .Build();
+
+            var layout = TooltipLayoutMath.LayoutContent(
+                content, 500, 20, TenPxPerChar, FixedCoinWidth, slotIndent: 21);
+
+            Assert.Equal(0, layout.Rows[0].Spans[0].X);
+            Assert.Equal(0, layout.Rows[0].IconAssetId);
+            Assert.Equal(21, layout.Rows[1].Spans[0].X);
+            Assert.Equal(517197, layout.Rows[1].IconAssetId);
+        }
+
+        [Fact]
+        public void AWrappedSlotRowDrawsItsGlyphOnceAndIndentsTheContinuation()
+        {
+            var content = new TooltipContentBuilder()
+                .SlotLine(517197, "aaa bbb ccc")
+                .Build();
+
+            // 21px indent plus 40px of budget: "aaa" fits, "bbb ccc" does not.
+            var layout = TooltipLayoutMath.LayoutContent(
+                content, 61, 20, TenPxPerChar, FixedCoinWidth, slotIndent: 21);
+
+            Assert.True(layout.Rows.Count > 1);
+            Assert.Equal(517197, layout.Rows[0].IconAssetId);
+            Assert.All(layout.Rows.Skip(1), r => Assert.Equal(0, r.IconAssetId));
+            Assert.All(layout.Rows, r => Assert.Equal(21, r.Spans[0].X));
+        }
     }
 }

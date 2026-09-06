@@ -130,7 +130,8 @@ namespace TaimisToolbench.Services
             internal LaidOutRow(
                 IReadOnlyList<PlacedSpan> spans, int width, int y, int height, string iconUrl,
                 TooltipLineKind kind = TooltipLineKind.Text,
-                TooltipHeaderSubject subject = default(TooltipHeaderSubject))
+                TooltipHeaderSubject subject = default(TooltipHeaderSubject),
+                int iconAssetId = 0)
             {
                 Spans = spans;
                 Width = width;
@@ -139,6 +140,7 @@ namespace TaimisToolbench.Services
                 IconUrl = iconUrl;
                 Kind = kind;
                 HeaderSubject = subject;
+                IconAssetId = iconAssetId;
             }
 
             public IReadOnlyList<PlacedSpan> Spans { get; }
@@ -177,6 +179,14 @@ namespace TaimisToolbench.Services
             /// frames <see cref="IconUrl"/> by on a header row.
             /// </summary>
             public TooltipHeaderSubject HeaderSubject { get; }
+
+            /// <summary>
+            /// The slot glyph on the first row of a
+            /// <see cref="TooltipLineKind.Slot"/> line, as a GW2 asset id;
+            /// 0 everywhere else, same first-row-only rule as
+            /// <see cref="IconUrl"/>.
+            /// </summary>
+            public int IconAssetId { get; }
         }
 
         public sealed class Layout
@@ -220,7 +230,8 @@ namespace TaimisToolbench.Services
             int coinRowHeight = 0,
             int headerRowHeight = 0,
             int headerIndent = 0,
-            int effectIndent = 0)
+            int effectIndent = 0,
+            int slotIndent = 0)
         {
             if (measureText == null)
             {
@@ -250,15 +261,19 @@ namespace TaimisToolbench.Services
             {
                 bool isHeader = line.Kind == TooltipLineKind.Header;
                 bool isEffect = line.Kind == TooltipLineKind.Effect;
+                bool isSlot = line.Kind == TooltipLineKind.Slot;
                 // The name column of a header row starts past the icon,
                 // and a wrapped continuation of it stays in that column.
                 // An effect row is indented past its inline icon the same
                 // way (measured: the game's effect text column starts
-                // ~31px in, live3 soul-pastries/candy-corn).
+                // ~31px in, live3 soul-pastries/candy-corn), and a slot row
+                // past its own narrower glyph.
                 int indent = isHeader ? Math.Max(0, headerIndent)
-                    : isEffect ? Math.Max(0, effectIndent) : 0;
+                    : isEffect ? Math.Max(0, effectIndent)
+                    : isSlot ? Math.Max(0, slotIndent) : 0;
                 int lineHeight = isHeader ? headerHeight : rowHeight;
                 string iconUrl = isHeader || isEffect ? line.IconUrl : null;
+                int iconAssetId = isSlot ? line.IconAssetId : 0;
 
                 var current = new List<PlacedSpan>();
                 int x = indent;
@@ -268,12 +283,14 @@ namespace TaimisToolbench.Services
                 void BreakRow()
                 {
                     rows.Add(new LaidOutRow(
-                        current, x, y, lineHeight, iconUrl, line.Kind, line.HeaderSubject));
+                        current, x, y, lineHeight, iconUrl, line.Kind, line.HeaderSubject,
+                        iconAssetId));
                     y += lineHeight;
                     // Continuations are ordinary text rows: only the FIRST
                     // row of a header line carries the icon and its height.
                     lineHeight = rowHeight;
                     iconUrl = null;
+                    iconAssetId = 0;
                     current = new List<PlacedSpan>();
                     x = indent;
                 }
