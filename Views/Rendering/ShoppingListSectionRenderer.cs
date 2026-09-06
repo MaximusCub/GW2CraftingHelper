@@ -35,7 +35,7 @@ namespace TaimisToolbench.Views.Rendering
 
         // Text anchor of the row's single reading line - see the identical
         // derivation note on UsedMaterialsSectionRenderer.RowTextY.
-        private const int RowTextY = 13;
+        private const int RowTextY = PlanContentHeightMath.IconRowIconY + 13;
 
         private readonly ISectionRelayoutSink _sink;
 
@@ -396,7 +396,8 @@ namespace TaimisToolbench.Views.Rendering
                     row.CurrencyCosts));
 
             var nameHandle = IconNameRowHelpers.CreateIconAndEllipsizedName(
-                rowPanel, row.IconUrl, row.Rarity, IconX, 0, fullName, font,
+                rowPanel, row.IconUrl, row.Rarity,
+                IconX, PlanContentHeightMath.IconRowIconY, fullName, font,
                 edges.SourceX, 0, NameToQtyGap, NameX, RowTextY,
                 ItemIconTier.BagSidebar, hover);
             var nameLabel = nameHandle.NameLabel;
