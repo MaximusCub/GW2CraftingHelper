@@ -1057,35 +1057,71 @@ from items 31 and 32 below (marked as such) so this list covers every
 genuinely open item, not just the ones originally filed under a
 "DEFERRED" heading.
 
-- Dimmed IGNORE toggle's mark falls below the 3:1 non-text contrast
-  floor. `PillColors.DimmedPillFactor` (0.6) is applied as
-  `Control.Opacity`, which Blish multiplies into every `DrawOnCtrl`
-  colour, so the black mark AND the amber ON plate both composite toward
-  the backdrop together. Measured on the shipped colours (`#9C7327`
-  plate, black ink, sRGB relative luminance): **4.90:1 at full strength,
-  1.87:1 over a black backdrop and 2.04:1 over the row's own dark one.**
-  White ink in the dimmed state alone would read 4.41:1 / 4.04:1. It is
-  not changed because the glyph is specified black, and inverting it in
-  one state is a design decision rather than a correctness fix. The rule
-  that used to encode exactly this inversion
-  (`PillColors.GlyphColor`) went dead when the hand-drawn toggle became a
-  `FeedbackButton` and has been deleted; this entry is where the argument
-  it carried now lives.
-  **Correction (2026-09-05): this measures a control that no longer
-  ships.** The toggle is not a `FeedbackButton` and was never one for
-  long: it is a `CloseKeyButton` (`Views/Rendering/TreeSectionController.cs:2037`),
-  which derives from `RowActionKey`, a plain `Control` that samples
-  Blish's own `button-exit` / `button-exit-active` window-close textures
-  (`Views/Rendering/RowActionKey.cs:21-26` says why it is not a
-  `FeedbackButton`). Nor is the fade `Control.Opacity`: `RowActionKey.
-  Dimmed` multiplies the draw colour directly, `color * DisabledDim`
-  (`Views/Rendering/RowActionKey.cs:72`), with `DisabledDim` read from
-  `PillColors.DimmedPillFactor` so the two cannot drift. So there is no
-  `#9C7327` plate and no black mark any more, and every ratio quoted
-  above describes the hand-drawn toggle that preceded this one. Whether
-  the shipped key clears 3:1 when disabled has not been re-measured -
-  that needs the two textures sampled, not arithmetic on named colours -
-  and this entry stays open until it is.
+- Dimmed IGNORE toggle's mark: the ignored state falls below the 3:1
+  non-text contrast floor. The plain state clears it, and that half is
+  closed. Re-measured 2026-09-06, because the first measurement described
+  a control that no longer ships. That one was a hand-drawn `#9C7327`
+  plate carrying a black glyph, faded by `Control.Opacity`, and it read
+  4.90:1 at full strength, 1.87:1 over black and 2.04:1 over the row's
+  backdrop. The flat plate, the separate ink colour and the
+  `Control.Opacity` fade are all gone, so none of those numbers describes
+  anything on screen.
+
+  What ships is a `CloseKeyButton`
+  (`Views/Rendering/TreeSectionController.cs:2037`) deriving from
+  `RowActionKey`. It blits Blish HUD's own window-close texture
+  `button-exit` and multiplies a tint into it: white while the row is
+  plain, and `PillColors`' ignore-active amber `#9C7327` while the item is
+  ignored. A dimmed row's toggle is always disabled, and a disabled key
+  goes through `RowActionKey.Dimmed`, which returns `color * DisabledDim`
+  with `DisabledDim` read from `PillColors.DimmedPillFactor` (0.6).
+  `Color * float` scales alpha as well as RGB, so the whole key is drawn
+  at 0.6 alpha, and Blish's pipeline is premultiplied, so an opaque texel
+  lands on screen at `0.6 * texel * tint + 0.4 * backdrop`. The hover
+  texture `button-exit-active` never appears in this state, because
+  `RowActionKey.Face` picks it only while the key is enabled.
+
+  Method, so the numbers can be recomputed. `button-exit.png` comes out of
+  `ref.dat` in the Blish HUD install directory, which is a zip. It is
+  32x32 RGBA. The control samples (7, 6) 21x23 of it, and inside that the
+  plate is the 16x16 square at (9, 9). Splitting those 256 pixels by sRGB
+  relative luminance gives two clusters: 17 mark pixels below 0.02, most
+  commonly RGBA (8, 0, 0, 255), and 167 plate pixels above 0.50, most
+  commonly (231, 219, 214, 255). Both representatives are fully opaque, so
+  it does not matter whether the file is stored premultiplied. Nothing in
+  the module paints behind a tree row, because the row panel is
+  transparent and so is every panel above it, so the backdrop is the GW2
+  window art, asset 502049. Over the middle 60% of that texture it is a
+  flat dark grey: median (41, 40, 41), brightest opaque pixel (82, 81,
+  82). A hovered row adds `Color.White * 0.07f` on top, which puts the
+  median at (55, 54, 55). Ratios are the WCAG formula,
+  (L1 + 0.05) / (L2 + 0.05), on sRGB relative luminance.
+
+  The mark against its own plate:
+
+  | key state | over black | over (41,40,41) | over (55,54,55) | over (82,81,82) |
+  | --- | --- | --- | --- | --- |
+  | plain, enabled | 15.34:1 | 15.34:1 | 15.34:1 | 15.34:1 |
+  | plain, dimmed | 5.64:1 | 6.28:1 | 6.42:1 | 6.51:1 |
+  | ignored, enabled | 3.91:1 | 3.91:1 | 3.91:1 | 3.91:1 |
+  | ignored, dimmed | 2.02:1 | 2.34:1 | 2.43:1 | 2.55:1 |
+
+  An enabled key is fully opaque, so no backdrop reaches it and its row is
+  one number. **The plain dimmed key reads 6.28:1 over the real backdrop.
+  It clears 3:1 and it clears 4.5:1, so that half of this entry is closed.
+  The ignored dimmed key reads 2.34:1 and fails 3:1, so the entry stays
+  open on that one state.** The ignored enabled key reads 3.91:1, which
+  clears the 3:1 floor a mark is held to; 4.5:1 is the text threshold and
+  does not apply to a mark.
+
+  Still not changed, for the reason already recorded: the mark is
+  specified black, and inverting it in one state is a design decision
+  rather than a correctness fix. One fact behind that has moved. The mark
+  is now part of Blish's texture rather than a colour this module picks,
+  and the tint multiplies mark and plate together, so there is no ink
+  colour left to invert - a white mark would need different art. The rule
+  that used to encode the inversion (`PillColors.GlyphColor`) is deleted;
+  this entry is where the argument it carried lives.
 - Localization (en/de/fr/es via API lang param): deferred as not core
   functionality. Full-milestone scale when picked up.
 - Upstream Blish HUD issue/PR for the wheel-delta wrap: REMOVED from the
@@ -1444,9 +1480,7 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Remaining-tabs design pass (2026-08-25)** - gate PASS 2026-08-25.
   Cited as: tab-design-pass.
   `dev/records/tab-design-pass.md`
-- **A module-owned button and a shipped glyph font (2026-08-27)** - the record
-  states no gate. Added to the ledger 2026-09-05; it had no line since it was
-  written, and nothing in the tree cites it.
+- **A module-owned button and a shipped glyph font (2026-08-27)** - the record names no gate.
   `dev/records/2026-08-glyph-font.md`
 - **Invisible UI glyphs, the guidance behind them, and the gate (2026-08-27)** - gate owed.
   Cited as: glyph-fixes, KNOWN-ISSUES #64.
@@ -1457,9 +1491,7 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Barter-item valuation: the vendor offers the solver was throwing away (2026-08-28)** - gate NOT RUN (no live session available on this branch).
   Cited as: barter-item-valuation.
   `dev/records/barter-item-valuation.md`
-- **Content viewport falls short of the window bottom (2026-08-28)** - gate NOT
-  RUN (no live session available on that branch). Added to the ledger
-  2026-09-05; item 66 cited the record but no ledger line existed.
+- **Content viewport falls short of the window bottom (2026-08-28)** - gate NOT RUN (no live game session available on that branch).
   Cited as: KNOWN-ISSUES #66.
   `dev/records/viewport-bottom-margin.md`
 - **The Battle Historian: a removed WvW vendor pricing legendary materials at zero (2026-08-29)** - gate not required (dev-tool and data change; verified by a byte-identical round trip and a `--diff-summary` showing 49 removed and nothing else touched).
