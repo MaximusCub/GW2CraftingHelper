@@ -73,7 +73,7 @@ Models/SeasonalVendorTip.cs                                                     
 Models/SettingsFormState.cs                                                             149
 Models/SnapshotCharacterDiscipline.cs                                                   24
 Models/SnapshotHoldLocation.cs                                                          45
-Models/SnapshotItemEntry.cs                                                             45
+Models/SnapshotItemEntry.cs                                                             70
 Models/SnapshotSearchRow.cs                                                             50
 Models/SnapshotSourceFilter.cs                                                          42
 Models/SnapshotWalletEntry.cs                                                           13
@@ -118,7 +118,7 @@ Services/FirstLoadSnapshotGate.cs                                               
 Services/GlyphButtonMetrics.cs                                                          69
 Services/GridLayout.cs                                                                  93
 Services/Gw2AccountRecipeClient.cs                                                      30
-Services/Gw2AccountSnapshotService.cs                                                   653
+Services/Gw2AccountSnapshotService.cs                                                   728
 Services/Gw2ItemApiClient.cs                                                            261
 Services/Gw2PriceApiClient.cs                                                           66
 Services/Gw2RecipeApiClient.cs                                                          206
@@ -570,7 +570,7 @@ tests/TaimisToolbench.Tests/Services/SnapshotRefreshSlotTests.cs                
 tests/TaimisToolbench.Tests/Services/SnapshotResultLayoutTests.cs                       94
 tests/TaimisToolbench.Tests/Services/SnapshotSearchResultBuilderTests.cs                1152
 tests/TaimisToolbench.Tests/Services/SnapshotSerializationTests.cs                      283
-tests/TaimisToolbench.Tests/Services/SnapshotStoreTests.cs                              358
+tests/TaimisToolbench.Tests/Services/SnapshotStoreTests.cs                              428
 tests/TaimisToolbench.Tests/Services/SnapshotTableSorterTests.cs                        147
 tests/TaimisToolbench.Tests/Services/SocketedUpgradeTests.cs                            321
 tests/TaimisToolbench.Tests/Services/SortIndicatorLayoutTests.cs                        151

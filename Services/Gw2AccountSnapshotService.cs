@@ -29,6 +29,11 @@ namespace TaimisToolbench.Services
             new Dictionary<int, (string, string, string)>();
 
         private readonly Dictionary<int, (string Name, string IconUrl)> _currencyCache = new Dictionary<int, (string, string)>();
+
+        // Skin id -> the name the game shows for an item wearing it.
+        // /v2/skins needs no API key and an account draws on few skins, so
+        // this outlives a single fetch the way _itemCache does.
+        private readonly Dictionary<int, string> _skinCache = new Dictionary<int, string>();
         private readonly object _cacheLock = new object();
 
         public Gw2AccountSnapshotService(Gw2ApiManager apiManager)
@@ -117,6 +122,7 @@ namespace TaimisToolbench.Services
                         Source = "Bank",
                         Upgrades = SocketedIds(item.Upgrades),
                         Infusions = SocketedIds(item.Infusions),
+                        SkinId = SkinIdOf(item.Skin),
                     });
                 }
             }
@@ -148,6 +154,7 @@ namespace TaimisToolbench.Services
                         Source = "SharedInventory",
                         Upgrades = SocketedIds(item.Upgrades),
                         Infusions = SocketedIds(item.Infusions),
+                        SkinId = SkinIdOf(item.Skin),
                     });
                 }
             }
@@ -314,6 +321,7 @@ namespace TaimisToolbench.Services
 
             // Resolve display names and icon URLs
             await ResolveItemDetailsAsync(snapshot.Items, ct);
+            await ResolveSkinDetailsAsync(snapshot.Items, ct);
             await ResolveCurrencyDetailsAsync(snapshot.Wallet, ct);
 
             return snapshot;
@@ -354,6 +362,7 @@ namespace TaimisToolbench.Services
                                 Source = AccountItemIndex.CharacterSourcePrefix + characterName,
                                 Upgrades = SocketedIds(item.Upgrades),
                                 Infusions = SocketedIds(item.Infusions),
+                                SkinId = SkinIdOf(item.Skin),
                             });
                         }
                     }
@@ -413,6 +422,7 @@ namespace TaimisToolbench.Services
                             Source = AccountItemIndex.CharacterEquipmentSourcePrefix + characterName,
                             Upgrades = SocketedIds(item.Upgrades),
                             Infusions = SocketedIds(item.Infusions),
+                            SkinId = SkinIdOf(item.Skin),
                         });
                     }
                 }
@@ -605,6 +615,71 @@ namespace TaimisToolbench.Services
             }
 
             return ItemRarityResolution.Normalize(raw) ?? "";
+        }
+
+        /// <summary>
+        /// One stack's applied skin as a plain id, or 0 for none. Gw2Sharp
+        /// surfaces the API's omitted field as null. Material storage and
+        /// the Legendary Armory carry no skin field at all, so their rows
+        /// never reach here.
+        /// </summary>
+        private static int SkinIdOf(int? skin)
+        {
+            return skin.HasValue && skin.Value > 0 ? skin.Value : 0;
+        }
+
+        /// <summary>
+        /// Fills in <see cref="SnapshotItemEntry.SkinName"/> for every
+        /// stack wearing a skin, batched and cached exactly the way
+        /// <see cref="ResolveItemDetailsAsync"/> resolves item names. A
+        /// failure leaves the names empty, which reads as "not
+        /// transmuted": an under-report, never a wrong name.
+        /// </summary>
+        private async Task ResolveSkinDetailsAsync(List<SnapshotItemEntry> items, CancellationToken ct)
+        {
+            try
+            {
+                List<int> uncachedIds;
+                lock (_cacheLock)
+                {
+                    uncachedIds = items
+                        .Select(i => i.SkinId)
+                        .Where(id => id > 0)
+                        .Distinct()
+                        .Where(id => !_skinCache.ContainsKey(id))
+                        .ToList();
+                }
+
+                for (int i = 0; i < uncachedIds.Count; i += ItemBulkLimit)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var chunk = uncachedIds.Skip(i).Take(ItemBulkLimit);
+                    var fetched = await _apiManager.Gw2ApiClient.V2.Skins.ManyAsync(chunk, ct);
+                    lock (_cacheLock)
+                    {
+                        foreach (var skin in fetched)
+                        {
+                            _skinCache[skin.Id] = skin.Name ?? "";
+                        }
+                    }
+                }
+
+                lock (_cacheLock)
+                {
+                    foreach (var entry in items)
+                    {
+                        if (entry.SkinId > 0 && _skinCache.TryGetValue(entry.SkinId, out string name))
+                        {
+                            entry.SkinName = name;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) when (!(ex is OperationCanceledException))
+            {
+                Logger.Warn(ex, "Failed to resolve skin names");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to resolve skin names: {ex.GetType().Name} - {ex.Message}");
+            }
         }
 
         private async Task ResolveCurrencyDetailsAsync(List<SnapshotWalletEntry> wallet, CancellationToken ct)

@@ -235,6 +235,8 @@ SnapshotItemEntry.Infusions:List`1<Int32>
 SnapshotItemEntry.ItemId:Int32
 SnapshotItemEntry.Name:String
 SnapshotItemEntry.Rarity:String
+SnapshotItemEntry.SkinId:Int32
+SnapshotItemEntry.SkinName:String
 SnapshotItemEntry.Source:String
 SnapshotItemEntry.Upgrades:List`1<Int32>
 TimegatedItem.CapType:TimegatedCapType
