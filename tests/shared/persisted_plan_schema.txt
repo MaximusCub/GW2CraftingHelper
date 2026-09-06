@@ -229,10 +229,12 @@ SnapshotCharacterDiscipline.Discipline:String
 SnapshotCharacterDiscipline.Rating:Int32
 SnapshotItemEntry.Count:Int32
 SnapshotItemEntry.IconUrl:String
+SnapshotItemEntry.Infusions:List`1<Int32>
 SnapshotItemEntry.ItemId:Int32
 SnapshotItemEntry.Name:String
 SnapshotItemEntry.Rarity:String
 SnapshotItemEntry.Source:String
+SnapshotItemEntry.Upgrades:List`1<Int32>
 TimegatedItem.CapType:TimegatedCapType
 TimegatedItem.CapValue:Int32
 TimegatedItem.ItemId:Int32
