@@ -436,10 +436,17 @@ namespace TaimisToolbench.Views.Rendering
             // The second box NEVER measures itself. It wraps to the width
             // the first box arrived at, so the two read as one column
             // whatever this module has to add.
+            //
+            // Its lines are unrelated statements - a unit price, a wallet
+            // holding, the right-click affordance - so once the first box
+            // hands over a width narrow enough to wrap one of them, the
+            // rows run together and a reader cannot tell where a statement
+            // ends. The first box is not separated this way: that one is
+            // the game's own block, whose lines belong together.
             TooltipLayoutMath.Layout extraLayout = content.HasExtra
                 ? BuildLayout(
                     content.Extra, System.Math.Max(1, layout.Width),
-                    font, lineHeight, coinIconSize)
+                    font, lineHeight, coinIconSize, separateEntriesWhenAnyWraps: true)
                 : null;
 
             var boxes = TooltipLayoutMath.Stack(
@@ -483,7 +490,8 @@ namespace TaimisToolbench.Views.Rendering
         }
 
         private TooltipLayoutMath.Layout BuildLayout(
-            TooltipContent content, int maxWidth, BitmapFont font, int lineHeight, int coinIconSize)
+            TooltipContent content, int maxWidth, BitmapFont font, int lineHeight, int coinIconSize,
+            bool separateEntriesWhenAnyWraps = false)
         {
             return TooltipLayoutMath.LayoutContent(
                 content, maxWidth, lineHeight,
@@ -497,7 +505,8 @@ namespace TaimisToolbench.Views.Rendering
                 headerRowHeight: System.Math.Max(lineHeight, HeaderIconFrameSize),
                 headerIndent: HeaderIconFrameSize + HeaderIconGap,
                 effectIndent: EffectTextIndent,
-                slotIndent: SlotTextIndent);
+                slotIndent: SlotTextIndent,
+                separateEntriesWhenAnyWraps: separateEntriesWhenAnyWraps);
         }
 
         private void RenderRows(

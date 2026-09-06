@@ -28,6 +28,13 @@ namespace TaimisToolbench.Tests.Services
             return TooltipLayoutMath.LayoutContent(content, maxWidth, 20, TenPxPerChar, FixedCoinWidth);
         }
 
+        private static TooltipLayoutMath.Layout Separated(TooltipContent content, int maxWidth)
+        {
+            return TooltipLayoutMath.LayoutContent(
+                content, maxWidth, 20, TenPxPerChar, FixedCoinWidth,
+                separateEntriesWhenAnyWraps: true);
+        }
+
         private static string RowText(TooltipLayoutMath.LaidOutRow row)
         {
             return string.Concat(row.Spans.Select(s => s.Span.Text));
@@ -724,6 +731,101 @@ namespace TaimisToolbench.Tests.Services
             Assert.Equal(50, first.Width);
             Assert.True(second.Rows.Count > 1);
             Assert.All(second.Rows, r => Assert.True(r.Width <= first.Width, r.Width.ToString()));
+        }
+
+        // --- Separating a box of unrelated statements ---
+        //
+        // Reported in game: hovering Obsidian Shard on a Recipe Tree row
+        // gave a 126px second box reading "Unit price: 425 for / 50 Fractal
+        // Relic / Right-click to open / the wiki page." - two unrelated
+        // statements over four rows with nothing between them. The second
+        // box takes its width from the first, so a short item name is all
+        // it takes to get there.
+        [Fact]
+        public void SeparateEntries_NothingWraps_IsTheBoxItAlwaysWas()
+        {
+            var content = TooltipContent.FromText("one\ntwo\nthree");
+
+            var plain = Layout(content, 500);
+            var separated = Separated(content, 500);
+
+            Assert.Equal(plain.Rows.Count, separated.Rows.Count);
+            Assert.Equal(plain.Height, separated.Height);
+        }
+
+        [Fact]
+        public void SeparateEntries_OneEntryWraps_EveryPairGetsABlankRow()
+        {
+            // Every character is 10px wide here, so a 110px box holds
+            // eleven of them: the second entry wraps and the third does
+            // not. Without the blank rows the four rows read as one
+            // statement of unknown length.
+            var content = TooltipContent.FromText("short\nwraps over here\ntail");
+
+            var separated = Separated(content, 110);
+            var texts = separated.Rows.Select(RowText).ToList();
+
+            Assert.Equal("short", texts[0]);
+            Assert.Equal("", texts[1]);
+            Assert.Equal("wraps over", texts[2]);
+            Assert.Equal("here", texts[3]);
+            Assert.Equal("", texts[4]);
+            Assert.Equal("tail", texts[5]);
+
+            // Every row still stacks at its own height, blanks included.
+            int y = 0;
+            foreach (var row in separated.Rows)
+            {
+                Assert.Equal(y, row.Y);
+                y += row.Height;
+            }
+
+            Assert.Equal(y, separated.Height);
+        }
+
+        [Fact]
+        public void SeparateEntries_UnwrappedNeighbours_AreSeparatedToo()
+        {
+            // The all-or-nothing rule. Separating only the pairs that wrap
+            // would leave "short" and "tail" adjacent, reading as one
+            // statement that wrapped.
+            var separated = Separated(
+                TooltipContent.FromText("short\ntail\nwraps over here"), 110);
+
+            Assert.Equal(
+                new[] { "short", "", "tail", "", "wraps over", "here" },
+                separated.Rows.Select(RowText).ToArray());
+        }
+
+        [Fact]
+        public void SeparateEntries_ContentThatAskedForItsOwnBlank_DoesNotGetASecond()
+        {
+            var separated = Separated(
+                TooltipContent.FromText("wraps over here\n\ntail"), 110);
+
+            Assert.Equal(
+                new[] { "wraps over", "here", "", "tail" },
+                separated.Rows.Select(RowText).ToArray());
+        }
+
+        [Fact]
+        public void SeparateEntries_ASingleEntry_HasNothingToSeparate()
+        {
+            var separated = Separated(TooltipContent.FromText("wraps over here"), 110);
+
+            Assert.Equal(
+                new[] { "wraps over", "here" },
+                separated.Rows.Select(RowText).ToArray());
+            Assert.Equal(40, separated.Height);
+        }
+
+        [Fact]
+        public void SeparateEntries_TheBoxWidth_IgnoresTheBlankRows()
+        {
+            var separated = Separated(
+                TooltipContent.FromText("short\nwraps over here"), 110);
+
+            Assert.Equal(Layout(TooltipContent.FromText("wraps over"), 110).Width, separated.Width);
         }
     }
 }
