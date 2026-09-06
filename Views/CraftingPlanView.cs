@@ -593,12 +593,11 @@ namespace TaimisToolbench.Views
 
         // Ceiling on how long a drag that still reads as running may hold
         // the strip's reflow back, and not a debounce - the rule lives in
-        // DeferredReflowGate.TryTake. Ten seconds is far longer than any
-        // pause a hand makes mid-drag, which is the point: this fires only
-        // when a drag flag outlives its drag (Blish clears WindowBase2's
-        // Resizing from a global mouse-release handler that no-ops while
-        // the window is hidden), never on a pause the user would see.
-        private const int StripReflowStallMs = 10000;
+        // DeferredReflowGate.TryTake. It runs from the last width observed,
+        // so only a grip held motionless for the whole five seconds reaches
+        // it. It is a last resort: the one way a resize flag is known to
+        // outlive its drag is handled in ResizeDragActive instead.
+        private const int StripReflowStallMs = 5000;
 
         // The item input strip's column count is a step function of the
         // panel width, so re-seating it on every drag tick stretches each
@@ -3373,21 +3372,22 @@ namespace TaimisToolbench.Views
 
         /// <summary>
         /// Whether a drag that is resizing this view is still running. The
-        /// strip's reflow waits for this to go false and for nothing else,
-        /// so it lands on the frame the user lets go.
+        /// strip's reflow waits for this to go false, so it lands on the
+        /// frame the user lets go.
         /// <para>
-        /// Blish sets WindowBase2.Resizing when the left button goes down
-        /// on the window's resize handle and clears it from a handler on
-        /// the global left-button-release event, and its resize loop writes
-        /// the window size only while that flag is set. So every resize
-        /// event the drag produces arrives on a frame where this reads
-        /// true, wherever the pointer has moved to.
+        /// Blish sets WindowBase2.Resizing on left-button-down over the
+        /// resize handle and writes the window size only while it is set,
+        /// so every resize tick a drag produces reads true here.
         /// </para>
         /// <para>
-        /// The button itself is read as well, for the resize this window
-        /// does not drive: dragging the game client's own border resizes
-        /// the sprite screen, and ResizableTabbedWindow refits this window
-        /// to each new screen size.
+        /// Visible is read with it because Blish clears Resizing from a
+        /// global mouse-release handler that returns early while the
+        /// window is hidden, and Hide clears Dragging but not Resizing.
+        /// An alt-tab mid-drag would otherwise leave the flag set.
+        /// </para>
+        /// <para>
+        /// A resize this window does not drive reads false here, and its
+        /// ticks are applied on the first take that follows.
         /// </para>
         /// </summary>
         private bool ResizeDragActive()
@@ -3397,17 +3397,11 @@ namespace TaimisToolbench.Views
                 var window = control as WindowBase2;
                 if (window != null)
                 {
-                    if (window.Resizing)
-                    {
-                        return true;
-                    }
-
-                    break;
+                    return window.Visible && window.Resizing;
                 }
             }
 
-            return GameService.Input?.Mouse?.State.LeftButton
-                == Microsoft.Xna.Framework.Input.ButtonState.Pressed;
+            return false;
         }
 
         /// <summary>

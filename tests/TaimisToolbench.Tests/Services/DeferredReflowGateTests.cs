@@ -9,7 +9,7 @@ namespace TaimisToolbench.Tests.Services
         // CraftingPlanView.StripReflowStallMs. The gate takes it as a
         // constructor argument, so this is the value under test and not a
         // copy of a rule.
-        private const int StallMs = 10000;
+        private const int StallMs = 5000;
 
         // The plan tab's re-ellipsis debounce (CraftingPlanView.
         // ResizeDebounceMs). The gate does not know about it: it is here so
@@ -89,8 +89,8 @@ namespace TaimisToolbench.Tests.Services
             }
 
             // The drag resumes and then ends: one reflow, at the last width.
-            gate.Observe(1300, T0.AddMilliseconds(9900));
-            Assert.True(gate.TryTake(T0.AddMilliseconds(9920), dragActive: false, width: out width));
+            gate.Observe(1300, T0.AddMilliseconds(4900));
+            Assert.True(gate.TryTake(T0.AddMilliseconds(4920), dragActive: false, width: out width));
             Assert.Equal(1300, width);
         }
 
