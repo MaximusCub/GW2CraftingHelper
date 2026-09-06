@@ -86,7 +86,7 @@ An offset ceiling of this shape is why
 `tools/VendorOfferUpdater/WikiSmwClient.cs` splits a large result set by
 vendor-name prefix rather than paging past it.
 
-### The wiki's robots.txt disallows the endpoint both tools use
+### The `robots.txt` entry on `/api.php`
 
 <https://wiki.guildwars2.com/robots.txt> reads, in full apart from a
 comment line and three further localised spellings of the last path:
@@ -102,8 +102,7 @@ Disallow: /wiki/Special:*
 `/api.php` is the endpoint `tools/VendorOfferUpdater/WikiSmwClient.cs` and
 `tools/MysticForgeSeeder/WikiRecipeClient.cs` send every request to.
 
-Whether this binds those tools is a judgement, not a fact, and this page
-does not settle it. Both readings are available:
+Two readings are available:
 
 - The Robots Exclusion Protocol applies to "automatic clients"
   ([RFC 9309 section 1](https://www.rfc-editor.org/rfc/rfc9309.html#section-1)),
@@ -113,8 +112,12 @@ does not settle it. Both readings are available:
   publishing the Action API for clients to use. Read that way the line is
   about indexing, not about API access.
 
-What is not a judgement: nothing in either tool reads this file, and no
-decision recorded in this repository refers to it.
+The second reading is the one this project acts on, and the tools continue
+to use the endpoint. The decision, its reasoning, the obligations taken on
+with it and what would reopen it are recorded in
+[`DECISIONS.md`](DECISIONS.md) under "Stopping wiki API access over the
+`robots.txt` entry". The rules in this section are those obligations; the
+compliance table below is where each one stands.
 
 ### Where this repository stands
 
@@ -309,10 +312,10 @@ These are known, sourced above, and not settled.
    `tools/MysticForgeSeeder/WikiRecipeClient.cs` POSTs its `action=ask`
    queries to keep URLs short, which is allowed, but does not send the
    header that tells MediaWiki the request is a read.
-6. **The GW2 Wiki's `robots.txt` disallows `/api.php`.** Both scraping
-   tools send every request there. Section 1 sets out the two readings.
-   This one needs a decision rather than a patch, and no decision recorded
-   in this repository refers to the file.
-7. **The GFDL attribution question on scraped facts.** Section 5 states
+6. **The GFDL attribution question on scraped facts.** Section 5 states
    what the wiki's copyright page says and what the seeds actually hold.
    Nothing in the repository states a position on it.
+
+The `robots.txt` entry on `/api.php` is no longer among these. Section 1
+records what it says, and [`DECISIONS.md`](DECISIONS.md) records the
+decision taken on it.
