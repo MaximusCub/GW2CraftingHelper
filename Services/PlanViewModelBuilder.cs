@@ -999,6 +999,12 @@ namespace TaimisToolbench.Services
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.CraftStep,
+                    // Carried so the row's hover can look the item's stats
+                    // up. Without it the id reads 0, the renderer skips the
+                    // lookup, and every Crafting Steps tooltip shows a name
+                    // and nothing else while every other section shows the
+                    // whole item.
+                    ItemId = step.ItemId,
                     Label = name,
                     Sublabel = sublabel,
                     IconUrl = iconUrl,
