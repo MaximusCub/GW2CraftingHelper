@@ -632,6 +632,7 @@ namespace TaimisToolbench.Services
                     Label = currencyName,
                     Quantity = required,
                     IconUrl = iconUrl,
+                    NonCoinCostKey = SummarySectionLayoutMath.WalletCurrencyCostKey(cc.CurrencyId),
                     CurrencyDescription = CurrencyDisplayResolver.ResolveDescription(
                         cc.CurrencyId, result.CurrencyMetadata),
                 };
@@ -664,6 +665,7 @@ namespace TaimisToolbench.Services
                     RowType = PlanRowType.CurrencyCost,
                     IsBarterItemCost = true,
                     ItemId = bc.ItemId,
+                    NonCoinCostKey = SummarySectionLayoutMath.BarterItemCostKey(bc.ItemId),
                     Label = ResolveName(bc.ItemId, result.ItemMetadata),
                     Quantity = ClampToInt(bc.Amount),
                     IconUrl = ResolveIconUrl(bc.ItemId, result.ItemMetadata),
@@ -997,6 +999,12 @@ namespace TaimisToolbench.Services
                 section.Rows.Add(new PlanRowViewModel
                 {
                     RowType = PlanRowType.CraftStep,
+                    // Carried so the row's hover can look the item's stats
+                    // up. Without it the id reads 0, the renderer skips the
+                    // lookup, and every Crafting Steps tooltip shows a name
+                    // and nothing else while every other section shows the
+                    // whole item.
+                    ItemId = step.ItemId,
                     Label = name,
                     Sublabel = sublabel,
                     IconUrl = iconUrl,

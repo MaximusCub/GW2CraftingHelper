@@ -29,6 +29,13 @@ namespace TaimisToolbench.Services
             new Dictionary<int, (string, string, string)>();
 
         private readonly Dictionary<int, (string Name, string IconUrl)> _currencyCache = new Dictionary<int, (string, string)>();
+
+        // Skin id -> what the game shows for an item wearing it.
+        // /v2/skins needs no API key and an account draws on few skins, so
+        // this outlives a single fetch the way _itemCache does.
+        private readonly Dictionary<int, (string Name, string IconUrl)> _skinCache =
+            new Dictionary<int, (string, string)>();
+
         private readonly object _cacheLock = new object();
 
         public Gw2AccountSnapshotService(Gw2ApiManager apiManager)
@@ -41,16 +48,27 @@ namespace TaimisToolbench.Services
             return _apiManager.HasPermissions(RequiredPermissions);
         }
 
-        // The 5 independent top-level account-data sources tallied for
+        // The 6 independent top-level account-data sources tallied for
         // success/failure. Per-character inventory and equipment failures
         // are not counted individually - they are tolerated as a partial
         // Characters-source degradation.
-        private const int SourceCount = 5;
+        private const int SourceCount = 6;
+
+        // /v2/account/legendaryarmory needs the "unlocks" scope, which
+        // manifest.json declares optional. A token without it cannot serve
+        // that endpoint, so the fetch is not attempted and the account has
+        // one source fewer rather than one failed source.
+        private static readonly TokenPermission[] LegendaryArmoryPermissions =
+        {
+            TokenPermission.Unlocks,
+        };
 
         public async Task<AccountSnapshot> FetchSnapshotAsync(CancellationToken ct)
         {
             var snapshot = new AccountSnapshot { CapturedAt = DateTime.UtcNow };
             int failedSources = 0;
+            bool canReadLegendaryArmory = _apiManager.HasPermissions(LegendaryArmoryPermissions);
+            int totalSources = canReadLegendaryArmory ? SourceCount : SourceCount - 1;
 
             // Per-source failure type names, captured here (where Gw2Sharp
             // exception types are in scope) as plain strings so the
@@ -106,6 +124,7 @@ namespace TaimisToolbench.Services
                         Source = "Bank",
                         Upgrades = SocketedIds(item.Upgrades),
                         Infusions = SocketedIds(item.Infusions),
+                        SkinId = SkinIdOf(item.Skin),
                     });
                 }
             }
@@ -137,6 +156,7 @@ namespace TaimisToolbench.Services
                         Source = "SharedInventory",
                         Upgrades = SocketedIds(item.Upgrades),
                         Infusions = SocketedIds(item.Infusions),
+                        SkinId = SkinIdOf(item.Skin),
                     });
                 }
             }
@@ -178,6 +198,45 @@ namespace TaimisToolbench.Services
             }
 
             ct.ThrowIfCancellationRequested();
+
+            // Legendary Armory
+            //
+            // Read from its own endpoint rather than inferred from
+            // equipment slots. A slot drawing a legendary out of the armory
+            // reports it once per slot per character, so the equipment
+            // fetch drops those entries (IsHeldByCharacter); this endpoint
+            // reports each item once for the whole account, with a count of
+            // how many an equipment template can draw at a time.
+            if (canReadLegendaryArmory)
+            {
+                try
+                {
+                    var armory = await _apiManager.Gw2ApiClient.V2.Account.LegendaryArmory.GetAsync(ct);
+                    foreach (var entry in armory)
+                    {
+                        if (entry == null || entry.Count <= 0)
+                        {
+                            continue;
+                        }
+
+                        snapshot.Items.Add(new SnapshotItemEntry
+                        {
+                            ItemId = entry.Id,
+                            Count = entry.Count,
+                            Source = AccountItemIndex.SourceLegendaryArmory,
+                        });
+                    }
+                }
+                catch (Exception ex) when (!(ex is OperationCanceledException))
+                {
+                    Logger.Warn(ex, "Failed to fetch legendary armory");
+                    ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to fetch legendary armory: {ex.GetType().Name} - {ex.Message}");
+                    failedSources++;
+                    failedSourceExceptionTypeNames.Add(ex.GetType().Name);
+                }
+
+                ct.ThrowIfCancellationRequested();
+            }
 
             // Character inventories + crafting disciplines
             try
@@ -259,11 +318,12 @@ namespace TaimisToolbench.Services
             // a prior good fetch (see SnapshotFetchFailedException).
             if (failedSources > 0)
             {
-                throw new SnapshotFetchFailedException(failedSources, SourceCount, failedSourceExceptionTypeNames);
+                throw new SnapshotFetchFailedException(failedSources, totalSources, failedSourceExceptionTypeNames);
             }
 
             // Resolve display names and icon URLs
             await ResolveItemDetailsAsync(snapshot.Items, ct);
+            await ResolveSkinDetailsAsync(snapshot.Items, ct);
             await ResolveCurrencyDetailsAsync(snapshot.Wallet, ct);
 
             return snapshot;
@@ -304,6 +364,7 @@ namespace TaimisToolbench.Services
                                 Source = AccountItemIndex.CharacterSourcePrefix + characterName,
                                 Upgrades = SocketedIds(item.Upgrades),
                                 Infusions = SocketedIds(item.Infusions),
+                                SkinId = SkinIdOf(item.Skin),
                             });
                         }
                     }
@@ -320,8 +381,9 @@ namespace TaimisToolbench.Services
 
         /// <summary>
         /// What this character is wearing, plus what its saved equipment
-        /// tabs hold, as one entry per physical item under the same
-        /// "Character:&lt;name&gt;" source its bags use.
+        /// tabs hold, as one entry per physical item under the
+        /// "Equipped:&lt;name&gt;" source, which is not the source its bags
+        /// use.
         /// <para>
         /// /v2/characters/:id/equipment returns each physical item once and
         /// names every tab it sits in, so an item shared by three loadouts
@@ -331,7 +393,9 @@ namespace TaimisToolbench.Services
         /// character holds; the two Legendary Armory values are an
         /// account-wide shared copy reported once per slot per character,
         /// so counting them would multiply one legendary by the number of
-        /// slots using it. Never throws, like the inventory fetch.
+        /// slots using it - the account's own
+        /// /v2/account/legendaryarmory read carries those instead. Never
+        /// throws, like the inventory fetch.
         /// </para>
         /// </summary>
         private async Task<List<SnapshotItemEntry>> FetchCharacterEquipmentItemsAsync(string characterName, CancellationToken ct)
@@ -353,9 +417,14 @@ namespace TaimisToolbench.Services
                         {
                             ItemId = item.Id,
                             Count = 1,
-                            Source = AccountItemIndex.CharacterSourcePrefix + characterName,
+
+                            // Worn gear gets its own source encoding so the
+                            // snapshot can tell it apart from this same
+                            // character's bag contents.
+                            Source = AccountItemIndex.CharacterEquipmentSourcePrefix + characterName,
                             Upgrades = SocketedIds(item.Upgrades),
                             Infusions = SocketedIds(item.Infusions),
+                            SkinId = SkinIdOf(item.Skin),
                         });
                     }
                 }
@@ -488,20 +557,44 @@ namespace TaimisToolbench.Services
                         .ToList();
                 }
 
+                // The catch is per chunk, not around the loop. A full
+                // account resolves thousands of ids in ItemBulkLimit-sized
+                // requests, and one request the API refuses used to skip
+                // every later chunk AND the apply pass below, so a single
+                // bad id cost the names of every item after it.
+                int failedChunks = 0;
+                Exception firstChunkFailure = null;
+
                 for (int i = 0; i < uncachedIds.Count; i += ItemBulkLimit)
                 {
                     ct.ThrowIfCancellationRequested();
                     var chunk = uncachedIds.Skip(i).Take(ItemBulkLimit);
-                    var fetched = await _apiManager.Gw2ApiClient.V2.Items.ManyAsync(chunk, ct);
-                    lock (_cacheLock)
+                    try
                     {
-                        foreach (var item in fetched)
+                        var fetched = await _apiManager.Gw2ApiClient.V2.Items.ManyAsync(chunk, ct);
+                        lock (_cacheLock)
                         {
-                            var url = item.Icon.Url;
-                            _itemCache[item.Id] =
-                                (item.Name ?? "", url != null ? url.AbsoluteUri : "", RarityOf(item));
+                            foreach (var item in fetched)
+                            {
+                                var url = item.Icon.Url;
+                                _itemCache[item.Id] =
+                                    (item.Name ?? "", url != null ? url.AbsoluteUri : "", RarityOf(item));
+                            }
                         }
                     }
+                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    {
+                        failedChunks++;
+                        if (firstChunkFailure == null)
+                        {
+                            firstChunkFailure = ex;
+                        }
+                    }
+                }
+
+                if (firstChunkFailure != null)
+                {
+                    LogChunkFailures("item names/icons", failedChunks, firstChunkFailure);
                 }
 
                 lock (_cacheLock)
@@ -548,6 +641,110 @@ namespace TaimisToolbench.Services
             }
 
             return ItemRarityResolution.Normalize(raw) ?? "";
+        }
+
+        /// <summary>
+        /// One stack's applied skin as a plain id, or 0 for none. Gw2Sharp
+        /// surfaces the API's omitted field as null. Material storage and
+        /// the Legendary Armory carry no skin field at all, so their rows
+        /// never reach here.
+        /// </summary>
+        private static int SkinIdOf(int? skin)
+        {
+            return skin.HasValue && skin.Value > 0 ? skin.Value : 0;
+        }
+
+        /// <summary>
+        /// Fills in <see cref="SnapshotItemEntry.SkinName"/> and
+        /// <see cref="SnapshotItemEntry.SkinIconUrl"/> for every stack
+        /// wearing a skin, batched and cached exactly the way
+        /// <see cref="ResolveItemDetailsAsync"/> resolves item names and
+        /// icons. A failure leaves both empty, which reads as "not
+        /// transmuted": an under-report, never a wrong name.
+        /// </summary>
+        private async Task ResolveSkinDetailsAsync(List<SnapshotItemEntry> items, CancellationToken ct)
+        {
+            try
+            {
+                List<int> uncachedIds;
+                lock (_cacheLock)
+                {
+                    uncachedIds = items
+                        .Select(i => i.SkinId)
+                        .Where(id => id > 0)
+                        .Distinct()
+                        .Where(id => !_skinCache.ContainsKey(id))
+                        .ToList();
+                }
+
+                // Per chunk, for the reason ResolveItemDetailsAsync gives.
+                int failedChunks = 0;
+                Exception firstChunkFailure = null;
+
+                for (int i = 0; i < uncachedIds.Count; i += ItemBulkLimit)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var chunk = uncachedIds.Skip(i).Take(ItemBulkLimit);
+                    try
+                    {
+                        var fetched = await _apiManager.Gw2ApiClient.V2.Skins.ManyAsync(chunk, ct);
+                        lock (_cacheLock)
+                        {
+                            foreach (var skin in fetched)
+                            {
+                                var url = skin.Icon.Url;
+                                _skinCache[skin.Id] =
+                                    (skin.Name ?? "", url != null ? url.AbsoluteUri : "");
+                            }
+                        }
+                    }
+                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    {
+                        failedChunks++;
+                        if (firstChunkFailure == null)
+                        {
+                            firstChunkFailure = ex;
+                        }
+                    }
+                }
+
+                if (firstChunkFailure != null)
+                {
+                    LogChunkFailures("skin names", failedChunks, firstChunkFailure);
+                }
+
+                lock (_cacheLock)
+                {
+                    foreach (var entry in items)
+                    {
+                        if (entry.SkinId > 0 && _skinCache.TryGetValue(entry.SkinId, out var cached))
+                        {
+                            entry.SkinName = cached.Name;
+                            entry.SkinIconUrl = cached.IconUrl;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) when (!(ex is OperationCanceledException))
+            {
+                Logger.Warn(ex, "Failed to resolve skin names");
+                ModuleLog.Shared.Write(ModuleLogLevel.Warn, "snapshot-fetch", $"Failed to resolve skin names: {ex.GetType().Name} - {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// One warning for a whole resolve pass, naming how many bulk
+        /// requests failed and carrying the first exception. Per-chunk
+        /// logging would put one line per request in the module log, and a
+        /// full account issues tens of them.
+        /// </summary>
+        private static void LogChunkFailures(string what, int failedChunks, Exception first)
+        {
+            Logger.Warn(first, "Failed to resolve " + what + " for " + failedChunks + " request(s)");
+            ModuleLog.Shared.Write(
+                ModuleLogLevel.Warn,
+                "snapshot-fetch",
+                $"Failed to resolve {what} for {failedChunks} request(s): {first.GetType().Name} - {first.Message}");
         }
 
         private async Task ResolveCurrencyDetailsAsync(List<SnapshotWalletEntry> wallet, CancellationToken ct)

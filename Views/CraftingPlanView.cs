@@ -591,19 +591,23 @@ namespace TaimisToolbench.Views
         private DateTime _lastResizeEventUtc;
         private bool _resizeSettlePending;
 
-        // Ceiling on how long a held pointer may hold the strip's reflow
-        // back, and not a second debounce - DeferredReflowGate.TryTake owns
-        // the rule and why the number is this far above ResizeDebounceMs.
-        private const int StripReflowStallMs = 2000;
+        // Ceiling on how long a drag that still reads as running may hold
+        // the strip's reflow back, and not a debounce - the rule lives in
+        // DeferredReflowGate.TryTake. It runs from the last width observed,
+        // so only a grip held motionless for the whole five seconds reaches
+        // it. It is a last resort: the one way a resize flag is known to
+        // outlive its drag is handled in ResizeDragActive instead.
+        private const int StripReflowStallMs = 5000;
 
         // The item input strip's column count is a step function of the
         // panel width, so re-seating it on every drag tick stretches each
         // cell between two boundaries and repacks the whole strip at each
         // one. This gate holds the newest width and releases it once the
-        // drag ends. Everything whose position derives from the strip's
-        // width reads AppliedWidth, never the live width: the reserved
-        // height and the strip it reserves for have to move on the same
-        // frame or the content jumps ahead of the strip.
+        // drag ends, or once a resize no drag drove goes quiet. Everything
+        // whose position derives from the strip's width reads AppliedWidth,
+        // never the live width: the reserved height and the strip it
+        // reserves for have to move on the same frame or the content jumps
+        // ahead of the strip.
         private readonly DeferredReflowGate _stripReflow =
             new DeferredReflowGate(ResizeDebounceMs, StripReflowStallMs);
 
@@ -1257,7 +1261,10 @@ namespace TaimisToolbench.Views
         // Section anchor keys are per PlanSectionType (one section, one
         // key); tree rows key off the solver NodeId the row draws - the
         // same identity TreeSectionController's own in-place row pairing
-        // already treats as stable across a re-solve.
+        // already treats as stable across a re-solve. The Total Cost
+        // table's own row and group-heading keys are built in
+        // Services/SummarySectionLayoutMath, which is Blish-free and so
+        // can be tested.
         internal static string SectionAnchorKey(PlanSectionType sectionKey)
         {
             return "section:" + sectionKey;
@@ -2959,7 +2966,7 @@ namespace TaimisToolbench.Views
             // below can never move ahead of the strip above it. The panel
             // itself still takes the live width - it is the clipping frame
             // for cells that a narrowing drag has not re-seated yet.
-            _stripReflow.Observe(w, nowUtc, PointerHeld());
+            _stripReflow.Observe(w, nowUtc, ResizeDragActive());
             var layout = ComputeTopRegionLayout(_stripReflow.AppliedWidth);
             _inputPanel.Size = new Point(w, layout.InputPanelHeight);
 
@@ -3355,7 +3362,7 @@ namespace TaimisToolbench.Views
             }
 
             int settledWidth;
-            if (!_stripReflow.TryTake(DateTime.UtcNow, PointerHeld(), out settledWidth))
+            if (!_stripReflow.TryTake(DateTime.UtcNow, ResizeDragActive(), out settledWidth))
             {
                 return;
             }
@@ -3365,16 +3372,37 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// Whether the left mouse button is down, which for a window being
-        /// dragged by an edge or a corner means the drag is still running.
-        /// Releasing it ends a drag with no quiet period, so the settle
-        /// gate counts a release as a settle in its own right rather than
-        /// making the user watch the strip re-seat itself after they let go.
+        /// Whether a drag that is resizing this view is still running. The
+        /// strip's reflow waits for this to go false, so it lands on the
+        /// frame the user lets go.
+        /// <para>
+        /// Blish sets WindowBase2.Resizing on left-button-down over the
+        /// resize handle and writes the window size only while it is set,
+        /// so every resize tick a drag produces reads true here.
+        /// </para>
+        /// <para>
+        /// Visible is read with it because Blish clears Resizing from a
+        /// global mouse-release handler that returns early while the
+        /// window is hidden, and Hide clears Dragging but not Resizing.
+        /// An alt-tab mid-drag would otherwise leave the flag set.
+        /// </para>
+        /// <para>
+        /// A resize this window does not drive reads false here. The gate
+        /// collapses that burst on its quiet interval instead.
+        /// </para>
         /// </summary>
-        private static bool PointerHeld()
+        private bool ResizeDragActive()
         {
-            return GameService.Input?.Mouse?.State.LeftButton
-                == Microsoft.Xna.Framework.Input.ButtonState.Pressed;
+            for (Control control = _buildPanel; control != null; control = control.Parent)
+            {
+                var window = control as WindowBase2;
+                if (window != null)
+                {
+                    return window.Visible && window.Resizing;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -4923,7 +4951,7 @@ namespace TaimisToolbench.Views
                     // Row rendering (the cost-tile row, the
                     // MultiItemNote banner, and the per-currency rows) moved
                     // to Views/Rendering/SummarySectionRenderer.
-                    new SummarySectionRenderer(this, _getItemStatBlock)
+                    new SummarySectionRenderer(this, _getItemStatBlock, RegisterScrollAnchor)
                         .Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.UsedMaterials:

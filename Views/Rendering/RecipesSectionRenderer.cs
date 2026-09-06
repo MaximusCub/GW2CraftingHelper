@@ -253,7 +253,7 @@ namespace TaimisToolbench.Views.Rendering
                         WikiLinkLauncher.Open(wikiUrl);
                     }
                 };
-                wikiHint = WikiHintText;
+                wikiHint = TreeRowTooltipComposer.WikiHintText;
             }
 
             int itemId = row.ItemId;
@@ -359,7 +359,5 @@ namespace TaimisToolbench.Views.Rendering
         // with the 34 -> 42 resize, and the reading line (name, discipline,
         // status) keeps its offset from that center.
         private const int NameY = PlanContentHeightMath.IconRowIconY + 12;
-
-        private const string WikiHintText = "Right-click: Open wiki page";
     }
 }

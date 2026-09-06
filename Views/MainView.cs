@@ -57,6 +57,12 @@ namespace TaimisToolbench.Views
         // stacks disagree - see SocketedUpgradeIndex.
         private IReadOnlyDictionary<int, SocketedUpgradeIds> _socketsByItemId;
 
+        // itemId -> its copies and the skins they wear, built beside
+        // _itemsById once per snapshot. Absent for an id no copy of which
+        // is transmuted. Which skin a row then shows depends on the source
+        // filter, so it is settled per row - see TransmutedNameIndex.
+        private IReadOnlyDictionary<int, IReadOnlyList<TransmutedItemCopy>> _transmutedCopiesByItemId;
+
         // Tops up the stat blocks the socket blocks are drawn FROM. Scoped
         // to the socketed ids and their hosts rather than to the whole
         // snapshot: an account's item list runs into the thousands, while
@@ -81,6 +87,7 @@ namespace TaimisToolbench.Views
         private bool _bankEnabled = true;
         private bool _materialStorageEnabled = true;
         private bool _sharedInventoryEnabled = true;
+        private bool _legendaryArmoryEnabled = true;
 
         // Exclusion set, keyed by character name: absent means checked, so
         // a character new in a fresh snapshot defaults to visible. Stale
@@ -157,7 +164,7 @@ namespace TaimisToolbench.Views
         /// <summary>What the status line reads while a refresh is in
         /// flight, clicked or automatic. Paired with the spinner beside
         /// it, so the two are written together.</summary>
-        private const string RefreshingStatusText = "Updating";
+        private const string RefreshingStatusText = "Updating...";
 
         // The status label gets its own full-width row rather than sharing
         // the button band - a long status string slid under the button row
@@ -178,9 +185,10 @@ namespace TaimisToolbench.Views
         private const int SearchToFilterGapY = 3;
         // Caption-driven, not icon-driven: the block holds the caption
         // label's own line box beside an inline coin run drawn at y=2. The
-        // run is the wallet BAR tier, seated on the digits' ink two pixels
-        // into its line box (2 + 2 + 16 = 20), so the icons clear this
-        // height with room to spare; it is the caption that sets it.
+        // run is the wallet BAR tier, seated four pixels into its line box
+        // by CoinSegmentMath.CoinIconY, so the icon box ends at 2 + 4 + 18,
+        // exactly this height. The caption still sets the number, but a
+        // taller bar tier now clips rather than fitting: raise this with it.
         private const int CoinHeight = 24;
         private const int SectionGapY = 4;
 
@@ -292,6 +300,7 @@ namespace TaimisToolbench.Views
 
         private const string CoinCaption = "Coin";
         private const int CoinCaptionGap = 8;
+        private const int CoinCaptionY = 2;
         private static readonly Color CoinCaptionColor = new Color(130, 130, 130);
 
         // Same rule under every section heading in the module - see
@@ -440,6 +449,7 @@ namespace TaimisToolbench.Views
             // a null items list, and so does BuildRepresentativeIndex.
             _accountItemIndex = new AccountItemIndex(_snapshot?.Items);
             _itemsById = SnapshotSearchResultBuilder.BuildRepresentativeIndex(_snapshot?.Items);
+            _transmutedCopiesByItemId = TransmutedNameIndex.Build(_snapshot?.Items);
             _characterNames = SnapshotSearchResultBuilder.CollectCharacterNames(_snapshot);
             IndexSockets();
             _initialStatus = initialStatus;
@@ -470,6 +480,7 @@ namespace TaimisToolbench.Views
             _snapshot = snapshot;
             _accountItemIndex = new AccountItemIndex(_snapshot?.Items);
             _itemsById = SnapshotSearchResultBuilder.BuildRepresentativeIndex(_snapshot?.Items);
+            _transmutedCopiesByItemId = TransmutedNameIndex.Build(_snapshot?.Items);
             IndexSockets();
 
             var characterNames = SnapshotSearchResultBuilder.CollectCharacterNames(_snapshot);
@@ -878,6 +889,7 @@ namespace TaimisToolbench.Views
             AddSourceCheckbox("Bank", _bankEnabled, isChecked => _bankEnabled = isChecked);
             AddSourceCheckbox("Material Storage", _materialStorageEnabled, isChecked => _materialStorageEnabled = isChecked);
             AddSourceCheckbox("Shared Inventory", _sharedInventoryEnabled, isChecked => _sharedInventoryEnabled = isChecked);
+            AddSourceCheckbox("Legendary Armory", _legendaryArmoryEnabled, isChecked => _legendaryArmoryEnabled = isChecked);
 
             // A master toggle earns its place only once there is more than
             // one character to cascade to.
@@ -1879,11 +1891,13 @@ namespace TaimisToolbench.Views
                     Bank = _bankEnabled,
                     MaterialStorage = _materialStorageEnabled,
                     SharedInventory = _sharedInventoryEnabled,
+                    LegendaryArmory = _legendaryArmoryEnabled,
                     UncheckedCharacters = new HashSet<string>(_uncheckedCharacters, StringComparer.Ordinal),
                 };
 
                 itemRows = SnapshotSearchResultBuilder.BuildItemRows(
-                    _itemsById, _accountItemIndex, searchText, sourceFilter, GetActiveCharacterName());
+                    _itemsById, _accountItemIndex, searchText, sourceFilter,
+                    GetActiveCharacterName(), _transmutedCopiesByItemId);
             }
 
             if (filter == "All" || filter == "Wallet")
@@ -2520,7 +2534,7 @@ namespace TaimisToolbench.Views
 
             // The row's hover, composed once and stamped on every control
             // over the row - the icon included, by CreateItemIcon itself.
-            var hover = ItemRowHover(row, rarity, breakdown);
+            var hover = ItemRowHover(row, rarity);
 
             IconControls.CreateItemIcon(
                 rowPanel, row.IconUrl, ItemIconFrame.ForRarity(rarity),
@@ -2555,9 +2569,7 @@ namespace TaimisToolbench.Views
             // NOTHING else on the cell answers a hover: the item's tooltip
             // is carried by its icon alone (ItemIconTooltip.StampOnIconTree),
             // and the name, the amount, the source breakdown and the strip
-            // between them are not the item. The breakdown's full run is a
-            // line of that same tooltip, so nothing is lost by the column
-            // being too narrow to show it here.
+            // between them are not the item.
 
             // The cell's own Size is the grid's to write (LayoutResultGrid),
             // so this closure only re-fits what the new column width changed.
@@ -2600,14 +2612,14 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// One item row's hover: the item's own icon+name header, its stat
-        /// block if this session happens to hold one, and the whole source
-        /// breakdown - ALWAYS, not only when the line was shortened, since
-        /// the hover is where a reader goes for the run of it. The identity
+        /// One item row's hover: the item's own icon+name header and its
+        /// stat block, if this session happens to hold one. The identity
         /// still carries the header, because a hover can land before
-        /// IndexSockets' top-up has fetched that item's block.
+        /// IndexSockets' top-up has fetched that item's block. The source
+        /// breakdown is NOT here - the row already prints it under the
+        /// name, and a second tooltip box repeating it says nothing new.
         /// </summary>
-        private ItemIconTooltip ItemRowHover(SnapshotSearchRow row, string rarity, string breakdown)
+        private ItemIconTooltip ItemRowHover(SnapshotSearchRow row, string rarity)
         {
             int itemId = row.ItemId;
             var identity = ItemTooltipIdentity.ForItem(row.Name ?? "", row.IconUrl, rarity);
@@ -2621,16 +2633,10 @@ namespace TaimisToolbench.Views
             return ItemIconTooltip.Composed(identity, () =>
             {
                 var stats = hasStats ? _getItemStatBlock(itemId) : null;
-                var extras = new TooltipContentBuilder();
-                if (!string.IsNullOrEmpty(breakdown))
-                {
-                    extras.Text(breakdown).EndLine();
-                }
-
                 return ItemRowTooltipComposer.BuildRowContent(
-                    ItemStatTooltipComposer.BuildContent(stats, SocketsFor(itemId)),
+                    ItemStatTooltipComposer.BuildContent(stats, SocketsFor(itemId), row.Skin),
                     identity,
-                    extras.Build());
+                    null);
             });
         }
 
@@ -2700,17 +2706,12 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// The row's source breakdown as one line, or "". NOT the Amount
-        /// column's prefix notation, and the one deliberate exemption from
-        /// it: these labels are LOCATIONS. "20x Bank" parses as
-        /// twenty banks, and "10x Character: Maximus Test" collides with
-        /// the label's own colon.
+        /// The row's line of holding places, or "". The wording is
+        /// SnapshotHoldLine's, which is where it can be tested.
         /// </summary>
         private static string BreakdownText(SnapshotSearchRow row)
         {
-            return row.Breakdown == null || row.Breakdown.Count == 0
-                ? ""
-                : string.Join("   ", row.Breakdown.Select(b => $"{b.Label} {b.Count}"));
+            return SnapshotHoldLine.Format(row.Breakdown);
         }
 
         /// <summary>The rarity this tab can know for an item, or null -
@@ -2921,30 +2922,38 @@ namespace TaimisToolbench.Views
 
             var (gold, silver, cop) = CoinSegmentMath.Split(copper);
 
-            var font = UiFonts.Body;
+            var captionFont = UiFonts.Body;
+            var digitFont = UiFonts.CoinDigits;
 
-            // Body, not Caption: this was the one text on the tab both
-            // smaller AND greyer than what it labels. One channel of
-            // de-emphasis, and it lines up with the numbers it introduces.
+            // Body, not the digits' own face: this was the one text on the
+            // tab both smaller AND greyer than what it labels. One channel
+            // of de-emphasis, not two.
             new Label()
             {
                 Text = CoinCaption,
-                Font = font,
+                Font = captionFont,
                 TextColor = CoinCaptionColor,
                 AutoSizeWidth = true,
                 AutoSizeHeight = true,
-                Location = new Point(0, 2),
+                Location = new Point(0, CoinCaptionY),
                 Parent = _coinBlockPanel,
             };
-            int captionWidth = (int)Math.Ceiling(font.MeasureString(CoinCaption).Width);
+            int captionWidth = (int)Math.Ceiling(captionFont.MeasureString(CoinCaption).Width);
+
+            // The digits are a step smaller than the caption, so they are
+            // drawn lower to keep the two on one baseline. That leaves the
+            // digits' ink bottom exactly where it was, and the coin seated
+            // on it (CoinCurrencyRenderer's CoinDigitSeat) does not move.
+            int digitY = TypeRampMetrics.BaselineAlignedY(
+                TypeRampMetrics.CoinDigitInk, CoinCaptionY + TypeRampMetrics.BodyInk.BaselineY);
 
             var segments = new List<CoinSegmentMath.CoinSegmentSpec>(3);
-            CoinCurrencyRenderer.AddSegmentSpec(segments, font, CoinSegmentMath.GoldAssetId, gold.ToString());
-            CoinCurrencyRenderer.AddSegmentSpec(segments, font, CoinSegmentMath.SilverAssetId, silver.ToString());
-            CoinCurrencyRenderer.AddSegmentSpec(segments, font, CoinSegmentMath.CopperAssetId, cop.ToString());
+            CoinCurrencyRenderer.AddSegmentSpec(segments, digitFont, CoinSegmentMath.GoldAssetId, gold.ToString());
+            CoinCurrencyRenderer.AddSegmentSpec(segments, digitFont, CoinSegmentMath.SilverAssetId, silver.ToString());
+            CoinCurrencyRenderer.AddSegmentSpec(segments, digitFont, CoinSegmentMath.CopperAssetId, cop.ToString());
 
             CoinCurrencyRenderer.LayoutCoinSegments(
-                _coinBlockPanel, segments, captionWidth + CoinCaptionGap, 2, font);
+                _coinBlockPanel, segments, captionWidth + CoinCaptionGap, digitY, digitFont);
 
             // The block's exact extent, from the same arithmetic that laid
             // it out - so nothing re-measures it to right-pin it.
