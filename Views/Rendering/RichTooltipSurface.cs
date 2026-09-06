@@ -51,14 +51,15 @@ namespace TaimisToolbench.Views.Rendering
         private const int ChromeBottom = 3;
 
         /// <summary>
-        /// The transparent gap between the two boxes. MEASURED on the
-        /// game's own stacked "Currently Equipped" comparison boxes: the
-        /// upper box's bottom border sits on row 322 and the lower box's
-        /// top border on row 341, at the game's 16px line pitch. The one
-        /// border row that reads darkest is ambiguous by a pixel, so the
-        /// true gap is 18 or 19.
+        /// The transparent gap between the two boxes. The game's own
+        /// stacked "Currently Equipped" comparison boxes measure 18 here:
+        /// the upper box's bottom border sits on row 322 and the lower
+        /// box's top border on row 341, at the game's 16px line pitch.
+        /// Ours is deliberately half of that. 9 was chosen after looking
+        /// at the module's own two boxes in game, so do not "restore" this
+        /// to the measured 18.
         /// </summary>
-        private const int BoxGap = 18;
+        private const int BoxGap = 9;
 
         /// <summary>
         /// FALLBACK canvas only: the game-derived art's median tint at its
