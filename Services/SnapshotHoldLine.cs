@@ -98,13 +98,50 @@ namespace TaimisToolbench.Services
             var line = new StringBuilder();
 
             for (var category = SnapshotHoldCategory.SharedInventory;
-                category <= SnapshotHoldCategory.Unknown;
+                category <= SnapshotHoldCategory.LegendaryArmory;
                 category++)
             {
                 AppendCategory(line, locations, category, showCounts);
             }
 
+            AppendUnrecognizedPlaces(line, locations, showCounts);
+
             return line.ToString();
+        }
+
+        /// <summary>
+        /// Appends every unrecognized place, each under its own raw source
+        /// key, in the order the caller supplied. They cannot share the
+        /// category loop above: two unrecognized keys are two different
+        /// places, and one label over both would hide one of them
+        /// (KNOWN-ISSUES #31: never silently mask data).
+        /// </summary>
+        private static void AppendUnrecognizedPlaces(
+            StringBuilder line,
+            IReadOnlyList<SnapshotHoldLocation> locations,
+            bool showCounts)
+        {
+            for (int i = 0; i < locations.Count; i++)
+            {
+                var location = locations[i];
+                if (location == null
+                    || location.Category != SnapshotHoldCategory.Unknown)
+                {
+                    continue;
+                }
+
+                if (line.Length > 0)
+                {
+                    line.Append(CategorySeparator);
+                }
+
+                line.Append(CategoryLabel(location));
+
+                if (showCounts)
+                {
+                    line.Append(": ").Append(location.Count);
+                }
+            }
         }
 
         /// <summary>
