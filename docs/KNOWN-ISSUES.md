@@ -220,7 +220,10 @@ row's bottom edge unpredictably depending on scroll phase. M36b gave
 gap for the vulnerable 44px/32px row types), proven immune by simulation
 across every row height and all four GW2 UI Size scale factors - this is
 machinery pinned by expensive evidence (see the policy note above), see
-`docs/ARCHITECTURE.md` section 3.
+`docs/ARCHITECTURE.md` section V.26 (`LabelHelpers`), which is where the
+scissor derivation lives. This entry cited section 3 until 2026-09-05;
+section 3 is scroll preserve/restore/verify and says nothing about
+dividers.
 Required Recipes and Crafting Steps were live pixel-scan verified at
 multiple scroll offsets after the fix; Required Disciplines (32px rows)
 was simulation-proven at the time but not yet individually pixel-scanned
@@ -555,6 +558,30 @@ changed; this round is comment-only. The class-sweep table's other rows and
 the `_buildComplete` keep-vs-remove decision were re-checked against the
 current code during this round and still hold as written.
 
+**Correction (2026-09-05).** Three statements above have drifted off the
+code. None of them changes a verdict; each sends a reader to the wrong
+place.
+
+- "`ViewAdapter` does not override `Unload()`" is false.
+  `Views/ViewAdapter.cs:250` overrides it. The override only unsubscribes
+  the window's `Resized` handler - it disposes nothing and reparents
+  nothing - so the conclusion it was offered in support of still stands:
+  a plain tab switch leaves every control below the top-level panel with
+  a non-null `Parent`. The same sentence appears in
+  `docs/ARCHITECTURE.md` Section 1 and is wrong there too.
+- The `CraftingPlanView` row cites `Views/CraftingPlanView.cs:1511` for
+  the `StopLiveTickers()` call in `Build()`. That call is now at line
+  2111; the method is defined at line 1542. It still cancels four
+  `SpriteScreen`-parented `FrameTicker`s from a ThreadPool-thread
+  `Build()`, so the row's OUT OF SCOPE hazard is unchanged.
+- "all six `RebuildRows()` call sites" is now four direct calls
+  (`Views/LogTabContent.cs:401` - the marshaled tail - plus `:504`,
+  `:541`, `:582`) reached through seven entry points, because a
+  `RebuildRowsIfBuilt()` wrapper (`:578`) and a delete-log-file
+  confirmation callback (`:628`) arrived later. Every one of them is
+  still either gated on `_buildComplete` or is the tail itself, so the
+  by-construction argument holds at the new count.
+
 **Validation:** `dotnet build -p:Platform=x64` - 0 errors. Module test suite
 (`tests/TaimisToolbench.Tests`) - 1101/1101 passing. VendorOfferUpdater
 suite (`tests/VendorOfferUpdater.Tests`) - 135/135 passing (re-measured a
@@ -631,6 +658,32 @@ computes none. Cited from `Models/ItemStatBlock.cs`,
 `Services/ItemMetadataService.cs`, `Services/ItemStatBlockFactory.cs` and
 `Views/Rendering/TreeSectionController.cs`. Full record:
 `dev/archive/known-issues/2026-08-23-item-stat-tooltips.md`.
+
+**The judgment call does not cover an owned copy (2026-09-05).** The
+sentence above is true of `/v2/items`, which describes an item type and so
+has no single answer to give. It was then read as a limit on what the
+module can know, and it is not one. The account endpoints report each
+owned stack's own state: `AccountItem` carries `Stats` ("the selected
+stats for the equipped item"), `Upgrades`, `Infusions`, `Binding`,
+`BoundTo` and `Charges` alongside `Id` and `Count` - measured in the
+vendored `Gw2Sharp` 1.7.4 model this module already calls
+(`Gw2Sharp/WebApi/V2/Models/Account/AccountItem.cs` at tag v1.7.4), which
+is the type `V2.Account.Bank`, `V2.Account.Inventory` and
+`V2.Characters[name].Inventory` all return.
+`Services/Gw2AccountSnapshotService.cs` reads `Id` and `Count` off each of
+those three and drops the rest (lines 104-106, 133-135, 294-296), and
+`Models/SnapshotItemEntry` has nowhere to put them. So for a Snapshot row
+- an item the account actually holds - there is no open question about
+which combination to compute, and no question about which copy the player
+is looking at either: the API names both. The same reasoning appears in
+`docs/ARCHITECTURE.md` section S1.4, where it also decides the bind-line
+wording ("Which copy the player is looking at is instance state
+`/v2/items` cannot carry"), and it is wrong there for the same reason.
+Nothing is changed here. Doing something with this needs decisions this
+entry cannot make on its own - what a stack of copies with different stats
+should show, and whether a snapshot schema bump is worth it (see section
+12) - and it does not touch the plan tree, where an item that is not owned
+yet really does have no answer.
 
 ### 41. Tooltip facility (one rich surface, four-edge clamp)
 
@@ -950,9 +1003,20 @@ also advances zero pixels, so neither a layout assertion nor a screenshot
 diff catches it. Plan History is fixed here - a Blish `Checkbox` for the
 pin, U+00D7 for the delete - and the class is gated by
 `docs/font-codepoints.txt` plus the "UI glyph escapes exist in the shipped
-font" step in `.github/workflows/tests.yml`. The Ranker's three are waived
-in that step until its own branch lands; the waiver fails the build once
-it goes stale. Full record: `dev/records/glyph-fixes.md`.
+font" step in `.github/workflows/tests.yml`. Full record:
+`dev/records/glyph-fixes.md`.
+
+**Correction (2026-09-05).** This entry said the Ranker's three escapes
+were waived in that step until its own branch landed. They are not waived
+any more: the step's `waived` set is empty, and the Ranker's reorder keys
+draw `UiGlyphs.CaretUp`/`CaretDown` (`Views/RankerTabContent.cs:1534`),
+which are real glyphs in the module's own atlas rather than codepoints
+Menomonia lacks. The sentence about the waiver going stale described
+machinery that no longer has anything to check. The rest of the entry
+stands, with one thing added that was not true when it was written: the
+module now ships a five-glyph font of its own (`ref/glyphs.fnt`, U+E100 to
+U+E104, named in `Services/UiGlyphs.cs`), so "the shipped font" is two
+fonts, and a geometric shape no longer has to be a texture.
 
 ### 65. First-paint viewport truncation (the resize that fixed it)
 
@@ -1007,6 +1071,21 @@ genuinely open item, not just the ones originally filed under a
   (`PillColors.GlyphColor`) went dead when the hand-drawn toggle became a
   `FeedbackButton` and has been deleted; this entry is where the argument
   it carried now lives.
+  **Correction (2026-09-05): this measures a control that no longer
+  ships.** The toggle is not a `FeedbackButton` and was never one for
+  long: it is a `CloseKeyButton` (`Views/Rendering/TreeSectionController.cs:2037`),
+  which derives from `RowActionKey`, a plain `Control` that samples
+  Blish's own `button-exit` / `button-exit-active` window-close textures
+  (`Views/Rendering/RowActionKey.cs:21-26` says why it is not a
+  `FeedbackButton`). Nor is the fade `Control.Opacity`: `RowActionKey.
+  Dimmed` multiplies the draw colour directly, `color * DisabledDim`
+  (`Views/Rendering/RowActionKey.cs:72`), with `DisabledDim` read from
+  `PillColors.DimmedPillFactor` so the two cannot drift. So there is no
+  `#9C7327` plate and no black mark any more, and every ratio quoted
+  above describes the hand-drawn toggle that preceded this one. Whether
+  the shipped key clears 3:1 when disabled has not been re-measured -
+  that needs the two textures sampled, not arithmetic on named colours -
+  and this entry stays open until it is.
 - Localization (en/de/fr/es via API lang param): deferred as not core
   functionality. Full-milestone scale when picked up.
 - Upstream Blish HUD issue/PR for the wheel-delta wrap: REMOVED from the
@@ -1069,8 +1148,9 @@ genuinely open item, not just the ones originally filed under a
   the M38 architecture proposal, section 5 (internal working document) -
   `Services/Pricing/`, `Services/Planning/`, `Services/Persistence/`,
   `Services/Vendor/`, `Services/Layout/`, `Services/Api/` - was never
-  built: none of the six directories exists, and `Services/` is 141 flat
-  files with two subdirectories (`Recipes/`, `Diagnostics/`) that arrived
+  built: none of the six directories exists, and `Services/` is 197
+  flat files (recounted 2026-09-05; it was 141 when this was written) with
+  two subdirectories (`Recipes/`, `Diagnostics/`) that arrived
   for unrelated reasons. Cut for the reason the plan itself flagged:
   `TaimisToolbench.csproj` lists every file explicitly, so each move is
   also a csproj path edit, and the plan's own sequencing note called out
@@ -1331,6 +1411,10 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Remaining-tabs design pass (2026-08-25)** - gate PASS 2026-08-25.
   Cited as: tab-design-pass.
   `dev/records/tab-design-pass.md`
+- **A module-owned button and a shipped glyph font (2026-08-27)** - the record
+  states no gate. Added to the ledger 2026-09-05; it had no line since it was
+  written, and nothing in the tree cites it.
+  `dev/records/2026-08-glyph-font.md`
 - **Invisible UI glyphs, the guidance behind them, and the gate (2026-08-27)** - gate owed.
   Cited as: glyph-fixes, KNOWN-ISSUES #64.
   `dev/records/glyph-fixes.md`
@@ -1340,6 +1424,11 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Barter-item valuation: the vendor offers the solver was throwing away (2026-08-28)** - gate NOT RUN (no live session available on this branch).
   Cited as: barter-item-valuation.
   `dev/records/barter-item-valuation.md`
+- **Content viewport falls short of the window bottom (2026-08-28)** - gate NOT
+  RUN (no live session available on that branch). Added to the ledger
+  2026-09-05; item 66 cited the record but no ledger line existed.
+  Cited as: KNOWN-ISSUES #66.
+  `dev/records/viewport-bottom-margin.md`
 - **The Battle Historian: a removed WvW vendor pricing legendary materials at zero (2026-08-29)** - gate not required (dev-tool and data change; verified by a byte-identical round trip and a `--diff-summary` showing 49 removed and nothing else touched).
   Cited as: w5-deadvendors.
   `dev/records/w5-deadvendors.md`
