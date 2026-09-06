@@ -120,7 +120,7 @@ Services/FirstLoadSnapshotGate.cs                                               
 Services/GlyphButtonMetrics.cs                                                          69
 Services/GridLayout.cs                                                                  93
 Services/Gw2AccountRecipeClient.cs                                                      30
-Services/Gw2AccountSnapshotService.cs                                                   734
+Services/Gw2AccountSnapshotService.cs                                                   793
 Services/Gw2ItemApiClient.cs                                                            261
 Services/Gw2PriceApiClient.cs                                                           66
 Services/Gw2RecipeApiClient.cs                                                          206
