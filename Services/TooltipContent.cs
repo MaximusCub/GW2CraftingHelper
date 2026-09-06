@@ -141,6 +141,18 @@ namespace TaimisToolbench.Services
         /// indent covers the icon's full height.
         /// </summary>
         Effect,
+
+        /// <summary>
+        /// An equipment slot row ("Unused Upgrade Slot"), one line pitch
+        /// tall, indented past the game's own slot glyph. The glyph is
+        /// game UI art rather than a render-service icon, so it arrives as
+        /// <see cref="TooltipLine.IconAssetId"/>, not
+        /// <see cref="TooltipLine.IconUrl"/>. Its indent is its own, and
+        /// narrower than an effect block's: measured on a live
+        /// ascended-staff tooltip, where a slot glyph is 16px at the
+        /// content edge with its text 21px in.
+        /// </summary>
+        Slot,
     }
 
     /// <summary>
@@ -218,12 +230,14 @@ namespace TaimisToolbench.Services
             IReadOnlyList<TooltipSpan> spans,
             TooltipLineKind kind = TooltipLineKind.Text,
             string iconUrl = null,
-            TooltipHeaderSubject subject = default(TooltipHeaderSubject))
+            TooltipHeaderSubject subject = default(TooltipHeaderSubject),
+            int iconAssetId = 0)
         {
             _spans = spans ?? new List<TooltipSpan>();
             Kind = kind;
             IconUrl = iconUrl;
             HeaderSubject = subject;
+            IconAssetId = iconAssetId;
         }
 
         public IReadOnlyList<TooltipSpan> Spans => _spans;
@@ -255,6 +269,17 @@ namespace TaimisToolbench.Services
         /// </para>
         /// </summary>
         public string IconUrl { get; }
+
+        /// <summary>
+        /// The game's own UI art for a <see cref="TooltipLineKind.Slot"/>
+        /// row, as a GW2 asset id; 0 on every other kind and on a wrapped
+        /// slot line's continuation rows. Separate from
+        /// <see cref="IconUrl"/> because the two resolve through different
+        /// caches - a render-service URL against the item icon service, an
+        /// asset id against the game's own UI art, the way the coin
+        /// denominations already do.
+        /// </summary>
+        public int IconAssetId { get; }
     }
 
     /// <summary>
@@ -482,6 +507,33 @@ namespace TaimisToolbench.Services
                 first = false;
             }
 
+            return this;
+        }
+
+        /// <summary>
+        /// One equipment slot row: <paramref name="text"/> beside the
+        /// game's own slot glyph, named by
+        /// <paramref name="iconAssetId"/>. See
+        /// <see cref="TooltipLineKind.Slot"/>.
+        /// </summary>
+        public TooltipContentBuilder SlotLine(int iconAssetId, string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return this;
+            }
+
+            if (_current != null)
+            {
+                EndLine();
+            }
+
+            _lines.Add(new TooltipLine(
+                new List<TooltipSpan> { TooltipSpan.FromText(text) },
+                TooltipLineKind.Slot,
+                null,
+                default(TooltipHeaderSubject),
+                iconAssetId));
             return this;
         }
 

@@ -5,8 +5,9 @@ namespace TaimisToolbench.Tests.Helpers
     /// the item classes the stat-tooltip work has to survive: fixed-stat
     /// ascended armour, a stat-selectable legendary weapon, a rune, a
     /// sigil, an infusion, fine and ascended food, a detail-less crafting
-    /// material, a stat-selectable exotic, and a legendary whose flavour
-    /// text carries markup and non-ASCII bullets.
+    /// material, a stat-selectable exotic, a legendary whose flavour text
+    /// carries markup and non-ASCII bullets, and the equipment-slot
+    /// shapes below.
     /// <para>
     /// Non-ASCII bytes in the API's own text are written as \u escapes so
     /// the source stays ASCII-only (repo invariant); the RUNTIME string is
@@ -54,6 +55,23 @@ namespace TaimisToolbench.Tests.Helpers
         /// </summary>
         public const string GiftOfTwilight =
             "{\"name\":\"Gift of Twilight\",\"description\":\"A gift used to create the legendary greatsword Twilight.\\n\\nMade by combining these items in the Mystic Forge:\\n\u2022 1 Gift of Metal\\n\u2022 1 Gift of Darkness\\n\u2022 100 Icy Runestones\\n\u2022 1 Superior Sigil of Blood\",\"type\":\"Trophy\",\"level\":0,\"rarity\":\"Legendary\",\"vendor_value\":640,\"game_types\":[\"Activity\",\"Wvw\",\"Dungeon\",\"Pve\"],\"flags\":[\"AccountBound\",\"NoSalvage\",\"AccountBindOnUse\",\"DeleteWarning\"],\"restrictions\":[],\"id\":19648,\"chat_link\":\"[&AgHATAAA]\",\"icon\":\"https://render.guildwars2.com/file/01D07FABAE26C0E5240892B00DA7AF90AB0EA022/455828.png\"}";
+
+        /// <summary>
+        /// The three slot shapes /v2/items expresses that no other fixture
+        /// here has: an ascended amulet's ENRICHMENT slot (77482), an
+        /// ascended back item whose second infusion slot is already filled
+        /// (37010, item_id 49428), and an exotic ring, which has an upgrade
+        /// slot and no infusion slot where its ascended equivalent has the
+        /// reverse (36551).
+        /// </summary>
+        public const string VialOfSalt =
+            "{\"name\":\"Vial of Salt\",\"description\":\"<c=@flavor>It took a lot of tears to create this much salt.</c>\",\"type\":\"Trinket\",\"level\":80,\"rarity\":\"Ascended\",\"vendor_value\":660,\"game_types\":[\"Activity\",\"Wvw\",\"Dungeon\",\"Pve\"],\"flags\":[\"HideSuffix\",\"AccountBound\",\"NotUpgradeable\",\"Unique\",\"AccountBindOnUse\"],\"restrictions\":[],\"id\":77482,\"chat_link\":\"[&AgGqLgEA]\",\"icon\":\"https://render.guildwars2.com/file/5C6AC7BB0B70C95D4DD4D07209546B6FB56A1E0D/1313083.png\",\"details\":{\"type\":\"Amulet\",\"infusion_slots\":[{\"flags\":[\"Enrichment\"]}],\"attribute_adjustment\":358.512,\"stat_choices\":[584,656,658,1119,657,1038,1097,659,690,583,585,1037,586,1035,588,1114,1128,1163,1066,1064,660,1430,1436,591,581,592,1263,1271,1265,1270,1262,1268,1264,1267,1269,1366,1367,1374,1549,1566,1691,1706,1827],\"secondary_suffix_item_id\":\"\"}}";
+
+        public const string KossOnKossInfused =
+            "{\"name\":\"Koss on Koss (Infused)\",\"description\":\"<c=@flavor>First edition. This book appears to be written in the author's own hand.</c>\",\"type\":\"Back\",\"level\":80,\"rarity\":\"Ascended\",\"vendor_value\":330,\"default_skin\":2376,\"game_types\":[\"Activity\",\"Wvw\",\"Dungeon\",\"Pve\"],\"flags\":[\"HideSuffix\",\"AccountBound\",\"NoSell\",\"NotUpgradeable\",\"Unique\",\"AccountBindOnUse\"],\"restrictions\":[],\"id\":37010,\"chat_link\":\"[&AgGSkAAA]\",\"icon\":\"https://render.guildwars2.com/file/22D31C930DFAFC955209201535DABB6C956DD7F0/511798.png\",\"details\":{\"infusion_slots\":[{\"flags\":[\"Infusion\"]},{\"flags\":[\"Infusion\"],\"item_id\":49428}],\"attribute_adjustment\":89.628,\"infix_upgrade\":{\"id\":601,\"buff\":{\"skill_id\":15757,\"description\":\"+32 Power\\n+18 Toughness\\n+18 Vitality\\n+5 Agony Resistance\"},\"attributes\":[{\"attribute\":\"Power\",\"modifier\":63},{\"attribute\":\"Toughness\",\"modifier\":40},{\"attribute\":\"Vitality\",\"modifier\":40}]},\"secondary_suffix_item_id\":\"\"}}";
+
+        public const string InfinityLoop =
+            "{\"name\":\"Infinity Loop\",\"description\":\"<c=@flavor>A single twist in the band creates a continuous surface.</c>\",\"type\":\"Trinket\",\"level\":80,\"rarity\":\"Exotic\",\"vendor_value\":396,\"game_types\":[\"Activity\",\"Wvw\",\"Dungeon\",\"Pve\"],\"flags\":[\"HideSuffix\",\"SoulBindOnUse\"],\"restrictions\":[],\"id\":36551,\"chat_link\":\"[&AgHHjgAA]\",\"icon\":\"https://render.guildwars2.com/file/A3473FFC3353576C2EF60C5A9CC47CDA6AB562C1/63613.png\",\"details\":{\"type\":\"Ring\",\"infusion_slots\":[],\"attribute_adjustment\":256.08,\"infix_upgrade\":{\"id\":153,\"attributes\":[{\"attribute\":\"Vitality\",\"modifier\":90},{\"attribute\":\"Healing\",\"modifier\":64},{\"attribute\":\"ConditionDamage\",\"modifier\":64}]},\"secondary_suffix_item_id\":\"\"}}";
 
         public static string Array(params string[] items)
         {
