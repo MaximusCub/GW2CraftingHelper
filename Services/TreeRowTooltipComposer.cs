@@ -34,6 +34,12 @@ namespace TaimisToolbench.Services
         /// </summary>
         public const string WikiHintText = "Right-click to open the wiki page.";
 
+        /// <summary>The same affordance on a row whose acquisition is left
+        /// to the player, where the link lands on the page's Acquisition
+        /// section rather than its top.</summary>
+        public const string WikiAcquisitionHintText =
+            "Right-click to see how to get this on the wiki.";
+
         /// <summary>
         /// A row's item stat block as tooltip content, or empty content
         /// when the session has no stats for it - or when the row's id is
@@ -231,10 +237,35 @@ namespace TaimisToolbench.Services
             // real page at all.
             if (WikiLinkBuilder.HasWikiPage(node.Name))
             {
-                extraTooltipLines.Add(TooltipContent.TextLine(WikiHintText));
+                extraTooltipLines.Add(TooltipContent.TextLine(
+                    CurrencyTradeUpRow.Matches(node)
+                        ? WikiAcquisitionHintText
+                        : WikiHintText));
             }
 
             return TooltipContent.FromLines(extraTooltipLines);
+        }
+
+        /// <summary>
+        /// The page the row's right-click opens. A currency trade-up row
+        /// (see <see cref="CurrencyTradeUpRow"/>) opens the item's
+        /// Acquisition section, because the module deliberately plans no
+        /// route to the currency and that section is where the player's
+        /// options are listed. Every other row opens the plain item page.
+        /// Null when the name has no wiki page, which is the same test the
+        /// tooltip line above uses, so the affordance and the link can
+        /// never disagree.
+        /// </summary>
+        public static string BuildWikiUrl(CraftingTreeNode node)
+        {
+            if (node == null)
+            {
+                return null;
+            }
+
+            return CurrencyTradeUpRow.Matches(node)
+                ? WikiLinkBuilder.BuildItemAcquisitionUrl(node.Name)
+                : WikiLinkBuilder.BuildItemPageUrl(node.Name);
         }
     }
 }

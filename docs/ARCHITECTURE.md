@@ -823,11 +823,22 @@ plan. A barter line's own scaled quantity rides on
 
 An offer with at least one non-coin line that has **no** valuation
 (including when it is mixed with other, valued lines) is incomparable with
-coin costs and is reported only as a **fallback**, ranked by lowest coin
-part. A fallback coin-part tie is broken by unit count only when both
-offers cost the same single non-coin line, kind included; ties across
-different lines keep the first-listed offer, because ranking across them
-has no exchange rate and their unit counts must never be compared.
+coin costs and is reported only as a **fallback**. Fallback offers are
+ranked on three keys, most significant first: whether the offer carries a
+barter line, then its coin part, then unit count. A fallback coin-part tie
+is broken by unit count only when both offers cost the same single
+non-coin line, kind included; ties across different lines keep the
+first-listed offer, because ranking across them has no exchange rate and
+their unit counts must never be compared.
+
+The barter key comes first because a barter line contributes nothing to
+the coin part, so ranking on coin alone reads an unpriceable cost as a
+cheap one. Three Secrets of the Obscure materials are each sold for a flat
+250 map currency and are each also listed against several account-bound
+zone reward chests. Every chest offer scored a coin part of 0 and beat the
+flat price, and the plan told the player to acquire chests the module can
+neither price, buy nor craft. Both offers stay selectable; only the order
+changed.
 
 That coin part is a **partial** accounting of the offer, and how partial
 depends on which kind of line was left unvalued. An unvalued wallet
@@ -3221,6 +3232,22 @@ true while a raw coin component stays folded into `SubtreeCost`.
 pills means a real choice, exactly one means the source is locked. The
 `default` arm of its source switch is a non-crashing safety net for a future
 regression, not a real code path.
+
+A row the plan buys for one wallet currency and nothing else is a
+*currency trade-up* row (`Services/CurrencyTradeUpRow.cs`). Three Secrets
+of the Obscure materials are the live case: 250 map currency each, from
+several merchants, at one fixed price. The module deliberately plans no
+route to the currency itself - it is earned several ways, capped
+differently per way, and there is no cheapest answer to optimize - so the
+row states what the held currency buys now and leaves the earning to the
+player. Two things follow from that. The row gains a
+`BUYS {n}/{needed} NEEDED` annotation pill whose tooltip names the
+remainder, and its right-click opens the item's wiki Acquisition section
+(`WikiLinkBuilder.BuildItemAcquisitionUrl`) rather than the page top,
+because that section is where the player's options are listed. Both
+decisions are made in Blish-free classes -
+`DecisionPillPlanner.AppendCurrencyTradeUpPill` and
+`TreeRowTooltipComposer.BuildWikiUrl` - so the view only wires them up.
 
 `Services/PlanRelayoutMath.cs` fits those pills into the row.
 `ComputeVisiblePillCount` is the primitive: at least one pill is always

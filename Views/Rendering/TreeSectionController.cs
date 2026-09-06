@@ -1330,7 +1330,10 @@ namespace TaimisToolbench.Views.Rendering
             // than doing nothing.
             if (WikiLinkBuilder.HasWikiPage(node.Name))
             {
-                string nodeName = node.Name;
+                // Which page a row opens is decided by
+                // TreeRowTooltipComposer.BuildWikiUrl, the same Blish-free
+                // class that writes the tooltip line naming the affordance.
+                string wikiUrl = TreeRowTooltipComposer.BuildWikiUrl(node);
                 bool wikiLinkArmed = false;
                 rowPanel.RightMouseButtonPressed += (_, __) => wikiLinkArmed = true;
                 rowPanel.MouseLeft += (_, __) => wikiLinkArmed = false;
@@ -1339,7 +1342,7 @@ namespace TaimisToolbench.Views.Rendering
                     if (wikiLinkArmed)
                     {
                         wikiLinkArmed = false;
-                        WikiLinkLauncher.Open(WikiLinkBuilder.BuildItemPageUrl(nodeName));
+                        WikiLinkLauncher.Open(wikiUrl);
                     }
                 };
         }
