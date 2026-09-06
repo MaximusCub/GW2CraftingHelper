@@ -1204,6 +1204,11 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 2026-08-25 pass that split the append zone put its records in
 `dev/records/`, one per branch, and that is where every record goes now.
 
+The last line below is dated 2026-08-29. Fifteen branches merged to master
+between that date and 2026-09-05 and none of them wrote a record, so
+nothing indexes them here. The ledger's last date is the date of the last
+record, not the date of the last change.
+
 - **In-game UX wave (six S-sized display fixes, 2026-08-06)** - gate PASS 2026-08-06.
   `dev/archive/known-issues/2026-08-06-field-test-ux-wave.md`
 - **In-game UX wave 2: MysticForge sublabel drop fix (2026-08-06)** - gate PASS 2026-08-06.
@@ -1382,6 +1387,8 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Remaining-tabs design pass (2026-08-25)** - gate PASS 2026-08-25.
   Cited as: tab-design-pass.
   `dev/records/tab-design-pass.md`
+- **A module-owned button and a shipped glyph font (2026-08-27)** - the record names no gate.
+  `dev/records/2026-08-glyph-font.md`
 - **Invisible UI glyphs, the guidance behind them, and the gate (2026-08-27)** - gate owed.
   Cited as: glyph-fixes, KNOWN-ISSUES #64.
   `dev/records/glyph-fixes.md`
@@ -1391,6 +1398,9 @@ into `dev/archive/known-issues/`, before per-branch files existed. The
 - **Barter-item valuation: the vendor offers the solver was throwing away (2026-08-28)** - gate NOT RUN (no live session available on this branch).
   Cited as: barter-item-valuation.
   `dev/records/barter-item-valuation.md`
+- **Content viewport falls short of the window bottom (2026-08-28)** - gate NOT RUN (no live game session available on that branch).
+  Cited as: KNOWN-ISSUES #66.
+  `dev/records/viewport-bottom-margin.md`
 - **The Battle Historian: a removed WvW vendor pricing legendary materials at zero (2026-08-29)** - gate not required (dev-tool and data change; verified by a byte-identical round trip and a `--diff-summary` showing 49 removed and nothing else touched).
   Cited as: w5-deadvendors.
   `dev/records/w5-deadvendors.md`
