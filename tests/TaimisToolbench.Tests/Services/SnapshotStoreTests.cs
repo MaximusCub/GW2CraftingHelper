@@ -259,6 +259,34 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void Load_SnapshotJsonWrittenBeforeEquipmentWasCaptured_StillLoads()
+        {
+            // A file on disk from a build that read only bags, bank, shared
+            // inventory and material storage. Equipped items are ordinary
+            // rows under the same "Character:<name>" source a bag row uses,
+            // so nothing about this file's shape changed and it must load
+            // whole rather than being discarded.
+            File.WriteAllText(
+                SnapshotPath,
+                "{\"CapturedAt\":\"2026-03-01T09:30:00Z\",\"CoinCopper\":4242," +
+                "\"Items\":[" +
+                "{\"ItemId\":19721,\"Name\":\"Glob of Ectoplasm\",\"Count\":37,\"Source\":\"MaterialStorage\"}," +
+                "{\"ItemId\":19685,\"Name\":\"Orichalcum Ore\",\"Count\":12,\"Source\":\"Character:Taimi\"}]," +
+                "\"Wallet\":[{\"CurrencyId\":2,\"CurrencyName\":\"Karma\",\"Value\":8000}]}");
+
+            var loaded = _store.LoadLatest();
+
+            Assert.NotNull(loaded);
+            Assert.Equal(4242, loaded.CoinCopper);
+            Assert.Equal(2, loaded.Items.Count);
+            Assert.Equal(19721, loaded.Items[0].ItemId);
+            Assert.Equal(37, loaded.Items[0].Count);
+            Assert.Equal("Character:Taimi", loaded.Items[1].Source);
+            Assert.Single(loaded.Wallet);
+            Assert.Null(loaded.CharacterDisciplines);
+        }
+
+        [Fact]
         public void Save_StacksWithNothingSocketed_CostNoBytes()
         {
             _store.Save(RealisticAccountSnapshot(socketedStacks: 0));

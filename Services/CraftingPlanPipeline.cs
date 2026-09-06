@@ -1229,18 +1229,14 @@ namespace TaimisToolbench.Services
 
             if (tree.Id == Gw2Constants.MultiItemWrapperItemId)
             {
-                var wrapperRecipe = tree.Recipes.FirstOrDefault(
-                    r => r.RecipeId == Gw2Constants.MultiItemWrapperRecipeId);
-                var roots = new List<CraftingTreeNode>(wrapperRecipe?.Ingredients.Count ?? 0);
-                if (wrapperRecipe != null)
+                var itemRoots = PlanRootNodes.Of(tree);
+                var roots = new List<CraftingTreeNode>(itemRoots.Count);
+                foreach (var itemRoot in itemRoots)
                 {
-                    foreach (var itemRoot in wrapperRecipe.Ingredients)
-                    {
-                        roots.Add(treeBuilder.BuildTree(
-                            itemRoot, decisions, metadata, hints,
-                            ownedQuantityUsedByNodeId, ignoredItemIds,
-                            currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts));
-                    }
+                    roots.Add(treeBuilder.BuildTree(
+                        itemRoot, decisions, metadata, hints,
+                        ownedQuantityUsedByNodeId, ignoredItemIds,
+                        currencyMetadata, ownedCurrencyAmounts, ownedVendorItemAmounts));
                 }
 
                 result.CraftingTree = null;
