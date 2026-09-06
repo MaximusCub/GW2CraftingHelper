@@ -254,7 +254,7 @@ namespace VendorOfferUpdater.Tests
                 handler, httpClient, (69, "Tales of Dungeon Delving"));
             var cache = new ItemIdCache();
 
-            await Program.ResolveUnknownCostNamesAsync(
+            await Program.ResolveUnknownNamesAsync(
                 new[] { "Tale of Dungeon Delving" },
                 client,
                 helper,
@@ -284,7 +284,7 @@ namespace VendorOfferUpdater.Tests
             var helper = await CurrenciesAsync(handler, httpClient, (2, "Karma"));
             var cache = new ItemIdCache();
 
-            await Program.ResolveUnknownCostNamesAsync(
+            await Program.ResolveUnknownNamesAsync(
                 new[] { "Ectoplasm" }, client, helper, cache, FastOptions(), default);
 
             Assert.Equal(19721, cache.Ids["Ectoplasm"]);
@@ -311,7 +311,7 @@ namespace VendorOfferUpdater.Tests
             var helper = await CurrenciesAsync(handler, httpClient, (2, "Karma"));
             var cache = new ItemIdCache();
 
-            await Program.ResolveUnknownCostNamesAsync(
+            await Program.ResolveUnknownNamesAsync(
                 new[] { "Glory" }, client, helper, cache, FastOptions(), default);
 
             Assert.Null(helper.ResolveCurrencyId("Glory"));
@@ -330,7 +330,7 @@ namespace VendorOfferUpdater.Tests
             var helper = await CurrenciesAsync(handler, httpClient, (2, "Karma"));
             var cache = new ItemIdCache();
 
-            await Program.ResolveUnknownCostNamesAsync(
+            await Program.ResolveUnknownNamesAsync(
                 new[] { "Trade Contracts" }, client, helper, cache, FastOptions(), default);
 
             Assert.Equal(0, cache.Count);
@@ -353,7 +353,7 @@ namespace VendorOfferUpdater.Tests
             var helper = await CurrenciesAsync(handler, httpClient, (2, "Karma"));
             var cache = new ItemIdCache();
 
-            await Program.ResolveUnknownCostNamesAsync(
+            await Program.ResolveUnknownNamesAsync(
                 new[] { "Ectoplasm" }, client, helper, cache, FastOptions(), default);
 
             Assert.Equal(0, cache.Count);
@@ -394,6 +394,41 @@ namespace VendorOfferUpdater.Tests
             // ever, because a settled name is never asked about again.
             Assert.Empty(cache.CurrencyNames);
             Assert.False(cache.Contains("Gaeting Crystal"));
+        }
+
+        [Fact]
+        public async Task AnUnlockRequirementNameIsSettledAsAnItem()
+        {
+            // A vendor row's "Has requirement" spells a recipe sheet the way
+            // a cost line spells an item, so both names take this route. The
+            // sheet has to come out of it with an item id: Program.Main feeds
+            // that id to ResolveUnlockRecipeIdsAsync, and a sheet settled as
+            // a currency or as a miss would leave the offer's gate untagged.
+            var (client, handler, httpClient) = CreateClient();
+            using var _ = httpClient;
+
+            MapTitles(handler, TitleAnswer(
+                pages: new[] { ("Recipe: Legendary Obsidian Armor", false) }));
+            handler.MapUrl(
+                url => url.Contains("action=ask"),
+                new WikiJsonBuilder()
+                    .AddResult("Recipe: Legendary Obsidian Armor", gameId: 101483)
+                    .Build());
+
+            var helper = await CurrenciesAsync(handler, httpClient, (2, "Karma"));
+            var cache = new ItemIdCache();
+
+            await Program.ResolveUnknownNamesAsync(
+                new[] { "Recipe: Legendary Obsidian Armor" },
+                client,
+                helper,
+                cache,
+                FastOptions(),
+                default);
+
+            Assert.Equal(101483, cache.Ids["Recipe: Legendary Obsidian Armor"]);
+            Assert.Empty(cache.CurrencyNames);
+            Assert.Empty(cache.Misses);
         }
     }
 }

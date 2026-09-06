@@ -7,8 +7,8 @@ namespace TaimisToolbench.Tests.Services
 {
     /// <summary>
     /// The guard that stops a recipe-tree row answering a click its own
-    /// IGNORE toggle is about to answer, and the behaviour asked for in
-    /// game: N clicks on the toggle with a cursor that never moves
+    /// ignore button is about to answer, and the behaviour asked for in
+    /// game: N clicks on that button with a cursor that never moves
     /// produce N toggles and no expand/collapse.
     /// <para>
     /// The row was rebuilt on every one of those clicks and the guard used
@@ -18,13 +18,19 @@ namespace TaimisToolbench.Tests.Services
     /// arithmetic the renderer itself calls, driven the same way it drives
     /// it, so the answer here is the answer on screen.
     /// </para>
+    /// <para>
+    /// The ignore button is now in a column of its own at the far right
+    /// of the row, so the source markers that vanish across the click
+    /// cannot move it. These cases still drive both sets: the guard has to
+    /// answer from the boxes in front of it either way.
+    /// </para>
     /// </summary>
     public class TreeRowPillHitTestTests
     {
         // One pixel per character, the stand-in face TreePillRunLayoutTests
         // and TreeCostColumnMathTests already use: what matters is that the
-        // two toggle texts differ in width and that the pills beside the
-        // toggle change wholesale across the click.
+        // markers beside the ignore button change wholesale across the
+        // click.
         private static int MeasureByLength(string text)
         {
             return text.Length;
@@ -34,12 +40,12 @@ namespace TaimisToolbench.Tests.Services
         private const int Gap = 6;
         private const int TightPadding = 6;
 
-        private const int ColumnStart = 700;
-        private const int ColumnRightEdge = ColumnStart + 252;
-
-        // Where the cost column's leftmost value sits, which is the other
-        // wall of the band the IGNORE key is seated in.
-        private const int CostInkX = ColumnRightEdge + 200;
+        // The row's real grid at the module's minimum window, so the
+        // ignore button's box below is the one the renderer draws.
+        private static readonly PlanRelayoutMath.TreeColumnEdges Edges =
+            PlanRelayoutMath.ComputeTreeColumnEdges(
+                WindowSizing.TabPanelWidthFor(WindowSizing.MinWindowWidth),
+                8 * 24 + 58, 0, PlanRelayoutMath.TreePillColumnWidth, 150, 8);
 
         // The renderer's own row-local pill anchors. Only their
         // consistency matters here - the boxes and the parked cursor are
@@ -49,7 +55,7 @@ namespace TaimisToolbench.Tests.Services
 
         /// <summary>
         /// A real item node with two sources, which is what the row holds
-        /// before its IGNORE toggle is clicked.
+        /// before its ignore button is clicked.
         /// </summary>
         private static CraftingTreeNode LiveNode()
         {
@@ -82,26 +88,17 @@ namespace TaimisToolbench.Tests.Services
         /// <summary>
         /// One row's pill rectangles, built exactly as
         /// TreeSectionController.RenderDecisionPills builds them: the
-        /// planner decides the specs, the anchored slot takes the column's
-        /// right edge, and the leading run is fitted against what the slot
-        /// leaves.
+        /// planner decides the specs, a trailing ignore button leaves the
+        /// run for the row's action column, and what is left is fitted
+        /// against the whole decision column.
         /// </summary>
-        private static List<TreeRowPillHitTest.PillBox> RowPills(
-            bool ignored, TreePillRunInkFloor runInk)
+        private static List<TreeRowPillHitTest.PillBox> RowPills(bool ignored)
         {
             var node = ignored ? IgnoredNode() : LiveNode();
             var specs = DecisionPillPlanner.BuildPillSpecs(node);
 
-            int anchoredIndex = specs.Count > 0 && specs[specs.Count - 1].Kind == PillKind.Ignore
-                ? specs.Count - 1
-                : -1;
-            int anchoredWidth = anchoredIndex >= 0
-                ? TreePillRunLayout.ReservedSlotWidth(
-                    MeasureByLength(DecisionPillPlanner.IgnorePillText),
-                    MeasureByLength(DecisionPillPlanner.IgnoredPillText),
-                    Padding)
-                : 0;
-            int leadingCount = anchoredIndex >= 0 ? anchoredIndex : specs.Count;
+            bool hasKey = specs.Count > 0 && specs[specs.Count - 1].Kind == PillKind.Ignore;
+            int leadingCount = hasKey ? specs.Count - 1 : specs.Count;
 
             var widths = new List<int>(leadingCount);
             for (int i = 0; i < leadingCount; i++)
@@ -110,12 +107,13 @@ namespace TaimisToolbench.Tests.Services
             }
 
             var fit = PlanRelayoutMath.ComputePillFit(
-                widths, Padding - TightPadding, Gap, ColumnStart,
-                TreePillRunLayout.LeadingLimitX(ColumnRightEdge, anchoredWidth, Gap),
+                widths, Padding - TightPadding, Gap, Edges.PillColX,
+                Edges.PillColX + PlanRelayoutMath.TreePillColumnWidth
+                    - TreePillColumnMath.TrailingClearance,
                 hidden => MeasureByLength("+" + hidden) + TightPadding);
 
             var boxes = new List<TreeRowPillHitTest.PillBox>();
-            int x = ColumnStart;
+            int x = Edges.PillColX;
             for (int i = 0; i < fit.VisibleCount; i++)
             {
                 int width = PlanRelayoutMath.ReducedWidth(widths[i], fit.WidthReduction);
@@ -128,29 +126,22 @@ namespace TaimisToolbench.Tests.Services
                 boxes.Add(new TreeRowPillHitTest.PillBox(x, PillY, fit.OverflowPillWidth, PillHeight));
             }
 
-            if (anchoredIndex >= 0)
+            if (hasKey)
             {
-                int runRightEdge = fit.HiddenCount > 0
-                    ? x + fit.OverflowPillWidth
-                    : (fit.VisibleCount > 0 ? x - Gap : ColumnStart);
                 boxes.Add(new TreeRowPillHitTest.PillBox(
-                    TreeIgnoreKeyPlacement.SlotX(
-                        ColumnRightEdge, CostInkX, anchoredWidth, Gap,
-                        ColumnStart + runInk.Widen(node.NodeId, runRightEdge - ColumnStart)),
-                    PillY,
-                    anchoredWidth,
-                    PillHeight));
+                    Edges.ActionButtonX, PillY,
+                    PlanRelayoutMath.TreeActionColumnWidth, PillHeight));
             }
 
             return boxes;
         }
 
-        /// <summary>Middle of the toggle as the un-ignored row drew it,
-        /// which is where a user who has just clicked it leaves the
+        /// <summary>Middle of the ignore button as the un-ignored row drew
+        /// it, which is where a user who has just clicked it leaves the
         /// cursor.</summary>
-        private static void ParkOnToggle(TreePillRunInkFloor runInk, out int x, out int y)
+        private static void ParkOnIgnoreButton(out int x, out int y)
         {
-            var pills = RowPills(false, runInk);
+            var pills = RowPills(false);
             var box = pills[pills.Count - 1];
             x = box.X + (box.Width / 2);
             y = box.Y + (box.Height / 2);
@@ -165,10 +156,9 @@ namespace TaimisToolbench.Tests.Services
         /// "no pill here" and the row would expand instead.
         /// </summary>
         [Fact]
-        public void FiveClicksOnTheToggle_WithAStationaryCursor_ProduceFiveToggles()
+        public void FiveClicksOnTheIgnoreButton_WithAStationaryCursor_ProduceFiveToggles()
         {
-            var runInk = new TreePillRunInkFloor();
-            ParkOnToggle(runInk, out int cursorX, out int cursorY);
+            ParkOnIgnoreButton(out int cursorX, out int cursorY);
 
             bool ignored = false;
             int toggles = 0;
@@ -176,7 +166,7 @@ namespace TaimisToolbench.Tests.Services
 
             for (int click = 0; click < 5; click++)
             {
-                var pills = RowPills(ignored, runInk);
+                var pills = RowPills(ignored);
                 if (TreeRowPillHitTest.AnyCovers(pills, cursorX, cursorY))
                 {
                     toggles++;
@@ -199,13 +189,12 @@ namespace TaimisToolbench.Tests.Services
         /// "which control did Blish last mark" left in it to go stale.
         /// </summary>
         [Fact]
-        public void TheGuardAnswersTheSame_InBothStatesOfTheToggle()
+        public void TheGuardAnswersTheSame_InBothStatesOfTheIgnoreButton()
         {
-            var runInk = new TreePillRunInkFloor();
-            ParkOnToggle(runInk, out int cursorX, out int cursorY);
+            ParkOnIgnoreButton(out int cursorX, out int cursorY);
 
-            Assert.True(TreeRowPillHitTest.AnyCovers(RowPills(false, runInk), cursorX, cursorY));
-            Assert.True(TreeRowPillHitTest.AnyCovers(RowPills(true, runInk), cursorX, cursorY));
+            Assert.True(TreeRowPillHitTest.AnyCovers(RowPills(false), cursorX, cursorY));
+            Assert.True(TreeRowPillHitTest.AnyCovers(RowPills(true), cursorX, cursorY));
         }
 
         /// <summary>
@@ -216,18 +205,17 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void APointOutsideEveryPill_IsTheRowsToAnswer()
         {
-            int nameColumnX = ColumnStart - 40;
+            int nameColumnX = Edges.PillColX - 40;
             int y = PillY + (PillHeight / 2);
 
-            var runInk = new TreePillRunInkFloor();
-            Assert.False(TreeRowPillHitTest.AnyCovers(RowPills(false, runInk), nameColumnX, y));
-            Assert.False(TreeRowPillHitTest.AnyCovers(RowPills(true, runInk), nameColumnX, y));
+            Assert.False(TreeRowPillHitTest.AnyCovers(RowPills(false), nameColumnX, y));
+            Assert.False(TreeRowPillHitTest.AnyCovers(RowPills(true), nameColumnX, y));
         }
 
         [Fact]
         public void TheGapBetweenTwoPills_BelongsToNeither()
         {
-            var pills = RowPills(false, new TreePillRunInkFloor());
+            var pills = RowPills(false);
             var first = pills[0];
             int y = PillY + 1;
 
