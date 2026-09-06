@@ -353,7 +353,11 @@ namespace TaimisToolbench.Services
                         {
                             ItemId = item.Id,
                             Count = 1,
-                            Source = AccountItemIndex.CharacterSourcePrefix + characterName,
+
+                            // Worn gear gets its own source encoding so the
+                            // snapshot can tell it apart from this same
+                            // character's bag contents.
+                            Source = AccountItemIndex.CharacterEquipmentSourcePrefix + characterName,
                             Upgrades = SocketedIds(item.Upgrades),
                             Infusions = SocketedIds(item.Infusions),
                         });

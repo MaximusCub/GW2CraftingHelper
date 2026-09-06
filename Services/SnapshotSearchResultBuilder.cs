@@ -182,7 +182,7 @@ namespace TaimisToolbench.Services
                 bool nameMatches = !searching || name.IndexOf(trimmedSearch, StringComparison.OrdinalIgnoreCase) >= 0;
 
                 var prioritizedSources = AccountItemIndex.GetPrioritizedSources(itemId, index, activeCharacterName);
-                var breakdown = new List<SnapshotSourceCount>();
+                var breakdown = new List<SnapshotHoldLocation>();
                 int total = 0;
                 bool characterMatches = false;
 
@@ -204,7 +204,7 @@ namespace TaimisToolbench.Services
                         characterMatches = CharacterNameMatches(source, trimmedSearch);
                     }
 
-                    breakdown.Add(new SnapshotSourceCount { Label = FormatSourceLabel(source), Count = quantity });
+                    breakdown.Add(SnapshotHoldLine.FromSource(source, quantity));
                     total += quantity;
                 }
 
@@ -260,7 +260,7 @@ namespace TaimisToolbench.Services
         /// (case-insensitive, with an ordinal tiebreak so two names differing
         /// only by case keep a deterministic order). Drives the Snapshot
         /// tab's per-character source checkboxes, so it deliberately merges
-        /// both rosters the snapshot carries: the "Character:&lt;name&gt;"
+        /// both rosters the snapshot carries: the character
         /// item sources AND CharacterDisciplines - a character holding no
         /// items at all still gets a checkbox as long as the snapshot saw it
         /// somewhere. Zero-count item entries are kept here (unlike
@@ -282,13 +282,11 @@ namespace TaimisToolbench.Services
             {
                 foreach (var entry in snapshot.Items)
                 {
-                    string source = entry?.Source;
-                    if (source == null || !source.StartsWith(AccountItemIndex.CharacterSourcePrefix, StringComparison.Ordinal))
+                    if (!AccountItemIndex.TryGetCharacterName(entry?.Source, out string name))
                     {
                         continue;
                     }
 
-                    string name = source.Substring(AccountItemIndex.CharacterSourcePrefix.Length);
                     if (name.Length > 0 && seen.Add(name))
                     {
                         names.Add(name);
@@ -354,8 +352,8 @@ namespace TaimisToolbench.Services
         /// <summary>
         /// True when <paramref name="search"/> is at least
         /// <see cref="MinCharacterSearchLength"/> characters long and occurs
-        /// (case-insensitively) in the character-name half of a
-        /// "Character:&lt;name&gt;" source. The scan starts past the encoding
+        /// (case-insensitively) in the character-name half of either
+        /// character source encoding. The scan starts past the encoding
         /// prefix, so searching "char" matches a character actually named
         /// e.g. "Charr Hoarder" and never the internal token itself, and it
         /// takes no substring (this runs per source per item on the
@@ -363,9 +361,14 @@ namespace TaimisToolbench.Services
         /// </summary>
         private static bool CharacterNameMatches(string rawSource, string search)
         {
-            return search.Length >= MinCharacterSearchLength
-                && rawSource.StartsWith(AccountItemIndex.CharacterSourcePrefix, StringComparison.Ordinal)
-                && rawSource.IndexOf(search, AccountItemIndex.CharacterSourcePrefix.Length, StringComparison.OrdinalIgnoreCase) >= 0;
+            if (search.Length < MinCharacterSearchLength)
+            {
+                return false;
+            }
+
+            int offset = AccountItemIndex.CharacterNameOffset(rawSource);
+            return offset >= 0
+                && rawSource.IndexOf(search, offset, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         /// <summary>
@@ -375,7 +378,7 @@ namespace TaimisToolbench.Services
         /// controls' own all-checked default), as is a character whose name
         /// is absent from SnapshotSourceFilter.UncheckedCharacters. A raw
         /// source string that matches none of the four known shapes
-        /// (Bank/MaterialStorage/SharedInventory/Character:&lt;name&gt;) is shown regardless -
+        /// (Bank/MaterialStorage/SharedInventory/either character encoding) is shown regardless -
         /// failing open rather than silently hiding real inventory data
         /// the module does not yet recognize (KNOWN-ISSUES #31's "never
         /// silently mask data" posture); there is no such source today.
@@ -392,7 +395,8 @@ namespace TaimisToolbench.Services
                 return false;
             }
 
-            if (rawSource.StartsWith(AccountItemIndex.CharacterSourcePrefix, StringComparison.Ordinal))
+            int characterNameOffset = AccountItemIndex.CharacterNameOffset(rawSource);
+            if (characterNameOffset >= 0)
             {
                 var excluded = filter.UncheckedCharacters;
                 if (excluded == null || excluded.Count == 0)
@@ -400,7 +404,7 @@ namespace TaimisToolbench.Services
                     return true;
                 }
 
-                return !IsExcludedCharacter(rawSource, excluded);
+                return !IsExcludedCharacter(rawSource, characterNameOffset, excluded);
             }
 
             switch (rawSource)
@@ -413,17 +417,19 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// True when the character-name half of a "Character:&lt;name&gt;"
-        /// source appears in the exclusion set. Compares the name in place
+        /// True when the character-name half of a character source appears
+        /// in the exclusion set. One checkbox covers both of that
+        /// character's encodings, so unchecking a character hides its bags
+        /// and its worn gear together. Compares the name in place
         /// rather than taking a substring (this runs per source per item on
         /// the keystroke path), which trades the set's O(1) lookup for a
         /// scan of it - bounded by the roster, and only reached at all once
         /// the user has unchecked something. Ordinal, matching the
         /// comparer SnapshotSourceFilter's set is created with.
         /// </summary>
-        private static bool IsExcludedCharacter(string rawSource, HashSet<string> excluded)
+        private static bool IsExcludedCharacter(
+            string rawSource, int prefixLength, HashSet<string> excluded)
         {
-            int prefixLength = AccountItemIndex.CharacterSourcePrefix.Length;
             int nameLength = rawSource.Length - prefixLength;
 
             foreach (string name in excluded)
@@ -437,37 +443,6 @@ namespace TaimisToolbench.Services
             }
 
             return false;
-        }
-
-        /// <summary>
-        /// Display-formats a raw AccountItemIndex source string, stripping
-        /// the internal "Character:" encoding prefix and spacing out the
-        /// PascalCase storage-location names (e.g. "MaterialStorage" -&gt;
-        /// "Material Storage") - a small polish fix so the raw internal
-        /// token never reaches the UI verbatim. The underlying strings are
-        /// already display-safe, not raw ids, so this is cosmetic only, not
-        /// an ids-stay-internal fix. Returns "Unknown" for
-        /// a null/empty source.
-        /// </summary>
-        public static string FormatSourceLabel(string rawSource)
-        {
-            if (string.IsNullOrEmpty(rawSource))
-            {
-                return "Unknown";
-            }
-
-            if (rawSource.StartsWith(AccountItemIndex.CharacterSourcePrefix, StringComparison.Ordinal))
-            {
-                return "Character: " + rawSource.Substring(AccountItemIndex.CharacterSourcePrefix.Length);
-            }
-
-            switch (rawSource)
-            {
-                case AccountItemIndex.SourceMaterialStorage: return "Material Storage";
-                case AccountItemIndex.SourceSharedInventory: return "Shared Inventory";
-                case AccountItemIndex.SourceBank: return "Bank";
-                default: return rawSource;
-            }
         }
     }
 }

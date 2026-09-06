@@ -2700,17 +2700,12 @@ namespace TaimisToolbench.Views
         }
 
         /// <summary>
-        /// The row's source breakdown as one line, or "". NOT the Amount
-        /// column's prefix notation, and the one deliberate exemption from
-        /// it: these labels are LOCATIONS. "20x Bank" parses as
-        /// twenty banks, and "10x Character: Maximus Test" collides with
-        /// the label's own colon.
+        /// The row's line of holding places, or "". The wording is
+        /// SnapshotHoldLine's, which is where it can be tested.
         /// </summary>
         private static string BreakdownText(SnapshotSearchRow row)
         {
-            return row.Breakdown == null || row.Breakdown.Count == 0
-                ? ""
-                : string.Join("   ", row.Breakdown.Select(b => $"{b.Label} {b.Count}"));
+            return SnapshotHoldLine.Format(row.Breakdown);
         }
 
         /// <summary>The rarity this tab can know for an item, or null -

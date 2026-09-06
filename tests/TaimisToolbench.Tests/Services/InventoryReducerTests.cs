@@ -926,6 +926,49 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void Sourced_WornGearCountsAsOwned()
+        {
+            // Equipment is captured under its own source key. It is still
+            // stock the account holds, so a plan needing that item must
+            // discount it exactly as it discounts a bag stack.
+            var tree = Leaf(100, 1);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 1, AccountItemIndex.CharacterEquipmentSourcePrefix + "Divineaxe"),
+            });
+
+            var result = ReduceBelowRoot(tree, index, "Divineaxe");
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.Single(sources);
+            Assert.Equal(
+                AccountItemIndex.CharacterEquipmentSourcePrefix + "Divineaxe", sources[0].Source);
+            Assert.Equal(1, sources[0].Quantity);
+        }
+
+        [Fact]
+        public void Sourced_ActiveCharBagsConsumedBeforeOwnWornGear()
+        {
+            var tree = Leaf(100, 3);
+            var index = new AccountItemIndex(new List<SnapshotItemEntry>
+            {
+                SnapEntry(100, 1, AccountItemIndex.CharacterEquipmentSourcePrefix + "Alice"),
+                SnapEntry(100, 2, AccountItemIndex.CharacterSourcePrefix + "Alice"),
+            });
+
+            var result = ReduceBelowRoot(tree, index, "Alice");
+
+            Assert.Equal(0, result.ReducedTree.Quantity);
+            var sources = result.UsedMaterials[0].Sources;
+            Assert.Equal(2, sources.Count);
+            Assert.Equal(
+                2, sources.First(x => x.Source == AccountItemIndex.CharacterSourcePrefix + "Alice").Quantity);
+            Assert.Equal(
+                1, sources.First(x => x.Source == AccountItemIndex.CharacterEquipmentSourcePrefix + "Alice").Quantity);
+        }
+
+        [Fact]
         public void Sourced_ItemNotInIndex_NotReduced()
         {
             var tree = Leaf(100, 5);

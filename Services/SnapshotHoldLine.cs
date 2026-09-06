@@ -1,0 +1,196 @@
+using System.Collections.Generic;
+using System.Text;
+using TaimisToolbench.Models;
+
+namespace TaimisToolbench.Services
+{
+    /// <summary>
+    /// Turns the places holding one item into the single line the Snapshot
+    /// tab prints under that item's name. Blish-free and pure, so a test can
+    /// drive the wording directly.
+    /// <para>
+    /// Counts are printed only when the reader cannot work the distribution
+    /// out from the line itself. The row above the line already carries the
+    /// account-wide total, so when every named place holds exactly one, the
+    /// counts repeat what is on screen and are dropped. As soon as one place
+    /// holds more than one, every place prints its count, including the
+    /// places holding one.
+    /// </para>
+    /// </summary>
+    internal static class SnapshotHoldLine
+    {
+        /// <summary>Separates two categories on the line.</summary>
+        private const string CategorySeparator = "  ";
+
+        /// <summary>
+        /// Reads a raw AccountItemIndex source key as a place. An
+        /// unrecognized key becomes
+        /// <see cref="SnapshotHoldCategory.Unknown"/> and keeps its raw text,
+        /// so real inventory the module does not yet know about still shows
+        /// (KNOWN-ISSUES #31: never silently mask data).
+        /// </summary>
+        public static SnapshotHoldLocation FromSource(string rawSource, int count)
+        {
+            var location = new SnapshotHoldLocation
+            {
+                Count = count,
+                RawSource = rawSource ?? "",
+            };
+
+            if (AccountItemIndex.TryGetCharacterName(rawSource, out string characterName))
+            {
+                location.Category = AccountItemIndex.IsEquipmentSource(rawSource)
+                    ? SnapshotHoldCategory.Equipped
+                    : SnapshotHoldCategory.Bags;
+                location.CharacterName = characterName;
+                return location;
+            }
+
+            switch (rawSource)
+            {
+                case AccountItemIndex.SourceSharedInventory:
+                    location.Category = SnapshotHoldCategory.SharedInventory;
+                    break;
+                case AccountItemIndex.SourceBank:
+                    location.Category = SnapshotHoldCategory.Bank;
+                    break;
+                case AccountItemIndex.SourceMaterialStorage:
+                    location.Category = SnapshotHoldCategory.MaterialStorage;
+                    break;
+                default:
+                    location.Category = SnapshotHoldCategory.Unknown;
+                    break;
+            }
+
+            return location;
+        }
+
+        /// <summary>
+        /// The whole line, or "" when nothing holds the item. Categories run
+        /// in the order of <see cref="SnapshotHoldCategory"/>; characters run
+        /// in the order the caller supplied, which is the order
+        /// AccountItemIndex.GetPrioritizedSources put them in.
+        /// </summary>
+        public static string Format(IReadOnlyList<SnapshotHoldLocation> locations)
+        {
+            if (locations == null || locations.Count == 0)
+            {
+                return "";
+            }
+
+            bool showCounts = false;
+            foreach (var location in locations)
+            {
+                if (location != null && location.Count != 1)
+                {
+                    showCounts = true;
+                    break;
+                }
+            }
+
+            var line = new StringBuilder();
+
+            for (var category = SnapshotHoldCategory.SharedInventory;
+                category <= SnapshotHoldCategory.Unknown;
+                category++)
+            {
+                AppendCategory(line, locations, category, showCounts);
+            }
+
+            return line.ToString();
+        }
+
+        private static void AppendCategory(
+            StringBuilder line,
+            IReadOnlyList<SnapshotHoldLocation> locations,
+            SnapshotHoldCategory category,
+            bool showCounts)
+        {
+            var places = new List<SnapshotHoldLocation>();
+            foreach (var location in locations)
+            {
+                if (location != null && location.Category == category)
+                {
+                    places.Add(location);
+                }
+            }
+
+            if (places.Count == 0)
+            {
+                return;
+            }
+
+            if (line.Length > 0)
+            {
+                line.Append(CategorySeparator);
+            }
+
+            line.Append(CategoryLabel(places[0]));
+
+            bool named = false;
+            foreach (var place in places)
+            {
+                named |= HasCharacterName(place);
+            }
+
+            if (!showCounts && !named)
+            {
+                // An account-wide place with nothing to say past its own
+                // name: "Bank", not "Bank:".
+                return;
+            }
+
+            line.Append(": ");
+
+            // With counts on, one space keeps each name beside its own
+            // bracketed count. With counts off, a comma is the only thing
+            // separating two bare names.
+            string separator = showCounts ? " " : ", ";
+
+            for (int i = 0; i < places.Count; i++)
+            {
+                if (i > 0)
+                {
+                    line.Append(separator);
+                }
+
+                AppendPlace(line, places[i], showCounts);
+            }
+        }
+
+        private static void AppendPlace(
+            StringBuilder line, SnapshotHoldLocation location, bool showCounts)
+        {
+            if (HasCharacterName(location))
+            {
+                line.Append(location.CharacterName);
+                if (showCounts)
+                {
+                    line.Append(" (").Append(location.Count).Append(")");
+                }
+
+                return;
+            }
+
+            line.Append(location.Count);
+        }
+
+        private static bool HasCharacterName(SnapshotHoldLocation location)
+        {
+            return !string.IsNullOrEmpty(location.CharacterName);
+        }
+
+        private static string CategoryLabel(SnapshotHoldLocation location)
+        {
+            switch (location.Category)
+            {
+                case SnapshotHoldCategory.SharedInventory: return "Shared Inventory";
+                case SnapshotHoldCategory.Bags: return "Bags";
+                case SnapshotHoldCategory.Equipped: return "Equipped";
+                case SnapshotHoldCategory.Bank: return "Bank";
+                case SnapshotHoldCategory.MaterialStorage: return "Material Storage";
+                default: return location.RawSource.Length > 0 ? location.RawSource : "Unknown";
+            }
+        }
+    }
+}
