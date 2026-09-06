@@ -154,6 +154,11 @@ namespace TaimisToolbench.Views
         private const int StatusSpinnerReserve =
             InlineSpinnerLayout.SnapshotStatusSize + InlineSpinnerLayout.LabelGap;
 
+        /// <summary>What the status line reads while a refresh is in
+        /// flight, clicked or automatic. Paired with the spinner beside
+        /// it, so the two are written together.</summary>
+        private const string RefreshingStatusText = "Updating";
+
         // The status label gets its own full-width row rather than sharing
         // the button band - a long status string slid under the button row
         // at the window's clamped minimum size.
@@ -1294,7 +1299,7 @@ namespace TaimisToolbench.Views
 
             SetSnapshotActionsEnabled(false);
             SetRefreshSpinnerVisible(true);
-            SetStatus("Refreshing...");
+            SetStatus(RefreshingStatusText);
 
             try
             {
@@ -1476,6 +1481,10 @@ namespace TaimisToolbench.Views
             {
                 _statusSpinner.Visible = _refreshInFlight || _backgroundRefreshInFlight;
             }
+
+            // The word and the spinner are one signal, so one writer moves
+            // both - see ApplyStatusDisplay's own guard.
+            ApplyStatusDisplay();
         }
 
         /// <summary>
@@ -1501,6 +1510,20 @@ namespace TaimisToolbench.Views
         {
             if (_statusLabel == null)
             {
+                return;
+            }
+
+            // While a refresh is running the line says so, and nothing
+            // else. The stored status is untouched, so the timestamp comes
+            // straight back when the spinner stops - which is what lets the
+            // AUTOMATIC refresh say it too. It could not before: that path
+            // writes no status of its own, so a label it overwrote would
+            // have had nothing to restore it.
+            if (_refreshInFlight || _backgroundRefreshInFlight)
+            {
+                _statusLabel.TextColor = _defaultStatusColor;
+                _statusFullText = RefreshingStatusText;
+                ApplyStatusText();
                 return;
             }
 
