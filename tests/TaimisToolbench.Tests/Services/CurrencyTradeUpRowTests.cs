@@ -139,16 +139,18 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void ThePill_StatesWhatTheHoldingBuysAgainstWhatTheRowNeeds()
+        public void ThePill_IsNotDrawnOnARowAtAll()
         {
+            // Reported in game: the pill appeared on a craft-to-vendor
+            // toggle and vanished on the reverse, so it widened the pill
+            // column, and that width ratchets for the rest of the plan's
+            // life. Every row's pills and name text shifted left.
             var owned = new Dictionary<int, int> { { CalcifiedGasp, 1200 } };
 
             var specs = DecisionPillPlanner.BuildPillSpecs(TradeUpNode(), null, owned);
 
-            var pill = Assert.Single(specs, s => s.Text.StartsWith("BUYS "));
-            Assert.Equal("BUYS 4/18 NEEDED", pill.Text);
-            Assert.Equal(PillKind.OwnedInfo, pill.Kind);
-            Assert.Null(pill.Source);
+            Assert.DoesNotContain(
+                specs, s => s.Text.StartsWith(DecisionPillPlanner.CurrencyTradeUpPillPrefix));
         }
 
         [Fact]
@@ -174,10 +176,15 @@ namespace TaimisToolbench.Tests.Services
         [Fact]
         public void ThePillTooltip_SaysHowManyAreLeftToAcquire()
         {
+            // The spec is built here rather than taken from a row: the
+            // pill is not drawn today, and the wording it would carry is
+            // still worth pinning for when it comes back.
             var node = TradeUpNode();
             var owned = new Dictionary<int, int> { { CalcifiedGasp, 1200 } };
-            var spec = DecisionPillPlanner.BuildPillSpecs(node, null, owned)
-                .Single(s => s.Text.StartsWith("BUYS "));
+            var spec = new PillSpec(
+                DecisionPillPlanner.CurrencyTradeUpPillPrefix + "4/18 NEEDED",
+                null,
+                PillKind.OwnedInfo);
 
             var plan = PillTooltipTextComposer.Compose(
                 spec, node, interactive: false, ignoreInteractive: false,

@@ -412,37 +412,8 @@ namespace TaimisToolbench.Services
         }
 
         /// <summary>
-        /// Appends "BUYS {n}/{needed} NEEDED" to a row the plan buys for
-        /// one wallet currency and nothing else (see
-        /// <see cref="CurrencyTradeUpRow"/>). The numerator is how many of
-        /// this row's items the held currency pays for right now, so the
-        /// remainder is what the player still has to earn. Omitted when
-        /// the holding is unknown, which is not the same as zero.
-        /// <para>
-        /// "BUYS" rather than "HAVE": the player holds the currency, not
-        /// the item, and HAVE means held stock everywhere else.
-        /// </para>
-        /// </summary>
-        private static void AppendCurrencyTradeUpPill(
-            List<PillSpec> specs,
-            CraftingTreeNode node,
-            IReadOnlyDictionary<int, int> ownedCurrencyAmounts)
-        {
-            if (!CurrencyTradeUpRow.TryGetAffordableNow(node, ownedCurrencyAmounts, out int affordable))
-            {
-                return;
-            }
-
-            specs.Add(new PillSpec(
-                CurrencyTradeUpPillPrefix + $"{affordable}/{node.Quantity} NEEDED",
-                null,
-                PillKind.OwnedInfo));
-        }
-
-        /// <summary>
         /// Appends the annotation pills shared by every
-        /// non-Have/non-Currency return path: the currency trade-up pill
-        /// (see AppendCurrencyTradeUpPill), the non-interactive
+        /// non-Have/non-Currency return path: the non-interactive
         /// "HAVE {used}/{total} NEEDED" annotation (only when this node's
         /// demand was partly covered by real inventory; total =
         /// OwnedQuantityUsed + Quantity, the original pre-reduction
@@ -463,8 +434,6 @@ namespace TaimisToolbench.Services
             CraftingTreeNode node,
             IReadOnlyDictionary<int, int> ownedCurrencyAmounts)
         {
-            AppendCurrencyTradeUpPill(specs, node, ownedCurrencyAmounts);
-
             if (node.OwnedQuantityUsed > 0)
             {
                 int totalDemand = node.OwnedQuantityUsed + node.Quantity;
