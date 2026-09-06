@@ -321,32 +321,35 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void RecipeRowHeight_ExactlyFitsIconFramePlusDividerPlusClearance()
+        public void RecipeRowHeight_FitsThePaddedIconFramePlusDividerPlusClearance()
         {
-            // Views/Rendering/RecipesSectionRenderer.CreateRecipeRow
-            // places a tier-2 rarity-framed icon at y=0 and a
-            // bottom-anchored 2px row divider inside rowHeight - the
-            // constant must equal exactly icon frame + divider + the one
-            // clearance pixel the scissor simulation demands at this
-            // height (42 + 2 + 1 = 45), with no overlap or slack. The
-            // pre-tier-2 shape (34 + 2 + 0 = 36) needed no clearance; 44
-            // is in the vulnerable class (KNOWN-ISSUES #23 / M36b), so
-            // the pixel is part of the height rather than an overlap of
-            // the icon - see RowDividerScissorSimulationTests.
+            // Views/Rendering/RecipesSectionRenderer.CreateRecipeRow places
+            // a tier-2 rarity-framed icon at IconRowIconY and a
+            // bottom-anchored 2px row divider inside rowHeight. The height
+            // must equal the icon's own y, the frame, the padding under it,
+            // the divider and the one clearance pixel the scissor
+            // simulation demands (2 + 42 + 3 + 2 + 1 = 50), with no overlap
+            // or slack. The clearance pixel is part of the height rather
+            // than an overlap of the icon - see
+            // RowDividerScissorSimulationTests.
             Assert.Equal(
-                ItemIconTiers.BagSidebarIconSize + 2 * PlanContentHeightMath.RowIconBorder
+                PlanContentHeightMath.IconRowIconY
+                    + ItemIconTiers.BagSidebarIconSize + 2 * PlanContentHeightMath.RowIconBorder
+                    + PlanContentHeightMath.IconRowFramePadding
                     + PlanContentHeightMath.RowDividerHeight
                     + PlanContentHeightMath.IconRowDividerClearance,
                 PlanContentHeightMath.RecipeRowHeight);
-            Assert.Equal(45, PlanContentHeightMath.RecipeRowHeight);
+            Assert.Equal(50, PlanContentHeightMath.RecipeRowHeight);
         }
 
         [Fact]
-        public void IconLedRowHeights_ShareTheTierTwoFlushFit()
+        public void IconLedRowHeights_ShareTheTierTwoPaddedFit()
         {
             // Used Materials, Shopping List and Required Recipes rows are
-            // the same flush shape: tier-2 icon frame at y=0, divider
-            // directly beneath, clearance pixel absorbed by the height.
+            // the same padded shape: tier-2 icon frame at IconRowIconY,
+            // IconRowFramePadding of clear space between the frame and the
+            // divider on either side, clearance pixel absorbed by the
+            // height.
             Assert.Equal(PlanContentHeightMath.RecipeRowHeight, PlanContentHeightMath.UsedMaterialRowHeight);
             Assert.Equal(PlanContentHeightMath.RecipeRowHeight, PlanContentHeightMath.ShoppingRowHeight);
         }

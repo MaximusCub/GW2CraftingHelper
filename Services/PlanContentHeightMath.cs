@@ -71,22 +71,38 @@ namespace TaimisToolbench.Services
         /// LabelHelpers.CreateRowDivider. 1, not 0: the tier-2 flush-fit
         /// heights (RowIconFrameSize + RowDividerHeight = 44) are in the
         /// Container.Paint round-trip defect's vulnerable class, so the
-        /// clearance pixel is part of the height derivation itself - the
-        /// divider sits at rowHeight - 2 - 1 = 42, exactly flush under the
-        /// 0..42 icon frame, and rowHeight absorbs the extra pixel. Proven
-        /// immune at every GW2 UI scale by the executable re-derivation in
+        /// clearance pixel is part of the height derivation itself, and
+        /// rowHeight absorbs it. Proven immune at every GW2 UI scale by the
+        /// executable re-derivation in
         /// tests/.../RowDividerScissorSimulationTests.cs.
         /// </summary>
         public const int IconRowDividerClearance = 1;
 
-        // Flush fit: icon frame at y=0, divider directly under it, plus
-        // the clearance pixel the simulation demands at this height
-        // (42 + 2 + 1 = 45). The pre-tier-2 36px shape (34 + 2 + 0) was
-        // immune without clearance; 44 is not, which is why the clearance
-        // term joined the sum instead of the divider moving up under the
-        // icon.
-        public const int UsedMaterialRowHeight = RowIconFrameSize + RowDividerHeight + IconRowDividerClearance;
-        public const int ShoppingRowHeight = RowIconFrameSize + RowDividerHeight + IconRowDividerClearance;
+        /// <summary>
+        /// Clear space an icon-led list row keeps between its icon frame
+        /// and the divider rule on either side of it. Reported in game: the
+        /// rows were flush, so the frame's bottom border and the rule's top
+        /// edge shared a y and the rule read as drawing over the icon.
+        /// </summary>
+        public const int IconRowFramePadding = 3;
+
+        /// <summary>
+        /// y of the icon frame in an icon-led list row. One less than the
+        /// padding, because the row above ends on its clearance pixel: the
+        /// gap a reader sees over the frame is this plus that pixel.
+        /// </summary>
+        public const int IconRowIconY = IconRowFramePadding - 1;
+
+        // Padded fit: the frame sits at IconRowIconY, the divider lands at
+        // rowHeight - RowDividerHeight - IconRowDividerClearance, and the
+        // terms above put exactly IconRowFramePadding between the two.
+        // 2 + 42 + 3 + 2 + 1 = 50.
+        public const int IconLedRowHeight =
+            IconRowIconY + RowIconFrameSize + IconRowFramePadding
+            + RowDividerHeight + IconRowDividerClearance;
+
+        public const int UsedMaterialRowHeight = IconLedRowHeight;
+        public const int ShoppingRowHeight = IconLedRowHeight;
 
         /// <summary>y of the craft-step row's icon frame - the one icon-led
         /// row whose icon is inset rather than flush, because the numbered
@@ -164,14 +180,14 @@ namespace TaimisToolbench.Services
         // LabelHelpers.CreateRowDivider's proven-immune list.
         public const int DisciplineRowHeight = 36;
 
-        // Same flush fit as UsedMaterialRowHeight/ShoppingRowHeight:
-        // tier-2 icon frame (y=0) + divider + the clearance pixel (45).
+        // The same padded shape as UsedMaterialRowHeight and
+        // ShoppingRowHeight.
         //
         // EVERY recipe row, since the discipline became a column
         // (Services/RecipesColumnMath) rather than a second line under the
         // name. The 48px twin this section used to need for a sublabel row
         // is gone with the sublabel.
-        public const int RecipeRowHeight = RowIconFrameSize + RowDividerHeight + IconRowDividerClearance;
+        public const int RecipeRowHeight = IconLedRowHeight;
 
         // Reserved height of a formula band's amount run: the taller of the
         // amount text's own line box (Regular16, 20 - TypeRampMetrics) and

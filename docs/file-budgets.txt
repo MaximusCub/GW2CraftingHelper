@@ -82,7 +82,7 @@ Models/UsedMaterial.cs                                                          
 Models/VendorItemCostLine.cs                                                            42
 Models/VendorOffer.cs                                                                   73
 Models/VendorOfferDataset.cs                                                            15
-Module.cs                                                                               2869
+Module.cs                                                                               2872
 Properties/AssemblyInfo.cs                                                              12
 Services/AboutLayoutMath.cs                                                             163
 Services/AccountCurrencyIndex.cs                                                        44
@@ -129,7 +129,7 @@ Services/IMysticForgeRecipeSource.cs                                            
 Services/IPriceApiClient.cs                                                             47
 Services/IRecipeApiClient.cs                                                            100
 Services/IconFrameGeometry.cs                                                           90
-Services/InlineSpinnerLayout.cs                                                         72
+Services/InlineSpinnerLayout.cs                                                         81
 Services/InventoryReducer.cs                                                            383
 Services/ItemDescriptionSanitizer.cs                                                    204
 Services/ItemIconTiers.cs                                                               180
@@ -234,7 +234,7 @@ Services/SnapshotFailureClassification.cs                                       
 Services/SnapshotFailureClassifier.cs                                                   143
 Services/SnapshotFailureKind.cs                                                         50
 Services/SnapshotFetchFailedException.cs                                                69
-Services/SnapshotHeaderLayout.cs                                                        205
+Services/SnapshotHeaderLayout.cs                                                        209
 Services/SnapshotHelpers.cs                                                             79
 Services/SnapshotItemGridLayout.cs                                                      250
 Services/SnapshotRefreshSlot.cs                                                         93
@@ -291,7 +291,7 @@ Views/ItemInputRowStrip.cs                                                      
 Views/ItemRowState.cs                                                                   39
 Views/LogTabContent.cs                                                                  1538
 Views/MainThreadMarshal.cs                                                              141
-Views/MainView.cs                                                                       2896
+Views/MainView.cs                                                                       2958
 Views/DialogWindow.cs                                                                   108
 Views/ModalBackdrop.cs                                                                  132
 Views/ModalDialog.cs                                                                    425
@@ -463,7 +463,7 @@ tests/TaimisToolbench.Tests/Services/PillSubduingEvaluatorTests.cs              
 tests/TaimisToolbench.Tests/Services/PillSubduingTooltipBuilderTests.cs                 130
 tests/TaimisToolbench.Tests/Services/PillTooltipTextComposerTests.cs                    306
 tests/TaimisToolbench.Tests/Services/PlanCompatibilityFixtureTests.cs                   371
-tests/TaimisToolbench.Tests/Services/PlanContentHeightMathTests.cs                      625
+tests/TaimisToolbench.Tests/Services/PlanContentHeightMathTests.cs                      628
 tests/TaimisToolbench.Tests/Services/PlanHistoryBlobStoreTests.cs                       324
 tests/TaimisToolbench.Tests/Services/PlanHistoryDedupKeyTests.cs                        94
 tests/TaimisToolbench.Tests/Services/PlanHistoryLabelsTests.cs                          138

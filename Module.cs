@@ -930,9 +930,12 @@ namespace TaimisToolbench
                 // session cache WarmCurrencyMetadataForSettings fills, so
                 // the description arrives without a second fetch.
                 _currencyMetadataService.GetCached,
-                // The socketed runes, sigils and infusions a snapshot row
-                // can name are components no plan ever asks for, so this
-                // tab is the only place that fetches them.
+                // A snapshot item's stat block has no other source: the
+                // capture reads name, icon and rarity out of Gw2Sharp and
+                // keeps nothing else, and the socketed runes, sigils and
+                // infusions a row can name are components no plan ever
+                // asks for. Without this the tab shows an identity-only
+                // tooltip for every item no plan happened to touch.
                 _warmItemStatsAsync
             );
 
@@ -1182,10 +1185,10 @@ namespace TaimisToolbench
             _mainWindow.Tabs.Add(new Tab(
                 AsyncTexture2D.FromAssetId(156699),
                 () => new ViewAdapter(
-                    "Snapshot",
+                    "Account Snapshot",
                     c => _snapshotContent.Build(c),
                     b => _snapshotContent.BuildHeaderActions(b)),
-                "Snapshot"));
+                "Account Snapshot"));
 
             _rankerContent = new RankerTabContent(
                 _craftingPipeline,

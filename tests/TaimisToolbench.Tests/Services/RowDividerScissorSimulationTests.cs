@@ -231,15 +231,27 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
-        public void FlushFitRowsKeepTheDividerClearOfTheIconFrame()
+        public void IconLedRowsKeepEqualPaddingAroundTheIconFrame()
         {
-            // The clearance pixel lives in the HEIGHT, not under the icon:
-            // at the flush heights the divider's top must land exactly at
-            // the icon frame's bottom edge - one pixel less height would
-            // slide the divider under the icon, one more would open a gap.
-            int dividerTop = PlanContentHeightMath.UsedMaterialRowHeight
-                - DividerHeight - PlanContentHeightMath.IconRowDividerClearance;
-            Assert.Equal(PlanContentHeightMath.RowIconFrameSize, dividerTop);
+            // Reported in game: the rows used to be flush, so the icon
+            // frame's bottom border and the divider's top edge shared a y.
+            // The gap a reader sees above the frame and the gap below it
+            // must both be IconRowFramePadding - which is why the icon's y
+            // is one LESS than the padding, the row above ending on its own
+            // clearance pixel.
+            int rowHeight = PlanContentHeightMath.UsedMaterialRowHeight;
+            int iconTop = PlanContentHeightMath.IconRowIconY;
+            int iconBottom = iconTop + PlanContentHeightMath.RowIconFrameSize;
+            int dividerTop = rowHeight - DividerHeight
+                - PlanContentHeightMath.IconRowDividerClearance;
+
+            Assert.Equal(PlanContentHeightMath.IconRowFramePadding, dividerTop - iconBottom);
+
+            // The next row's icon against the divider this row just drew.
+            int previousDividerBottom = dividerTop + DividerHeight;
+            Assert.Equal(
+                PlanContentHeightMath.IconRowFramePadding,
+                (rowHeight + iconTop) - previousDividerBottom);
         }
     }
 }
