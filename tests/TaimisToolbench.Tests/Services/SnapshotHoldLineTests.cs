@@ -193,6 +193,42 @@ namespace TaimisToolbench.Tests.Services
         }
 
         [Fact]
+        public void TwoUnrecognizedKeysAreBothNamed()
+        {
+            var line = SnapshotHoldLine.Format(new List<SnapshotHoldLocation>
+            {
+                SnapshotHoldLine.FromSource("FutureVault", 1),
+                SnapshotHoldLine.FromSource("FutureLocker", 1),
+            });
+
+            Assert.Equal("FutureVault  FutureLocker", line);
+        }
+
+        [Fact]
+        public void TwoUnrecognizedKeysEachPrintTheirOwnCount()
+        {
+            var line = SnapshotHoldLine.Format(new List<SnapshotHoldLocation>
+            {
+                SnapshotHoldLine.FromSource("FutureVault", 1),
+                SnapshotHoldLine.FromSource("FutureLocker", 2),
+            });
+
+            Assert.Equal("FutureVault: 1  FutureLocker: 2", line);
+        }
+
+        [Fact]
+        public void UnrecognizedKeysReadAfterEveryKnownPlace()
+        {
+            var line = SnapshotHoldLine.Format(new List<SnapshotHoldLocation>
+            {
+                SnapshotHoldLine.FromSource("FutureVault", 1),
+                SnapshotHoldLine.FromSource(AccountItemIndex.SourceBank, 1),
+            });
+
+            Assert.Equal("Bank  FutureVault", line);
+        }
+
+        [Fact]
         public void ANullKeyReadsAsUnknownAndNeverThrows()
         {
             var location = SnapshotHoldLine.FromSource(null, 1);
