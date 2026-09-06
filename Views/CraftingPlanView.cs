@@ -1261,7 +1261,10 @@ namespace TaimisToolbench.Views
         // Section anchor keys are per PlanSectionType (one section, one
         // key); tree rows key off the solver NodeId the row draws - the
         // same identity TreeSectionController's own in-place row pairing
-        // already treats as stable across a re-solve.
+        // already treats as stable across a re-solve. The Total Cost
+        // table's own row and group-heading keys are built in
+        // Services/SummarySectionLayoutMath, which is Blish-free and so
+        // can be tested.
         internal static string SectionAnchorKey(PlanSectionType sectionKey)
         {
             return "section:" + sectionKey;
@@ -4953,7 +4956,7 @@ namespace TaimisToolbench.Views
                     // Row rendering (the cost-tile row, the
                     // MultiItemNote banner, and the per-currency rows) moved
                     // to Views/Rendering/SummarySectionRenderer.
-                    new SummarySectionRenderer(this, _getItemStatBlock)
+                    new SummarySectionRenderer(this, _getItemStatBlock, RegisterScrollAnchor)
                         .Render(section, contentFlow, panelWidth);
                     break;
                 case PlanSectionType.UsedMaterials:

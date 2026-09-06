@@ -411,6 +411,17 @@ namespace TaimisToolbench.Models
         // populated for both kinds. False on every other row.
         public bool IsBarterItemCost { get; set; }
 
+        // Identity of one CurrencyCost row, stable across a re-solve: the
+        // row's id with the id space it came from written into the string.
+        // The id space has to be part of it, because a wallet currency id
+        // and an item id are different spaces over the same numbers - id
+        // 24 is both a real item and the currency "Pristine Fractal
+        // Relics". Null on every other row type. Never displayed (repo
+        // invariant: ids are internal-only); the scroll anchor registry
+        // keys the row's control by it, so a rebuilt table's row takes
+        // over from the disposed one it stands in for.
+        public string NonCoinCostKey { get; set; }
+
         // User-mandated mouseover
         // tooltips: the exact-meaning tooltip text for a CostFormulaTile/
         // ProfitFormulaTile row's header caption. Set directly on the
