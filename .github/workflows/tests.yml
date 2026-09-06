@@ -849,6 +849,40 @@ jobs:
           print('The Total Cost table still registers its scroll anchors.')
           PY
 
+      - name: The snapshot coin row seats its digits on the caption baseline
+        shell: bash
+        run: |
+          # MainView is Blish-bound, so CoinSegmentMathTests reproduces this
+          # expression and the caption y it reads instead of calling it.
+          # That makes the test a mirror: change the view alone and it stays
+          # green. Until the seat moves into a Blish-free class the test can
+          # call, this step is what fails on that change.
+          python3 - <<'PY'
+          import sys
+
+          view = ''.join(open('Views/MainView.cs', encoding='utf-8').read().split())
+          fail = []
+
+          if 'privateconstintCoinCaptionY=2;' not in view:
+              fail.append(
+                  'MainView.CoinCaptionY is no longer 2. CoinSegmentMathTests carries '
+                  'that number as its own CaptionY constant; update it too.')
+
+          seat = ('intdigitY=TypeRampMetrics.BaselineAlignedY(TypeRampMetrics.CoinDigitInk,'
+                  'CoinCaptionY+TypeRampMetrics.BodyInk.BaselineY);')
+          if seat not in view:
+              fail.append(
+                  'MainView no longer seats the coin digits with BaselineAlignedY over '
+                  'CoinDigitInk and the caption baseline. CoinSegmentMathTests.'
+                  'TheCoinSeat_HoldsItsRow_WhenTheDigitsDropOneRampStep reproduces that '
+                  'expression; update it too.')
+
+          if fail:
+              print('\n'.join(fail))
+              sys.exit(1)
+          print('The coin row seat still matches the one CoinSegmentMathTests pins.')
+          PY
+
       - name: Module source cites no out-of-repo spec sections
         shell: bash
         run: |
