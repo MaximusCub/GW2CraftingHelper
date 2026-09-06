@@ -263,7 +263,7 @@ Services/TransmutedNameIndex.cs                                                 
 Services/UiGlyphs.cs                                                                    124
 Services/GlyphFontDescriptor.cs                                                         316
 Services/TextWrapMath.cs                                                                324
-Services/TooltipContent.cs                                                              687
+Services/TooltipContent.cs                                                              701
 Services/TooltipLayoutMath.cs                                                           549
 Services/TooltipTextFormat.cs                                                           136
 Services/TopRegionLayoutMath.cs                                                         116
@@ -588,7 +588,7 @@ tests/TaimisToolbench.Tests/Services/GlyphButtonMetricsTests.cs                 
 tests/TaimisToolbench.Tests/Services/GlyphFontDescriptorTests.cs                        332
 tests/TaimisToolbench.Tests/Services/TextWrapMathTests.cs                               297
 tests/TaimisToolbench.Tests/Services/TooltipComposerContentTests.cs                     215
-tests/TaimisToolbench.Tests/Services/TooltipContentTests.cs                             180
+tests/TaimisToolbench.Tests/Services/TooltipContentTests.cs                             208
 tests/TaimisToolbench.Tests/Services/TooltipLayoutMathTests.cs                          729
 tests/TaimisToolbench.Tests/Services/TooltipSpanRoleTests.cs                            108
 tests/TaimisToolbench.Tests/Services/TooltipTextFormatTests.cs                          138
