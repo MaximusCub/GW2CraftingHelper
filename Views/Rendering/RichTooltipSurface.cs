@@ -557,10 +557,13 @@ namespace TaimisToolbench.Views.Rendering
                 case TooltipSpanRole.Bonus:
                     return new Color(85, 153, 255);
 
-                // A tier above the wearer's equipped count. Unreachable
-                // today - see TooltipSpanRole.BonusInactive.
+                // #AAA - a tier above the wearer's equipped count. MEASURED
+                // on a rune socketed at (0/4): the four bonus lines are
+                // neutral grey with a hard ceiling at 170-176 where the
+                // white lines of the same capture reach 255. The earlier
+                // 150 was a guess made while the role was unreachable.
                 case TooltipSpanRole.BonusInactive:
-                    return new Color(150, 150, 150);
+                    return new Color(170, 170, 170);
 
                 // #9ED - MEASURED saturating peak (p95 == max ==
                 // (153,238,221)) on three independent live3 flavour runs:

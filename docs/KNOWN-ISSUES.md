@@ -725,12 +725,27 @@ slot line, and prints upgrade slots, which it never did before: /v2/items
 has no upgrade-slot field, so the count comes from the item's type and its
 `NotUpgradeable` flag (`Services/ItemSlotFacts.cs`).
 
-The distinction that DOES hold is about the player's own copy. An item a
-player owns can have things socketed in it, and the account endpoints
-report that per stack: `Gw2Sharp.AccountItem` exposes `Upgrades` and
-`Infusions`. `Services/Gw2AccountSnapshotService.cs` reads neither today,
-taking only ids and counts, so the module cannot show a player's own
-sigils and infusions. That is a separate change and is not started.
+**Follow-up (PARTLY FIXED): what is socketed is no longer unknowable.** The
+record above lists "what is actually socketed in the player's copy" among
+the things the API cannot tell us. That was true of `/v2/items`, which
+describes a definition, and false of `/v2/account/*`, which reports
+`upgrades` and `infusions` per owned stack. The Snapshot tab now names the
+runes, sigils, infusions and enrichments in a stack it holds, each with its
+own icon and effect text. A socketed component spends the definition's slot
+of its own kind, so only the slots left over print an unused-slot line. An
+item id whose stacks disagree reports nothing rather than one stack's
+reading, because a Snapshot row sums every stack of an id.
+
+Two residuals, both wanting character equipment the module does not fetch.
+First, the `(n/m)` set counter the game prints beside a socketed rune: the
+denominator is `details.bonuses.length` and is known, but the numerator is
+how many pieces of that set are equipped on the character being played, so
+no honest number exists here and none is printed. Second, and following
+from it, every tier of a socketed rune's ladder renders inactive - true of
+the piece itself, which is by construction not equipped, and a divergence
+from the game whenever the same rune is worn elsewhere. Both close together
+if a snapshot ever reads `/v2/characters/:id/equipment`, which returns the
+same `upgrades` and `infusions` arrays per slot.
 
 ### 43. Tooltip text wrapping and Blish's 500px cap (audit batches A+B+C)
 
